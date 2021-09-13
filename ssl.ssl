@@ -1,0 +1,746 @@
+title: 'SSL Translator 1.2.3 -- Mar 26 ''91';
+%
+%  ssl.ssl
+%
+%  Amiga Syntax/Semantic Language Processor
+%
+%  HISTORY
+%    31Aug89   Translated from my SSL processor hardcoded in C
+%    08Sep89   SSL processor now functional, except for error recovery
+%    18Oct89   Added 'title' section
+%    03Feb90   Change to ssl.c: Added debugger output
+%    20Mar91   Change to ssl.c: Increased string table size
+%    26Mar91   Fixed bug in handling of statement ">>value".
+%              Fixed bug in handling of choice using a choice rule defined later
+%
+%  BUGS:
+%    28Jan90   Doesn't complain if functions called but never declared!	
+%
+%  NOTES:
+%   1) 'Kind' always means identifier kind (type, val, etc), not token kind.
+%      The phrase identKind is not used.
+%   2) Emitted values are written into a table rather than a file.
+%      The semantic mechanism Patch is able to modify values that have been
+%      previously emitted (i.e. labels).
+%   3) All mechanisms have hardcoded initialization routines which
+%      don't have to be listed here.  For example, stack pointers are
+%      set to 0, the symbol table is initialized with the predefined
+%      names, and so on.
+%   4) The scanner/screener maintains an identifier table, with extra
+%      fields set aside for this processor access via the Ident mechanism.
+%      There is no separate symbol table.
+%   5) Information on the 'last ident read' is valid until another ident
+%      is read.
+%   6) The base counter in the count stack counts semantic operations.
+%   7) When a new identifier is added to the table by the scanner,
+%      it is given a default kind kUnknown.
+%   8) Stack entries that are read by an operation are left there,
+%      unless the operation contains the word 'Pop'.
+%      The emit statement never pops stack entries (i.e. .iConstant
+%      emits the value on the value stack, but does not pop it.)
+%
+
+input:
+   pIdent
+   pIntLit
+   pStrLit
+   pEquals     '='
+   pColon      ':'
+   pSemiColon  ';'
+   pComma      ','
+   pLParen     '('
+   pRParen     ')'
+   pReturn     '>>'
+   pBreak      '>'
+   pLCurly     '{'
+   pRCurly     '}'
+   pLSquare    '['
+   pRSquare    ']'
+   pBar        '|'
+   pCall       '@'
+   pEmit       '.'
+   pStar       '*'
+   pErr        '#'
+   pQuestion   '?'
+   pEof
+   pInvalid
+
+%  keywords
+
+   pTitle
+   pInput
+   pOutput
+   pType
+   pError
+   pMechanism
+   pRules
+   pEnd;
+
+
+output:
+
+%  codes for SSL machine instructions
+
+   iJumpForward
+   iJumpBack
+   iInput
+   iInputAny
+   iEmit
+   iError
+   iInputChoice
+   iCall
+   iReturn
+   iSetResult
+   iChoice
+   iEndChoice
+   iSetParameter
+
+%  other output
+
+   iSpace           % emit a dummy value; a value will be patched here later
+   iConstant        % emit the value on the value stack
+   iIdentVal        % emit the value of the last ident
+   iIdentISVal;     % emit the value of the ident on the ident stack
+
+error:
+   eMissingProgramBlock
+   eMissingEnd
+   eWrongType
+   eNoShortFormHere
+   eNotAType
+   eNotAVal
+   eNotInput
+   eNotOutput
+   eNotARule
+   eNotOpRule
+   eUndeclaredIdent
+   eBadStatement
+   eNotAnErrSig
+   eNotInLoop
+   eNotChoice     % rule or op
+   eChoiceRuleOutOfPlace
+   eChoiceOpOutOfPlace;
+
+type boolean:
+   false    = 0
+   true     = 1;
+
+type number:
+   zero            = 0
+   one             = 1
+   numberSystemOps = 13;   % # for the first user operation
+
+type kind:
+   kIllegal        % not an identifier
+   kUnknown        % new identifier
+   kInput
+   kOutput
+   kError
+   kType
+   kVal            % an element of a type
+   kMech
+   kOp
+   kRule;
+
+mechanism count:
+   oCountPush(number)        % push a new counter, with initial value
+   oCountPushIntLit          % push value of integer just read
+   oCountPop                 % discard counter
+   oCountInc
+   oCountDec
+   oCountZero >> boolean;    % is the top counter 0?
+
+mechanism value:                     % multi-purpose stack
+   oValuePushKind(kind)              % push a kind value
+   oValuePushVal                     % push value of last ident read
+   oValuePushISVal                   % value of ident on ident stack
+   oValuePushIdent                   % push ident# of last ident read
+   oValuePushType                    % push type of last ident read
+   oValueChooseKind >> kind          % kind on top of stack
+   oValuePushCount                   % value on top of count stack
+   oValueSwap                        % swap top two elements
+   oValuePop;
+
+% keep different patch stacks, each with a stack of position markers:
+
+type patchStack:
+   patchChoiceTableAddr    % addr where pointer to table is stored
+   patchChoiceTable        % build up choice table here (value,addr)
+   patchChoiceExit         % addrs where jumps at end of each option are
+   patchCall               % (addr,ident) where calls to undefined rules are
+   patchLoop               % addr of start of a loop
+   patchBreak;             % addrs where jumps out of a loop are
+
+mechanism patch:
+   oPatchMark(patchStack)             % mark current position on a stack
+   oPatchAtMark(patchStack) >> boolean     % true if all items since
+                                           %   last mark are popped
+                                           %   (mark is dropped if true)
+   oPatchPushHere(patchStack)         % put current address on a patch stack
+   oPatchPushIdent(patchStack)        % put last ident on a patch stack
+   oPatchPushValue(patchStack)        % push value on value stack
+   oPatchAnyEntries(patchStack) >> boolean    % are there any entries?
+   oPatchPopFwd(patchStack)           % fix table, storing here-x at x,
+                                      %   where x is on top of the stack
+   oPatchPopBack(patchStack)          % emit here-x here (advance 'here')
+   oPatchPopValue(patchStack)         % emit x here (advance 'here')
+   oPatchPopCall(patchStack);         % fix table, storing value of ident i
+                                      %   at x, where i is on top of stack
+                                      %   and x is under it  (pop both)
+mechanism shortForm:   % keep a table of string shortforms for input/output
+   oShortFormAdd       % add current StrLit token, with last ident read
+   oShortFormLookup;   % look up strLit, push equiv ident on ident stack
+
+mechanism ident:
+
+   % these work on the last ident read:
+
+   oIdentSetDeclared         % declared = true  (err if was already true)
+   oIdentSetKind(kind)       % kind = kind specified
+   oIdentSetKindVS           % kind = kind on value stack
+   oIdentSetType             % type = type on value stack
+   oIdentSetValCount         % val = integer on count stack
+   oIdentSetValHere          % val = current address
+   oIdentSetChoice(boolean)  % choice flag = true/false
+   oIdentChooseKind >> kind  % returns the kind of the last ident
+   oIdentChooseParam >> boolean
+   oIdentChooseChoice >> boolean
+   oIdentChooseDeclared >> boolean
+   oIdentMatchType >> boolean  % does the type of the last ident equal
+                               %   the type of the ident on the IS stack?
+   oIdentMatchParamType >> boolean  % does the type of the last ident equal
+                                    %   the param type of the ident on IS?
+
+   % these maintain an ident stack (IS) to be used with the ops below:
+   %   (and some ops in other mechanisms)
+
+   oIdentISPush                  % remember index of last ident read
+   oIdentISPushBottom            % push id in bottom of IS to top (kludge to get rule type)
+   oIdentISPop                   % drop top stack entry
+
+   % these work on the ident whose index is on top of the ident stack:
+
+   oIdentSetISParamType          % sets the param type from the value stack
+   oIdentSetISParam              % sets the param flag
+   oIdentSetISChoice(boolean)    % sets the choice flag
+   oIdentSetISType               % sets the rule/op type from the value stack
+   oIdentChooseISKind >> kind    % returns the ident's kind
+   oIdentChooseISChoice >> boolean
+   oIdentChooseISParam >> boolean
+   oIdentMatchISType >> boolean; % do the types of the top 2 idents match?
+
+mechanism titleMech:
+   oTitleSet;          % define title to be strlit just read
+
+mechanism doc:         % display documentary info
+   oDocNewRule         % print "Rule <token>"
+   oDocCheckpoint;     % display current pc value, for debugging
+
+
+rules
+
+ProcessSSL:
+   oCountPush(numberSystemOps)     % this counter is used to
+                                    %   give code #'s to semantic operations
+   {[
+      | pTitle :
+         ':'
+         pStrLit
+         oTitleSet
+         ';'
+      | pInput :
+         oValuePushKind(kInput)
+         @ReadIdList
+         oValuePop
+      | pOutput :
+         oValuePushKind(kOutput)
+         @ReadIdList
+         oValuePop
+      | pError :
+         oValuePushKind(kError)
+         @ReadIdList
+         oValuePop
+      | pType :
+         pIdent
+         oIdentSetDeclared
+         oIdentSetKind(kType)
+         oValuePushIdent          % type #
+         oIdentSetType            % record it in itself
+         oValuePushIdent          % type #, for following values
+         oValuePushKind(kVal)
+         @ReadIdList
+         oValuePop
+         oValuePop
+      | pMechanism :
+         pIdent
+         oIdentSetDeclared
+         oIdentSetKind(kMech)
+         ':'
+         {[
+            | pIdent :
+               @OpDefinition
+            | * :
+               >
+         ]}
+         ';'
+      | pRules :
+         {[
+            | pIdent :
+               oDocNewRule
+               @RuleDefinition
+            | pEnd :
+               >
+         ]}
+      | pEof :
+         >
+      | * :
+         #eMissingProgramBlock
+         ?      % skip token, try again
+   ]}
+   @FixForwardCalls
+   oCountPop;
+
+ReadIdList:
+   ':'
+   oCountPush(zero)
+   {[
+      | pIdent :
+         oIdentSetDeclared
+         oIdentSetKindVS            % from kind on value stack
+         [ oValueChooseKind
+            | kVal :
+                oValueSwap         % type # to top
+                oIdentSetType
+                oValueSwap
+            | * :
+         ]
+         [
+            | pStrLit :
+               [ oValueChooseKind
+                  | kInput, kOutput :
+                     oShortFormAdd
+                  | * :
+                     #eNoShortFormHere
+                     ?
+               ]
+            | * :
+         ]
+         [
+            | '=' :
+               pIntLit
+               oCountPop          % replace counter with new integer
+               oCountPushIntLit
+            | * :
+         ]
+         oIdentSetValCount   % set value from count stack
+         oCountInc
+      | * :
+         >
+   ]}
+   oCountPop
+   ';';
+
+
+OpDefinition:
+   oIdentSetDeclared
+   oIdentISPush          % remember ident, to set types
+   oIdentSetKind(kOp)
+   oIdentSetValCount     % store operation# from counter
+   oCountInc
+   [
+      | '(' :
+         pIdent
+         [ oIdentChooseKind
+            | kType :
+               oValuePushIdent
+               oIdentSetISParamType
+               oValuePop
+               oIdentSetISParam
+            | * :
+               #eNotAType
+         ]
+         ')'
+      | * :
+   ]
+   [
+      | '>>' :
+         oIdentSetISChoice(true)
+         pIdent
+         [ oIdentChooseKind
+            | kType :
+               oValuePushIdent
+               oIdentSetISType
+               oValuePop
+            | * :
+               #eNotAType
+         ]
+      | * :
+         oIdentSetISChoice(false)
+   ]
+   oIdentISPop;
+
+
+RuleDefinition:
+   oIdentISPush          % remember rule ident throughout.  IT WILL SIT ON
+                         % BOTTOM OF IS STACK (choice rules will push above it)
+                         % (access from bottom is a kludge... should use a
+                         % separate stack to remember the rule id)
+   oIdentSetDeclared
+   oIdentSetKind(kRule)
+   oIdentSetValHere      % address = here
+   [
+      | '>>' :
+         oIdentSetChoice(true)
+         pIdent
+         [ oIdentChooseKind
+            | kType :
+               oValuePushIdent
+               oIdentSetISType
+               oValuePop
+            | * :
+               #eNotAType
+         ]
+      | * :
+         oIdentSetChoice(false)
+   ]
+   ':'
+   {[
+      | ';' :
+         >
+      | * :
+         @Statement
+   ]}
+   .iReturn
+   oIdentISPop;
+
+
+Statement:
+   [
+      | pStrLit :
+         oShortFormLookup       % push index of equivalent ident
+         @InputOrOpPop          % actually, should only be input
+      | pIdent :
+         oIdentISPush
+         @InputOrOpPop
+      | pErr :
+         pIdent
+         [ oIdentChooseKind
+            | kError :
+               .iError
+               .iIdentVal
+            | * :
+               #eNotAnErrSig
+         ]
+      | pEmit :
+         [
+            | pIdent :
+               oIdentISPush
+            | pStrLit :
+               oShortFormLookup   % push ident on IS stack
+         ]
+         [ oIdentChooseISKind
+            | kOutput :
+               .iEmit
+               .iIdentISVal
+            | * :
+               #eNotOutput
+         ]
+         oIdentISPop
+      | pCall :
+         pIdent
+         [ oIdentChooseDeclared
+            | true :
+               [ oIdentChooseKind
+                  | kRule :
+                     [ oIdentChooseChoice
+                        | false :
+                           .iCall
+                           .iIdentVal
+                        | true :
+                           #eChoiceRuleOutOfPlace
+                     ]
+                  | * :
+                     #eNotARule
+               ]
+            | false :                 % rule used before declared
+               oIdentSetKind(kRule)   % don't set declared flag yet
+               .iCall
+               oPatchPushHere(patchCall)    % fix up at end
+               oPatchPushIdent(patchCall)
+               .iSpace
+         ]
+      | pReturn :
+         oIdentISPushBottom     % check type of current rule (bottom of IS)
+         [ oIdentChooseISChoice
+            | true :
+               pIdent
+               [ oIdentChooseKind
+                  | kVal :
+                     [ oIdentMatchType
+                        | true :
+                           .iSetResult
+                           .iIdentVal
+                        | false :
+                           #eWrongType
+                     ]
+                  | * :
+                     #eWrongType
+               ]
+            | false :
+         ]
+         oIdentISPop
+         .iReturn
+      | pLCurly :
+         oPatchPushHere(patchLoop)   % remember start of loop
+         oPatchMark(patchBreak)
+         {[
+            | pRCurly :    % *** WAS *** '}' :
+               >
+            | * :
+               @Statement
+         ]}
+         .iJumpBack
+         oPatchPopBack(patchLoop)
+         {[ oPatchAtMark(patchBreak)      % fix up break statements
+            | false :
+               oPatchPopFwd(patchBreak)
+            | true :
+               >
+         ]}
+      | pBreak :
+         [ oPatchAnyEntries(patchLoop)
+            | true :
+               .iJumpForward
+               oPatchPushHere(patchBreak)
+               .iSpace
+            | false :
+               #eNotInLoop
+         ]
+      | pLSquare :
+         @Choice
+      | pQuestion :
+         .iInputAny
+      | * :
+         #eBadStatement
+         ?
+   ];
+
+InputOrOpPop:        % ident is on ident stack (pop when done)
+   [ oIdentChooseISKind
+      | kInput :
+         .iInput
+         .iIdentISVal
+      | kOp :
+         @CallOp
+         [ oIdentChooseISChoice
+            | true :
+               #eChoiceOpOutOfPlace
+            | * :
+         ]
+      | kUnknown :
+         #eUndeclaredIdent
+      | * :
+         #eNotOpRule
+   ]
+   oIdentISPop;
+
+CallOp:                  % op ident on ident stack
+   [ oIdentChooseISParam
+      | true :
+         '('
+         pIdent
+         [ oIdentChooseKind
+            | kVal :
+               [ oIdentMatchParamType
+                  | true :
+                     .iSetParameter
+                     .iIdentVal
+                  | false :
+                     #eWrongType
+               ]
+            | * :
+               #eWrongType
+         ]
+         ')'
+      | * :
+   ]
+   .iIdentISVal;     % operation #
+
+
+Choice:
+   [
+      | pIdent :                     % rule/op choice
+         oIdentISPush                % remember type of options
+         [ oIdentChooseDeclared
+            | true :
+               [ oIdentChooseKind
+                  | kRule :
+                     .iCall
+                     .iIdentVal
+                  | kOp :
+                     @CallOp
+                  | * :
+                     #eNotOpRule
+               ]
+               [ oIdentChooseISChoice
+                  | false :
+                     #eNotChoice
+                  | * :
+               ]
+               oValuePushKind(kType)  % flag that IS has option type
+            | false :                 % rule used before declared
+               oIdentSetKind(kRule)   % don't set declared flag yet
+               .iCall
+               oPatchPushHere(patchCall)    % fix up call at end
+               oPatchPushIdent(patchCall)
+               .iSpace
+               oValuePushKind(kUnknown)  % flag that option type unknown
+         ]
+         .iChoice
+      | * :
+         oValuePushKind(kInput)  % flag that options should be input tokens
+         oIdentISPush            % DUMMY: push entry so can pop later
+         .iInputChoice           %        regardless of input/rule choice
+   ]
+   oPatchPushHere(patchChoiceTableAddr)  % addr of table will go here
+   .iSpace
+   oPatchMark(patchChoiceTable)    % build up choice table in this stack
+   oPatchMark(patchChoiceExit)     % remember ends of each option
+   oCountPush(zero)                % count the options
+   '|'
+   {
+      [
+         | '*' :       % default code (must be last option)
+            ':'
+            @CopyChoiceTable
+            oCountPop
+            oValuePop
+            oIdentISPop
+            {[
+               | ']' :
+                  >
+               | * :
+                  @Statement
+            ]}
+            @FixChoiceExits
+            >>
+         | * :         % option(s)
+            {
+               [ oValueChooseKind
+                  | kType :           % rule/op choice
+                     pIdent
+                     [ oIdentChooseKind
+                        | kVal :
+                           [ oIdentMatchType
+                              | false :
+                                 #eWrongType
+                              | * :
+                           ]
+                        | * :
+                           #eNotAVal
+                     ]
+                     oValuePushVal    % value# of option
+                  | kUnknown :        % rule, not yet defined
+                     pIdent
+                     [ oIdentChooseKind
+                        | kVal :
+                           oValuePushType   % now know type of rule
+                           oIdentSetISType
+                           oValuePop
+                           oValuePop        % replace flag
+                           oValuePushKind(kType)   % flag that IS has type
+                        | * :
+                           #eNotAVal
+                     ]
+                     oValuePushVal    % value# of option
+                  | kInput :
+                     [
+                        | pIdent :
+                           oIdentISPush
+                        | pStrLit :
+                           oShortFormLookup
+                     ]
+                     [ oIdentChooseISKind
+                        | kInput :
+                        | * :
+                           #eNotInput
+                     ]
+                     oValuePushISVal  % value# of option
+                     oIdentISPop
+               ]
+               % value of option is now on value stack
+               oPatchPushHere(patchChoiceTable)
+               oPatchPushValue(patchChoiceTable)  % build choice table
+               oValuePop
+               oCountInc
+               [
+                  | ':' :
+                     >
+                  | ',' :   % go around and get another
+               ]
+            }
+      ]
+
+      % code for option:
+
+      {[
+         | '|' :      % more options follow
+            .iJumpForward
+            oPatchPushHere(patchChoiceExit)
+            .iSpace
+            >
+         | ']' :      % end of choice, no default
+            .iJumpForward
+            oPatchPushHere(patchChoiceExit)
+            .iSpace
+            @CopyChoiceTable
+            oCountPop      % #options
+            oValuePop      % flag: input/rule choice
+            oIdentISPop    % type of rule choice (dummy if input choice)
+            .iEndChoice
+            @FixChoiceExits
+            >>
+         | * :
+            @Statement
+      ]}
+   };
+
+
+% Install choice table here. #options is in top counter.
+% Note, the order of the options is opposite that in the source file.
+% So, in error recovery in a choice with no otherwise, take the
+% option just before the oEndChoice.
+
+CopyChoiceTable:
+   oPatchPopFwd(patchChoiceTableAddr)   % fix pointer to table
+   oValuePushCount   % #entries
+   .iConstant        % emit value
+   oValuePop
+   {[ oPatchAtMark(patchChoiceTable)
+      | true :
+         >
+      | * :
+         oPatchPopValue(patchChoiceTable)
+         oPatchPopBack(patchChoiceTable)
+   ]};
+
+
+FixChoiceExits:
+   {[ oPatchAtMark(patchChoiceExit)     % fix jumps from end of each option
+      | false :                         %    to end of the choice
+         oPatchPopFwd(patchChoiceExit)
+      | * :
+         >
+   ]};
+
+FixForwardCalls:
+   {[ oPatchAnyEntries(patchCall)
+      | true :
+         oPatchPopCall(patchCall)
+      | * :
+         >
+   ]};
+
+
+end
+
