@@ -1,0 +1,15 @@
+
+My Pascal compiler project, Sept 1989 - Nov 1990.
+
+Requires ssl compiler (one of my other compiler projects),
+to translate pascal.ssl into pascal.tbl / pascal.h
+
+I don't find a Makefile!  Maybe I lost it?
+The "do" script compiles the *.c files, but not the ssl, and doesn't name the execs as required.
+
+The "pas" script runs the two phases of the compiler:
+  - pascal <source.pas>  generates intermediate file a.out
+  - sm a.out   interprets the intermediate code, with a stack machine.
+
+The *.pas files are unit tests. It looks like I didn't keep their outputs.
+

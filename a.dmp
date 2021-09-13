@@ -1,0 +1,31 @@
+   0	tPushAddr	   4
+   2	tPushIntLit	 -27
+   4	tAssignInt
+   5	tPushAddr	   2
+   7	tPushIntLit	   1
+   9	tAssignInt
+  10	tPushIntVar	   2
+  12	tPushIntLit	  10
+  14	tLessEqualInt
+  15	tJumpFalse	  48
+  17	tPushAddr	   3
+  19	tPushIntVar	   2
+  21	tPushIntLit	   5
+  23	tMultiplyInt
+  24	tAssignInt
+  25	tPushIntVar	   4
+  27	tPutInt
+  28	tPushIntVar	   3
+  30	tPutInt
+  31	tPushIntVar	   4
+  33	tPushIntVar	   3
+  35	tAddInt
+  36	tPutInt
+  37	tPutCR
+  38	tPushAddr	   2
+  40	tPushIntVar	   2
+  42	tPushIntLit	   1
+  44	tAddInt
+  45	tAssignInt
+  46	tJump   	  10
+  48	tReturn

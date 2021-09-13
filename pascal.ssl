@@ -1,0 +1,1189 @@
+title: 'Pascal Compiler 1.1.5 -- Jan 01 ''90';
+%
+%  Pascal.ssl
+%
+%  Pascal Compiler for the Amiga, by Steve Rice.
+%
+%  HISTORY
+%    11Sep89   First version, framework of parser.
+%    18Sep89   Added some semantic mechanisms.
+%    21Sep89   Added simple type references; expressions generate code.
+%    22Sep89   Allocate variable addresses as they're declared.
+%    24Sep89   Added arrays, pointers.
+%    27Sep89   Added for statement.
+%    23Oct89   Fixed for statement, so CYCLE goes to next step.
+%    01Jan90   Added string literals
+%
+%  *** WORKING ON : Records ***
+%    - fields allocated now, but need to calculate size of whole record
+%    - need to make ST a linked list structure for oSymPopLevelSaveType
+%      (note, this will mess up SD, and oSymLevelAnySyms)
+%    - references to records: currently pushes addr on stack. ok.
+%      Field selection '.' should push the fields on the SD, look up
+%      the next ident only in that level, add the offset if not 0,
+%      replace the current type with the field type, and continue
+%      (note, we're in fetch mode here, working with addresses on run stack
+%      just as with arrays).
+%
+%  *** WORKING ON : Procedures ***
+%    - formal args declared but not saved (see Records)
+%    - allocate args so the #'s match the stack (esp. re VAR flag)
+%    - pay attention to VAR flag
+%    - formal params are visible to body of proc, but requires special
+%      code to access non-global vars.
+%      i.e. in expressions, if var is found at SD level > 0, must take it
+%      off stack. (possibly with indirection).
+%      NOTE, VAR parameters are like pointer vars, with automatic deref ('^')
+%      Maybe this helps with the implementation.
+%    - Big choice: what is runtime environment of stack machine?
+%        Call stack with params, returns
+%        Expr stack used within a statement
+%        These can be the same if Expr stack always empty before/after an
+%        indivisible expression. (??)
+%
+%  NOTES
+%    1) During a loop, the top counter counts the number of 'exit'
+%       statements to be patched.
+%    2) During a loop, the top entry in the patchLoop stack is the addr
+%       of the start of the loop (used by 'cycle' to repeat the loop).
+%    3) The 'value' of a var symbol is its allocated address.
+%    4) References to vars of intrinsic types, and pointer types,
+%       pushes the value of the var on the expr stack.  Referenecs to
+%       vars of compound types (arrays, records...) pushes the address
+%       on the expr stack.
+%    5) Just as there is only one type table entry for a given (named) type,
+%       there is only one type table entry for a pointer to a named type.
+%       When a pointer type is declared, a field in the TT entry of the
+%       type pointed to will be set to indicate the TT entry of the pointer
+%       to that type (0 means none defined yet).  When evaluating the
+%       expression ^x, the type in that field in the entry for the type of x
+%       will be used (unless it's 0, in which case a new TT entry will be
+%       created).
+
+input:
+   pIdent
+   pIntLit
+   pStrLit
+   pAssign       ':='
+   pSemiColon    ';'
+   pEqual        '='
+   pNotEqual     '<>'
+   pLess         '<'
+   pGreater      '>'
+   pLessEqual    '<='
+   pGreaterEqual '>='
+   pColon        ':'
+   pComma        ','
+   pLParen       '('
+   pRParen       ')'
+   pLSquare      '['
+   pRSquare      ']'
+   pCarat        '^'
+   pDot          '.'
+   pDotDot       '..'
+   pTimes        '*'
+   pDivide       '/'
+   pPlus         '+'
+   pMinus        '-'
+   pEof
+   pInvalid
+
+%  keywords  (built-in types 'integer', 'char', etc, are not keywords,
+%             type constructors 'array', 'record', 'set' are keywords,
+%             pseudo-procedures 'writeln', 'readln' are keywords)
+
+   pProgram
+   pProcedure
+   pFunction
+   pConst
+   pType
+   pVar
+   pBegin
+   pEnd
+   pArray
+   pRecord
+   pSet
+   pOf
+   pIf
+   pThen
+   pElse
+   pFor
+   pTo
+   pDownto
+   pDo
+   pWhile
+   pRepeat
+   pUntil
+   pCycle
+   pExit
+   pReturn
+   pAnd
+   pOr
+   pNot
+   pWriteln
+   pWrite
+   pReadln
+   pRead;
+
+
+output:
+
+%  Instructions for a stack machine (all vars are 32-bit integers)
+
+   tPushIntVar       % push value of int var; addr follows
+   tPushBoolVar
+   tPushPtrVar
+   tPushAddr         % addr (of a var) follows
+   tFetchInt         % replace addr (on tos) of int var with contents
+   tFetchBool        %    "      "      "     " bool  "   "    "
+   tFetchPtr         %    "      "      "     " ptr   "   "    "   
+   tPushIntLit       % int lit follows (NOTE, used for BOOLEAN too)
+   tAssignInt        % assign value on tos to addr under it (pop both)
+   tAssignBool       %   "      "    "   "  "   "    "    "   "   "
+   tAssignPtr        % assign val WHOSE ADDR is on tos to addr under it (pop)
+   tCopy             % #words follows.  tos=src, 2nd=dest (pop 2)
+   tIncIntVar        % increment int var (addr follows)
+   tDecIntVar        % decrement int var (addr follows)
+   tMultiplyInt      % multiply top two integers (replacing with result)
+   tDivideInt
+   tAddInt
+   tSubtractInt
+   tNegateInt        % top entry *= -1
+   tNot              % negate top boolean
+   tAnd              % boolean AND of top 2 (pop 2, push 1)
+   tOr               % boolean OR or top 2 (pop 2, push 1)
+   tEqualInt         % top two entries equal? (pop 2, push 1) (true=1)
+   tNotEqualInt      %    NOTE, these all work for booleans too
+   tGreaterInt       % 2nd entry greater than top entry? (pop 2, push answer)
+   tLessInt
+   tGreaterEqualInt
+   tLessEqualInt
+   tEqualPtr         % are the ptr vars whose addresses are top 2 equal?
+   tNotEqualPtr
+   tCall             % addr follows
+   tReturn
+   tJump             % addr follows
+   tJumpTrue         % addr follows  (pops top of stack, jumps if true)
+   tJumpFalse        % addr follows  (pops top of stack, jumps if false)
+   tPutInt           % for writeln : write integer on tos, pop
+   tPutBool          %  "     "    : write TRUE/FALSE, pop
+   tPutStr           %  "     "    : write string whose addr is on tos, pop
+   tPutPtr           %  "     "    : write ptr var whose addr is on tos, pop
+   tPutCR            %  "     "    : write cr
+
+%  Other:
+
+   tSpace            % emit a hole, to be patched later
+   tConstant         % emit value on top of value stack (don't pop)
+   tSymVal           % emit value of symbol looked-up with oSymLookup
+   ;
+
+error:
+   eBadStatement
+   eNotConst
+   eNotType
+   eNotVar
+   eNotIntVar
+   eNotValue
+   eNotInteger
+   eNotBoolean
+   eNotPointer
+   eNotArray
+   eTooManySubscripts
+   eTypeMismatch
+   eNotImplemented
+   eNotAllowed
+   eNotInALoop
+   eRecordEmpty;
+
+type boolean:
+   false    = 0
+   true     = 1;
+
+type number:
+   zero     = 0
+   one      = 1;
+
+type kind:           % kind of identifier
+   kUndefined        % not yet added to symbol table
+   kProgram
+   kProc
+   kFunc
+   kConst
+   kType
+   kVar;
+
+% intrinsic types & type constructs
+
+type typ:
+   tyNone     = 0    % in ptrTyp field of TT, means no ptr to type defined
+   tyInteger
+   tyBoolean
+   tyChar
+   tyString
+   tyFile            % tyInteger..tyFile are scalars (types on their own)
+   tyPointer         % following are type constructor classes...
+   tyArray           %   (they are not type#'s)
+   tyRecord
+   tyParams          % like record; a collection of proc/func params
+   tySet;
+
+mechanism count :
+   oCountPush(number)          % start a new counter, with initial value
+   oCountInc
+   oCountDec
+   oCountIsZero >> boolean
+   oCountPop;
+
+mechanism sym :                
+
+   % symbol table
+
+   oSymPushLevel               % new lexical level
+   oSymPopLevel                % return to old lexical level
+   oSymPopLevelSaveType        % attach id's in lex level to the syms field
+                               %   of the type on top of the type stack
+   oSymLookup                  % lookup last id accepted (for use by
+                               %   other semantic operations...)
+   oSymChooseKind >> kind      % kind of symbol looked-up
+   oSymAddSPop                 % add id on symbol stack to symbol table
+                               %   (pop symbol stack)
+   oSymLevelAnySyms >> boolean % any symbols in top lexical level?
+
+   % symbol stack
+   % (used to construct entries for the symbol table,
+   %       and to handle references to symbols)
+
+   oSymSPushId                 % push id# of last id accepted
+   oSymSSetKind(kind)          % set kind of top symbol (kVar, kType, etc)
+                               %   ... error if it was already set
+   oSymSSetValPop              % set val of sym on SS from val on VS (pop VS)
+   oSymSSetTypS                % set type of top symbol, from type on
+                               %   type stack (don't pop type stack)
+   oSymSSetParamTypS           % set param type of top symbol from type on TS
+   oSymSAllocate               % allocate data space for var, using size of
+                               %   type on type stack
+   ;
+
+mechanism value :              % value stack, to calc. const expr's
+   oValuePushToken             % push value of (int lit) token just read
+   oValuePushVal               % push val of symbol looked-up
+   oValuePush(number)          % push an explicit int lit
+   oValuePushSizeTS            % push size of type on type stack
+   oValuePushLowTS             % push low subscript of type on type stack
+   oValueNegate                % negate top value
+   oValueDifference            % pop 2, push (top - 2nd + 1)
+   oValueMultiply              % pop 2, push (top * 2nd)
+   oValueIsZero >> boolean     % is top value zero?
+   oValueIsOne >> boolean      % is top value one?
+   oValuePop;
+
+mechanism string :
+   oStringAllocLit;            % alloc data space for strlit, push address
+                               %   on value stack
+
+mechanism typS :               % type stack
+   oTypSPushTyp                % push type# of sym looked-up (not root type)
+   oTypSPush(typ)              % push explicit type# (intrinsic)
+   oTypSPopPushBase            % replace top TS with type# of its base type
+   oTypSPopPushPtr             % replace top TS with its ptrType field
+   oTypSMatch >> boolean       % do top 2 types match? (pop both, push 1)
+   oTypSChoose >> typ          % return type on TS (not root type)
+   oTypSChoosePop >> typ       % return type on TS (not root type), pop it
+   oTypSChooseKind >> typ      % return kind (array,etc) of top type; no pop
+   oTypSChoosePtr >> typ       % return 'ptrType' field of type; no pop
+   oTypSSwap                   % swap top two TS entries
+   oTypSPop
+
+   oTypNew(typ)                % new TT entry, with type class (e.g. array)
+                               %   push typ# on TS, for use by following:
+   oTypSetLow                  % low field = VS (don't pop VS)
+   oTypSetHigh                 % high field = VS (don't pop VS)
+   oTypSetSize                 % size field = VS (don't pop VS)
+   oTypAssignBasePop           % base of 2nd on TS := top of TS, pop TS
+   oTypAssignPtr               % ptrType of 2nd on TS := top of TS, no pop
+;
+
+type patchStack:
+   patchLoop                   % addr of start of loop (repeat, while, for)
+   patchExit                   % addrs where jumps out of loop are
+                               %   (use count mechanism to count how many)
+   patchIf;                    % addr of jump around code in 'if' statement
+
+mechanism patch:               % note, creates absolute-address jumps
+   oPatchPushHere(patchStack)  % put current address on a patch stack
+   oPatchAnyEntries(patchStack) >> boolean     % anything in patch stack?
+   oPatchSwap(patchStack)      % swap top two entries
+   oPatchDup(patchStack)       % duplicate the top entry
+   oPatchPopFwd(patchStack)    % store here at x (x=top of stack), pop stack
+   oPatchPopBack(patchStack);  % emit x (so advance 'here'), pop stack
+
+rules
+
+% ----------------------------- Declarations ----------------------------
+
+Program:
+   pProgram
+   pIdent
+   oSymSPushId oSymSSetKind(kProgram) oSymAddSPop
+   [
+      | '(' :
+         pIdent      % input, output files
+         oSymSPushId
+         oSymSSetKind(kVar)
+         oTypSPush(tyFile)
+         oSymSSetTypS
+         oSymSAllocate
+         oSymAddSPop
+         oTypSPop
+         ','
+         pIdent
+         oSymSPushId
+         oSymSSetKind(kVar)
+         oTypSPush(tyFile)
+         oSymSSetTypS
+         oSymSAllocate
+         oSymAddSPop
+         oTypSPop
+         ')'
+      | * :
+   ]
+   ';'
+   @Block    % not including punctuation after body's 'end'
+   '.';
+
+Block:
+   {[
+      | pConst :     @ConstDecl
+      | pType :      @TypeDecl
+      | pVar :       @VarDecl
+      | pProcedure : @ProcDecl
+      | pFunction :  @FuncDecl
+      | * :          @Statement
+                     .tReturn
+                     >
+   ]};
+
+ProcDecl:
+   pIdent
+   oSymSPushId oSymSSetKind(kProc)    % don't save in table yet
+   oSymPushLevel
+   @FormalArgDecl            % params go in their own lex level
+   [ oSymLevelAnySyms
+      | true :
+         oTypNew(tyParams)   % create a type to hold list of params
+         oSymPopLevelSaveType
+      | * :
+         oTypSPush(tyNone)   % no parameters
+         oSymPopLevel
+   ]
+   oSymSSetParamTypS
+   oTypSPop
+   oSymAddSPop               % add proc name to table
+   ';'
+   oSymPushLevel
+   @Block
+   oSymPopLevel
+   ';';
+
+FuncDecl:
+   pIdent
+   oSymSPushId oSymSSetKind(kFunc)
+   oSymPushLevel
+   @FormalArgDecl
+   [ oSymLevelAnySyms
+      | true :
+         oTypNew(tyParams)   % create a type to hold list of params
+         oSymPopLevelSaveType
+      | * :
+         oTypSPush(tyNone)   % no parameters
+         oSymPopLevel
+   ]
+   oSymSSetParamTypS
+   oTypSPop
+   ':'
+   @TypeRef
+   oSymSSetTypS              % type of function
+   oTypSPop
+   oSymAddSPop
+   ';'
+   oSymPushLevel
+   @Block
+   oSymPopLevel
+   ';';
+
+FormalArgDecl:
+   [
+      | '(' :
+         {
+            [
+               | pVar :         % currently ignored ***
+               | * :
+            ]
+            oCountPush(zero)    % count vars of one type
+            {  pIdent
+               oSymSPushId oSymSSetKind(kVar)
+               oCountInc
+               [
+                  | ':' : >
+                  | ',' :
+               ]
+            }
+            @TypeRef
+            {[ oCountIsZero
+               | false :
+                  oSymSSetTypS
+                  oSymSAllocate
+                  oSymAddSPop
+                  oCountDec
+               | * :
+                  >
+            ]}
+            oCountPop
+            oTypSPop
+            [
+               | ')' : >
+               | ';' :
+            ]
+         }
+      | * :
+   ];
+
+ConstDecl:
+   {[
+      | pIdent :
+         oSymSPushId oSymSSetKind(kConst)
+         '='
+         @ConstExpr
+         oSymSSetValPop oSymAddSPop
+         ';'
+      | * :
+         >
+   ]};
+
+TypeDecl:
+   {[
+      | pIdent :
+         oSymSPushId oSymSSetKind(kType)
+         '='
+         @TypeRef
+         oSymSSetTypS oTypSPop oSymAddSPop
+         ';'
+      | * :
+         >
+   ]};
+
+VarDecl:
+   {[
+      | pIdent :
+         oCountPush(zero)
+         {
+            oSymSPushId oSymSSetKind(kVar)
+            oCountInc
+            [
+               | ',' :
+                  pIdent
+               | * :
+                  >
+            ]
+         }
+         ':'
+         @TypeRef
+         {[ oCountIsZero
+            | false :
+               oSymSSetTypS
+               oSymSAllocate
+               oSymAddSPop
+               oCountDec
+            | * :
+               >
+         ]}
+         oCountPop
+         oTypSPop
+         ';'
+      | * :
+         >
+   ]};
+
+TypeRef:      % possibly create new type entry; put type# on type stack
+   [
+      | pIdent :           % previously named type (including intrinsics)
+         oSymLookup
+         [ oSymChooseKind
+            | kType :
+               oTypSPushTyp
+            | * :
+               #eNotType oTypSPush(tyInteger)
+         ]
+      | pArray :
+         '['
+         oCountPush(zero)     % count dimensions (to fix their TT entries)
+         {
+            oTypNew(tyArray)  % start new TT entry; push typ# on TS
+            oCountInc
+            @ConstExpr
+            oTypSetLow
+            '..'
+            @ConstExpr
+            oTypSetHigh
+            oValueDifference
+            [
+               | ']' : >
+               | ',' :
+            ]
+         }
+         pOf
+         @TypeRef
+         oValuePushSizeTS        % push size of OF type
+         {
+            oTypAssignBasePop    % assign OF type to last dim, pop OF type
+            oValueMultiply       % size of last dimension
+            oTypSetSize
+            oCountDec            % repeat for all dimensions back to 1st
+            [ oCountIsZero
+               | false :
+               | * :     >
+            ]
+         }
+         oValuePop
+         oCountPop
+      | '^' :
+         @TypeRef
+         [ oTypSChoosePtr        % has a ptr to this type been declared?
+            | tyNone :           % no
+               oTypNew(tyPointer)
+               oValuePush(one) oTypSetSize oValuePop
+               oTypAssignPtr
+               oTypSSwap
+               oTypAssignBasePop
+            | * :                % yes
+               oTypSPopPushPtr
+         ]
+      | pRecord :
+         oTypNew(tyRecord)
+         oSymPushLevel
+         @VarDecl
+         [ oSymLevelAnySyms
+            | false :   #eRecordEmpty
+            | * :
+         ]
+         oSymPopLevelSaveType
+         pEnd
+      % *** following type constructors are not implemented *** 
+      | pSet :
+         pOf @TypeRef
+      | * :       % this works for cases except where expr starts with an id
+         @ConstExpr '..' @ConstExpr
+   ];
+
+
+% ------------------------------ Expressions -----------------------------
+
+% Constant expressions: currently, only literal integers or previously
+% named constant integers are supported, possibly with a negation.
+% Constant expressions are evaluated at compile time.
+
+ConstExpr:
+   [
+      | pIntLit :
+         oValuePushToken
+      | pIdent :
+         oSymLookup
+         [ oSymChooseKind
+            | kConst :
+               oValuePushVal
+            | * :
+               #eNotConst
+               oValuePush(zero)
+         ]
+      | pMinus :
+         @ConstExpr
+         oValueNegate
+   ];
+
+%
+% General run-time expressions
+% The type stack tracks the type of the expression.
+%
+
+Expr:
+   @BoolExpr
+   {[
+      | '=' :
+         @BoolExpr
+         @MatchTypes
+         [ oTypSChoosePop
+            | tyInteger, tyBoolean :   .tEqualInt
+            | tyPointer :              .tEqualPtr
+            | tyChar, tyString :       #eNotImplemented
+            | * :                      #eNotAllowed
+         ]
+         oTypSPush(tyBoolean)
+      | '<>' :
+         @BoolExpr
+         @MatchTypes
+         [ oTypSChoosePop
+            | tyInteger, tyBoolean :   .tNotEqualInt
+            | tyPointer :              .tNotEqualPtr
+            | tyChar, tyString :       #eNotImplemented
+            | * :                      #eNotAllowed
+         ]
+         oTypSPush(tyBoolean)
+      | '<' :
+         @BoolExpr
+         @MatchTypes
+         [ oTypSChoosePop
+            | tyInteger, tyBoolean :   .tLessInt
+            | tyChar, tyString :       #eNotImplemented
+            | * :                      #eNotAllowed
+         ]
+         oTypSPush(tyBoolean)
+      | '>' :
+         @BoolExpr
+         @MatchTypes
+         [ oTypSChoosePop
+            | tyInteger, tyBoolean :   .tGreaterInt
+            | tyChar, tyString :       #eNotImplemented
+            | * :                      #eNotAllowed
+         ]
+         oTypSPush(tyBoolean)
+      | '<=' :
+         @BoolExpr
+         @MatchTypes
+         [ oTypSChoosePop
+            | tyInteger, tyBoolean :   .tLessEqualInt
+            | tyChar, tyString :       #eNotImplemented
+            | * :                      #eNotAllowed
+         ]
+         oTypSPush(tyBoolean)
+      | '>=' :
+         @BoolExpr
+         @MatchTypes
+         [ oTypSChoosePop
+            | tyInteger, tyBoolean :   .tGreaterEqualInt
+            | tyChar, tyString :       #eNotImplemented
+            | * :                      #eNotAllowed
+         ]
+         oTypSPush(tyBoolean)
+      | * :
+         >
+   ]};
+
+BoolExpr:
+   @BoolTerm
+   {[
+      | pOr :
+         @RequireBoolPop
+         @BoolTerm
+         @RequireBool
+         .tOr
+      | * :
+         >
+   ]};
+
+BoolTerm:
+   @BoolFactor
+   {[
+      | pAnd :
+         @RequireBoolPop
+         @BoolFactor
+         @RequireBool
+         .tAnd
+      | * :
+         >
+   ]};
+
+BoolFactor:
+   [
+      | pNot :
+         @ArithExpr
+         @RequireBool
+         .tNot
+      | * :
+         @ArithExpr
+   ];
+
+ArithExpr:
+   @Term
+   {[
+      | pPlus :
+         @RequireIntPop
+         @Term
+         @RequireInt
+         .tAddInt
+      | pMinus :
+         @RequireIntPop
+         @Term
+         @RequireInt
+         .tSubtractInt
+      | * :
+         >
+   ]};
+
+Term:
+   @Factor
+   {[
+      | pTimes :
+         @RequireIntPop
+         @Factor
+         @RequireInt
+         .tMultiplyInt
+      | pDivide :
+         @RequireIntPop
+         @Factor
+         @RequireInt
+         .tDivideInt
+      | * :
+         >
+   ]};
+
+Factor:
+   [
+      | pPlus :
+         @Primary
+         @RequireInt
+      | pMinus :
+         @Primary
+         @RequireInt
+         .tNegateInt
+      | * :
+         @Primary
+   ];
+
+Primary:
+   [
+      | pIntLit :
+         .tPushIntLit
+         oValuePushToken .tConstant oValuePop
+         oTypSPush(tyInteger)
+      | '(' :
+         @Expr
+         ')'
+      | pStrLit :
+         oStringAllocLit     % store, put addr on value stack
+         .tPushAddr .tConstant oValuePop
+         oTypSPush(tyString)
+      | pIdent :
+         oSymLookup
+         [ oSymChooseKind
+            | kFunc :
+               oValuePushVal
+               oTypSPushTyp
+               [
+                  | '(' :
+                     {  @Expr    % match type
+                        oTypSPop % *** don't for now ***
+                        [
+                          | ')' : >
+                          | ',' :
+                        ]
+                     }
+                  | * :
+               ]
+               .tCall
+               .tConstant oValuePop
+            | kConst :
+               oTypSPush(tyInteger)
+               [ oTypSChoose
+                  | tyInteger, tyBoolean :
+                     .tPushIntLit .tSymVal
+                  | * :
+                     #eNotImplemented
+               ]
+            | kVar :
+               oTypSPushTyp
+               [ oTypSChoose
+                  | tyInteger :
+                     .tPushIntVar .tSymVal
+                  | tyBoolean :
+                     .tPushBoolVar .tSymVal
+                  | tyChar, tyString, tyFile :
+                     #eNotImplemented
+                  | * :                   % user type
+                     [ oTypSChooseKind
+                        | tyPointer :
+                           .tPushPtrVar .tSymVal
+                           [
+                              | '^' :             % dereferenced
+                                 oTypSPopPushBase
+                                 @LValue
+                                 @FetchVar
+                              | * :               % just ptr value alone
+                           ]
+                        | * :                     % compound type
+                           .tPushAddr .tSymVal    % addr of start of var
+                           @LValue                % get final addr
+                           @FetchVar              % get final value
+                     ]
+               ]
+            | * :
+               #eNotValue
+               oTypSPush(tyInteger)
+         ]
+      | '^' :        % ^var
+         pIdent
+         oSymLookup
+         [ oSymChooseKind
+            | kVar :
+               oTypSPushTyp
+               .tPushAddr .tSymVal
+               @LValue     % ptr value to expr stack
+               % now, adjust TS to indicate ptr type
+               [ oTypSChoosePtr
+                  | tyNone :             % not yet a ptr type declared
+                     oTypNew(tyPointer)  % so declare one now
+                     oValuePush(one) oTypSetSize oValuePop
+                     oTypAssignPtr
+                     oTypSSwap
+                     oTypAssignBasePop
+                  | * :
+                     oTypSPopPushPtr
+               ]
+            | * :
+               #eNotVar
+               oTypSPush(tyInteger)
+         ]
+      | * :
+         #eNotValue
+         oTypSPush(tyInteger)
+   ];
+
+% Addr of start of var is on expr stack; type is on type stack.
+% Replace expr stack with value of var.
+% (In the case of compound vars, this remains as the addr of the var).
+
+FetchVar:
+   [ oTypSChoose
+      | tyInteger :   .tFetchInt
+      | tyBoolean :   .tFetchBool
+      | tyChar, tyString, tyFile :
+                      #eNotImplemented
+      | * :                 % user type
+         [ oTypSChooseKind
+            | tyPointer :    .tFetchPtr
+            | * :            % compound type; leave as addr
+         ]
+   ];
+
+
+% Addr of start of var is already on run stack, and type is on type stack.
+% Read subscripts, etc, to get final addr on run stack, and final type
+% on type stack.
+
+LValue:
+   {[
+      | '[' :       @ArraySubscripts
+      | '.' :       #eNotImplemented
+      | '^' :       @PointerDeref
+      | * :         >
+   ]};
+
+ArraySubscripts:
+   [ oTypSChooseKind
+      | tyArray :
+      | * :       #eNotArray
+   ]
+   {
+      [ oTypSChooseKind
+         | tyArray :
+         | * :    #eTooManySubscripts
+      ]
+      oValuePushLowTS   % low subscript of this dimension
+      oTypSPopPushBase  % replace TS with next dimension, or OF type
+      @Expr
+      @RequireIntPop
+      [ oValueIsZero    % adjust for low subscript
+         | true :       oValuePop
+         | * :          .tPushIntLit .tConstant .tSubtractInt oValuePop
+      ]
+      oValuePushSizeTS
+      [ oValueIsOne     % adjust for size of subtype
+         | true :       oValuePop
+         | * :          .tPushIntLit .tConstant .tMultiplyInt oValuePop
+      ]
+      .tAddInt          % update start address
+      [
+         | ']' :  >
+         | ',' :
+      ]
+   };
+
+% ptr deref on left side, i.e. BEFORE addr of ptr var is on stack,
+%                              AFTER addr of thing pointed to is on stack
+PointerDeref:
+   [ oTypSChooseKind
+      | tyPointer :
+      | * :       #eNotPointer
+   ]
+   .tFetchPtr           % now addr on stack is addr of what we're pointing to
+   oTypSPopPushBase;    % replace TS with type of thing we're pointing to
+
+   
+% ------------------------------ Statements -----------------------------
+
+Statement:
+   [
+      | pWriteln :     @WritelnStmt
+      | pWrite :       @WriteStmt
+      | pReadln :      @ReadlnStmt
+      | pRead :        @ReadStmt
+      | pIf :          @IfStmt
+      | pWhile :       @WhileStmt
+      | pFor :         @ForStmt
+      | pRepeat :      @RepeatStmt
+      | pExit :        @ExitStmt
+      | pCycle :       @CycleStmt
+      | pBegin :       @BeginStmt
+      | pIdent :       @AssignOrCallStmt
+      | * :            % null statement : don't accept any tokens
+   ];
+
+AssignOrCallStmt:         % *** Call doesn't work yet ***
+   oSymLookup
+   [ oSymChooseKind       % can parse without semantic info
+      | kProc :           %    but this is easier
+         oValuePushVal    % addr of proc
+         [
+            | '(' :
+               {  @Expr oTypSPop  % ignore type for now
+                  [
+                    | ')' : >
+                    | ',' :
+                  ]
+               }
+            | * :
+         ]
+         .tCall
+         .tConstant oValuePop
+      | kVar :
+         .tPushAddr .tSymVal
+         oTypSPushTyp
+         @LValue        % handle subscripts, if any
+         ':=' 
+         @Expr
+         @MatchTypes    % left = right?
+         [ oTypSChoose
+            | tyInteger :
+               .tAssignInt
+            | tyBoolean :
+               .tAssignBool
+            | tyChar, tyString, tyFile :
+               #eNotImplemented
+            | * :       % compound var assigns; addrs of src, dest on stack
+               [ oTypSChooseKind
+                  | tyPointer :
+                     .tAssignPtr
+                  | * :
+                     oValuePushSizeTS     % size of var
+                     .tCopy .tConstant    % multi-word copy
+                     oValuePop
+               ]
+         ]
+         oTypSPop
+      | * :
+         #eBadStatement
+   ];
+
+IfStmt:
+   @Expr
+   @RequireBoolPop
+   pThen
+   .tJumpFalse
+   oPatchPushHere(patchIf)
+   .tSpace
+   @Statement
+   [
+      | pElse :
+         .tJump
+         oPatchPushHere(patchIf)
+         .tSpace
+         oPatchSwap(patchIf)
+         oPatchPopFwd(patchIf)
+         @Statement
+      | * :
+   ]
+   oPatchPopFwd(patchIf);
+
+ForStmt:
+   pIdent
+   oSymLookup
+   [ oSymChooseKind
+      | kVar :
+         oTypSPushTyp
+         @RequireIntPop
+      | * :        #eNotIntVar
+   ]
+   oValuePushVal                   % address of index var (keep on VS)
+   .tPushAddr .tConstant
+   ':='
+   @Expr
+   @RequireIntPop
+   .tAssignInt
+   .tJump oPatchPushHere(patchLoop) .tSpace
+   oPatchPushHere(patchLoop)
+   oPatchSwap(patchLoop)
+   [
+      | pTo :
+         .tIncIntVar .tConstant
+         oPatchPopFwd(patchLoop)
+         .tPushIntVar .tConstant
+         @Expr
+         @RequireIntPop
+         .tGreaterInt
+         .tJumpTrue oPatchPushHere(patchLoop) .tSpace
+         oPatchSwap(patchLoop)
+      | pDownTo :
+         .tDecIntVar .tConstant
+         oPatchPopFwd(patchLoop)
+         .tPushIntVar .tConstant
+         @Expr
+         @RequireIntPop
+         .tLessInt
+         .tJumpTrue oPatchPushHere(patchLoop) .tSpace
+         oPatchSwap(patchLoop)
+   ]
+   oCountPush(zero)          % count 'exit' patches
+   pDo
+   @Statement
+   .tJump oPatchPopBack(patchLoop)
+   oValuePop
+   oPatchPopFwd(patchLoop)
+   @PatchExitsPop;
+
+RepeatStmt:
+   oPatchPushHere(patchLoop) % start of loop
+   oCountPush(zero)          % count the 'exit' patches
+   @Statement
+   {[
+      | ';' :
+         @Statement
+      | pUntil :
+         @Expr
+         @RequireBoolPop
+         .tJumpFalse
+         oPatchPopBack(patchLoop)
+         @PatchExitsPop
+         >
+   ]};
+
+WhileStmt:
+   oPatchPushHere(patchLoop)    % start of loop
+   oCountPush(zero)
+   @Expr
+   @RequireBoolPop
+   pDo
+   .tJumpFalse
+   oPatchPushHere(patchLoop)    % jump out
+   .tSpace
+   oPatchSwap(patchLoop)        % start on top
+   @Statement
+   .tJump
+   oPatchPopBack(patchLoop)
+   oPatchPopFwd(patchLoop)
+   @PatchExitsPop;
+
+CycleStmt:                     % NOTE, for repeat..until, skips test (??)
+   [ oPatchAnyEntries(patchLoop)
+      | true :
+         .tJump
+         oPatchDup(patchLoop)  % addr of start
+         oPatchPopBack(patchLoop)
+      | * :
+         #eNotInALoop
+   ];
+
+ExitStmt:
+   [ oPatchAnyEntries(patchLoop)
+      | true :
+         .tJump
+         oPatchPushHere(patchExit)
+         .tSpace
+         oCountInc
+      | * :
+         #eNotInALoop
+   ];
+
+BeginStmt:
+   @Statement
+   {[
+      | ';' :   @Statement
+      | pEnd :  >
+   ]};
+
+WritelnStmt:
+   @WriteStmt
+   .tPutCR;
+
+WriteStmt:
+   [
+      | '(' :
+         {
+            @Expr
+            [ oTypSChoose
+               | tyInteger :                .tPutInt
+               | tyBoolean :                .tPutBool
+               | tyString :                 .tPutStr
+               | tyChar, tyFile :           #eNotImplemented
+               | * :                        % compound types
+                  [ oTypSChooseKind
+                     | tyPointer :          .tPutPtr
+                     | * :                  #eNotAllowed
+                  ]
+            ]
+            oTypSPop
+            [
+               | ')' : >
+               | ',' :
+            ]
+         }
+      | * :
+   ];
+
+
+ReadlnStmt:      % ***
+   ;
+ReadStmt:
+   ;
+
+% -------------------------------- Utilities -------------------------------
+
+PatchExitsPop:
+   {[ oCountIsZero
+      | false : oPatchPopFwd(patchExit)
+      | * :     >
+   ]}
+   oCountPop;
+
+MatchTypes:
+   [ oTypSMatch
+      | false :
+         #eTypeMismatch
+      | * :
+   ];
+
+RequireIntPop:
+   [ oTypSChoosePop
+      | tyInteger :
+      | * :          #eNotInteger
+   ];
+
+RequireInt:
+   [ oTypSChoose
+      | tyInteger :
+      | * :          #eNotInteger
+   ];
+
+RequireBoolPop:
+   [ oTypSChoosePop
+      | tyBoolean :
+      | * :          #eNotBoolean
+   ];
+
+RequireBool:
+   [ oTypSChoose
+      | tyBoolean :
+      | * :          #eNotBoolean
+   ];
+
+end
+
