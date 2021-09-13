@@ -20,3 +20,12 @@ would have to provide two things: a scanner (file tokenizer), and a table walker
 Later versions of the ssl compiler simplify this a bit by generating C code for the table,
 and offering a generic runtime ssl_rt, plus an interactive ssl debugger.
 
+------
+
+Version 1.2.3 (03/26/1991) is implemented in ssl itself.
+The program is implemented by reading and walking through the table file ssl.tbl,
+which is produced either by itself or by the earlier bootstrap implementation hssl.
+
+(I don't have a makefile for this version, so I'm not totally certain that hssl
+can produce a compatbile tbl file, but I expect it can.  The dates are about right.)
+

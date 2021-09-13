@@ -19,8 +19,35 @@
                Failed inside choice due to stuff on IS stack above the
                rule id, put there by choice.  Fixed with new mechanism
                "oIdentISPushBottom".  (KLUDGE!)
+    24Apr91    Increased id size from 31 chars to 50 chars
+               Increased patch stack sizes
+               Increased output table size
+               Make ssl source case sensitive, but optionally insensitive
+    04May91    Increased id table size from 300 to 600.
+               Moved id names and string shortforms into separately allocated
+               memory, and changed length limit from 50 to 256 chars.
+               Added -c option to generate C code for the table.
+               Use the automatically generated C code table in this program.
+    05May91    Added "include" feature.
+    21May91    Added mechanism next_error.
+               Added table optimization: reduce chains of jumps into one jump.
+    04Jun91    Write rule addresses to code file.
 
 */
+
+int      case_sensitive = 1;
+
+
+/*  Define USE_C_TABLE to include C version of code table (in ssl.tbl).
+ *  Undefine it to read the table from the file ssl.tbl.
+ *  (In the second case, the data is just a dump of integers, no commas)
+ *  (I should ALWAYS generate C form, but allow readers to read the
+ *  C form at run time if desired).
+ */
+
+#define  USE_C_TABLE
+
+
 
 #include <stdio.h>
 #include <string.h>
@@ -32,7 +59,9 @@
 #define  SSL_INCLUDE_ERR_TABLE
 #include "ssl.h"
 
+/* I only care about this if I want to read at run time */
 #define TABLE_FILE "ssl.tbl"   /* This is the ssl code to execute */
+
 
 /* The scanner is hardcoded in C.
 
@@ -62,22 +91,40 @@
    condition is checked automatically, but (1) is not.
 */
 
-short w_codeTable[w_codeTableSize];     /* size defined in .h file */
+#ifdef   USE_C_TABLE
+
+#include "ssl.tbl"
+
+#else    USE_C_TABLE
+
+short    w_codeTable [w_codeTableSize];     /* size defined in .h file */
+
+#endif   USE_C_TABLE
+
 
 FILE *t_src,*t_out,*t_hdr,*t_doc,*t_lst,*t_dbg;
+FILE *t_src_includer;
+
+int     t_including_file;
 
 #define t_lineSize 256
 #define t_bufferSize 256           /* also used for strlits */
-#define t_idSize 31
-#define t_idTableSize 300
+#define t_idSize (t_bufferSize-1)
+#define t_idTableSize 600
 
 char   t_lineBuffer[t_lineSize];
 char   *t_ptr;
 short  t_lineNumber;
 char   t_lineListed;
+short  t_lastId;                   /* code of last id accepted */
+
+/* user options */
+
 char   t_listing;                  /* do we want a listing file? */
 char   t_debugOut;                 /* do we want debugger output? */
-short  t_lastId;                   /* code of last id accepted */
+char   t_generate_C;               /* generate a table in C code? */
+char   option_optimize;       /* perform optimization postproces? */
+char   option_verbose;        /* verbose output */
 
 /* token kinds and id kinds are declared in the SSL code, not here */
 
@@ -95,7 +142,7 @@ struct t_tokenType {
 } t_token;
 
 struct t_idTableType {
-  char buffer[t_idSize+1];
+  char  *buffer;           /* name is stored in separately allocated memory */
   short buflen;
   short kind;
   short idKind;
@@ -119,14 +166,17 @@ short w_result, w_param;           /* For oSetResult, oSetParam */
 short w_options;                   /* # choice options */
 char w_errBuffer[256];             /* build up err messages here */
 
-char w_title[t_lineSize];          /* Title of this SSL processor */
+#ifndef USE_C_TABLE
+char w_title_string[t_lineSize];   /* Title of this SSL processor */
+#endif  USE_C_TABLE
+
 char w_targetTitle[t_lineSize];    /* Title of processor being compiled */
 
-#define w_outTableSize 2500
+#define w_outTableSize 5000
 short w_outTable[w_outTableSize];  /* Emit into this table */
 short w_here;                      /* Output position */
 short w_errorCount;                /* Number of error signals emitted */
-#define w_lineTableSize 2500       /* Max # lines for debug table */
+#define w_lineTableSize 3000       /* Max # lines for debug table */
 short w_lineTable[w_lineTableSize];/* Line# of every instruction */
 
 /*************** Variables for semantic mechanisms ***************/
@@ -136,6 +186,8 @@ short dTemp;                       /* multi-purpose */
 #define dCSsize 30
 short dCS[dCSsize], dCSptr;        /* count stack */
 
+short dNextError;                  /* for mechanism next_error */
+
 #define dVSsize 30
 short dVS[dVSsize], dVSptr;        /* value stack */
 
@@ -144,13 +196,14 @@ short dIS[dISsize], dISptr;
 
 #define dStrTableSize 100
 struct dStrTableType {
-  char buffer[t_idSize+1];
+  char *buffer;                   /* text is stored in separately allocated memory */
   short val;
 } dStrTable[dStrTableSize];
 short dStrTableNext;
 
 /* code patch stacks */
 
+#if 0    /* These are the original values -- 24apr91 */
 #define dMarkSize 10               /* marks in the following patch stacks */
 #define dPatchCTAsize 10           /*     (not all the stacks need marks) */
 #define dPatchCTsize 200
@@ -158,6 +211,18 @@ short dStrTableNext;
 #define dPatchCsize 200
 #define dPatchLsize 10
 #define dPatchBsize 30
+#endif 0
+
+/* These are the new values -- 24apr91 */
+
+#define dMarkSize 20               /* marks in the following patch stacks */
+#define dPatchCTAsize 20           /*     (not all the stacks need marks) */
+#define dPatchCTsize 500
+#define dPatchCEsize 300
+#define dPatchCsize 800
+#define dPatchLsize 20
+#define dPatchBsize 50
+
 
 short dPatchCTA[dPatchCTAsize];    /* choice table addr ptrs */
 short dPatchCT[dPatchCTsize];      /* choice table built here */
@@ -187,7 +252,6 @@ int argc;
 char *argv[];
 {
   int t_hitBreak();
-  int entries,temp;                /* I can't seem to read a 'short' */
   short arg;
   char *p;
 
@@ -195,6 +259,10 @@ char *argv[];
 
   t_listing = 0;
   t_debugOut = 0;
+  t_generate_C = 0;
+  option_optimize = 0;
+  option_verbose = 0;
+
   for (arg=1; arg<argc; arg++) {
     if (*argv[arg] != '-')
       break;
@@ -203,6 +271,12 @@ char *argv[];
         t_listing = 1;
       else if (*p=='d')
         t_debugOut = 1;
+      else if (*p=='c')
+        t_generate_C = 1;
+      else if (*p=='o')
+        option_optimize = 1;
+      else if (*p=='v')
+        option_verbose = 1;
       else {
         printf ("Unknown option '%c'\n", *p);
         exit (10);
@@ -210,27 +284,18 @@ char *argv[];
     }
   }
   if (arg>=argc) {
-    printf("Usage:  ssl [-l] [-d] file\n");
+    printf("Usage:  ssl [-l] [-d] [-o] [-c] [-v] file\n");
     printf("        -l: produce listing file\n");
     printf("        -d: produce debugging file\n");
-    exit(10);
-  }
-  if((t_src=fopen(TABLE_FILE,"r"))==NULL) {
-    printf("Can't open table file %s\n",TABLE_FILE);
-    exit(10);
-  }
-  printf("%s",fgets(w_title,t_lineSize,t_src));
-  fscanf(t_src,"%d",&entries);
-  if (entries>w_codeTableSize) {
-    printf("Table file too big; must recompile %s.c\n",argv[0]);
+    printf("        -o: optimize code table\n");
+    printf("        -c: produce C code for table\n");
+    printf("        -v: verbose\n");
     exit(10);
   }
 
-  for (w_pc=0; w_pc<entries; w_pc++) {
-    fscanf(t_src,"%d",&temp);
-    w_codeTable[w_pc] = temp;
-  }
-  fclose(t_src);
+#ifndef USE_C_TABLE
+    read_table (argv[0]);
+#endif USE_C_TABLE
 
   sprintf(t_lineBuffer,"%s.ssl",argv[arg]);
   if((t_src=fopen(t_lineBuffer,"r"))==NULL) {
@@ -267,6 +332,8 @@ char *argv[];
     }
   }
 
+  printf("%s\n", w_title_string);
+
 #ifdef AMIGA
   onbreak(&t_hitBreak);
 #endif AMIGA
@@ -285,6 +352,9 @@ char *argv[];
   if (w_errorCount)
     printf("\nSSL: %d error(s)\n",w_errorCount);
 
+  if (option_optimize && (w_errorCount == 0))
+    w_optimize_table();
+
   t_cleanup();
 
   if (w_errorCount)
@@ -293,6 +363,32 @@ char *argv[];
     exit (0);
 }
 
+
+/*  Read ssl code (if not using the USE_C_TABLE option)  */
+
+read_table (progname)
+char       *progname;
+{
+  int entries,temp;                /* I can't seem to read a 'short' */
+
+  if((t_src=fopen(TABLE_FILE,"r"))==NULL) {
+    printf("Can't open table file %s\n",TABLE_FILE);
+    exit(10);
+  }
+  
+  fgets(w_title_string,t_lineSize,t_src);
+  fscanf(t_src,"%d",&entries);
+  if (entries>w_codeTableSize) {
+    printf("Table file too big -- recompile %s.c\n", progname);
+    exit(10);
+  }
+
+  for (w_pc=0; w_pc<entries; w_pc++) {
+    fscanf(t_src,"%d",&temp);
+    w_codeTable[w_pc] = temp;
+  }
+  fclose(t_src);
+}
 
 /*********** S e m a n t i c   O p e r a t i o n s ***********/
 
@@ -437,6 +533,16 @@ w_walkTable()
               w_result = !dCS[dCSptr];
               continue;
 
+       /* Mechanism next_error */
+
+       case oNextErrorPushCount :
+              if (++dCSptr==dCSsize) t_fatal("CS overflow");
+              dCS[dCSptr] = dNextError;
+              continue;
+       case oNextErrorPopCount :
+              dNextError = dCS[dCSptr--];
+              continue;
+
        /* Mechanism value */
 
        case oValuePushKind :
@@ -562,6 +668,7 @@ w_walkTable()
        case oShortFormAdd :
               if (dStrTableNext==dStrTableSize)
                 t_fatal("String table overflow");
+              dStrTable[dStrTableNext].buffer = (char *) malloc (strlen(t_token.buffer)+1);
               strcpy(dStrTable[dStrTableNext].buffer,t_token.buffer);
               dStrTable[dStrTableNext++].val = t_lastId;
               continue;
@@ -635,13 +742,32 @@ w_walkTable()
        /* Mechanism doc */
 
        case oDocNewRule :
-              printf("Rule %s\n",t_token.buffer);
+              if (option_verbose)
+                  printf("Rule %s\n",t_token.buffer);
               fprintf(t_doc,"Rule %s\n",t_token.buffer);
               continue;
        case oDocCheckpoint :
               printf("Checkpoint %d (sp=%d) ",w_pc-1,w_sp);
               fprintf(t_doc,"Checkpoint %d (sp=%d) ",w_pc-1,w_sp);
               t_printToken();
+              continue;
+
+       /* Mechanism include_mech */
+
+       case oInclude :
+              if (t_including_file)
+                  t_fatal ("Nested includes are not yet supported");
+              t_including_file = 1;
+              t_src_includer = t_src;
+              t_src = fopen (t_token.buffer, "r");
+              if (t_src == NULL)
+              {
+                  sprintf (w_errBuffer, "Can't open include file '%s'", t_token.buffer);
+                  t_fatal (w_errBuffer);
+              }
+              t_lineBuffer[0] = '\0';
+              t_ptr = t_lineBuffer;
+              t_lineListed = 1;
               continue;
 
        default:
@@ -746,6 +872,7 @@ t_initScanner ()
   t_addId("output",pOutput);
   t_addId("type",pType);
   t_addId("error",pError);
+  t_addId("include",pInclude);
   t_addId("mechanism",pMechanism);
   t_addId("rules",pRules);
   t_addId("end",pEnd);
@@ -764,12 +891,15 @@ t_initScanner ()
   t_addId("oChoice",pIdent);
   t_addId("oEndChoice",pIdent);
   t_addId("oSetParameter",pIdent);
+  t_addId("oBreak",pIdent);
   opVal = 0;
   for (op=firstOp;op<t_idTableNext;op++) {
     t_idTable[op].val = opVal++;
     t_idTable[op].idKind = kOp;
     t_idTable[op].declared = 1;    /* other fields 0 */
   }
+
+  t_including_file = 0;
 }  
 
 t_getNextToken()
@@ -795,7 +925,7 @@ t_getNextToken()
           fprintf(t_lst,"      %s",t_lineBuffer);
       }
       more = t_readln(t_lineBuffer);
-      if (!more) {  t_token.kind = pEof; return;  }
+      if (!more) { t_hit_Eof(); return; }
       t_ptr = t_lineBuffer;
       t_lineNumber++;
       t_lineListed = 0;
@@ -806,7 +936,7 @@ t_getNextToken()
           fprintf(t_lst,"      %s",t_lineBuffer);
       }
       more = t_readln(t_lineBuffer);
-      if (!more) {  t_token.kind = pEof; return;  }
+      if (!more) {  t_hit_Eof(); return;  }
       t_ptr = t_lineBuffer;
       t_lineNumber++;
       t_lineListed = 0;
@@ -852,6 +982,16 @@ t_getNextToken()
     *p = '\0';
     t_token.val = lit;
     t_token.kind = pIntLit;
+  } else if (*t_ptr == '-') {
+    t_ptr++;
+    lit = 0;
+    while (t_digit[*t_ptr]) {
+      lit = lit*10 - '0' + *t_ptr;
+      *p++ = *t_ptr++;
+    }
+    *p = '\0';
+    t_token.val = -lit;
+    t_token.kind = pIntLit;
   } else if (*t_ptr=='\'') {
     t_ptr++;
     t_token.kind = pStrLit;
@@ -890,11 +1030,34 @@ t_getNextToken()
   }
 }
 
+t_hit_Eof ()
+{
+    if (t_including_file)
+    {
+        fclose (t_src);
+        t_including_file = 0;
+        t_src = t_src_includer;
+        t_lineBuffer[0] = '\0';
+        t_ptr = t_lineBuffer;
+        t_lineListed = 1;
+        t_getNextToken();
+    }
+    else
+    {
+        t_token.kind = pEof;
+    }
+}
+
+
 t_addId(buffer,kind)
 char *buffer;
 short kind;
 {
-  t_idTable[t_idTableNext].buflen = strlen(buffer);
+  short  name_length;
+
+  name_length = strlen (buffer);
+  t_idTable[t_idTableNext].buflen = name_length;
+  t_idTable[t_idTableNext].buffer = (char *) malloc (name_length+1);
   strcpy(t_idTable[t_idTableNext].buffer,buffer);
   t_idTable[t_idTableNext].kind = kind;
   t_idTable[t_idTableNext].idKind = kUnknown;  /* for user-id's */
@@ -907,19 +1070,39 @@ t_lookupId()
   short i;
   register char *a,*b;
 
-  for (i=0;i<t_idTableNext;i++) {
-    if (t_token.buflen==t_idTable[i].buflen) {
-      a = t_token.buffer;
-      b = t_idTable[i].buffer;
-      while (t_upper[*a++]==t_upper[*b++]) {
-        if (!*a) {   /* match */
-          t_token.kind = t_idTable[i].kind;  /* for built-in ids */
-          t_token.val = i;                   /* for user-defined ids */
-          return;
+  if (case_sensitive)
+  {
+    for (i=0;i<t_idTableNext;i++) {
+      if (t_token.buflen==t_idTable[i].buflen) {
+        a = t_token.buffer;
+        b = t_idTable[i].buffer;
+        while (*a++ == *b++) {
+          if (!*a) {   /* match */
+            t_token.kind = t_idTable[i].kind;  /* for built-in ids */
+            t_token.val = i;                   /* for user-defined ids */
+            return;
+          }
         }
       }
     }
   }
+  else /* case insensitive */
+  {
+    for (i=0;i<t_idTableNext;i++) {
+      if (t_token.buflen==t_idTable[i].buflen) {
+        a = t_token.buffer;
+        b = t_idTable[i].buffer;
+        while (t_upper[*a++]==t_upper[*b++]) {
+          if (!*a) {   /* match */
+            t_token.kind = t_idTable[i].kind;  /* for built-in ids */
+            t_token.val = i;                   /* for user-defined ids */
+            return;
+          }
+        }
+      }
+    }
+  }
+
   t_token.val = t_idTableNext;
   t_addId(t_token.buffer,pIdent);
 }
@@ -992,8 +1175,48 @@ char *msg;
 t_dumpTables()
 {
   short i,count;
+  struct rule_addr {
+      char *name;
+      short addr;
+      struct rule_addr *next;
+  };
+  struct rule_addr *head, *curr, *prev, *new_rule;
+  int rule_table_size;
+  
   printf("\nWriting Files...\n");
-/*
+
+  /* Build list of rule addresses, sorted by address (insertion sort) */
+
+  rule_table_size = 0;
+  head = NULL;
+  for (i = 0; i < t_idTableNext; i++)
+  {
+      if (t_idTable[i].kind == pIdent &&
+          t_idTable[i].idKind == kRule)
+      {
+          new_rule = (struct rule_addr *) malloc (sizeof(struct rule_addr));
+          new_rule->name = t_idTable[i].buffer;
+          new_rule->addr = t_idTable[i].val;
+          new_rule->next = NULL;
+          rule_table_size++;
+          if (head == NULL)
+              head = new_rule;
+          else
+          {
+              curr = head;
+              prev = NULL;
+              while (curr != NULL && curr->addr < new_rule->addr)
+              {
+                  prev = curr;
+                  curr = curr->next;
+              }
+              prev->next = new_rule;
+              new_rule->next = curr;
+          }
+      }
+  }
+
+#if 0
   fprintf(t_doc,"Id table:\n\n");
   for (i=0; i<t_idTableNext; i++) {
     fprintf(t_doc,"%d: %s\n",i,t_idTable[i].buffer);
@@ -1010,15 +1233,55 @@ t_dumpTables()
   for (i=0; i<dStrTableNext; i++)
     fprintf(t_doc,"%s  '%s'\n",t_idTable[dStrTable[i].val].buffer,
                                dStrTable[i].buffer);
-*/
-  fprintf(t_out,"%s\n%d\n\n",w_targetTitle,w_here);
-  for (i=0; i<w_here; i++)
-    fprintf(t_out,"%d\n",w_outTable[i]);
+#endif 0
+
+
+  /*  Write table  */
+
+    if (t_generate_C)
+    {
+        fprintf (t_out, "/* Automatically generated by ssl */\n\n");
+        fprintf (t_out, "char *w_title_string = \"%s\";\n\n", w_targetTitle);
+        fprintf (t_out, "short w_codeTable[] = {\n\t");
+        for (i = 0; i < w_here; i++)
+        {
+            fprintf (t_out, "%d, ", w_outTable[i]);
+            if ((i & 15) == 15)
+                fprintf (t_out, "\n\t");
+        }
+        fprintf (t_out, "\n};\n\n");
+        /* output rule addresses */
+        fprintf (t_out, "int w_ruleTableSize = %d;\n", rule_table_size);
+        fprintf (t_out, "struct {\n  char *name;\n  short addr;\n} w_ruleTable[] = {\n");
+        for (curr = head; curr != NULL; curr = curr->next)
+        {
+            fprintf (t_out, "\t{\"%s\",\t%d},\n", curr->name, curr->addr);
+        }
+        fprintf (t_out, "};\n");
+    }
+    else
+    {
+        /* output code */
+        fprintf (t_out, "%s\n%d\n\n", w_targetTitle, w_here);
+        for (i=0; i<w_here; i++)
+            fprintf (t_out, "%d\n", w_outTable[i]);
+        /* output rule addresses */
+        fprintf (t_out, "%d\n", rule_table_size);
+        for (curr = head; curr != NULL; curr = curr->next)
+        {
+            fprintf (t_out, "%s\t%d\n", curr->name, curr->addr);
+        }
+    }
+
+  /*  Write debug file  */
+
   if (t_debugOut) {
     fprintf(t_dbg,"%d\n",t_lineNumber);
     for (i=1; i<=t_lineNumber; i++)
       fprintf(t_dbg,"%d\n",w_lineTable[i]);
   }
+
+  /*  Write header file  */
 
   fprintf(t_hdr,"#define w_codeTableSize %d\n\n",w_here+50);
   for (i=0; i<t_idTableNext; i++)
@@ -1046,3 +1309,150 @@ t_dumpTables()
 
 }
 
+
+/* Optimize generated table */
+
+w_optimize_table ()
+{
+    short  pc, target, final_target;
+    short  options;
+    short  improved_count;
+    short  improved_case_jump_count;
+    short  find_ultimate_destination();
+
+    /*  keep track of when next choice table is coming up  */
+    short  choice_table [dPatchCTAsize], choice_table_sp;
+
+    printf ("\nOptimizing table...\n");
+
+    choice_table_sp = 0;
+
+    /* Convert a chain of jumps into a single jump */
+
+    improved_count = 0;
+    improved_case_jump_count = 0;
+
+    pc = 0;
+    while (pc < w_here)
+    {
+        if (choice_table_sp > 0  &&
+            choice_table [choice_table_sp] == pc)
+        {
+            /* skip past choice table ... maybe optimize it too */
+
+            options = w_outTable [pc++];
+            /* pc += 2 * options; */
+
+            while (options > 0)
+            {
+                pc++;
+                target = pc - w_outTable[pc];
+                final_target = find_ultimate_destination (target);
+                if ((final_target != target) &&
+                    (final_target < pc))
+                {
+                    w_outTable[pc] = pc - final_target;
+                    improved_case_jump_count++;
+                    improved_count++;
+                }
+                pc++;
+                options--;
+            }
+
+            choice_table_sp--;
+            continue;
+        }
+
+        switch (w_outTable[pc++])
+        {
+            case oJumpForward :
+                    target = pc + w_outTable[pc];
+                    final_target = find_ultimate_destination (target);
+                    if (final_target != target)
+                    {
+                        improved_count++;
+                        if (final_target > pc)
+                        {
+                            w_outTable [pc-1] = oJumpForward;
+                            w_outTable [pc] = final_target - pc;
+                        }
+                        else
+                        {
+                            w_outTable [pc-1] = oJumpBack;
+                            w_outTable [pc] = pc - final_target;
+                        }
+                    }
+                    pc++;
+                    continue;
+
+            case oJumpBack :
+                    target = pc - w_outTable[pc];
+                    final_target = find_ultimate_destination (target);
+                    if (final_target != target)
+                    {
+                        improved_count++;
+                        if (final_target > pc)
+                        {
+                            w_outTable [pc-1] = oJumpForward;
+                            w_outTable [pc] = final_target - pc;
+                        }
+                        else
+                        {
+                            w_outTable [pc-1] = oJumpBack;
+                            w_outTable [pc] = pc - final_target;
+                        }
+                    }
+                    pc++;
+                    continue;
+
+            case oInputChoice :
+            case oChoice :
+                    choice_table [++choice_table_sp] = pc + w_outTable[pc];
+                    pc++;
+                    continue;
+
+            case oInput :
+            case oEmit :
+            case oError :
+            case oCall :
+            case oSetResult :
+            case oSetParameter :
+                    pc++;
+                    continue;
+
+            case oInputAny :
+            case oReturn :
+            case oEndChoice :
+                    continue;
+
+            default :
+                    continue;
+        }
+    }
+    printf ("Reduced %d jump instructions\n", improved_count);
+    if (improved_case_jump_count)
+        printf ("including %d jumps directly from a case.\n",
+                improved_case_jump_count);
+}
+
+short find_ultimate_destination (pc)
+short                      pc;
+{
+    while (1)
+    {
+        if (w_outTable[pc] == oJumpForward)
+        {
+            pc++;
+            pc += w_outTable[pc];
+        }
+        else if (w_outTable[pc] == oJumpBack)
+        {
+            pc++;
+            pc -= w_outTable[pc];
+        }
+        else
+            break;
+    }
+
+    return (pc);
+}

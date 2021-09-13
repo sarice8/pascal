@@ -16,11 +16,9 @@
 
 #include <stdio.h>
 #include <string.h>
-
-#ifdef AMIGA
-   /* for onbreak() */
 #include <dos.h>
-#endif
+
+/* (uses dos.h for onbreak function) */
 
 FILE *src,*out,*hdr,*doc,*lst;
 
@@ -136,26 +134,24 @@ char *argv[];
     printf("Can't open source file %s\n",token.buffer);
     return(-1);
   }
-  if((out=fopen("a.tbl","w"))==NULL) {
+  if((out=fopen("ram:a.tbl","w"))==NULL) {
     printf("Can't open output file a.tbl\n");
     return(-1);
   }
-  if((hdr=fopen("a.h","w"))==NULL) {
+  if((hdr=fopen("ram:a.h","w"))==NULL) {
     printf("Can't open output file a.h\n");
     return(-1);
   }
-  if((doc=fopen("a.doc","w"))==NULL) {
+  if((doc=fopen("ram:a.doc","w"))==NULL) {
     printf("Can't open output file a.doc\n");
     return(-1);
   }
-  if((lst=fopen("a.lst","w"))==NULL) {
+  if((lst=fopen("ram:a.lst","w"))==NULL) {
     printf("Can't open output file a.lst\n");
     return(-1);
   }
 
-#ifdef AMIGA
   onbreak(&hit_break);
-#endif
 
   initScanner();
 
@@ -960,7 +956,6 @@ dumpTables()
   for (i=0; i<stringTableNext; i++)
     fprintf(doc,"%s  '%s'\n",identTable[stringTable[i].val].buffer,
                              stringTable[i].buffer);
-  fprintf(out,"...Title...\n");
   fprintf(out,"%d\n\n",codeTableNext);
   for (i=0; i<codeTableNext; i++)
     fprintf(out,"%d\n",codeTable[i]);
@@ -1001,7 +996,7 @@ writeHeader()
   fprintf(hdr,"} w_errTable[] = {\n");
   for (i=0; i<identTableNext; i++)
     if (identTable[i].kind == kIdent &&
-        identTable[i].identKind == ikError) {
+        identTable[i].idKind == ikErr) {
       fprintf(hdr,"   \"%s\", %d,\n",identTable[i].buffer,
                                      identTable[i].val);
       count++;
@@ -1009,4 +1004,3 @@ writeHeader()
   fprintf(hdr,"   \"\", 0\n};\n#define w_errTableSize %d\n",count);
 
 }
-

@@ -1,4 +1,4 @@
-title: 'SSL Translator 1.2.3 -- Mar 26 ''91';
+title: 'SSL Translator 1.2.7 -- June 4 ''91';
 %
 %  ssl.ssl
 %
@@ -12,6 +12,13 @@ title: 'SSL Translator 1.2.3 -- Mar 26 ''91';
 %    20Mar91   Change to ssl.c: Increased string table size
 %    26Mar91   Fixed bug in handling of statement ">>value".
 %              Fixed bug in handling of choice using a choice rule defined later
+%    24Apr91   Change to ssl.c: Increased identifier size to 50 characters
+%    05May91   Change to ssl.c: Increased identifier table size to 600,
+%              and moved names out of table. New limit 256 chars.
+%              Added "include" feature.
+%    21May91   Multiple "error" sections will use distinct error #'s.
+%              Added postprocess optimization: reduce chains of jumps.
+%    04Jun91   Change to ssl.c: Write rule addresses to code file.
 %
 %  BUGS:
 %    28Jan90   Doesn't complain if functions called but never declared!	
@@ -73,6 +80,7 @@ input:
    pType
    pError
    pMechanism
+   pInclude
    pRules
    pEnd;
 
@@ -128,7 +136,7 @@ type boolean:
 type number:
    zero            = 0
    one             = 1
-   numberSystemOps = 13;   % # for the first user operation
+   numberSystemOps = 14;   % # for the first user operation
 
 type kind:
    kIllegal        % not an identifier
@@ -149,6 +157,11 @@ mechanism count:
    oCountInc
    oCountDec
    oCountZero >> boolean;    % is the top counter 0?
+
+mechanism next_error:                % variable to determine error #
+   oNextErrorPushCount               % push variable onto Count stack
+   oNextErrorPopCount;               % pop variable off Count stack
+
 
 mechanism value:                     % multi-purpose stack
    oValuePushKind(kind)              % push a kind value
@@ -236,12 +249,19 @@ mechanism doc:         % display documentary info
    oDocNewRule         % print "Rule <token>"
    oDocCheckpoint;     % display current pc value, for debugging
 
+mechanism include_mech:
+   oInclude;           % include the SSL file whose name is in the
+                       % string token just accepted
 
 rules
 
 ProcessSSL:
+
+   oCountPush(zero)                % set variable to track error #
+   oNextErrorPopCount
+
    oCountPush(numberSystemOps)     % this counter is used to
-                                    %   give code #'s to semantic operations
+                                   %   give code #'s to semantic operations
    {[
       | pTitle :
          ':'
@@ -250,15 +270,21 @@ ProcessSSL:
          ';'
       | pInput :
          oValuePushKind(kInput)
+         oCountPush(zero)
          @ReadIdList
+         oCountPop
          oValuePop
       | pOutput :
          oValuePushKind(kOutput)
+         oCountPush(zero)
          @ReadIdList
+         oCountPop
          oValuePop
       | pError :
          oValuePushKind(kError)
+         oNextErrorPushCount
          @ReadIdList
+         oNextErrorPopCount
          oValuePop
       | pType :
          pIdent
@@ -268,9 +294,14 @@ ProcessSSL:
          oIdentSetType            % record it in itself
          oValuePushIdent          % type #, for following values
          oValuePushKind(kVal)
+         oCountPush(zero)
          @ReadIdList
+         oCountPop
          oValuePop
          oValuePop
+      | pInclude :
+         pStrLit
+         oInclude
       | pMechanism :
          pIdent
          oIdentSetDeclared
@@ -300,9 +331,8 @@ ProcessSSL:
    @FixForwardCalls
    oCountPop;
 
-ReadIdList:
+ReadIdList:     % initial # to use is on count stack
    ':'
-   oCountPush(zero)
    {[
       | pIdent :
          oIdentSetDeclared
@@ -337,7 +367,6 @@ ReadIdList:
       | * :
          >
    ]}
-   oCountPop
    ';';
 
 
