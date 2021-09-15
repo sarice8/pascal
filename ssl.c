@@ -105,6 +105,7 @@ int    option_generate_C;   /* generate a table in C code? */
 int    option_optimize;     /* perform optimization postprocess? */
 int    option_verbose;      /* verbose output */
 int    option_debug;        /* run ssl compiler under debugger */
+int    option_no_warning;   /* don't report warning messages */
 
 int    option_list_code;    /* write generated code in listing file too */
 short  list_code_previous_location;
@@ -112,11 +113,11 @@ short  list_code_previous_location;
 /*************** Variables for semantic mechanisms ***************/
 
 
-#define w_outTableSize 5000
+#define w_outTableSize 10000
 short   w_outTable[w_outTableSize];     /* Emit into this table */
 short   w_here;                         /* Output position */
 
-#define w_lineTableSize 3000            /* Max # lines for debug table */
+#define w_lineTableSize 5000            /* Max # lines for debug table */
 short   w_lineTable[w_lineTableSize];   /* Line# of every instruction */
 
 
@@ -232,6 +233,7 @@ char *argv[];
     option_optimize = 0;
     option_verbose = 0;
     option_debug = 0;
+    option_no_warning = 0;
 
     option_list_code = 0;
     list_code_previous_location = 0;
@@ -252,6 +254,8 @@ char *argv[];
                 option_optimize = 1;
             else if (*p=='v')
                 option_verbose = 1;
+            else if (*p=='q')
+                option_no_warning = 1;
             else if (*p=='r')
             {
                 option_list_code = 1;
@@ -275,12 +279,13 @@ char *argv[];
 
     if (arg>=argc)
     {
-        printf("Usage:  ssl [-l] [-d] [-o] [-c] [-v] [-r] [-s] file\n");
+        printf("Usage:  ssl [-l] [-d] [-o] [-c] [-v] [-q] [-r] [-s] file\n");
         printf("        -l: produce listing file\n");
         printf("        -d: produce debugging file\n");
         printf("        -o: optimize code table\n");
         printf("        -c: produce C code for table\n");
         printf("        -v: verbose\n");
+        printf("        -q: quiet (no warning messages reported)\n");
         printf("        -r: report generated code in listing file\n");
         printf("        -s: run ssl compiler under symbolic debugger\n");
 #ifndef DEBUG
@@ -313,11 +318,7 @@ char *argv[];
     ssl_set_recovery_token (pSemiColon);
 
 
-    /* Need to call listing callback for debug_out too, in order to
-       collect line table data */
-
-    if (option_list || option_debug_out)
-        ssl_set_listing_callback (my_listing_function);
+    /* Listing callback will be made by oStartListing at start of second pass.  */
 
 
     ssl_set_init_operations_callback (init_my_operations);
@@ -559,18 +560,24 @@ long                      *next_operation;
 /* Pre-define some type identifiers.  Want to do this in SSL code
    eventually.  */
 
-install_system_types (int_type)
-NODE_PTR             *int_type;
+install_system_types (int_type, token_type)
+NODE_PTR             *int_type, *token_type;
 {
     short      id;
     NODE_PTR   node_ptr;
 
     id = ssl_add_id ("int", pIdent);
-
     node_ptr = nodeNew (nType);
     nodeSetValue (node_ptr, qIdent, id);
     nodeAppend (dSS[dSSptr], qDecls, node_ptr);
     *int_type = node_ptr;
+
+    id = ssl_add_id ("token", pIdent);
+    node_ptr = nodeNew (nType);
+    nodeSetValue (node_ptr, qIdent, id);
+    nodeAppend (dSS[dSSptr], qDecls, node_ptr);
+    *token_type = node_ptr;
+
 }
 
 /* ----------------------------------------------------------------------- */
@@ -585,13 +592,31 @@ short    dTemp;                            /* multi-purpose */
     /* built-in Emit operation is handled by application */
 
     case oEmit :
+            if (w_here >= w_outTableSize)
+                ssl_fatal ("SSL code table overflow");
             w_outTable[w_here++] = ssl_code_table[ssl_pc++];
+            continue;
+
+
+    /* Mechanism scanner_mech */
+
+    case oResetInput :
+            ssl_reset_input();
+            continue;
+    case oStartListing :
+            /* Just turn on listing during second pass, to get code addresses. */
+            /* Need to call listing callback for debug_out too, in order to
+               collect line table data */
+            if (option_list || option_debug_out)
+                ssl_set_listing_callback (my_listing_function);
             continue;
 
 
     /* Mechanism warning_mech */
 
     case oWarning :
+            if (option_no_warning)
+                continue;
             switch (ssl_param)
             {
                 case wRuleMissingAtSign:
@@ -607,6 +632,15 @@ short    dTemp;                            /* multi-purpose */
             }
             continue;
 
+
+    /* Mechanism more_errors_mech */
+
+    case oUndeclaredRule :
+            sprintf (ssl_error_buffer, "Rule '%s' was referenced but never declared",
+                     ssl_get_id_string(ssl_param));
+            ssl_error (ssl_error_buffer);
+            break;
+            continue;
 
     /* Mechanism emit_mech */
 
@@ -842,7 +876,8 @@ short    dTemp;                            /* multi-purpose */
             install_system_operations (&ssl_var_stack[ssl_param]);
             continue;
     case oInstallSystemTypes:
-            install_system_types (&(NODE_PTR)(ssl_var_stack[ssl_param]));
+            install_system_types (&(NODE_PTR)(ssl_var_stack[ssl_argv(0,2)]),
+                                  &(NODE_PTR)(ssl_var_stack[ssl_argv(1,2)]));
             continue;
 
 
@@ -950,6 +985,12 @@ w_dump_tables ()
     int               rule_table_size;
     NODE_PTR          node_ptr;
   
+    if (ssl_error_count > 0)
+    {
+        printf ("\nNot writing files due to errors\n");
+        return;
+    }
+
     printf ("\nWriting Files...\n");
 
     /* Build list of rule addresses, sorted by address (insertion sort) */
@@ -1043,7 +1084,10 @@ w_dump_tables ()
 
     /*  Write header file  */
 
-    fprintf(f_hdr,"#define SSL_CODE_TABLE_SIZE %d\n\n", w_here+50);
+    /*  Round up the code table size so we only need to recompile the
+        application C code occasionally.  */
+    fprintf(f_hdr,"#define SSL_CODE_TABLE_SIZE %d\n\n",
+                  ((w_here/100)+2)*100);
 
     for (node_ptr = nodeGet(dGlobalScope, qDecls);
          node_ptr != NULL;
@@ -1051,7 +1095,7 @@ w_dump_tables ()
     {
         switch (nodeType(node_ptr))
         {
-            case nInput:
+            /* case nInput: */
             case nOutput:
             case nError:
             case nValue:

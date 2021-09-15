@@ -1,6 +1,6 @@
 %  sccsid = "%W% %G% %U% %P%";
 
-title: 'SSL Translator 1.3.0 -- August 23 ''93';
+title: 'SSL Translator 1.3.2 -- September 14 ''93';
 
 %
 % *****************************************************************************
@@ -41,14 +41,11 @@ title: 'SSL Translator 1.3.0 -- August 23 ''93';
 %            |        | instructions in generated code).
 %   08/29/93 |        | Reimplement compiler using above new language features
 %            |        | (typically using local variables rather than stacks)
+%   09/14/93 |        | Split into two passes: collect definitions, generate
+%            |        | code for rules.  So user is not required to provide
+%            |        | forward definitions for rules with out parameters.
 %            |        |
 % 
-% *****************************************************************************
-%
-%   BUGS
-% -----------------------------------------------------------------------------
-%   01/28/90 | Doesn't complain if functions called but never declared!	
-%
 % *****************************************************************************
 %
 
@@ -157,6 +154,7 @@ error:
 
 
 
+
 % Generated automatically by schema
 
 type node_type:
@@ -203,13 +201,9 @@ type boolean:
     no       = 0
     yes      = 1;
 
-type number:
-    zero            = 0
-    one             = 1
-    ;
-
 type warning:
     wRuleMissingAtSign
+    wReturnValueIgnored
     ;
 
 type Node:     % A pointer to a node in the schema database (symbol database)
@@ -230,9 +224,24 @@ type kind:
     kVar
     ;
 
+type pass:
+    CollectDefinitionsPass
+    CodeGenerationPass
+    ;
+
+mechanism scanner_mech:
+    oResetInput               % reset input to start (if required)
+    oStartListing             % start listing if requested; collect debug line numbers
+    ;
+
 mechanism warning_mech:
     oWarning (warning);       % issue warning message,
                               % continue normally (not in error recovery mode)
+
+mechanism more_errors_mech:
+    oUndeclaredRule (int id)     % Report that rule id was referenced, but never
+                                 % declared (i.e. no body).  No error recovery mode.
+    ;
 
 mechanism emit_mech:
     oEmitInt (int)            % emit an integer into the generated code
@@ -335,6 +344,7 @@ rules
 
 % ---------------------- Global Variables --------------------
 
+pass    CurrentPass         % which of two passes are we in?
 Node    IntType             % nType node for built-in "int" type
 Node    CurrentRule         % nRule node for current rule being declared
 int     NumGlobals          % number of global variables in program
@@ -346,48 +356,18 @@ Node    GlobalScope         % global nScope
 
 % -------------------- Forward Declarations ------------------
 
-Section >> boolean;
-ValueList (node_type class, inout int value, boolean str_alias_allowed, Node t);
-OperationDefinition >> boolean;
-RuleSectionDefinition >> boolean;
-RuleBodyDefinition (Node r);
-RuleRedefinition (Node r);
-Statement >> boolean;
-CallOperation (Node o);
-ActualParams (Node r) >> int;
-CallRule (Node r);
-CallUndefinedRule;
-Assignment (Node i);
-CopyChoiceTable (int num_options);
-Expr (out Node t);
-Lvalue (out Node t);
-Lvalue_HaveIdent (Node i, out Node t);
-Const (out Node t) >> int;
-IntConst >> int;
-LookupType (out Node i);
-LookupInput (out Node i);
-LookupOutput (out Node i);
-LookupValue (out Node i);
-LookupError (out Node i);
-RequireType (Node i);
-RequireInput (Node i);
-RequireOutput (Node i);
-RequireValue (Node i);
-RequireError (Node i);
-RequireRule (Node i);
-RequireNoType (Node r);
-RequireMatchValueType (Node v, Node t);
-MatchType (Node t1, Node t2) >> boolean;
-RequireMatchType (Node t1, Node t2);
-MatchIntType (Node t) >> boolean;
-RequireMatchIntType (Node t);
-EmitValue (Node i);
-EmitAddr (Node v);
-
 % ------------------------- Main Parser ----------------------
 
 ProcessSSL:
-    int   global_space_addr  % address of iGlobalSpace arg for global vars
+    @CollectDefinitions     % first pass through input
+    oResetInput
+    @CodeGeneration         % second pass through input
+    ;
+
+
+CollectDefinitions:
+
+    CurrentPass = CollectDefinitionsPass
 
     oScopeBegin (GlobalScope)
 
@@ -398,9 +378,28 @@ ProcessSSL:
     oInstallSystemTypes (IntType)
 
     NumGlobals = 0                 % Count global variables
-    .iGlobalSpace                  % Make space for global variables
-    global_space_addr = Here   .iSpace
 
+    {[ @Section
+        | true:
+        | *:  >
+    ]}
+
+    oScopeEnd
+    ;
+
+
+CodeGeneration:
+
+    CurrentPass = CodeGenerationPass
+
+    oScopeOpen (GlobalScope)   % Re-open scope
+
+    oStartListing   % Listing done in second pass, so it contains
+                    % addresses of generated code.
+                    % Also, collects line numbers for debugging.
+
+    % Make space for global variables (inc because addressed from 1, not 0)
+    inc (NumGlobals)   .iGlobalSpace  oEmitInt(NumGlobals)
 
     {[ @Section
         | true:
@@ -408,9 +407,7 @@ ProcessSSL:
     ]}
 
     @FixForwardCalls
-
-    inc (NumGlobals)   % because globals addressed from 1 (addr 0 unused)
-    oPatch (global_space_addr, NumGlobals)
+    @VerifyAllRulesDeclared
 
     oScopeEnd
 
@@ -422,20 +419,38 @@ ProcessSSL:
 
 Section >> boolean:
 
-    [
-        | pTitle:      @Title
-        | pInput:      @Input
-        | pOutput:     @Output
-        | pError:      @Error
-        | pType:       @Type
-        | pInclude:    @Include
-        | pMechanism:  @Mechanism
-        | pRules:      @Rules
+    [ CurrentPass
+        | CollectDefinitionsPass :
+            [
+                | pTitle:      @Title
+                | pInput:      @Input
+                | pOutput:     @Output
+                | pError:      @Error
+                | pType:       @Type
+                | pInclude:    @Include
+                | pMechanism:  @Mechanism
+                | pRules:      @Rules
+                | pEof:        >> false      % end of file
+            ]
 
-        | pEof:        >> false      % end of file
+        | CodeGenerationPass :
+            [
+                | pTitle, pInput, pOutput, pError, pType, pMechanism :
+                               @SkipSection
+
+                | pInclude:    @Include
+                | pRules:      @Rules
+                | pEof:        >> false      % end of file
+            ]
     ]
     >> true
     ;
+
+SkipSection:
+    {[
+        | ';' : >
+        | * :   ?
+    ]};
 
 % ------------------------- Sections -------------------------
 
@@ -461,16 +476,30 @@ Error:
     @ValueList (nError, NextError, false, Null)
     ';';
 
+
 Type:
     Node  t
     int   next_value
 
-    pIdent  t = oNodeNew (nType)  oNodeSetInt (t, qIdent, LAST_ID)
-    oScopeDeclare (t)
+    pIdent
+    [ oScopeFind (t)
+        | false:
+            t = oNodeNew (nType)  oNodeSetInt (t, qIdent, LAST_ID)
+            oScopeDeclare (t)
+
+        | true:
+
+            % Extend existing definition (to add more values)
+            % Note, new values will start from 0 again unless told otherwise!
+
+            @RequireType (t)
+    ]
+
     ':'
     next_value = 0
     @ValueList (nValue, next_value, false, t)
     ';';
+
 
 Include:
     pStrLit oInclude;
@@ -566,6 +595,15 @@ DeclareLocals (Node t):
     @DeclareVariables (nLocal, t, NumLocals);
 
 
+%  Skip list of global variables, during second pass.
+
+SkipGlobals:
+    {
+        pIdent
+        [ | ',' : | * : > ]
+    };
+
+
 %  Defines formal parameters (if any) in current scope.
 %  The caller should have called oScopeBegin to begin a
 %  scope just for parameters.  (This gives a simple way
@@ -640,10 +678,9 @@ FormalParamDefinition (Node scope):
     }
     ;
 
-%  Redefine formal parameters during declaration of actual rule (with body).
+%  Redefine formal parameters, perhaps during declaration of actual rule (with body).
 %  Previously, parameters were declared by a forward declaration or by usage.
 %  Ensure that types match.  Update parameter names to new names given.
-%  (All parameters must be named since this will be the final declaration).
 %
 %  Previous parameter nScope is given, and scope has been opened.
 %  (Addresses were assigned previously, no need to do it again).
@@ -689,7 +726,10 @@ FormalParamRedefinition (Node scope):
         @RequireMatchType (t, t2)
 
         % parameter name
-        pIdent  oNodeSetInt (p, qIdent, LAST_ID)    % must be named
+        [
+            | pIdent :  oNodeSetInt (p, qIdent, LAST_ID)
+            | * :       oNodeSetInt (p, qIdent, 0)   % currently unnamed
+        ]
 
         oNodeNext (p)
 
@@ -758,14 +798,25 @@ RuleSectionDefinition >> boolean:
         | false:     @RuleDefinition
         | true:
             [ oNodeType(i)
-                | nType :  @DeclareGlobals(i)
-                | nRule :  @RuleRedefinition(i)    % Should be body of fwd declared rule
+                | nType :  [ CurrentPass
+                               | CollectDefinitionsPass :  @DeclareGlobals(i)
+                               | CodeGenerationPass :      @SkipGlobals
+                           ]
+                | nRule :  @RuleRedefinition(i)    % Probably body of fwd declared rule
                 | * :      #eNotRuleOrGlobalDefn  >> true  % True to skip to next
             ]
     ]
 
     >> true
     ;
+
+
+% Skip a rule body during first pass (may begin with ':', or may not be a body)
+SkipRule:
+    {[
+        | ';' : >
+        | * :   ?
+    ]};
 
 %   Define the parameters, and possibly the body, of a rule
 %   that has not been defined previously.
@@ -790,11 +841,17 @@ RuleDefinition:
       | * :
     ]
 
-    [
-        | ':' :  @RuleBodyDefinition (r)
-        | * :    % No body; a forward declaration of the rule.
+    [ CurrentPass
+        | CollectDefinitionsPass :
+            @SkipRule
+        | CodeGenerationPass :
+            [
+                | ':' :  @RuleBodyDefinition (r)
+                | * :    % No body; a forward declaration of the rule.
+            ]
+            ';'
     ]
-    ';'
+
 
     oScopeEnd            % parameters scope (already linked to nRule above)
 
@@ -861,9 +918,16 @@ RuleRedefinition (Node r):
       | * :     @RequireMatchType(t, Null)
     ]
 
-    ':'
-    @RuleBodyDefinition (r)
-    ';'
+    [ CurrentPass
+        | CollectDefinitionsPass :
+            @SkipRule
+        | CodeGenerationPass :
+            [
+                | ':' :  @RuleBodyDefinition (r)
+                | * :    % No body; a forward declaration of the rule.
+            ]
+            ';'
+    ]
 
     oScopeEnd            % parameters scope (already linked to nRule)
     ;
@@ -1055,10 +1119,19 @@ CallRule (Node r):
 %  Implicitly declare a rule that has not previously been declared.
 %  Rule name is last accepted identifier.
 %  Implicitly declares InParam parameters, and no return type.
+%
+%  Rule is declared in GlobalScope.
 
 CallUndefinedRule:
     Node  r, s, t, p
     int   id, num_params, addr
+
+    % Global scope opened so that rule will be declared in it,
+    % and so the parameters we declare for the rule will have the
+    % correct ParentScope
+
+    oScopeOpen (GlobalScope)
+
 
     r = oNodeNew (nRule)  id = LAST_ID  oNodeSetInt (r, qIdent, id)
     oNodeSetBoolean(r, qAddrDefined, false)
@@ -1082,6 +1155,7 @@ CallUndefinedRule:
               | * :   >
             ]
         }
+        ')'
 
         % Assign parameter addresses
 
@@ -1102,6 +1176,9 @@ CallUndefinedRule:
 
     oScopeEnd    % param scope
     oScopeDeclare (r)
+
+    oScopeEnd    % GlobalScope
+
 
     % Now call rule
 
@@ -1264,6 +1341,28 @@ FixForwardCalls:
         | true :    oPatchPopCall (patchCall)
         | * :       >
     ]};
+
+% Ensure that there are no rules referenced but never declared
+VerifyAllRulesDeclared:
+    Node  n
+    n = oNodeGet (GlobalScope, qDecls)
+    {
+        [ oNodeNull(n)
+            | true : >
+            | false :
+        ]
+
+        [ oNodeType(n)
+            | nRule :
+                [ oNodeGetBoolean (n, qAddrDefined)
+                    | false :   oUndeclaredRule(oNodeGetInt(n, qIdent))
+                    | * :
+                ]
+            | * :
+        ]
+
+        oNodeNext(n)
+    };
 
 %  ------------------------------------------------------- 
 
@@ -1459,7 +1558,7 @@ RequireRule (Node i):
 
 RequireNoType (Node r):
     [ oNodeNull (oNodeGet(r, qType))
-        | false: #eChoiceOpRuleOutOfPlace
+        | false: oWarning(wReturnValueIgnored)  % #eChoiceOpRuleOutOfPlace
         | * :
     ];
 

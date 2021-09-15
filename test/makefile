@@ -4,22 +4,22 @@
 ROOT           = /home/sarice/compilers
 
 # Generic SSL runtime module
-SSL_RT_DIR     = ${ROOT}/ssl_rt_2.0
+SSL_RT_DIR     = ${ROOT}/ssl_rt/2.0
 SSL_RT_HEADERS = ${SSL_RT_DIR}/ssl_rt.h \
                  ${SSL_RT_DIR}/ssl_begin.h \
                  ${SSL_RT_DIR}/ssl_end.h
 
-SCHEMA_DIR     = ${ROOT}/schema_1.3
+SCHEMA_DIR     = ${ROOT}/schema/1.3
 
-SSL_DIR        = ${ROOT}/ssl_1.3.1
+SSL_DIR        = ${ROOT}/ssl/1.3.2
 
 
 # ---------------------------------------------------------
 
 # Debug objects only required if compile with -DDEBUG
 
-DEBUG_DIR      = ${ROOT}/debug_1.3.0
-SSLTOOL_DIR    = ${ROOT}/ssltool_1.2.7
+DEBUG_DIR      = ${ROOT}/debug/1.3.0
+SSLTOOL_DIR    = ${ROOT}/ssltool/1.2.7
 
 DEBUG_OBJS     = ${DEBUG_DIR}/debug.o
 DEBUG_STUBS    = ${DEBUG_DIR}/dbgstub.o

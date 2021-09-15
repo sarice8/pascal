@@ -7,7 +7,6 @@ type node_type:
 	nScope
 	nDeclaration
 	nIdent
-	nInput
 	nOutput
 	nError
 	nType

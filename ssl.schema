@@ -27,9 +27,10 @@ nDeclaration =>
 
 nDeclaration ::= nIdent
 
-nIdent ::= nInput
-nInput =>
-	qValue:		Integer4
+% Input tokens are now recorded as nValue with qType == "token"
+%nIdent ::= nInput
+%nInput =>
+%	qValue:		Integer4
 
 nIdent ::= nOutput
 nOutput =>

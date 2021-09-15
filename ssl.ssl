@@ -1,6 +1,6 @@
 %  sccsid = "%W% %G% %U% %P%";
 
-title: 'SSL Translator 1.3.1 -- August 29 ''93';
+title: 'SSL Translator 1.3.2 -- September 14 ''93';
 
 %
 % *****************************************************************************
@@ -41,14 +41,11 @@ title: 'SSL Translator 1.3.1 -- August 29 ''93';
 %            |        | instructions in generated code).
 %   08/29/93 |        | Reimplement compiler using above new language features
 %            |        | (typically using local variables rather than stacks)
+%   09/14/93 |        | Split into two passes: collect definitions, generate
+%            |        | code for rules.  So user is not required to provide
+%            |        | forward definitions for rules with out parameters.
 %            |        |
 % 
-% *****************************************************************************
-%
-%   BUGS
-% -----------------------------------------------------------------------------
-%   01/28/90 | Doesn't complain if functions called but never declared!	
-%
 % *****************************************************************************
 %
 
@@ -165,11 +162,6 @@ type boolean:
     no       = 0
     yes      = 1;
 
-type number:
-    zero            = 0
-    one             = 1
-    ;
-
 type warning:
     wRuleMissingAtSign
     wReturnValueIgnored
@@ -193,9 +185,24 @@ type kind:
     kVar
     ;
 
+type pass:
+    CollectDefinitionsPass
+    CodeGenerationPass
+    ;
+
+mechanism scanner_mech:
+    oResetInput               % reset input to start (if required)
+    oStartListing             % start listing if requested; collect debug line numbers
+    ;
+
 mechanism warning_mech:
     oWarning (warning);       % issue warning message,
                               % continue normally (not in error recovery mode)
+
+mechanism more_errors_mech:
+    oUndeclaredRule (int id)     % Report that rule id was referenced, but never
+                                 % declared (i.e. no body).  No error recovery mode.
+    ;
 
 mechanism emit_mech:
     oEmitInt (int)            % emit an integer into the generated code
@@ -287,8 +294,8 @@ mechanism scope_mech:
 
 mechanism install_mech:
     oInstallSystemOperations (inout int next_operation)   % Predefine some operations
-    oInstallSystemTypes (out Node int_type)   % Predefine some types.
-                                              % Return nType declaration of int type.
+    oInstallSystemTypes (out Node int_type, out Node token_type)   % Predefine some types.
+                                              % Return nType declaration of types int, token.
     ;
 
 mechanism write_mech:
@@ -298,7 +305,9 @@ rules
 
 % ---------------------- Global Variables --------------------
 
+pass    CurrentPass         % which of two passes are we in?
 Node    IntType             % nType node for built-in "int" type
+Node    TokenType           % nType node for built-in "token" type (input tokens)
 Node    CurrentRule         % nRule node for current rule being declared
 int     NumGlobals          % number of global variables in program
 int     NumLocals           % number of local variables in current rule
@@ -350,7 +359,15 @@ EmitAddr (Node v);
 % ------------------------- Main Parser ----------------------
 
 ProcessSSL:
-    int   global_space_addr  % address of iGlobalSpace arg for global vars
+    @CollectDefinitions     % first pass through input
+    oResetInput
+    @CodeGeneration         % second pass through input
+    ;
+
+
+CollectDefinitions:
+
+    CurrentPass = CollectDefinitionsPass
 
     oScopeBegin (GlobalScope)
 
@@ -358,12 +375,31 @@ ProcessSSL:
     NextOperation = 0
 
     oInstallSystemOperations (NextOperation)
-    oInstallSystemTypes (IntType)
+    oInstallSystemTypes (IntType, TokenType)
 
     NumGlobals = 0                 % Count global variables
-    .iGlobalSpace                  % Make space for global variables
-    global_space_addr = Here   .iSpace
 
+    {[ @Section
+        | true:
+        | *:  >
+    ]}
+
+    oScopeEnd
+    ;
+
+
+CodeGeneration:
+
+    CurrentPass = CodeGenerationPass
+
+    oScopeOpen (GlobalScope)   % Re-open scope
+
+    oStartListing   % Listing done in second pass, so it contains
+                    % addresses of generated code.
+                    % Also, collects line numbers for debugging.
+
+    % Make space for global variables (inc because addressed from 1, not 0)
+    inc (NumGlobals)   .iGlobalSpace  oEmitInt(NumGlobals)
 
     {[ @Section
         | true:
@@ -371,9 +407,7 @@ ProcessSSL:
     ]}
 
     @FixForwardCalls
-
-    inc (NumGlobals)   % because globals addressed from 1 (addr 0 unused)
-    oPatch (global_space_addr, NumGlobals)
+    @VerifyAllRulesDeclared
 
     oScopeEnd
 
@@ -385,31 +419,50 @@ ProcessSSL:
 
 Section >> boolean:
 
-    [
-        | pTitle:      @Title
-        | pInput:      @Input
-        | pOutput:     @Output
-        | pError:      @Error
-        | pType:       @Type
-        | pInclude:    @Include
-        | pMechanism:  @Mechanism
-        | pRules:      @Rules
+    [ CurrentPass
+        | CollectDefinitionsPass :
+            [
+                | pTitle:      @Title
+                | pInput:      @Input
+                | pOutput:     @Output
+                | pError:      @Error
+                | pType:       @Type
+                | pInclude:    @Include
+                | pMechanism:  @Mechanism
+                | pRules:      @Rules
+                | pEof:        >> false      % end of file
+            ]
 
-        | pEof:        >> false      % end of file
+        | CodeGenerationPass :
+            [
+                | pTitle, pInput, pOutput, pError, pType, pMechanism :
+                               @SkipSection
+
+                | pInclude:    @Include
+                | pRules:      @Rules
+                | pEof:        >> false      % end of file
+            ]
     ]
     >> true
     ;
+
+SkipSection:
+    {[
+        | ';' : >
+        | * :   ?
+    ]};
 
 % ------------------------- Sections -------------------------
 
 Title:
     ':' pStrLit oTitleSet ';' ;
 
+% Input tokens are values of the predefined "token" type
 Input:
     int  next_value
     ':'
     next_value = 0
-    @ValueList (nInput, next_value, true, Null)
+    @ValueList (nValue, next_value, true, TokenType)
     ';';
 
 Output:
@@ -543,6 +596,15 @@ DeclareLocals (Node t):
     @DeclareVariables (nLocal, t, NumLocals);
 
 
+%  Skip list of global variables, during second pass.
+
+SkipGlobals:
+    {
+        pIdent
+        [ | ',' : | * : > ]
+    };
+
+
 %  Defines formal parameters (if any) in current scope.
 %  The caller should have called oScopeBegin to begin a
 %  scope just for parameters.  (This gives a simple way
@@ -617,10 +679,9 @@ FormalParamDefinition (Node scope):
     }
     ;
 
-%  Redefine formal parameters during declaration of actual rule (with body).
+%  Redefine formal parameters, perhaps during declaration of actual rule (with body).
 %  Previously, parameters were declared by a forward declaration or by usage.
 %  Ensure that types match.  Update parameter names to new names given.
-%  (All parameters must be named since this will be the final declaration).
 %
 %  Previous parameter nScope is given, and scope has been opened.
 %  (Addresses were assigned previously, no need to do it again).
@@ -666,7 +727,10 @@ FormalParamRedefinition (Node scope):
         @RequireMatchType (t, t2)
 
         % parameter name
-        pIdent  oNodeSetInt (p, qIdent, LAST_ID)    % must be named
+        [
+            | pIdent :  oNodeSetInt (p, qIdent, LAST_ID)
+            | * :       oNodeSetInt (p, qIdent, 0)   % currently unnamed
+        ]
 
         oNodeNext (p)
 
@@ -735,14 +799,25 @@ RuleSectionDefinition >> boolean:
         | false:     @RuleDefinition
         | true:
             [ oNodeType(i)
-                | nType :  @DeclareGlobals(i)
-                | nRule :  @RuleRedefinition(i)    % Should be body of fwd declared rule
+                | nType :  [ CurrentPass
+                               | CollectDefinitionsPass :  @DeclareGlobals(i)
+                               | CodeGenerationPass :      @SkipGlobals
+                           ]
+                | nRule :  @RuleRedefinition(i)    % Probably body of fwd declared rule
                 | * :      #eNotRuleOrGlobalDefn  >> true  % True to skip to next
             ]
     ]
 
     >> true
     ;
+
+
+% Skip a rule body during first pass (may begin with ':', or may not be a body)
+SkipRule:
+    {[
+        | ';' : >
+        | * :   ?
+    ]};
 
 %   Define the parameters, and possibly the body, of a rule
 %   that has not been defined previously.
@@ -767,11 +842,17 @@ RuleDefinition:
       | * :
     ]
 
-    [
-        | ':' :  @RuleBodyDefinition (r)
-        | * :    % No body; a forward declaration of the rule.
+    [ CurrentPass
+        | CollectDefinitionsPass :
+            @SkipRule
+        | CodeGenerationPass :
+            [
+                | ':' :  @RuleBodyDefinition (r)
+                | * :    % No body; a forward declaration of the rule.
+            ]
+            ';'
     ]
-    ';'
+
 
     oScopeEnd            % parameters scope (already linked to nRule above)
 
@@ -838,9 +919,16 @@ RuleRedefinition (Node r):
       | * :     @RequireMatchType(t, Null)
     ]
 
-    ':'
-    @RuleBodyDefinition (r)
-    ';'
+    [ CurrentPass
+        | CollectDefinitionsPass :
+            @SkipRule
+        | CodeGenerationPass :
+            [
+                | ':' :  @RuleBodyDefinition (r)
+                | * :    % No body; a forward declaration of the rule.
+            ]
+            ';'
+    ]
 
     oScopeEnd            % parameters scope (already linked to nRule)
     ;
@@ -862,11 +950,14 @@ Statement >> boolean:
             oScopeFindRequire(i)
             [ oNodeType(i)
 
-                | nInput:      .iInput @EmitValue(i)
+%  | nInput:      .iInput @EmitValue(i)
 
                 | nOperation:  @RequireNoType(i) @CallOperation(i)
 
                 | nType:       @DeclareLocals(i)
+
+                | nValue:      @RequireInput(i)
+                               .iInput @EmitValue(i)
 
                 | *:           @Assignment(i)
             ]
@@ -1107,7 +1198,7 @@ CallUndefinedRule:
     ];
 
 
-%  Already parsed pIdent and determined it is not a rule/type/operation.
+%  Already parsed pIdent and determined it is not a rule/type/operation/value.
 
 Assignment (Node i):
     Node t, t2
@@ -1187,10 +1278,8 @@ Choice:
                             choice_kind = kType
 
                         | kInput :        % input choice
-                            [ | pIdent :  @LookupInput(i)
-                              | pStrLit : oShortFormLookup(i) @RequireInput(i)
-                            ]
-                            val = oNodeGetInt (i, qValue)
+                            val = @Const(t)
+                            @RequireMatchTokenType(t)
                     ]
 
                     oPatchPushHere (patchChoiceTable)
@@ -1255,6 +1344,28 @@ FixForwardCalls:
         | true :    oPatchPopCall (patchCall)
         | * :       >
     ]};
+
+% Ensure that there are no rules referenced but never declared
+VerifyAllRulesDeclared:
+    Node  n
+    n = oNodeGet (GlobalScope, qDecls)
+    {
+        [ oNodeNull(n)
+            | true : >
+            | false :
+        ]
+
+        [ oNodeType(n)
+            | nRule :
+                [ oNodeGetBoolean (n, qAddrDefined)
+                    | false :   oUndeclaredRule(oNodeGetInt(n, qIdent))
+                    | * :
+                ]
+            | * :
+        ]
+
+        oNodeNext(n)
+    };
 
 %  ------------------------------------------------------- 
 
@@ -1370,6 +1481,10 @@ Const (out Node t) >> int:
         | pIntLit :
             val = TOKEN_VALUE
             t = IntType
+        | pStrLit :
+            oShortFormLookup (i)
+            val = oNodeGetInt (i, qValue)
+            t = oNodeGet (i, qType)
     ]
     >> val;
 
@@ -1416,9 +1531,10 @@ RequireType (Node i):
         | * :    #eNotAType
     ];
 
+%  Ensure that value is an input token (value of type "token")
 RequireInput (Node i):
-    [ oNodeType(i)
-        | nInput :
+    [ oNodeEqual(oNodeGet(i, qType), TokenType)
+        | true :
         | * :    #eNotInput
     ];
 
@@ -1486,6 +1602,11 @@ RequireMatchIntType (Node t):
         | * :     #eWrongType
     ];
 
+RequireMatchTokenType (Node t):
+    [ oNodeEqual (t, TokenType)
+        | true :
+        | * :     #eNotInput
+    ];
 
 %  ------------------------------------------------------- 
 

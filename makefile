@@ -12,7 +12,7 @@ SSL_RT_HEADERS = ${SSL_RT_DIR}/ssl_rt.h \
 SCHEMA_DIR     = ${ROOT}/schema/1.3
 
 # Existing SSL compiler used to build this one
-SSL_DIR        = ${ROOT}/ssl/1.3.0
+SSL_DIR        = ${ROOT}/ssl/1.3.1
 
 
 # ---------------------------------------------------------
