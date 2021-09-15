@@ -1,9 +1,14 @@
 
-SSL 1.2.7
+SSL 1.2.8        Aug 23 '93
 
-This is the original SSL compiler.  It is built by its own
-verison of SSL.  (hssl is the first version hardcoded in C).
+This is a version of the SSL compiler that generates output
+compatible with the generic runtime module ssl_rt 1.1.
 
-The output produced is not compatible with any version of
-the generic ssl_rt runtime module.  Client programs must
-provide their own table walkers and scanners.
+[ So, client programs may integrate with ssl_rt. ]
+
+In addition, this compiler is itself built using ssl_rt 1.1.
+So, it must be compiled by itself.
+
+The language permitted is the same as the original SSL, but some of the
+generated variable names are different (e.g. ssl_* instead of w_*)
+

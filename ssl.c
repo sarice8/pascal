@@ -1,52 +1,51 @@
+/**/
+static char sccsid[] = "%W% %G% %U% %P%";
+/**/
+
 /*
+*****************************************************************************
+*
+*   Syntax/Semantic Language Compiler
+*
+*   by Steve Rice
+*
+*   Aug 27, 1989
+*
+*****************************************************************************
+*
+*   ssl.c               Semantic operations for SSL compiler.
+*
+*   HISTORY
+*----------------------------------------------------------------------------
 
-  ssl.c    -- Amiga Syntax/Semantic Language Processor
-
-              This is the table walker for the ssl processor
-              written in ssl.
-
-  HISTORY
-    27Aug89    Hardcoded SSL processor written in C
-    31Aug89    SSL processor rewritten in SSL
-    02Sep89    Wrote table walker shell and SSL instructions
-    07Sep89    Finished implementing semantic operations
-    09Sep89    Produce optional listing file
-    18Oct89    Added 'title' section
-    02Feb90    Added debugger output (line # table for now)
-    21Feb90    Added hex constants (0xABCD)
-    20Mar91    Increased size of string shortform table
-    26Mar91    Fixed bug in handling of statement ">>value".
-               Failed inside choice due to stuff on IS stack above the
-               rule id, put there by choice.  Fixed with new mechanism
-               "oIdentISPushBottom".  (KLUDGE!)
-    24Apr91    Increased id size from 31 chars to 50 chars
-               Increased patch stack sizes
-               Increased output table size
-               Make ssl source case sensitive, but optionally insensitive
-    04May91    Increased id table size from 300 to 600.
-               Moved id names and string shortforms into separately allocated
-               memory, and changed length limit from 50 to 256 chars.
-               Added -c option to generate C code for the table.
-               Use the automatically generated C code table in this program.
-    05May91    Added "include" feature.
-    21May91    Added mechanism next_error.
-               Added table optimization: reduce chains of jumps into one jump.
-    04Jun91    Write rule addresses to code file.
-
+*   08/27/89 | Steve  | First version: hardcoded SSL processor written in C
+*   08/31/89 |        | SSL processor rewritten in SSL
+*   09/02/89 |        | Wrote table walker shell and SSL instructions
+*   09/07/89 |        | Finished implementing semantic operations
+*   09/09/89 |        | Produce optional listing file
+*   10/18/89 |        | Added 'title' section
+*   02/02/90 |        | Added debugger output (line # table for now)
+*   02/21/90 |        | Added hex constants (0xABCD)
+*   03/20/91 |        | Increased size of string shortform table
+*   03/26/91 |        | Fixed bug in handling of statement ">>value".
+*            |        | Failed inside choice due to stuff on IS stack
+*            |        | above the rule id, put there by choice.
+*            |        | Fixed with new mechanism oIdentISPushBottom (kludge)
+*   04/24/91 |        | Increased id size from 31 chars to 50 chars
+*            |        | Increased patch stack sizes
+*            |        | Increased output table size
+*            |        | Make SSL source case sensitive, but optionally
+*            |        |     insensitive
+*   05/05/91 |        | Added "include" feature
+*   05/21/91 |        | Added mechanism next_error
+*            |        | Added table optimization: reduce chains of jumps
+*   06/04/91 |        | Write rule addresses to code file.
+*   08/21/93 |        | Repackaged to use generic ssl runtime module,
+*            |        | scanner, and debugger (ssl_rt.o, ssl_scan.o, debug.o)
+*            |        | 
+*
+*****************************************************************************
 */
-
-int      case_sensitive = 1;
-
-
-/*  Define USE_C_TABLE to include C version of code table (in ssl.tbl).
- *  Undefine it to read the table from the file ssl.tbl.
- *  (In the second case, the data is just a dump of integers, no commas)
- *  (I should ALWAYS generate C form, but allow readers to read the
- *  C form at run time if desired).
- */
-
-#define  USE_C_TABLE
-
 
 
 #include <stdio.h>
@@ -56,132 +55,92 @@ int      case_sensitive = 1;
 #include <dos.h>
 #endif AMIGA
 
+/*  SSL Runtime module definitions  */
+#include "ssl_rt.h"
+
+/*  Version of runtime model required by programs compiled with this SSL  */
+#define TARGET_RUNTIME_VRS "RT 1.1 - Original SSL model, generic ssl_rt - 08/18/93"
+
+
+#ifdef DEBUG
+
+/*  Optionally integrate SSL debugger */
+
+#include "debug.h"
+#define DEBUG_FILE   "ssl.dbg"    /* SSL debug information */
+#define PROGRAM_FILE "ssl.lst"    /* SSL program listing */
+
+#endif /* DEBUG */
+
+
+/*  SSL definitions generated for this program  */
 #define  SSL_INCLUDE_ERR_TABLE
 #include "ssl.h"
 
-/* I only care about this if I want to read at run time */
-#define TABLE_FILE "ssl.tbl"   /* This is the ssl code to execute */
-
-
-/* The scanner is hardcoded in C.
-
-   Scanner variables start with 't_'.
-   Table walker variables start with 'w_'.
-   Convention: 
-     Semantic operations start with 'o'.
-     Corresponding data structures start with 'd'.
-
-   The code to walk is in w_codeTable (pointer=w_pc).
-   The output buffer is w_outTable (pointer=w_here).
-
-   A token is read and screened when oInput, oInputAny, or oInputChoice
-   is encountered.  When an id is accepted, set t_lastId to its code.
-
-   The various stacks here don't use the [0] entry.  The stack variable
-   points to the top entry.  Overflow is always checked; underflow is
-   never checked.
-
-   The first line in the table file is the title (version) of the processor.
-   The next word in the table file is the #entries.  The table can be
-   modified and reused without having to recompile the corresponding
-   semantic operations code, as long as 1) only the rules/title are changed
-   (not the inputs, outputs, types, errors, or mechanisms), and
-   2) the size of the table does not exceed the space compiled for it
-   (initially, a margin of 50 unused words is allocated).  This second
-   condition is checked automatically, but (1) is not.
-*/
-
-#ifdef   USE_C_TABLE
-
+/*  SSL code generated for this program  */
 #include "ssl.tbl"
 
-#else    USE_C_TABLE
 
-short    w_codeTable [w_codeTableSize];     /* size defined in .h file */
-
-#endif   USE_C_TABLE
+char    input_filename[256];
 
 
-FILE *t_src,*t_out,*t_hdr,*t_doc,*t_lst,*t_dbg;
-FILE *t_src_includer;
+char    list_out_filename[256];
+char    tbl_out_filename[256];
+char    hdr_out_filename[256];
+char    dbg_out_filename[256];
 
-int     t_including_file;
-
-#define t_lineSize 256
-#define t_bufferSize 256           /* also used for strlits */
-#define t_idSize (t_bufferSize-1)
-#define t_idTableSize 600
-
-char   t_lineBuffer[t_lineSize];
-char   *t_ptr;
-short  t_lineNumber;
-char   t_lineListed;
-short  t_lastId;                   /* code of last id accepted */
+FILE   *f_lst;
+FILE   *f_out; 
+FILE   *f_hdr; 
+FILE   *f_dbg; 
 
 /* user options */
 
-char   t_listing;                  /* do we want a listing file? */
-char   t_debugOut;                 /* do we want debugger output? */
-char   t_generate_C;               /* generate a table in C code? */
-char   option_optimize;       /* perform optimization postproces? */
-char   option_verbose;        /* verbose output */
+int    option_list;         /* want listing file? */
+int    option_debug_out;    /* generate debugger output? */
+int    option_generate_C;   /* generate a table in C code? */
+int    option_optimize;     /* perform optimization postprocess? */
+int    option_verbose;      /* verbose output */
+int    option_debug;        /* run ssl compiler under debugger */
 
-/* token kinds and id kinds are declared in the SSL code, not here */
-
-char t_upper[256],t_blank[256],t_idStart[256],t_idCont[256];
-char t_digit[256];
-short t_punct[256];
-
-struct t_tokenType {
-  char accepted;
-  char buffer[t_bufferSize+1];     /* used to hold StrLits (and ids) */
-  short buflen;
-  short val;                       /* user id code, int lit, etc */
-  short kind;                      /* pIdent, pIntLit, keyword code, etc */
-  short lineNumber;
-} t_token;
-
-struct t_idTableType {
-  char  *buffer;           /* name is stored in separately allocated memory */
-  short buflen;
-  short kind;
-  short idKind;
-  char declared;
-  char choice;
-  char param;
-  short val;                       /* code #, or rule address */
-  short idType;
-  short paramType;
-} t_idTable[t_idTableSize];
-short t_idTableNext;
-
-#define t_getToken   if (t_token.accepted) t_getNextToken
-
-/* Variables for table walker */
-
-#define w_stackSize 200
-short w_stack[w_stackSize],w_sp;   /* Call stack */
-short w_pc;                        /* Program counter */
-short w_result, w_param;           /* For oSetResult, oSetParam */
-short w_options;                   /* # choice options */
-char w_errBuffer[256];             /* build up err messages here */
-
-#ifndef USE_C_TABLE
-char w_title_string[t_lineSize];   /* Title of this SSL processor */
-#endif  USE_C_TABLE
-
-char w_targetTitle[t_lineSize];    /* Title of processor being compiled */
-
-#define w_outTableSize 5000
-short w_outTable[w_outTableSize];  /* Emit into this table */
-short w_here;                      /* Output position */
-short w_errorCount;                /* Number of error signals emitted */
-#define w_lineTableSize 3000       /* Max # lines for debug table */
-short w_lineTable[w_lineTableSize];/* Line# of every instruction */
 
 /*************** Variables for semantic mechanisms ***************/
 
-short dTemp;                       /* multi-purpose */
+/*
+ * Identifier attributes table.
+ *
+ * This table is parallel to the ssl scanner's ssl_id_table.
+ * i.e. they are both indexed by the identifier value.
+ * The identifier name and code (pIDENTIFIER, keyword code, etc)
+ * are stored in the ssl_id_table.
+ *
+ * (This table should be as large as the ssl_id_table.)
+ */
+
+struct id_table_struct
+{
+    short   kind;        /* kind of identifier in SSL program */
+    char    declared;
+    char    choice;
+    char    param;
+    short   val;         /* code #, or rule address */
+    short   type;        /* identifier's user defined type */
+    short   paramType;
+} id_table[ssl_id_table_size];
+
+
+#define w_outTableSize 5000
+short   w_outTable[w_outTableSize];     /* Emit into this table */
+short   w_here;                         /* Output position */
+
+#define w_lineTableSize 3000            /* Max # lines for debug table */
+short   w_lineTable[w_lineTableSize];   /* Line# of every instruction */
+
+
+char target_title[SSL_STRLIT_SIZE+1];   /* Title of processor being compiled */
+
+
+short dTemp;                            /* multi-purpose */
 
 #define dCSsize 30
 short dCS[dCSsize], dCSptr;        /* count stack */
@@ -202,18 +161,6 @@ struct dStrTableType {
 short dStrTableNext;
 
 /* code patch stacks */
-
-#if 0    /* These are the original values -- 24apr91 */
-#define dMarkSize 10               /* marks in the following patch stacks */
-#define dPatchCTAsize 10           /*     (not all the stacks need marks) */
-#define dPatchCTsize 200
-#define dPatchCEsize 100
-#define dPatchCsize 200
-#define dPatchLsize 10
-#define dPatchBsize 30
-#endif 0
-
-/* These are the new values -- 24apr91 */
 
 #define dMarkSize 20               /* marks in the following patch stacks */
 #define dPatchCTAsize 20           /*     (not all the stacks need marks) */
@@ -241,284 +188,358 @@ struct dPSType {
   short markPtr;
 } dPS[6];
 
-/* ----------------------------------------------------------------- */
+
+#ifdef DEBUG
+
+dbg_variables debug_variables[] =
+{
+    /* "Name", address,    udata,    function */
+    "",        NULL,       0,        NULL,
+};
+
+#endif /* DEBUG */
 
 
 /* ----------------------------------------------------------------- */
 
+/*  Callbacks  */
+int  my_listing_function ();
+int  init_my_operations ();
 
-main(argc,argv)
-int argc;
+
+/* ----------------------------------------------------------------- */
+
+
+/*
+*****************************************************************************
+*
+* main
+*
+*****************************************************************************
+*/
+
+
+main (argc, argv)
+int   argc;
 char *argv[];
 {
-  int t_hitBreak();
-  short arg;
-  char *p;
+    int     hit_break_key();
+    short   arg;
+    char   *p;
+    int     status;
 
   /* Prepare Files */
 
-  t_listing = 0;
-  t_debugOut = 0;
-  t_generate_C = 0;
-  option_optimize = 0;
-  option_verbose = 0;
+    option_list = 0;
+    option_debug_out = 0;
+    option_generate_C = 0;
+    option_optimize = 0;
+    option_verbose = 0;
+    option_debug = 0;
 
-  for (arg=1; arg<argc; arg++) {
-    if (*argv[arg] != '-')
-      break;
-    for (p=argv[arg]+1; *p; p++) {
-      if (*p=='l')
-        t_listing = 1;
-      else if (*p=='d')
-        t_debugOut = 1;
-      else if (*p=='c')
-        t_generate_C = 1;
-      else if (*p=='o')
-        option_optimize = 1;
-      else if (*p=='v')
-        option_verbose = 1;
-      else {
-        printf ("Unknown option '%c'\n", *p);
-        exit (10);
-      }
+    for (arg=1; arg<argc; arg++)
+    {
+        if (*argv[arg] != '-')
+            break;
+        for (p=argv[arg]+1; *p; p++)
+        {
+            if (*p=='l')
+                option_list = 1;
+            else if (*p=='d')
+                option_debug_out = 1;
+            else if (*p=='c')
+                option_generate_C = 1;
+            else if (*p=='o')
+                option_optimize = 1;
+            else if (*p=='v')
+                option_verbose = 1;
+            else if (*p=='s')
+            {
+#ifdef DEBUG
+                option_debug = 1;
+#else  /* DEBUG */
+                printf("The -s option is not available in this binary\n");
+#endif /* DEBUG */
+            }
+            else
+            {
+                printf ("Unknown option '%c'\n", *p);
+                exit (10);
+            }
+        }
     }
-  }
-  if (arg>=argc) {
-    printf("Usage:  ssl [-l] [-d] [-o] [-c] [-v] file\n");
-    printf("        -l: produce listing file\n");
-    printf("        -d: produce debugging file\n");
-    printf("        -o: optimize code table\n");
-    printf("        -c: produce C code for table\n");
-    printf("        -v: verbose\n");
-    exit(10);
-  }
 
-#ifndef USE_C_TABLE
-    read_table (argv[0]);
-#endif USE_C_TABLE
+    if (arg>=argc)
+    {
+        printf("Usage:  ssl [-l] [-d] [-o] [-c] [-v] [-s] file\n");
+        printf("        -l: produce listing file\n");
+        printf("        -d: produce debugging file\n");
+        printf("        -o: optimize code table\n");
+        printf("        -c: produce C code for table\n");
+        printf("        -v: verbose\n");
+        printf("        -s: run ssl compiler under symbolic debugger\n");
+#ifndef DEBUG
+        printf("            [The -s option is not available in this binary]\n");
+#endif  /* DEBUG */
 
-  sprintf(t_lineBuffer,"%s.ssl",argv[arg]);
-  if((t_src=fopen(t_lineBuffer,"r"))==NULL) {
-    printf("Can't open source file %s\n",t_lineBuffer);
-    exit(10);
-  }
-  sprintf(t_lineBuffer,"ram_%s.tbl",argv[arg]);
-  if((t_out=fopen(t_lineBuffer,"w"))==NULL) {
-    printf("Can't open output file %s\n",t_lineBuffer);
-    exit(10);
-  }
-  sprintf(t_lineBuffer,"ram_%s.h",argv[arg]);
-  if((t_hdr=fopen(t_lineBuffer,"w"))==NULL) {
-    printf("Can't open output file %s\n",t_lineBuffer);
-    exit(10);
-  }
-  sprintf(t_lineBuffer,"ram_%s.doc",argv[arg]);
-  if((t_doc=fopen(t_lineBuffer,"w"))==NULL) {
-    printf("Can't open output file %s\n",t_lineBuffer);
-    exit(10);
-  }
-  sprintf(t_lineBuffer,"ram_%s.lst",argv[arg]);
-  if (t_listing) {
-    if((t_lst=fopen(t_lineBuffer,"w"))==NULL) {
-      printf("Can't open output file %s\n",t_lineBuffer);
-      exit(10);
+        exit(10);
     }
-  }
-  sprintf(t_lineBuffer,"ram_%s.dbg",argv[arg]);
-  if (t_debugOut) {
-    if((t_dbg=fopen(t_lineBuffer,"w"))==NULL) {
-      printf("Can't open output file %s\n",t_lineBuffer);
-      exit(10);
-    }
-  }
 
-  printf("%s\n", w_title_string);
+    sprintf (input_filename, "%s.ssl", argv[arg]);
+
+    sprintf (list_out_filename, "ram_%s.lst", argv[arg]);
+    sprintf (tbl_out_filename,  "ram_%s.tbl", argv[arg]);
+    sprintf (hdr_out_filename,  "ram_%s.h",   argv[arg]);
+    sprintf (dbg_out_filename,  "ram_%s.dbg", argv[arg]);
+
+    open_my_files ();
+
+    ssl_init ();
+
+    init_my_scanner ();
+
+#ifdef DEBUG
+    ssl_set_debug (option_debug);
+    ssl_set_debug_info (DEBUG_FILE, PROGRAM_FILE, oBreak, debug_variables);
+#endif /* DEBUG */
+
+    ssl_set_input_filename (input_filename);
+
+    ssl_set_recovery_token (pSemiColon);
+
+
+    /* Need to call listing callback for debug_out too, in order to
+       collect line table data */
+
+    if (option_list || option_debug_out)
+        ssl_set_listing_callback (my_listing_function);
+
+
+    ssl_set_init_operations_callback (init_my_operations);
+
 
 #ifdef AMIGA
-  onbreak(&t_hitBreak);
+    onbreak(&hit_break_key);
 #endif AMIGA
 
-  t_initScanner();
 
-  w_pc = 0;                        /* Initialize walker */
-  w_sp = 0;
-  w_here = 0;
-  w_errorCount = 0;
+    /*  Execute SSL program  */
 
-  w_initSemanticOperations();
+    status = ssl_run_program ();
 
-  w_walkTable();
 
-  if (w_errorCount)
-    printf("\nSSL: %d error(s)\n",w_errorCount);
+    if (status == 0)
+    {
+        if (option_optimize)
+            w_optimize_table();
 
-  if (option_optimize && (w_errorCount == 0))
-    w_optimize_table();
+        w_dump_tables();
+    }
+    
+    close_my_files ();
 
-  t_cleanup();
+    if (status != 0)
+        exit (-1);
 
-  if (w_errorCount)
-    exit (1);
-  else
     exit (0);
 }
 
 
-/*  Read ssl code (if not using the USE_C_TABLE option)  */
+/*  Callback when first token of each source line accepted.
+ *
+ *  Normally used to list source file, but here also used to create
+ *  debug line table.
+ *
+ *  Line supplied to us containing '\n' for now.
+ */
 
-read_table (progname)
-char       *progname;
+int my_listing_function (source_line, token_accepted)
+char                    *source_line;
+int                      token_accepted;
 {
-  int entries,temp;                /* I can't seem to read a 'short' */
+    int     line_number;
+    int     addr;
 
-  if((t_src=fopen(TABLE_FILE,"r"))==NULL) {
-    printf("Can't open table file %s\n",TABLE_FILE);
-    exit(10);
-  }
-  
-  fgets(w_title_string,t_lineSize,t_src);
-  fscanf(t_src,"%d",&entries);
-  if (entries>w_codeTableSize) {
-    printf("Table file too big -- recompile %s.c\n", progname);
-    exit(10);
-  }
+    /*  Collect debug line table  */
 
-  for (w_pc=0; w_pc<entries; w_pc++) {
-    fscanf(t_src,"%d",&temp);
-    w_codeTable[w_pc] = temp;
-  }
-  fclose(t_src);
+    if (token_accepted)
+    {
+        line_number = ssl_token.lineNumber;
+        addr = w_here;
+    }
+    else
+    {
+        /*  In this case have to use scanner's "ssl_line_number"
+            because token lineNumber not set for blank lines */
+        line_number = ssl_line_number;
+        addr = -1;
+    }
+
+    if (line_number > w_lineTableSize)
+        ssl_fatal ("Too many source lines for debug line table");
+    else
+        w_lineTable[line_number] = addr;
+
+
+    /*  Produce listing file  */
+
+    if (option_list)
+    {
+        if (token_accepted)
+        {
+            fprintf (f_lst, "%4d: %s", w_here, source_line);
+        }
+        else
+        {
+            /*  "blank" line  */
+            fprintf (f_lst, "      %s", source_line);
+        }
+    }
 }
 
-/*********** S e m a n t i c   O p e r a t i o n s ***********/
-
-w_errorSignal(err)
-short err;
+open_my_files ()
 {
-  short i;
-  i = err;
-  if (w_errTable[i].val != i)
-    for (i=0; i<w_errTableSize && w_errTable[i].val != err; i++);
-  sprintf(w_errBuffer,"Error #%d (%s)",err,w_errTable[i].msg);
-  t_error(w_errBuffer);
+    if ((f_out = fopen(tbl_out_filename, "w")) == NULL)
+    {
+        printf ("Can't open output file %s\n", tbl_out_filename);
+        exit (10);
+    }
+
+    if ((f_hdr = fopen(hdr_out_filename, "w")) == NULL)
+    {
+        printf ("Can't open output file %s\n", hdr_out_filename);
+        exit (10);
+    }
+
+    if (option_list)
+    {
+        if ((f_lst = fopen(list_out_filename, "w")) == NULL)
+        {
+            printf ("Can't open output file %s\n", list_out_filename);
+            exit (10);
+        }
+    }
+
+    if (option_debug_out)
+    {
+        if ((f_dbg = fopen(dbg_out_filename, "w")) == NULL)
+        {
+            printf ("Can't open output file %s\n", dbg_out_filename);
+            exit (10);
+        }
+    }
+
 }
 
-w_initSemanticOperations()
+close_my_files ()
 {
-  /* link up patch stacks */
+    fclose (f_out);
 
-  dPS[patchChoiceTableAddr].stack = dPatchCTA;
-  dPS[patchChoiceTableAddr].size = dPatchCTAsize;
-  dPS[patchChoiceTable].stack = dPatchCT;
-  dPS[patchChoiceTable].size = dPatchCTsize;
-  dPS[patchChoiceExit].stack = dPatchCE;
-  dPS[patchChoiceExit].size = dPatchCEsize;
-  dPS[patchCall].stack = dPatchC;
-  dPS[patchCall].size = dPatchCsize;
-  dPS[patchLoop].stack = dPatchL;
-  dPS[patchLoop].size = dPatchLsize;
-  dPS[patchBreak].stack = dPatchB;
-  dPS[patchBreak].size = dPatchBsize;
+    fclose (f_hdr);
 
-  strcpy(w_targetTitle,"Compiling");    /* default title */
+    if (option_list)
+        fclose (f_lst);
+
+    if (option_debug_out)
+        fclose (f_dbg);
+}
+
+hit_break_key()
+{
+  printf("Breaking...\n");
+  close_my_files ();       /* Also need way to clean up SSL */
+  return(1);
 }
 
 
-w_walkTable()
+/* --------------------------- Semantic Operations ----------------------- */
+
+
+init_my_operations()
 {
-   while (1) {
-     switch (w_codeTable[w_pc++]) {
+    register short i;
+    short    firstOp,lastOp,op,opVal;
 
-       /* SSL Instructions */
+    w_here = 0;
 
-       case oJumpForward :
-              w_pc += w_codeTable[w_pc];
-              continue;
-       case oJumpBack :
-              w_pc -= w_codeTable[w_pc];
-              continue;
-       case oInput :
-              t_getToken();
-              if (t_token.kind != w_codeTable[w_pc++])
-                t_error ("SSL: Syntax error");
-              accept_token();
-              continue;
-       case oInputAny :
-              t_getToken();
-              accept_token();
-              continue;
+    /* link up patch stacks */
+
+    dPS[patchChoiceTableAddr].stack = dPatchCTA;
+    dPS[patchChoiceTableAddr].size = dPatchCTAsize;
+    dPS[patchChoiceTable].stack = dPatchCT;
+    dPS[patchChoiceTable].size = dPatchCTsize;
+    dPS[patchChoiceExit].stack = dPatchCE;
+    dPS[patchChoiceExit].size = dPatchCEsize;
+    dPS[patchCall].stack = dPatchC;
+    dPS[patchCall].size = dPatchCsize;
+    dPS[patchLoop].stack = dPatchL;
+    dPS[patchLoop].size = dPatchLsize;
+    dPS[patchBreak].stack = dPatchB;
+    dPS[patchBreak].size = dPatchBsize;
+
+    strcpy(target_title, "Compiling");    /* default title */
+
+
+    /* Pre-define some operation identifiers */
+
+    firstOp = ssl_add_id ("oJumpForward",  pIdent);
+              ssl_add_id ("oJumpBack",     pIdent);
+              ssl_add_id ("oInput",        pIdent);
+              ssl_add_id ("oInputAny",     pIdent);
+              ssl_add_id ("oEmit",         pIdent);
+              ssl_add_id ("oError",        pIdent);
+              ssl_add_id ("oInputChoice",  pIdent);
+              ssl_add_id ("oCall",         pIdent);
+              ssl_add_id ("oReturn",       pIdent);
+              ssl_add_id ("oSetResult",    pIdent);
+              ssl_add_id ("oChoice",       pIdent);
+              ssl_add_id ("oEndChoice",    pIdent);
+              ssl_add_id ("oSetParameter", pIdent);
+    lastOp =  ssl_add_id ("oBreak",        pIdent);
+
+    opVal = 0;
+
+    for (op = firstOp; op <= lastOp; op++)
+    {
+        id_table[op].kind     = kOp;
+        id_table[op].val      = opVal++;
+        id_table[op].declared = 1;
+        /* other fields 0 */
+    }
+}
+
+
+/* ----------------------------------------------------------------------- */
+/* ----------------------------------------------------------------------- */
+
+#include "ssl_begin.h"
+
+       /* built-in Emit operation is handled by application */
+
        case oEmit :
-              dTemp = w_codeTable[w_pc++];
+              dTemp = ssl_code_table[ssl_pc++];
               switch (dTemp) {
                 case iConstant :   w_outTable[w_here++] = dVS[dVSptr];
                                    continue;
                 case iIdentVal :   w_outTable[w_here++] =
-                                       t_idTable[t_lastId].val;
+                                       id_table[ssl_last_id].val;
                                    continue;
                 case iIdentISVal : w_outTable[w_here++] =
-                                       t_idTable[dIS[dISptr]].val;
+                                       id_table[dIS[dISptr]].val;
                                    continue;
                 default :          w_outTable[w_here++] = dTemp;
                                    continue;
               }
-       case oError :
-              w_errorSignal(w_codeTable[w_pc++]);
-              continue;
-       case oInputChoice :
-              t_getToken();
-              w_pc += w_codeTable[w_pc];
-              w_options = w_codeTable[w_pc++];
-              while (w_options--) {
-                if (w_codeTable[w_pc++] == t_token.kind) {
-                  w_pc -= w_codeTable[w_pc];
-                  accept_token();
-                  break;
-                }
-                w_pc++;
-              }
-              continue;
-       case oCall :
-              if (++w_sp==w_stackSize) t_fatal ("SSL: call stack overflow");
-              w_stack[w_sp] = w_pc+1;
-              w_pc = w_codeTable[w_pc];
-              continue;
-       case oReturn :
-              if (w_sp) {
-                w_pc = w_stack[w_sp--];
-                continue;
-              } else
-                return;            /* done walking table */
-       case oSetResult :
-              w_result = w_codeTable[w_pc++];
-              continue;
-       case oChoice :
-              w_pc += w_codeTable[w_pc];
-              w_options = w_codeTable[w_pc++];
-              while (w_options--) {
-                if (w_codeTable[w_pc++] == w_result) {
-                  w_pc -= w_codeTable[w_pc];
-                  break;
-                }
-                w_pc++;
-              }
-              continue;
-       case oEndChoice :           /* choice or inputChoice didn't match */
-              t_error ("SSL: syntax error");
-              t_token.accepted = 1;   /* need full err recovery */
-              continue;
-       case oSetParameter :
-              w_param = w_codeTable[w_pc++];
-              continue;
 
        /* Mechanism count */
 
        case oCountPush :
-              if (++dCSptr==dCSsize) t_fatal("CS overflow");
-              dCS[dCSptr] = w_param;
+              if (++dCSptr==dCSsize) ssl_fatal("CS overflow");
+              dCS[dCSptr] = ssl_param;
               continue;
        case oCountPushIntLit :
-              if (++dCSptr==dCSsize) t_fatal("CS overflow");
-              dCS[dCSptr] = t_token.val;
+              if (++dCSptr==dCSsize) ssl_fatal("CS overflow");
+              dCS[dCSptr] = ssl_token.val;
               continue;
        case oCountPop :
               dCSptr--;
@@ -529,14 +550,17 @@ w_walkTable()
        case oCountDec :
               dCS[dCSptr]--;
               continue;
+       case oCountNegate :
+              dCS[dCSptr] = -dCS[dCSptr];
+              continue;
        case oCountZero :
-              w_result = !dCS[dCSptr];
+              ssl_result = !dCS[dCSptr];
               continue;
 
        /* Mechanism next_error */
 
        case oNextErrorPushCount :
-              if (++dCSptr==dCSsize) t_fatal("CS overflow");
+              if (++dCSptr==dCSsize) ssl_fatal("CS overflow");
               dCS[dCSptr] = dNextError;
               continue;
        case oNextErrorPopCount :
@@ -546,30 +570,30 @@ w_walkTable()
        /* Mechanism value */
 
        case oValuePushKind :
-              if (++dVSptr==dVSsize) t_fatal("VS overflow");
-              dVS[dVSptr] = w_param;
+              if (++dVSptr==dVSsize) ssl_fatal("VS overflow");
+              dVS[dVSptr] = ssl_param;
               continue;
        case oValuePushVal :
-              if (++dVSptr==dVSsize) t_fatal("VS overflow");
-              dVS[dVSptr] = t_idTable[t_lastId].val;
+              if (++dVSptr==dVSsize) ssl_fatal("VS overflow");
+              dVS[dVSptr] = id_table[ssl_last_id].val;
               continue;
        case oValuePushISVal :
-              if (++dVSptr==dVSsize) t_fatal("VS overflow");
-              dVS[dVSptr] = t_idTable[dIS[dISptr]].val;
+              if (++dVSptr==dVSsize) ssl_fatal("VS overflow");
+              dVS[dVSptr] = id_table[dIS[dISptr]].val;
               continue;
        case oValuePushIdent :
-              if (++dVSptr==dVSsize) t_fatal("VS overflow");
-              dVS[dVSptr] = t_lastId;
+              if (++dVSptr==dVSsize) ssl_fatal("VS overflow");
+              dVS[dVSptr] = ssl_last_id;
               continue;
        case oValuePushType :
-              if (++dVSptr==dVSsize) t_fatal("VS overflow");
-              dVS[dVSptr] = t_idTable[t_lastId].idType;
+              if (++dVSptr==dVSsize) ssl_fatal("VS overflow");
+              dVS[dVSptr] = id_table[ssl_last_id].type;
               continue;
        case oValueChooseKind :
-              w_result = dVS[dVSptr];
+              ssl_result = dVS[dVSptr];
               continue;
        case oValuePushCount :
-              if (++dVSptr==dVSsize) t_fatal("VS overflow");
+              if (++dVSptr==dVSsize) ssl_fatal("VS overflow");
               dVS[dVSptr] = dCS[dCSptr];
               continue;
        case oValueSwap :
@@ -584,733 +608,385 @@ w_walkTable()
        /* Mechanism ident */
 
        case oIdentSetDeclared :
-              if (t_idTable[t_lastId].declared)
-                t_error("Name already declared");
-              t_idTable[t_lastId].declared = 1;
+              if (id_table[ssl_last_id].declared)
+                ssl_error("Name already declared");
+              id_table[ssl_last_id].declared = 1;
               continue;
        case oIdentSetKind :
-              t_idTable[t_lastId].idKind = w_param;
+              id_table[ssl_last_id].kind = ssl_param;
               continue;
        case oIdentSetKindVS :
-              t_idTable[t_lastId].idKind = dVS[dVSptr];
+              id_table[ssl_last_id].kind = dVS[dVSptr];
               continue;
        case oIdentSetType :
-              t_idTable[t_lastId].idType = dVS[dVSptr];
+              id_table[ssl_last_id].type = dVS[dVSptr];
               continue;
        case oIdentSetValCount :
-              t_idTable[t_lastId].val = dCS[dCSptr];
+              id_table[ssl_last_id].val = dCS[dCSptr];
               continue;
        case oIdentSetValHere :
-              t_idTable[t_lastId].val = w_here;
+              id_table[ssl_last_id].val = w_here;
               continue;
        case oIdentSetChoice :
-              t_idTable[t_lastId].choice = w_param;
+              id_table[ssl_last_id].choice = ssl_param;
               continue;
        case oIdentChooseKind :
-              w_result = t_idTable[t_lastId].idKind;
+              ssl_result = id_table[ssl_last_id].kind;
               continue;
        case oIdentChooseParam :
-              w_result = t_idTable[t_lastId].param;
+              ssl_result = id_table[ssl_last_id].param;
               continue;
        case oIdentChooseChoice :
-              w_result = t_idTable[t_lastId].choice;
+              ssl_result = id_table[ssl_last_id].choice;
               continue;
        case oIdentChooseDeclared :
-              w_result = t_idTable[t_lastId].declared;
+              ssl_result = id_table[ssl_last_id].declared;
               continue;
        case oIdentMatchType :
-              w_result = t_idTable[t_lastId].idType ==
-                         t_idTable[dIS[dISptr]].idType;
+              ssl_result = id_table[ssl_last_id].type ==
+                         id_table[dIS[dISptr]].type;
               continue;
        case oIdentMatchParamType :
-              w_result = t_idTable[t_lastId].idType ==
-                         t_idTable[dIS[dISptr]].paramType;
+              ssl_result = id_table[ssl_last_id].type ==
+                         id_table[dIS[dISptr]].paramType;
               continue;
        case oIdentISPush :
-              if (++dISptr==dISsize) t_fatal("IS overflow");
-              dIS[dISptr] = t_lastId;
+              if (++dISptr==dISsize) ssl_fatal("IS overflow");
+              dIS[dISptr] = ssl_last_id;
               continue;
        case oIdentISPushBottom :
-              if (++dISptr==dISsize) t_fatal("IS overflow");
+              if (++dISptr==dISsize) ssl_fatal("IS overflow");
               dIS[dISptr] = dIS[1];
               continue;
        case oIdentISPop :
               dISptr--;
               continue;
        case oIdentSetISParamType :
-              t_idTable[dIS[dISptr]].paramType = dVS[dVSptr];
+              id_table[dIS[dISptr]].paramType = dVS[dVSptr];
               continue;
        case oIdentSetISParam :
-              t_idTable[dIS[dISptr]].param = 1;
+              id_table[dIS[dISptr]].param = 1;
               continue;
        case oIdentSetISChoice :
-              t_idTable[dIS[dISptr]].choice = w_param;
+              id_table[dIS[dISptr]].choice = ssl_param;
               continue;
        case oIdentSetISType :
-              t_idTable[dIS[dISptr]].idType = dVS[dVSptr];
+              id_table[dIS[dISptr]].type = dVS[dVSptr];
               continue;
        case oIdentChooseISKind :
-              w_result = t_idTable[dIS[dISptr]].idKind;
+              ssl_result = id_table[dIS[dISptr]].kind;
               continue;
        case oIdentChooseISChoice :
-              w_result = t_idTable[dIS[dISptr]].choice;
+              ssl_result = id_table[dIS[dISptr]].choice;
               continue;
        case oIdentChooseISParam :
-              w_result = t_idTable[dIS[dISptr]].param;
+              ssl_result = id_table[dIS[dISptr]].param;
               continue;
        case oIdentMatchISType :
-              w_result = t_idTable[dIS[dISptr-1]].idType ==
-                         t_idTable[dIS[dISptr]].idType;
+              ssl_result = id_table[dIS[dISptr-1]].type ==
+                         id_table[dIS[dISptr]].type;
               continue;
 
        /* Mechanism shortForm */
 
        case oShortFormAdd :
               if (dStrTableNext==dStrTableSize)
-                t_fatal("String table overflow");
-              dStrTable[dStrTableNext].buffer = (char *) malloc (strlen(t_token.buffer)+1);
-              strcpy(dStrTable[dStrTableNext].buffer,t_token.buffer);
-              dStrTable[dStrTableNext++].val = t_lastId;
+                ssl_fatal("String table overflow");
+              dStrTable[dStrTableNext].buffer = strdup(ssl_strlit_buffer);
+              dStrTable[dStrTableNext++].val = ssl_last_id;
               continue;
        case oShortFormLookup :
-              if (++dISptr==dISsize) t_fatal("IS overflow");
+              if (++dISptr==dISsize) ssl_fatal("IS overflow");
               dIS[dISptr] = 0;
               for (dTemp=0; dTemp<dStrTableNext; dTemp++)
-                if (!strcmp(t_token.buffer,dStrTable[dTemp].buffer)) {
+                if (!strcmp(ssl_strlit_buffer, dStrTable[dTemp].buffer)) {
                   dIS[dISptr] = dStrTable[dTemp].val;
                   break;
                 }
               if (!dIS[dISptr])
-                t_error("String shortform not defined");
+                ssl_error("String shortform not defined");
               continue;
 
        /* Mechanism patch */
 
        case oPatchMark :
-              if (++dPS[w_param].markPtr==dMarkSize)
-                    t_fatal("mark overflow");
-              dPS[w_param].mark[dPS[w_param].markPtr] = dPS[w_param].ptr;
+              if (++dPS[ssl_param].markPtr==dMarkSize)
+                    ssl_fatal("mark overflow");
+              dPS[ssl_param].mark[dPS[ssl_param].markPtr] = dPS[ssl_param].ptr;
               continue;
        case oPatchAtMark :
-              w_result = dPS[w_param].mark[dPS[w_param].markPtr] ==
-                         dPS[w_param].ptr;
-              if (w_result)
-                dPS[w_param].markPtr--;
+              ssl_result = dPS[ssl_param].mark[dPS[ssl_param].markPtr] ==
+                         dPS[ssl_param].ptr;
+              if (ssl_result)
+                dPS[ssl_param].markPtr--;
               continue;
        case oPatchPushHere :
-              if (++dPS[w_param].ptr==dPS[w_param].size)
-                    t_fatal("patch overflow");
-              dPS[w_param].stack[dPS[w_param].ptr] = w_here;
+              if (++dPS[ssl_param].ptr==dPS[ssl_param].size)
+                    ssl_fatal("patch overflow");
+              dPS[ssl_param].stack[dPS[ssl_param].ptr] = w_here;
               continue;
        case oPatchPushIdent :
-              if (++dPS[w_param].ptr==dPS[w_param].size)
-                    t_fatal("patch overflow");
-              dPS[w_param].stack[dPS[w_param].ptr] = t_lastId;
+              if (++dPS[ssl_param].ptr==dPS[ssl_param].size)
+                    ssl_fatal("patch overflow");
+              dPS[ssl_param].stack[dPS[ssl_param].ptr] = ssl_last_id;
               continue;
        case oPatchPushValue :
-              if (++dPS[w_param].ptr==dPS[w_param].size)
-                    t_fatal("patch overflow");
-              dPS[w_param].stack[dPS[w_param].ptr] = dVS[dVSptr];
+              if (++dPS[ssl_param].ptr==dPS[ssl_param].size)
+                    ssl_fatal("patch overflow");
+              dPS[ssl_param].stack[dPS[ssl_param].ptr] = dVS[dVSptr];
               continue;
        case oPatchAnyEntries :
-              w_result = dPS[w_param].ptr > 0;
+              ssl_result = dPS[ssl_param].ptr > 0;
               continue;              
        case oPatchPopFwd :
-              dTemp = dPS[w_param].stack[dPS[w_param].ptr--];
+              dTemp = dPS[ssl_param].stack[dPS[ssl_param].ptr--];
               w_outTable[dTemp] = w_here - dTemp;
               continue;
        case oPatchPopBack :
               w_outTable[w_here] = w_here -
-                    dPS[w_param].stack[dPS[w_param].ptr--];
+                    dPS[ssl_param].stack[dPS[ssl_param].ptr--];
               w_here++;
               continue;
        case oPatchPopValue :
-              w_outTable[w_here++] = dPS[w_param].stack[dPS[w_param].ptr--];
+              w_outTable[w_here++] = dPS[ssl_param].stack[dPS[ssl_param].ptr--];
               continue;
        case oPatchPopCall :
-              dTemp = dPS[w_param].stack[dPS[w_param].ptr--];
-              w_outTable[dPS[w_param].stack[dPS[w_param].ptr--]] =
-                    t_idTable[dTemp].val;
+              dTemp = dPS[ssl_param].stack[dPS[ssl_param].ptr--];
+              w_outTable[dPS[ssl_param].stack[dPS[ssl_param].ptr--]] =
+                    id_table[dTemp].val;
               continue;
 
        /* Mechanism titleMech */
 
        case oTitleSet :
-              strcpy(w_targetTitle,t_token.buffer);
+              strcpy(target_title, ssl_strlit_buffer);
               continue;
 
        /* Mechanism doc */
 
        case oDocNewRule :
               if (option_verbose)
-                  printf("Rule %s\n",t_token.buffer);
-              fprintf(t_doc,"Rule %s\n",t_token.buffer);
+                  printf("Rule %s\n", ssl_token.name);
               continue;
        case oDocCheckpoint :
-              printf("Checkpoint %d (sp=%d) ",w_pc-1,w_sp);
-              fprintf(t_doc,"Checkpoint %d (sp=%d) ",w_pc-1,w_sp);
-              t_printToken();
+              printf("Checkpoint %d (sp=%d) ",ssl_pc-1, ssl_sp);
+              /* t_printToken(); */
               continue;
 
        /* Mechanism include_mech */
 
        case oInclude :
-              if (t_including_file)
-                  t_fatal ("Nested includes are not yet supported");
-              t_including_file = 1;
-              t_src_includer = t_src;
-              t_src = fopen (t_token.buffer, "r");
-              if (t_src == NULL)
-              {
-                  sprintf (w_errBuffer, "Can't open include file '%s'", t_token.buffer);
-                  t_fatal (w_errBuffer);
-              }
-              t_lineBuffer[0] = '\0';
-              t_ptr = t_lineBuffer;
-              t_lineListed = 1;
+              ssl_include_filename (ssl_strlit_buffer);
               continue;
 
-       default:
-              w_pc--;
-              sprintf(w_errBuffer,"SSL: Bad instruction #%d at %d",
-                      w_codeTable[w_pc],w_pc);
-              t_fatal(w_errBuffer);
-     } /* switch */
-   }
-}
+#include "ssl_end.h"
 
-accept_token()
-{
-  t_token.accepted = 1;
-  if (!t_lineListed) {
-    t_lineListed = 1;
-    if (t_token.lineNumber > w_lineTableSize)
-      t_fatal ("Too many source lines for debug line table");
-    w_lineTable[t_token.lineNumber] = w_here;
-    if (t_listing)
-      fprintf(t_lst,"%4d: %s",w_here,t_lineBuffer);
-  }
-  if (t_token.kind == pIdent)
-    t_lastId = t_token.val;
-}
+/* ----------------------------------------------------------------------- */
+/* ----------------------------------------------------------------------- */
 
-w_traceback()
-{
-  short i;
-  printf("SSL Traceback:\n");
-  fprintf(t_doc,"SSL Traceback:\n");
-  printf("  %d",w_pc);
-  fprintf(t_doc,"  %d",w_pc);
-  for (i=w_sp;i>0;i--) {
-    printf("  called from\n  %d",w_stack[i]-2);
-    fprintf(t_doc,"  called from\n  %d",w_stack[i]-2);
-  }
-  printf("\n");
-  fprintf(t_doc,"\n");
-}
+
 
 /************************ S c a n n e r *********************/
 
-t_initScanner ()
+struct ssl_token_table_struct my_keyword_table[] =
 {
-  register short i;
-  short firstOp,op,opVal;
+    "title",         pTitle,
+    "input",         pInput,
+    "output",        pOutput,
+    "type",          pType,
+    "error",         pError,
+    "include",       pInclude,
+    "mechanism",     pMechanism,
+    "rules",         pRules,
+    "end",           pEnd,
 
-  /* C guarantees static vars to start with 0, so here I don't
-       bother to initialize all of blank,idStart,idCont,digit */
+    NULL,            0
+};
 
-  for (i=0;i<256;i++)
-    t_upper[i] = i;
-  for (i='a';i<='z';i++) {
-    t_upper[i] = i - ('a'-'A');
-    t_idStart[i] = 1;
-    t_idCont[i] = 1;
-  }
-  for (i='A';i<='Z';i++) {
-    t_idStart[i] = 1;
-    t_idCont[i] = 1;
-  }
-  t_idStart['_'] = 1;
-  t_idCont['_'] = 1;
-  for (i='0';i<='9';i++) {
-    t_digit[i] = 1;
-    t_idCont[i] = 1;
-  }
-  t_blank[' '] = 1;
-  t_blank['\t'] = 1;
-  t_blank['\n'] = 1;
-
-  /* single-character tokens */
-  for (i=0;i<256;i++)
-    t_punct[i] = pInvalid;
-  t_punct['{'] = pLCurly;
-  t_punct['}'] = pRCurly;
-  t_punct['['] = pLSquare;
-  t_punct[']'] = pRSquare;
-  t_punct['|'] = pBar;
-  t_punct['@'] = pCall;
-  t_punct['*'] = pStar;
-  t_punct['?'] = pQuestion;
-  t_punct['.'] = pEmit;
-  t_punct['='] = pEquals;
-  t_punct[':'] = pColon;
-  t_punct[';'] = pSemiColon;
-  t_punct[','] = pComma;
-  t_punct['('] = pLParen;
-  t_punct[')'] = pRParen;
-  t_punct['#'] = pErr;
-
-  t_lineBuffer[0] = '\0';
-  t_ptr = t_lineBuffer;
-  t_lineNumber = 0;
-  t_lineListed = 1;
-  t_idTableNext = 0;
-  t_token.kind = pColon;           /* dummy */
-  t_token.accepted = 1;
-  t_addId("title",pTitle);
-  t_addId("input",pInput);
-  t_addId("output",pOutput);
-  t_addId("type",pType);
-  t_addId("error",pError);
-  t_addId("include",pInclude);
-  t_addId("mechanism",pMechanism);
-  t_addId("rules",pRules);
-  t_addId("end",pEnd);
-  /* add basic operations */
-  firstOp = t_idTableNext;
-  t_addId("oJumpForward",pIdent);
-  t_addId("oJumpBack",pIdent);
-  t_addId("oInput",pIdent);
-  t_addId("oInputAny",pIdent);
-  t_addId("oEmit",pIdent);
-  t_addId("oError",pIdent);
-  t_addId("oInputChoice",pIdent);
-  t_addId("oCall",pIdent);
-  t_addId("oReturn",pIdent);
-  t_addId("oSetResult",pIdent);
-  t_addId("oChoice",pIdent);
-  t_addId("oEndChoice",pIdent);
-  t_addId("oSetParameter",pIdent);
-  t_addId("oBreak",pIdent);
-  opVal = 0;
-  for (op=firstOp;op<t_idTableNext;op++) {
-    t_idTable[op].val = opVal++;
-    t_idTable[op].idKind = kOp;
-    t_idTable[op].declared = 1;    /* other fields 0 */
-  }
-
-  t_including_file = 0;
-}  
-
-t_getNextToken()
+struct ssl_token_table_struct my_operator_table[] =
 {
-  char more,*p,t_readln();
-  short lit;
+    "{",             pLCurly,
+    "}",             pRCurly,
+    "[",             pLSquare,
+    "]",             pRSquare,
+    "|",             pBar,
+    "@",             pCall,
+    "*",             pStar,
+    "?",             pQuestion,
+    ".",             pEmit,
+    "-",             pMinus,
+    "=",             pEquals,
+    ":",             pColon,
+    ";",             pSemiColon,
+    ",",             pComma,
+    "(",             pLParen,
+    ")",             pRParen,
+    "#",             pErr,
+    ">",             pBreak,
+    ">>",            pReturn,
 
-  t_token.accepted = 0;
+    NULL,            0
+};
 
-  /* error if we try to read past the end of file */
-  if (t_token.kind == pEof)              /* last token was eof */
-    t_fatal ("Unexpected end of file"); 
+struct ssl_special_codes_struct my_special_codes;
 
-  /* skip to start of token */
 
-  while (1) {
-    while (t_blank[*t_ptr])
-      t_ptr++;
-    if (*t_ptr=='\0') {
-      if (!t_lineListed) {
-        w_lineTable[t_lineNumber] = -1;
-        if (t_listing)
-          fprintf(t_lst,"      %s",t_lineBuffer);
-      }
-      more = t_readln(t_lineBuffer);
-      if (!more) { t_hit_Eof(); return; }
-      t_ptr = t_lineBuffer;
-      t_lineNumber++;
-      t_lineListed = 0;
-    } else if (*t_ptr=='%') {
-      if (!t_lineListed) {
-        w_lineTable[t_lineNumber] = -1;
-        if (t_listing)
-          fprintf(t_lst,"      %s",t_lineBuffer);
-      }
-      more = t_readln(t_lineBuffer);
-      if (!more) {  t_hit_Eof(); return;  }
-      t_ptr = t_lineBuffer;
-      t_lineNumber++;
-      t_lineListed = 0;
-    } else {
-      break;
-    }
-  }
+init_my_scanner ()
+{
+    my_special_codes.invalid = pInvalid;
+    my_special_codes.eof     = pEof;
+    my_special_codes.ident   = pIdent;
+    my_special_codes.intlit  = pIntLit;
+    my_special_codes.strlit  = pStrLit;
 
-  /* copy token, screen ids and integers */
-
-  t_token.lineNumber = t_lineNumber;
-  p = t_token.buffer;
-  if (t_idStart[*t_ptr]) {
-    while (t_idCont[*t_ptr] && p-t_token.buffer < t_idSize)
-      *p++ = *t_ptr++;
-    *p = '\0';
-    t_token.buflen = p-t_token.buffer;
-    t_token.kind = pIdent;
-    t_lookupId();
-  } else if (*t_ptr=='0' && *(t_ptr+1)=='x') {   /* hex number */
-    t_ptr += 2;
-    lit = 0;
-    while (1) {
-      if (t_digit[*t_ptr])
-        lit = lit*16 - '0' + *t_ptr;
-      else if (*t_ptr >= 'A' && *t_ptr <= 'F')
-        lit = lit*16 - 'A' + *t_ptr + 10;
-      else if (*t_ptr >= 'a' && *t_ptr <= 'f')
-        lit = lit*16 - 'a' + *t_ptr + 10;
-      else
-        break;
-      *p++ = *t_ptr++;
-    }
-    *p = '\0';
-    t_token.val = lit;
-    t_token.kind = pIntLit;
-  } else if (t_digit[*t_ptr]) {
-    lit = 0;
-    while (t_digit[*t_ptr]) {
-      lit = lit*10 - '0' + *t_ptr;
-      *p++ = *t_ptr++;
-    }
-    *p = '\0';
-    t_token.val = lit;
-    t_token.kind = pIntLit;
-  } else if (*t_ptr == '-') {
-    t_ptr++;
-    lit = 0;
-    while (t_digit[*t_ptr]) {
-      lit = lit*10 - '0' + *t_ptr;
-      *p++ = *t_ptr++;
-    }
-    *p = '\0';
-    t_token.val = -lit;
-    t_token.kind = pIntLit;
-  } else if (*t_ptr=='\'') {
-    t_ptr++;
-    t_token.kind = pStrLit;
-    while (p-t_token.buffer < t_bufferSize) {
-      if (*t_ptr=='\'') {
-        if (*++t_ptr=='\'') {
-          *p++ = '\'';
-          t_ptr++;
-        } else {
-          break;
-        }
-      } else if (*t_ptr=='\0') {
-        break;
-      } else {
-        *p++ = *t_ptr++;
-      }
-    }
-    *p = '\0';
-    t_token.buflen = p-t_token.buffer;
-  } else if (*t_ptr=='>') {
-    t_ptr++;
-    if (*t_ptr=='>') {
-      t_ptr++;
-      t_token.kind = pReturn;
-    } else {
-      t_token.kind = pBreak;
-    }
-  } else {
-    t_token.kind = t_punct[*t_ptr++];
-    if (t_token.kind == pInvalid) {
-      --t_ptr;
-      t_token.buffer[0] = *t_ptr++;
-      t_token.buffer[1] = '\0';
-      t_error ("SSL: invalid character");
-    }
-  }
+    ssl_init_scanner (my_keyword_table, my_operator_table, &my_special_codes);
 }
 
-t_hit_Eof ()
+
+w_dump_tables()
 {
-    if (t_including_file)
+    short             i;
+    short             count;
+    struct rule_addr
     {
-        fclose (t_src);
-        t_including_file = 0;
-        t_src = t_src_includer;
-        t_lineBuffer[0] = '\0';
-        t_ptr = t_lineBuffer;
-        t_lineListed = 1;
-        t_getNextToken();
-    }
-    else
-    {
-        t_token.kind = pEof;
-    }
-}
-
-
-t_addId(buffer,kind)
-char *buffer;
-short kind;
-{
-  short  name_length;
-
-  name_length = strlen (buffer);
-  t_idTable[t_idTableNext].buflen = name_length;
-  t_idTable[t_idTableNext].buffer = (char *) malloc (name_length+1);
-  strcpy(t_idTable[t_idTableNext].buffer,buffer);
-  t_idTable[t_idTableNext].kind = kind;
-  t_idTable[t_idTableNext].idKind = kUnknown;  /* for user-id's */
-  if (++t_idTableNext >= t_idTableSize)
-    t_fatal("identifier table overflow");
-}
-
-t_lookupId()
-{
-  short i;
-  register char *a,*b;
-
-  if (case_sensitive)
-  {
-    for (i=0;i<t_idTableNext;i++) {
-      if (t_token.buflen==t_idTable[i].buflen) {
-        a = t_token.buffer;
-        b = t_idTable[i].buffer;
-        while (*a++ == *b++) {
-          if (!*a) {   /* match */
-            t_token.kind = t_idTable[i].kind;  /* for built-in ids */
-            t_token.val = i;                   /* for user-defined ids */
-            return;
-          }
-        }
-      }
-    }
-  }
-  else /* case insensitive */
-  {
-    for (i=0;i<t_idTableNext;i++) {
-      if (t_token.buflen==t_idTable[i].buflen) {
-        a = t_token.buffer;
-        b = t_idTable[i].buffer;
-        while (t_upper[*a++]==t_upper[*b++]) {
-          if (!*a) {   /* match */
-            t_token.kind = t_idTable[i].kind;  /* for built-in ids */
-            t_token.val = i;                   /* for user-defined ids */
-            return;
-          }
-        }
-      }
-    }
-  }
-
-  t_token.val = t_idTableNext;
-  t_addId(t_token.buffer,pIdent);
-}
-
-char t_readln(lineBuffer)
-char *lineBuffer;
-{
-  char *ptr;
-  ptr = fgets(lineBuffer,t_lineSize,t_src);
-  if (ptr==NULL)
-    return(0);
-  return(1);
-}
-
-t_hitBreak()
-{
-  printf("Breaking...\n");
-  t_cleanup();
-  return(1);
-}
-
-t_cleanup()
-{
-  t_dumpTables();
-  fclose(t_src);
-  fclose(t_out);
-  fclose(t_hdr);
-  fclose(t_doc);
-  if (t_listing) fclose(t_lst);
-  if (t_debugOut) fclose(t_dbg);
-}
-
-t_fatal(msg)
-char *msg;
-{
-  printf("[FATAL] ");
-  fprintf(t_doc,"[FATAL] ");
-  t_error (msg);
-  w_traceback();
-  t_cleanup();
-  exit(-3);
-}
-
-t_printToken()
-{
-  printf("(Token=");
-  fprintf(t_doc,"(Token=");
-  if (t_token.kind==pIdent) {
-    printf("%s)\n",t_token.buffer);
-    fprintf(t_doc,"%s)\n",t_token.buffer);
-  } else if (t_token.kind==pStrLit || t_token.kind==pInvalid) {
-    printf("'%s')\n",t_token.buffer);
-    fprintf(t_doc,"'%s')\n",t_token.buffer);
-  } else {
-    printf("<%d>)\n",t_token.kind);
-    fprintf(t_doc,"<%d>)\n",t_token.kind);
-  }
-}
-
-t_error(msg)
-char *msg;
-{
-  printf("%s on line %d ",msg,t_token.lineNumber);
-  fprintf(t_doc,"%s on line %d ",msg,t_token.lineNumber);
-  t_printToken();
-  w_errorCount++;
-  printf ("SRICE: error detected near PC=%d\n", w_pc);
-}
-
-t_dumpTables()
-{
-  short i,count;
-  struct rule_addr {
-      char *name;
-      short addr;
-      struct rule_addr *next;
-  };
-  struct rule_addr *head, *curr, *prev, *new_rule;
-  int rule_table_size;
+        char      *name;
+        short      addr;
+        struct rule_addr *next;
+    };
+    struct rule_addr *head, *curr, *prev, *new_rule;
+    int               rule_table_size;
   
-  printf("\nWriting Files...\n");
+    printf ("\nWriting Files...\n");
 
-  /* Build list of rule addresses, sorted by address (insertion sort) */
+    /* Build list of rule addresses, sorted by address (insertion sort) */
 
-  rule_table_size = 0;
-  head = NULL;
-  for (i = 0; i < t_idTableNext; i++)
-  {
-      if (t_idTable[i].kind == pIdent &&
-          t_idTable[i].idKind == kRule)
-      {
-          new_rule = (struct rule_addr *) malloc (sizeof(struct rule_addr));
-          new_rule->name = t_idTable[i].buffer;
-          new_rule->addr = t_idTable[i].val;
-          new_rule->next = NULL;
-          rule_table_size++;
-          if (head == NULL)
-              head = new_rule;
-          else
-          {
-              curr = head;
-              prev = NULL;
-              while (curr != NULL && curr->addr < new_rule->addr)
-              {
-                  prev = curr;
-                  curr = curr->next;
-              }
-              prev->next = new_rule;
-              new_rule->next = curr;
-          }
-      }
-  }
-
-#if 0
-  fprintf(t_doc,"Id table:\n\n");
-  for (i=0; i<t_idTableNext; i++) {
-    fprintf(t_doc,"%d: %s\n",i,t_idTable[i].buffer);
-    fprintf(t_doc,"    iKind=%d val=%d dcl=%d >>=%d typ=%d ()=%d pTyp=%d\n",
-            t_idTable[i].idKind,
-            t_idTable[i].val,
-            t_idTable[i].declared,
-            t_idTable[i].choice,
-            t_idTable[i].idType,
-            t_idTable[i].param,
-            t_idTable[i].paramType);
-  }
-  fprintf(t_doc,"\nString shortform table:\n\n");
-  for (i=0; i<dStrTableNext; i++)
-    fprintf(t_doc,"%s  '%s'\n",t_idTable[dStrTable[i].val].buffer,
-                               dStrTable[i].buffer);
-#endif 0
-
-
-  /*  Write table  */
-
-    if (t_generate_C)
+    rule_table_size = 0;
+    head = NULL;
+    for (i = 1; i < ssl_id_table_next; i++)
     {
-        fprintf (t_out, "/* Automatically generated by ssl */\n\n");
-        fprintf (t_out, "char *w_title_string = \"%s\";\n\n", w_targetTitle);
-        fprintf (t_out, "short w_codeTable[] = {\n\t");
+        if (ssl_id_table[i].code == pIdent &&
+            id_table[i].kind == kRule)
+        {
+            new_rule = (struct rule_addr *) malloc (sizeof(struct rule_addr));
+            new_rule->name = ssl_id_table[i].name;
+            new_rule->addr = id_table[i].val;
+            new_rule->next = NULL;
+            rule_table_size++;
+            if (head == NULL)
+                head = new_rule;
+            else
+            {
+                curr = head;
+                prev = NULL;
+                while (curr != NULL && curr->addr < new_rule->addr)
+                {
+                    prev = curr;
+                    curr = curr->next;
+                }
+                if (prev == NULL)
+                    head = new_rule;
+                else
+                    prev->next = new_rule;
+                new_rule->next = curr;
+            }
+        }
+    }
+
+    /*  Write table  */
+
+    if (option_generate_C)
+    {
+        fprintf (f_out, "/* Automatically generated by ssl */\n\n");
+        fprintf (f_out, "char ssl_title_string[] = \"%s\";\n", target_title);
+        fprintf (f_out, "char ssl_runtime_vrs[]  = \"%s\";\n\n", TARGET_RUNTIME_VRS);
+        fprintf (f_out, "short ssl_code_table[] = {\n\t");
         for (i = 0; i < w_here; i++)
         {
-            fprintf (t_out, "%d, ", w_outTable[i]);
+            fprintf (f_out, "%d, ", w_outTable[i]);
             if ((i & 15) == 15)
-                fprintf (t_out, "\n\t");
+                fprintf (f_out, "\n\t");
         }
-        fprintf (t_out, "\n};\n\n");
+        fprintf (f_out, "\n};\n\n");
+        fprintf (f_out, "int ssl_code_table_size = %d;\n", w_here);
+
         /* output rule addresses */
-        fprintf (t_out, "int w_ruleTableSize = %d;\n", rule_table_size);
-        fprintf (t_out, "struct {\n  char *name;\n  short addr;\n} w_ruleTable[] = {\n");
+        fprintf (f_out, "int ssl_rule_table_size = %d;\n", rule_table_size);
+        fprintf (f_out, "struct ssl_rule_table_struct ssl_rule_table[] = {\n");
         for (curr = head; curr != NULL; curr = curr->next)
         {
-            fprintf (t_out, "\t{\"%s\",\t%d},\n", curr->name, curr->addr);
+            fprintf (f_out, "\t{\"%s\",\t%d},\n", curr->name, curr->addr);
         }
-        fprintf (t_out, "};\n");
+        fprintf (f_out, "};\n");
     }
     else
     {
         /* output code */
-        fprintf (t_out, "%s\n%d\n\n", w_targetTitle, w_here);
+        fprintf (f_out, "%s\n", target_title);
+        fprintf (f_out, "%s\n", TARGET_RUNTIME_VRS);
+        fprintf (f_out, "%d\n\n", w_here);
         for (i=0; i<w_here; i++)
-            fprintf (t_out, "%d\n", w_outTable[i]);
+            fprintf (f_out, "%d\n", w_outTable[i]);
+
         /* output rule addresses */
-        fprintf (t_out, "%d\n", rule_table_size);
+        fprintf (f_out, "%d\n", rule_table_size);
         for (curr = head; curr != NULL; curr = curr->next)
         {
-            fprintf (t_out, "%s\t%d\n", curr->name, curr->addr);
+            fprintf (f_out, "%s\t%d\n", curr->name, curr->addr);
         }
     }
 
-  /*  Write debug file  */
+    /*  Write debug file  */
 
-  if (t_debugOut) {
-    fprintf(t_dbg,"%d\n",t_lineNumber);
-    for (i=1; i<=t_lineNumber; i++)
-      fprintf(t_dbg,"%d\n",w_lineTable[i]);
-  }
-
-  /*  Write header file  */
-
-  fprintf(t_hdr,"#define w_codeTableSize %d\n\n",w_here+50);
-  for (i=0; i<t_idTableNext; i++)
-    if (t_idTable[i].kind == pIdent &&
-        t_idTable[i].idKind != kType &&
-        t_idTable[i].idKind != kMech &&
-        t_idTable[i].idKind != kRule)
-      fprintf(t_hdr,"#define %s %d\n",
-              t_idTable[i].buffer,
-              t_idTable[i].val);
-  count = 0;
-  fprintf(t_hdr,"\n#ifdef SSL_INCLUDE_ERR_TABLE\n");
-  fprintf(t_hdr,"\nstruct w_errTableType {\n");
-  fprintf(t_hdr,"  char *msg;\n  short val;\n");
-  fprintf(t_hdr,"} w_errTable[] = {\n");
-  for (i=0; i<t_idTableNext; i++)
-    if (t_idTable[i].kind == pIdent &&
-        t_idTable[i].idKind == kError) {
-      fprintf(t_hdr,"   \"%s\", %d,\n",t_idTable[i].buffer,
-                                       t_idTable[i].val);
-      count++;
+    if (option_debug_out)
+    {
+        fprintf(f_dbg,"%d\n", ssl_line_number);  /* # lines */
+        for (i=1; i <= ssl_line_number; i++)
+          fprintf(f_dbg,"%d\n",w_lineTable[i]);
     }
-  fprintf(t_hdr,"   \"\", 0\n};\n#define w_errTableSize %d\n",count);
-  fprintf(t_hdr,"\n#endif SSL_INCLUDE_ERR_TABLE\n");
+
+    /*  Write header file  */
+
+    fprintf(f_hdr,"#define SSL_CODE_TABLE_SIZE %d\n\n", w_here+50);
+
+    for (i=1; i<ssl_id_table_next; i++)
+    {
+        if (ssl_id_table[i].code == pIdent &&
+            id_table[i].kind != kType &&
+            id_table[i].kind != kMech &&
+            id_table[i].kind != kRule)
+        {
+            fprintf(f_hdr,"#define %s %d\n", ssl_id_table[i].name,
+                                             id_table[i].val);
+        }
+    }
+
+    count = 0;
+    fprintf(f_hdr,"\n#ifdef SSL_INCLUDE_ERR_TABLE\n");
+
+    fprintf(f_hdr,"\nstruct ssl_error_table_struct ssl_error_table[] = {\n");
+    for (i=1; i<ssl_id_table_next; i++)
+    {
+        if (ssl_id_table[i].code == pIdent &&
+            id_table[i].kind == kError)
+        {
+            fprintf(f_hdr,"   \"%s\", %d,\n",ssl_id_table[i].name,
+                                             id_table[i].val);
+            count++;
+        }
+    }
+    fprintf(f_hdr,"   \"\", 0\n};\nint ssl_error_table_size = %d;\n",count);
+    fprintf(f_hdr,"\n#endif SSL_INCLUDE_ERR_TABLE\n");
 
 }
 
 
 /* Optimize generated table */
+
+/* NOTE:  This function does something risky:  it uses definition of
+ *        oJumpForward, etc., from the SSL compiler that built the
+ *        SSL compiler, not from the definition of the current SSL
+ *        compiler that generated the output table.
+ */
 
 w_optimize_table ()
 {
@@ -1456,3 +1132,13 @@ short                      pc;
 
     return (pc);
 }
+
+
+/*  Need this stub function for now, if integrating with debugger
+    but not schema database  */
+
+nodeDumpTreeNum ()
+{
+    printf ("Schema database not used in this program\n");
+}
+

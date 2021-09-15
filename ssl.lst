@@ -1,4 +1,4 @@
-   0: title: 'SSL Translator 1.2.7 -- June 4 ''91';
+   0: title: 'SSL Translator 1.2.8 -- August 23 ''93';
       %
       %  ssl.ssl
       %
@@ -19,6 +19,7 @@
       %    21May91   Multiple "error" sections will use distinct error #'s.
       %              Added postprocess optimization: reduce chains of jumps.
       %    04Jun91   Change to ssl.c: Write rule addresses to code file.
+      %    23Aug93   Fix some loops so error recovery can terminate.
       %
       %  BUGS:
       %    28Jan90   Doesn't complain if functions called but never declared!	
@@ -51,6 +52,7 @@
    0:    pIdent
    0:    pIntLit
    0:    pStrLit
+   0:    pMinus      '-'
    0:    pEquals     '='
    0:    pColon      ':'
    0:    pSemiColon  ';'
@@ -156,6 +158,7 @@
    0:    oCountPop                 % discard counter
    0:    oCountInc
    0:    oCountDec
+   0:    oCountNegate              % negate top counter
    0:    oCountZero >> boolean;    % is the top counter 0?
       
    0: mechanism next_error:                % variable to determine error #
@@ -324,415 +327,426 @@
  113:          ]}
  123:       | pEof :
  125:          >
- 127:       | * :
- 148:          #eMissingProgramBlock
- 150:          ?      % skip token, try again
- 151:    ]}
- 153:    @FixForwardCalls
- 155:    oCountPop;
+      %     | * :
+      %        #eMissingProgramBlock
+      %        %  ?      % skip token, try again
+      %        ';'   % a trick to force error recovery to synchronize
+ 127:    ]}
+ 151:    @FixForwardCalls
+ 153:    oCountPop;
       
- 157: ReadIdList:     % initial # to use is on count stack
- 157:    ':'
- 159:    {[
- 161:       | pIdent :
- 161:          oIdentSetDeclared
- 162:          oIdentSetKindVS            % from kind on value stack
- 163:          [ oValueChooseKind
- 166:             | kVal :
- 166:                 oValueSwap         % type # to top
- 167:                 oIdentSetType
- 168:                 oValueSwap
- 169:             | * :
- 174:          ]
- 174:          [
- 176:             | pStrLit :
- 176:                [ oValueChooseKind
- 179:                   | kInput, kOutput :
- 179:                      oShortFormAdd
- 180:                   | * :
- 187:                      #eNoShortFormHere
- 189:                      ?
- 190:                ]
- 190:             | * :
- 195:          ]
- 195:          [
- 197:             | '=' :
- 197:                pIntLit
- 199:                oCountPop          % replace counter with new integer
- 200:                oCountPushIntLit
- 201:             | * :
- 206:          ]
- 206:          oIdentSetValCount   % set value from count stack
- 207:          oCountInc
- 208:       | * :
- 213:          >
- 215:    ]}
- 217:    ';';
-      
-      
- 220: OpDefinition:
- 220:    oIdentSetDeclared
- 221:    oIdentISPush          % remember ident, to set types
- 222:    oIdentSetKind(kOp)
- 225:    oIdentSetValCount     % store operation# from counter
- 226:    oCountInc
- 227:    [
- 229:       | '(' :
- 229:          pIdent
- 231:          [ oIdentChooseKind
- 234:             | kType :
- 234:                oValuePushIdent
- 235:                oIdentSetISParamType
- 236:                oValuePop
- 237:                oIdentSetISParam
- 238:             | * :
- 243:                #eNotAType
- 245:          ]
- 245:          ')'
- 247:       | * :
- 252:    ]
- 252:    [
- 254:       | '>>' :
- 254:          oIdentSetISChoice(true)
- 257:          pIdent
- 259:          [ oIdentChooseKind
- 262:             | kType :
- 262:                oValuePushIdent
- 263:                oIdentSetISType
- 264:                oValuePop
- 265:             | * :
- 270:                #eNotAType
- 272:          ]
- 272:       | * :
- 277:          oIdentSetISChoice(false)
- 280:    ]
- 280:    oIdentISPop;
+ 155: ReadIdList:     % initial # to use is on count stack
+ 155:    ':'
+ 157:    {[
+ 159:       | pIdent :
+ 159:          oIdentSetDeclared
+ 160:          oIdentSetKindVS            % from kind on value stack
+ 161:          [ oValueChooseKind
+ 164:             | kVal :
+ 164:                 oValueSwap         % type # to top
+ 165:                 oIdentSetType
+ 166:                 oValueSwap
+ 167:             | * :
+ 172:          ]
+ 172:          [
+ 174:             | pStrLit :
+ 174:                [ oValueChooseKind
+ 177:                   | kInput, kOutput :
+ 177:                      oShortFormAdd
+ 178:                   | * :
+ 185:                      #eNoShortFormHere
+ 187:                      ?
+ 188:                ]
+ 188:             | * :
+ 193:          ]
+ 193:          [
+ 195:             | '=' :
+                     % replace counter with new integer
+ 195:                [
+ 197:                    | '-' :
+ 197:                        pIntLit
+ 199:                        oCountPop
+ 200:                        oCountPushIntLit
+ 201:                        oCountNegate
+ 202:                    | * :
+ 207:                        pIntLit
+ 209:                        oCountPop
+ 210:                        oCountPushIntLit
+ 211:                ]
+ 211:             | * :
+ 216:          ]
+ 216:          oIdentSetValCount   % set value from count stack
+ 217:          oCountInc
+ 218:       | * :
+ 223:          >
+ 225:    ]}
+ 227:    ';';
       
       
- 282: RuleDefinition:
- 282:    oIdentISPush          % remember rule ident throughout.  IT WILL SIT ON
+ 230: OpDefinition:
+ 230:    oIdentSetDeclared
+ 231:    oIdentISPush          % remember ident, to set types
+ 232:    oIdentSetKind(kOp)
+ 235:    oIdentSetValCount     % store operation# from counter
+ 236:    oCountInc
+ 237:    [
+ 239:       | '(' :
+ 239:          pIdent
+ 241:          [ oIdentChooseKind
+ 244:             | kType :
+ 244:                oValuePushIdent
+ 245:                oIdentSetISParamType
+ 246:                oValuePop
+ 247:                oIdentSetISParam
+ 248:             | * :
+ 253:                #eNotAType
+ 255:          ]
+ 255:          ')'
+ 257:       | * :
+ 262:    ]
+ 262:    [
+ 264:       | '>>' :
+ 264:          oIdentSetISChoice(true)
+ 267:          pIdent
+ 269:          [ oIdentChooseKind
+ 272:             | kType :
+ 272:                oValuePushIdent
+ 273:                oIdentSetISType
+ 274:                oValuePop
+ 275:             | * :
+ 280:                #eNotAType
+ 282:          ]
+ 282:       | * :
+ 287:          oIdentSetISChoice(false)
+ 290:    ]
+ 290:    oIdentISPop;
+      
+      
+ 292: RuleDefinition:
+ 292:    oIdentISPush          % remember rule ident throughout.  IT WILL SIT ON
                                % BOTTOM OF IS STACK (choice rules will push above it)
                                % (access from bottom is a kludge... should use a
                                % separate stack to remember the rule id)
- 283:    oIdentSetDeclared
- 284:    oIdentSetKind(kRule)
- 287:    oIdentSetValHere      % address = here
- 288:    [
- 290:       | '>>' :
- 290:          oIdentSetChoice(true)
- 293:          pIdent
- 295:          [ oIdentChooseKind
- 298:             | kType :
- 298:                oValuePushIdent
- 299:                oIdentSetISType
- 300:                oValuePop
- 301:             | * :
- 306:                #eNotAType
- 308:          ]
- 308:       | * :
- 313:          oIdentSetChoice(false)
- 316:    ]
- 316:    ':'
- 318:    {[
- 320:       | ';' :
- 320:          >
- 322:       | * :
- 327:          @Statement
- 329:    ]}
- 331:    .iReturn
- 333:    oIdentISPop;
+ 293:    oIdentSetDeclared
+ 294:    oIdentSetKind(kRule)
+ 297:    oIdentSetValHere      % address = here
+ 298:    [
+ 300:       | '>>' :
+ 300:          oIdentSetChoice(true)
+ 303:          pIdent
+ 305:          [ oIdentChooseKind
+ 308:             | kType :
+ 308:                oValuePushIdent
+ 309:                oIdentSetISType
+ 310:                oValuePop
+ 311:             | * :
+ 316:                #eNotAType
+ 318:          ]
+ 318:       | * :
+ 323:          oIdentSetChoice(false)
+ 326:    ]
+ 326:    ':'
+ 328:    {[ Statement
+ 332:        | true :
+ 332:        | * :    >
+ 339:    ]}
+ 341:    ';'
+ 343:    .iReturn
+ 345:    oIdentISPop;
       
       
- 335: Statement:
- 335:    [
- 337:       | pStrLit :
- 337:          oShortFormLookup       % push index of equivalent ident
- 338:          @InputOrOpPop          % actually, should only be input
- 340:       | pIdent :
- 342:          oIdentISPush
- 343:          @InputOrOpPop
- 345:       | pErr :
- 347:          pIdent
- 349:          [ oIdentChooseKind
- 352:             | kError :
- 352:                .iError
- 354:                .iIdentVal
- 356:             | * :
- 361:                #eNotAnErrSig
- 363:          ]
- 363:       | pEmit :
- 365:          [
- 367:             | pIdent :
- 367:                oIdentISPush
- 368:             | pStrLit :
- 370:                oShortFormLookup   % push ident on IS stack
- 371:          ]
- 379:          [ oIdentChooseISKind
- 382:             | kOutput :
- 382:                .iEmit
- 384:                .iIdentISVal
- 386:             | * :
- 391:                #eNotOutput
- 393:          ]
- 393:          oIdentISPop
- 394:       | pCall :
- 396:          pIdent
- 398:          [ oIdentChooseDeclared
- 401:             | true :
- 401:                [ oIdentChooseKind
- 404:                   | kRule :
- 404:                      [ oIdentChooseChoice
- 407:                         | false :
- 407:                            .iCall
- 409:                            .iIdentVal
- 411:                         | true :
- 413:                            #eChoiceRuleOutOfPlace
- 415:                      ]
- 423:                   | * :
- 428:                      #eNotARule
- 430:                ]
- 430:             | false :                 % rule used before declared
- 432:                oIdentSetKind(kRule)   % don't set declared flag yet
- 435:                .iCall
- 437:                oPatchPushHere(patchCall)    % fix up at end
- 440:                oPatchPushIdent(patchCall)
- 443:                .iSpace
- 445:          ]
- 453:       | pReturn :
- 455:          oIdentISPushBottom     % check type of current rule (bottom of IS)
- 456:          [ oIdentChooseISChoice
- 459:             | true :
- 459:                pIdent
- 461:                [ oIdentChooseKind
- 464:                   | kVal :
- 464:                      [ oIdentMatchType
- 467:                         | true :
- 467:                            .iSetResult
- 469:                            .iIdentVal
- 471:                         | false :
- 473:                            #eWrongType
- 475:                      ]
- 483:                   | * :
- 488:                      #eWrongType
- 490:                ]
- 490:             | false :
- 492:          ]
- 500:          oIdentISPop
- 501:          .iReturn
- 503:       | pLCurly :
- 505:          oPatchPushHere(patchLoop)   % remember start of loop
- 508:          oPatchMark(patchBreak)
- 511:          {[
- 513:             | pRCurly :    % *** WAS *** '}' :
- 513:                >
- 515:             | * :
- 520:                @Statement
- 522:          ]}
- 524:          .iJumpBack
- 526:          oPatchPopBack(patchLoop)
- 529:          {[ oPatchAtMark(patchBreak)      % fix up break statements
- 534:             | false :
- 534:                oPatchPopFwd(patchBreak)
- 537:             | true :
- 539:                >
- 541:          ]}
- 551:       | pBreak :
- 553:          [ oPatchAnyEntries(patchLoop)
- 558:             | true :
- 558:                .iJumpForward
- 560:                oPatchPushHere(patchBreak)
- 563:                .iSpace
- 565:             | false :
- 567:                #eNotInLoop
- 569:          ]
- 577:       | pLSquare :
- 579:          @Choice
- 581:       | pQuestion :
- 583:          .iInputAny
- 585:       | * :
- 608:          #eBadStatement
- 610:          ?
- 611:    ];
+      %  Returns true if statement found
       
- 612: InputOrOpPop:        % ident is on ident stack (pop when done)
- 612:    [ oIdentChooseISKind
- 615:       | kInput :
- 615:          .iInput
- 617:          .iIdentISVal
- 619:       | kOp :
- 621:          @CallOp
- 623:          [ oIdentChooseISChoice
- 626:             | true :
- 626:                #eChoiceOpOutOfPlace
- 628:             | * :
- 633:          ]
- 633:       | kUnknown :
- 635:          #eUndeclaredIdent
- 637:       | * :
- 646:          #eNotOpRule
- 648:    ]
- 648:    oIdentISPop;
+ 347: Statement >> boolean:
+ 347:    [
+ 349:       | pStrLit :
+ 349:          oShortFormLookup       % push index of equivalent ident
+ 350:          @InputOrOpPop          % actually, should only be input
+ 352:       | pIdent :
+ 354:          oIdentISPush
+ 355:          @InputOrOpPop
+ 357:       | pErr :
+ 359:          pIdent
+ 361:          [ oIdentChooseKind
+ 364:             | kError :
+ 364:                .iError
+ 366:                .iIdentVal
+ 368:             | * :
+ 373:                #eNotAnErrSig
+ 375:          ]
+ 375:       | pEmit :
+ 377:          [
+ 379:             | pIdent :
+ 379:                oIdentISPush
+ 380:             | pStrLit :
+ 382:                oShortFormLookup   % push ident on IS stack
+ 383:          ]
+ 391:          [ oIdentChooseISKind
+ 394:             | kOutput :
+ 394:                .iEmit
+ 396:                .iIdentISVal
+ 398:             | * :
+ 403:                #eNotOutput
+ 405:          ]
+ 405:          oIdentISPop
+ 406:       | pCall :
+ 408:          pIdent
+ 410:          [ oIdentChooseDeclared
+ 413:             | true :
+ 413:                [ oIdentChooseKind
+ 416:                   | kRule :
+ 416:                      [ oIdentChooseChoice
+ 419:                         | false :
+ 419:                            .iCall
+ 421:                            .iIdentVal
+ 423:                         | true :
+ 425:                            #eChoiceRuleOutOfPlace
+ 427:                      ]
+ 435:                   | * :
+ 440:                      #eNotARule
+ 442:                ]
+ 442:             | false :                 % rule used before declared
+ 444:                oIdentSetKind(kRule)   % don't set declared flag yet
+ 447:                .iCall
+ 449:                oPatchPushHere(patchCall)    % fix up at end
+ 452:                oPatchPushIdent(patchCall)
+ 455:                .iSpace
+ 457:          ]
+ 465:       | pReturn :
+ 467:          oIdentISPushBottom     % check type of current rule (bottom of IS)
+ 468:          [ oIdentChooseISChoice
+ 471:             | true :
+ 471:                pIdent
+ 473:                [ oIdentChooseKind
+ 476:                   | kVal :
+ 476:                      [ oIdentMatchType
+ 479:                         | true :
+ 479:                            .iSetResult
+ 481:                            .iIdentVal
+ 483:                         | false :
+ 485:                            #eWrongType
+ 487:                      ]
+ 495:                   | * :
+ 500:                      #eWrongType
+ 502:                ]
+ 502:             | false :
+ 504:          ]
+ 512:          oIdentISPop
+ 513:          .iReturn
+ 515:       | pLCurly :
+ 517:          oPatchPushHere(patchLoop)   % remember start of loop
+ 520:          oPatchMark(patchBreak)
+ 523:          {[ Statement
+ 527:              | true :
+ 527:              | * :    >
+ 534:          ]}
+ 536:          '}'
+ 538:          .iJumpBack
+ 540:          oPatchPopBack(patchLoop)
+ 543:          {[ oPatchAtMark(patchBreak)      % fix up break statements
+ 548:             | false :
+ 548:                oPatchPopFwd(patchBreak)
+ 551:             | * :
+ 556:                >
+ 558:          ]}
+ 560:       | pBreak :
+ 562:          [ oPatchAnyEntries(patchLoop)
+ 567:             | true :
+ 567:                .iJumpForward
+ 569:                oPatchPushHere(patchBreak)
+ 572:                .iSpace
+ 574:             | false :
+ 576:                #eNotInLoop
+ 578:          ]
+ 586:       | pLSquare :
+ 588:          @Choice
+ 590:       | pQuestion :
+ 592:          .iInputAny
+ 594:       | * :
+ 617:          >> false    % not necessarily an error
+ 620:    ]
+ 620:    >> true;
       
- 650: CallOp:                  % op ident on ident stack
- 650:    [ oIdentChooseISParam
- 653:       | true :
- 653:          '('
- 655:          pIdent
- 657:          [ oIdentChooseKind
- 660:             | kVal :
- 660:                [ oIdentMatchParamType
- 663:                   | true :
- 663:                      .iSetParameter
- 665:                      .iIdentVal
- 667:                   | false :
- 669:                      #eWrongType
- 671:                ]
- 679:             | * :
- 684:                #eWrongType
- 686:          ]
- 686:          ')'
- 688:       | * :
- 693:    ]
- 693:    .iIdentISVal;     % operation #
+ 624: InputOrOpPop:        % ident is on ident stack (pop when done)
+ 624:    [ oIdentChooseISKind
+ 627:       | kInput :
+ 627:          .iInput
+ 629:          .iIdentISVal
+ 631:       | kOp :
+ 633:          @CallOp
+ 635:          [ oIdentChooseISChoice
+ 638:             | true :
+ 638:                #eChoiceOpOutOfPlace
+ 640:             | * :
+ 645:          ]
+ 645:       | kUnknown :
+ 647:          #eUndeclaredIdent
+ 649:       | * :
+ 658:          #eNotOpRule
+ 660:    ]
+ 660:    oIdentISPop;
+      
+ 662: CallOp:                  % op ident on ident stack
+ 662:    [ oIdentChooseISParam
+ 665:       | true :
+ 665:          '('
+ 667:          pIdent
+ 669:          [ oIdentChooseKind
+ 672:             | kVal :
+ 672:                [ oIdentMatchParamType
+ 675:                   | true :
+ 675:                      .iSetParameter
+ 677:                      .iIdentVal
+ 679:                   | false :
+ 681:                      #eWrongType
+ 683:                ]
+ 691:             | * :
+ 696:                #eWrongType
+ 698:          ]
+ 698:          ')'
+ 700:       | * :
+ 705:    ]
+ 705:    .iIdentISVal;     % operation #
       
       
- 696: Choice:
- 696:    [
- 698:       | pIdent :                     % rule/op choice
- 698:          oIdentISPush                % remember type of options
- 699:          [ oIdentChooseDeclared
- 702:             | true :
- 702:                [ oIdentChooseKind
- 705:                   | kRule :
- 705:                      .iCall
- 707:                      .iIdentVal
- 709:                   | kOp :
- 711:                      @CallOp
- 713:                   | * :
- 720:                      #eNotOpRule
- 722:                ]
- 722:                [ oIdentChooseISChoice
- 725:                   | false :
- 725:                      #eNotChoice
- 727:                   | * :
- 732:                ]
- 732:                oValuePushKind(kType)  % flag that IS has option type
- 735:             | false :                 % rule used before declared
- 737:                oIdentSetKind(kRule)   % don't set declared flag yet
- 740:                .iCall
- 742:                oPatchPushHere(patchCall)    % fix up call at end
- 745:                oPatchPushIdent(patchCall)
- 748:                .iSpace
- 750:                oValuePushKind(kUnknown)  % flag that option type unknown
- 753:          ]
- 761:          .iChoice
- 763:       | * :
- 768:          oValuePushKind(kInput)  % flag that options should be input tokens
- 771:          oIdentISPush            % DUMMY: push entry so can pop later
- 772:          .iInputChoice           %        regardless of input/rule choice
- 774:    ]
- 774:    oPatchPushHere(patchChoiceTableAddr)  % addr of table will go here
- 777:    .iSpace
- 779:    oPatchMark(patchChoiceTable)    % build up choice table in this stack
- 782:    oPatchMark(patchChoiceExit)     % remember ends of each option
- 785:    oCountPush(zero)                % count the options
- 788:    '|'
- 790:    {
- 790:       [
- 792:          | '*' :       % default code (must be last option)
- 792:             ':'
- 794:             @CopyChoiceTable
- 796:             oCountPop
- 797:             oValuePop
- 798:             oIdentISPop
- 799:             {[
- 801:                | ']' :
- 801:                   >
- 803:                | * :
- 808:                   @Statement
- 810:             ]}
- 812:             @FixChoiceExits
- 814:             >>
- 815:          | * :         % option(s)
- 820:             {
- 820:                [ oValueChooseKind
- 823:                   | kType :           % rule/op choice
- 823:                      pIdent
- 825:                      [ oIdentChooseKind
- 828:                         | kVal :
- 828:                            [ oIdentMatchType
- 831:                               | false :
- 831:                                  #eWrongType
- 833:                               | * :
- 838:                            ]
- 838:                         | * :
- 843:                            #eNotAVal
- 845:                      ]
- 845:                      oValuePushVal    % value# of option
- 846:                   | kUnknown :        % rule, not yet defined
- 848:                      pIdent
- 850:                      [ oIdentChooseKind
- 853:                         | kVal :
- 853:                            oValuePushType   % now know type of rule
- 854:                            oIdentSetISType
- 855:                            oValuePop
- 856:                            oValuePop        % replace flag
- 857:                            oValuePushKind(kType)   % flag that IS has type
- 860:                         | * :
- 865:                            #eNotAVal
- 867:                      ]
- 867:                      oValuePushVal    % value# of option
- 868:                   | kInput :
- 870:                      [
- 872:                         | pIdent :
- 872:                            oIdentISPush
- 873:                         | pStrLit :
- 875:                            oShortFormLookup
- 876:                      ]
- 884:                      [ oIdentChooseISKind
- 887:                         | kInput :
- 887:                         | * :
- 892:                            #eNotInput
- 894:                      ]
- 894:                      oValuePushISVal  % value# of option
- 895:                      oIdentISPop
- 896:                ]
+ 708: Choice:
+ 708:    [
+ 710:       | pIdent :                     % rule/op choice
+ 710:          oIdentISPush                % remember type of options
+ 711:          [ oIdentChooseDeclared
+ 714:             | true :
+ 714:                [ oIdentChooseKind
+ 717:                   | kRule :
+ 717:                      .iCall
+ 719:                      .iIdentVal
+ 721:                   | kOp :
+ 723:                      @CallOp
+ 725:                   | * :
+ 732:                      #eNotOpRule
+ 734:                ]
+ 734:                [ oIdentChooseISChoice
+ 737:                   | false :
+ 737:                      #eNotChoice
+ 739:                   | * :
+ 744:                ]
+ 744:                oValuePushKind(kType)  % flag that IS has option type
+ 747:             | false :                 % rule used before declared
+ 749:                oIdentSetKind(kRule)   % don't set declared flag yet
+ 752:                .iCall
+ 754:                oPatchPushHere(patchCall)    % fix up call at end
+ 757:                oPatchPushIdent(patchCall)
+ 760:                .iSpace
+ 762:                oValuePushKind(kUnknown)  % flag that option type unknown
+ 765:          ]
+ 773:          .iChoice
+ 775:       | * :
+ 780:          oValuePushKind(kInput)  % flag that options should be input tokens
+ 783:          oIdentISPush            % DUMMY: push entry so can pop later
+ 784:          .iInputChoice           %        regardless of input/rule choice
+ 786:    ]
+ 786:    oPatchPushHere(patchChoiceTableAddr)  % addr of table will go here
+ 789:    .iSpace
+ 791:    oPatchMark(patchChoiceTable)    % build up choice table in this stack
+ 794:    oPatchMark(patchChoiceExit)     % remember ends of each option
+ 797:    oCountPush(zero)                % count the options
+ 800:    '|'
+ 802:    {
+ 802:       [
+ 804:          | '*' :       % default code (must be last option)
+ 804:             ':'
+ 806:             @CopyChoiceTable
+ 808:             oCountPop
+ 809:             oValuePop
+ 810:             oIdentISPop
+ 811:             {[ Statement
+ 815:                 | true :
+ 815:                 | * :    >
+ 822:             ]}
+ 824:             ']'
+ 826:             @FixChoiceExits
+ 828:             >>
+ 829:          | * :         % option(s)
+ 834:             {
+ 834:                [ oValueChooseKind
+ 837:                   | kType :           % rule/op choice
+ 837:                      pIdent
+ 839:                      [ oIdentChooseKind
+ 842:                         | kVal :
+ 842:                            [ oIdentMatchType
+ 845:                               | false :
+ 845:                                  #eWrongType
+ 847:                               | * :
+ 852:                            ]
+ 852:                         | * :
+ 857:                            #eNotAVal
+ 859:                      ]
+ 859:                      oValuePushVal    % value# of option
+ 860:                   | kUnknown :        % rule, not yet defined
+ 862:                      pIdent
+ 864:                      [ oIdentChooseKind
+ 867:                         | kVal :
+ 867:                            oValuePushType   % now know type of rule
+ 868:                            oIdentSetISType
+ 869:                            oValuePop
+ 870:                            oValuePop        % replace flag
+ 871:                            oValuePushKind(kType)   % flag that IS has type
+ 874:                         | * :
+ 879:                            #eNotAVal
+ 881:                      ]
+ 881:                      oValuePushVal    % value# of option
+ 882:                   | kInput :
+ 884:                      [
+ 886:                         | pIdent :
+ 886:                            oIdentISPush
+ 887:                         | pStrLit :
+ 889:                            oShortFormLookup
+ 890:                      ]
+ 898:                      [ oIdentChooseISKind
+ 901:                         | kInput :
+ 901:                         | * :
+ 906:                            #eNotInput
+ 908:                      ]
+ 908:                      oValuePushISVal  % value# of option
+ 909:                      oIdentISPop
+ 910:                ]
                      % value of option is now on value stack
- 906:                oPatchPushHere(patchChoiceTable)
- 909:                oPatchPushValue(patchChoiceTable)  % build choice table
- 912:                oValuePop
- 913:                oCountInc
- 914:                [
- 916:                   | ':' :
- 916:                      >
- 918:                   | ',' :   % go around and get another
- 920:                ]
- 928:             }
- 930:       ]
+ 920:                oPatchPushHere(patchChoiceTable)
+ 923:                oPatchPushValue(patchChoiceTable)  % build choice table
+ 926:                oValuePop
+ 927:                oCountInc
+ 928:                [
+ 930:                   | ':' :
+ 930:                      >
+ 932:                   | ',' :   % go around and get another
+ 934:                ]
+ 942:             }
+ 944:       ]
       
             % code for option:
       
- 930:       {[
- 932:          | '|' :      % more options follow
- 932:             .iJumpForward
- 934:             oPatchPushHere(patchChoiceExit)
- 937:             .iSpace
- 939:             >
- 941:          | ']' :      % end of choice, no default
- 943:             .iJumpForward
- 945:             oPatchPushHere(patchChoiceExit)
- 948:             .iSpace
- 950:             @CopyChoiceTable
- 952:             oCountPop      % #options
- 953:             oValuePop      % flag: input/rule choice
- 954:             oIdentISPop    % type of rule choice (dummy if input choice)
- 955:             .iEndChoice
- 957:             @FixChoiceExits
- 959:             >>
- 960:          | * :
- 967:             @Statement
- 969:       ]}
- 971:    };
+ 944:       {[ Statement
+ 948:           | true:
+ 948:           | * : >
+ 955:       ]}
+      
+ 957:       [
+ 959:          | ']' :      % end of choice, no default
+ 959:             .iJumpForward
+ 961:             oPatchPushHere(patchChoiceExit)
+ 964:             .iSpace
+ 966:             @CopyChoiceTable
+ 968:             oCountPop      % #options
+ 969:             oValuePop      % flag: input/rule choice
+ 970:             oIdentISPop    % type of rule choice (dummy if input choice)
+ 971:             .iEndChoice
+ 973:             @FixChoiceExits
+ 975:             >>
+ 976:          | '|' :      % more options follow
+ 978:             .iJumpForward
+ 980:             oPatchPushHere(patchChoiceExit)
+ 983:             .iSpace
+ 985:       ]
+ 993:    };
       
       
       % Install choice table here. #options is in top counter.
@@ -740,37 +754,37 @@
       % So, in error recovery in a choice with no otherwise, take the
       % option just before the oEndChoice.
       
- 974: CopyChoiceTable:
- 974:    oPatchPopFwd(patchChoiceTableAddr)   % fix pointer to table
- 977:    oValuePushCount   % #entries
- 978:    .iConstant        % emit value
- 980:    oValuePop
- 981:    {[ oPatchAtMark(patchChoiceTable)
- 986:       | true :
- 986:          >
- 988:       | * :
- 993:          oPatchPopValue(patchChoiceTable)
- 996:          oPatchPopBack(patchChoiceTable)
- 999:    ]};
+ 996: CopyChoiceTable:
+ 996:    oPatchPopFwd(patchChoiceTableAddr)   % fix pointer to table
+ 999:    oValuePushCount   % #entries
+1000:    .iConstant        % emit value
+1002:    oValuePop
+1003:    {[ oPatchAtMark(patchChoiceTable)
+1008:       | false :
+1008:          oPatchPopValue(patchChoiceTable)
+1011:          oPatchPopBack(patchChoiceTable)
+1014:       | * :
+1019:          >
+1021:    ]};
       
       
-1002: FixChoiceExits:
-1002:    {[ oPatchAtMark(patchChoiceExit)     % fix jumps from end of each option
-1007:       | false :                         %    to end of the choice
-1007:          oPatchPopFwd(patchChoiceExit)
-1010:       | * :
-1015:          >
-1017:    ]};
+1024: FixChoiceExits:
+1024:    {[ oPatchAtMark(patchChoiceExit)     % fix jumps from end of each option
+1029:       | false :                         %    to end of the choice
+1029:          oPatchPopFwd(patchChoiceExit)
+1032:       | * :
+1037:          >
+1039:    ]};
       
-1020: FixForwardCalls:
-1020:    {[ oPatchAnyEntries(patchCall)
-1025:       | true :
-1025:          oPatchPopCall(patchCall)
-1028:       | * :
-1033:          >
-1035:    ]};
+1042: FixForwardCalls:
+1042:    {[ oPatchAnyEntries(patchCall)
+1047:       | true :
+1047:          oPatchPopCall(patchCall)
+1050:       | * :
+1055:          >
+1057:    ]};
       
       
-1038: end
+1060: end
       
-1038: 
+1060: 
