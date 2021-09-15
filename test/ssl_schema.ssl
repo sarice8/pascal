@@ -33,6 +33,8 @@ type node_attribute:
 	qType
 	qParamScope
 	qScope
+	qAddrDefined
+	qTypeDefined
 	qAddr
 	;
 

@@ -70,18 +70,18 @@ static char sccsid[] = "%W% %G% %U% %P%";
 #ifdef DEBUG
 
 #include "debug.h"
-#define DEBUG_FILE   "ssl.dbg"    /* SSL debug information */
-#define PROGRAM_FILE "ssl.lst"    /* SSL program listing */
+#define DEBUG_FILE   "t.dbg"    /* SSL debug information */
+#define PROGRAM_FILE "t.lst"    /* SSL program listing */
 
 #endif /* DEBUG */
 
 
 /*  SSL definitions generated for this program  */
 #define  SSL_INCLUDE_ERR_TABLE
-#include "ssl.h"
+#include "t.h"
 
 /*  SSL code generated for this program  */
-#include "ssl.tbl"
+#include "t.tbl"
 
 
 char    input_filename[256];
@@ -123,29 +123,12 @@ short   w_lineTable[w_lineTableSize];   /* Line# of every instruction */
 char target_title[SSL_STRLIT_SIZE+1];   /* Title of processor being compiled */
 
 
-#define dCSsize 30
-short dCS[dCSsize], dCSptr;        /* count stack */
-
-short dNextError;                  /* for mechanism next_error */
-
-#define dVSsize 30
-short dVS[dVSsize], dVSptr;        /* value stack */
-
-#define dOSsize 40                        /* OS: object (node) stack        */
-NODE_PTR       dOS[dOSsize];
-short          dOSptr;
-
 #define dSSsize 40                        /* SS: scope stack               */
 NODE_PTR       dSS[dSSsize];
 short          dSSptr;
 short          dSSlookup;     /* for lookup in scope stack */
 
-NODE_PTR       dCurrentRule;  /* For operation oNodeSetCurrentRule */
-NODE_PTR       dIntType;      /* nType "int" node, for oNodeGetIntType */
 NODE_PTR       dGlobalScope;  /* Global nScope (only set at end of parsing) */
-
-int            dRuleNumLocals;   /* Count of local vars in rule */
-int            dRuleLocalSpaceAddr;  /* Addr of arg of rule's .iLocalSpace instruction */
 
 
 /*  Table of string aliases for declarations  */
@@ -190,17 +173,17 @@ struct dPSType {
 
 int dump_tree_short();
 int dump_short_int_stack();
+int dump_short_int();
 int dump_node_short();
+int dump_var_stack();
 
 dbg_variables debug_variables[] =
 {
     /* "Name",     address,             udata,           function */
 
-    "OS",          (char *)dOS,         (char *)&dOSptr, dump_tree_short,
     "SS",          (char *)dSS,         (char *)&dSSptr, dump_tree_short,
-    "VS",          (char *)dVS,         (char *)&dVSptr, dump_short_int_stack,
-    "CS",          (char *)dCS,         (char *)&dCSptr, dump_short_int_stack,
-    "CurrentRule", (char *)&dCurrentRule, NULL,          dump_node_short,
+    "Here",        (char *)&w_here,       NULL,          dump_short_int,
+    "vars",        NULL,                  NULL,          dump_var_stack,
 
     "",            NULL,                0,               NULL,
 };
@@ -484,20 +467,13 @@ hit_break_key()
 
 init_my_operations()
 {
-    register short i;
-
     w_here = 0;
 
     /* Initialize node package (schema runtime module) */
     nodeInit();
 
-    dOSptr = 0;
     dSSptr = 0;
-    dCurrentRule = NULL;
     dGlobalScope = NULL;
-    dRuleLocalSpaceAddr = 0;
-    dRuleNumLocals = 0;
-    dIntType = NULL;
 
     /* link up patch stacks */
 
@@ -515,15 +491,14 @@ init_my_operations()
     dPS[patchBreak].size = dPatchBsize;
 
     strcpy(target_title, "Compiling");    /* default title */
-
-
 }
 
 
 /* Pre-define some operation identifiers.  Want to do this in SSL code
    eventually.  */
 
-install_system_operations ()
+install_system_operations (next_operation)
+long                      *next_operation;
 {
     short      id;
     int        index;
@@ -531,7 +506,7 @@ install_system_operations ()
 
     /* This list must match the list of output tokens defined in ssl.ssl
        with the exception of token values that are not emitted in final
-       table (e.g. iSpace, iConstant) */
+       table (e.g. iSpace) */
 
     static char *system_operations[] =
     {
@@ -550,12 +525,15 @@ install_system_operations ()
         "oPushResult",
         "oPop",
         "oBreak",
+        "oGlobalSpace",
         "oLocalSpace",
         "oGetParam",
         "oGetFromParam",
         "oGetLocal",
+        "oGetGlobal",
         "oGetAddrParam",
         "oGetAddrLocal",
+        "oGetAddrGlobal",
         "oAssign",
 
         NULL,
@@ -565,37 +543,29 @@ install_system_operations ()
     {
         id = ssl_add_id (system_operations[index], pIdent);
 
-        /* oNodeNew (nOperation)  oNodeSetIdent (qIdent)      */
-        /* oValuePushCount  oNodeSetValue (qValue)  oValuePop */
-        /* oScopeDeclare    oCountInc                         */
-
         node_ptr = nodeNew (nOperation);
         nodeSetValue (node_ptr, qIdent, id);
-        nodeSetValue (node_ptr, qValue, dCS[dCSptr]++);
+        nodeSetValue (node_ptr, qValue, (*next_operation)++);
         nodeAppend (dSS[dSSptr], qDecls, node_ptr);
     }
-    dCS[dCSptr] = index;   /* Set top counter to next available operation # */
 }
 
 
 /* Pre-define some type identifiers.  Want to do this in SSL code
    eventually.  */
 
-install_system_types ()
+install_system_types (int_type)
+NODE_PTR             *int_type;
 {
     short      id;
     NODE_PTR   node_ptr;
-
-    /* oNodeNew (nType)  oNodeSetIdent (qIdent)      */
-    /* oScopeDeclare                                 */
 
     id = ssl_add_id ("int", pIdent);
 
     node_ptr = nodeNew (nType);
     nodeSetValue (node_ptr, qIdent, id);
     nodeAppend (dSS[dSSptr], qDecls, node_ptr);
-
-    dIntType = node_ptr;     /* Remember for operation oNodeGetIntType  */
+    *int_type = node_ptr;
 }
 
 /* ----------------------------------------------------------------------- */
@@ -607,404 +577,278 @@ short    dTemp;                            /* multi-purpose */
 
 #include "ssl_begin.h"
 
-       /* built-in Emit operation is handled by application */
+    /* built-in Emit operation is handled by application */
 
-       case oEmit :
-              dTemp = ssl_code_table[ssl_pc++];
-              switch (dTemp) {
-                case iConstant :   w_outTable[w_here++] = dVS[dVSptr];
-                                   continue;
-                default :          w_outTable[w_here++] = dTemp;
-                                   continue;
-              }
+    case oEmit :
+            w_outTable[w_here++] = ssl_code_table[ssl_pc++];
+            continue;
 
-       /* Mechanism count */
 
-       case oCountPush :
-              if (++dCSptr==dCSsize) ssl_fatal("CS overflow");
-              dCS[dCSptr] = ssl_param;
-              continue;
-       case oCountPushIntLit :
-              if (++dCSptr==dCSsize) ssl_fatal("CS overflow");
-              dCS[dCSptr] = ssl_token.val;
-              continue;
-       case oCountPushValue :
-              if (++dCSptr==dCSsize) ssl_fatal("CS overflow");
-              dCS[dCSptr] = dVS[dVSptr];
-              continue;
-       case oCountPop :
-              dCSptr--;
-              continue;
-       case oCountInc :
-              dCS[dCSptr]++;
-              continue;
-       case oCountDec :
-              dCS[dCSptr]--;
-              continue;
-       case oCountNegate :
-              dCS[dCSptr] = -dCS[dCSptr];
-              continue;
-       case oCountZero :
-              ssl_result = !dCS[dCSptr];
-              continue;
+    /* Mechanism warning_mech */
 
-       /* Mechanism next_error */
+    case oWarning :
+            switch (ssl_param)
+            {
+                case wRuleMissingAtSign:
+                    ssl_warning ("Warning: Rule call is missing '@'");
+                    break;
+                default:
+                    sprintf (ssl_error_buffer, "Warning #%d (no message)", ssl_param);
+                    ssl_warning (ssl_error_buffer);
+                    break;
+            }
+            continue;
 
-       case oNextErrorPushCount :
-              if (++dCSptr==dCSsize) ssl_fatal("CS overflow");
-              dCS[dCSptr] = dNextError;
-              continue;
-       case oNextErrorPopCount :
-              dNextError = dCS[dCSptr--];
-              continue;
 
-       /* Mechanism value */
+    /* Mechanism emit_mech */
 
-       case oValuePush :
-       case oValuePushKind :
-       case oValuePushNodeType :
-              if (++dVSptr==dVSsize) ssl_fatal("VS overflow");
-              dVS[dVSptr] = ssl_param;
-              continue;
-       case oValuePushIdent :
-              if (++dVSptr==dVSsize) ssl_fatal("VS overflow");
-              dVS[dVSptr] = ssl_last_id;
-              continue;
-       case oValuePushIntLit :
-              if (++dVSptr==dVSsize) ssl_fatal("VS overflow");
-              dVS[dVSptr] = ssl_token.val;
-              continue;
-       case oValueChooseKind :
-              ssl_result = dVS[dVSptr];
-              continue;
-       case oValuePushCount :
-              if (++dVSptr==dVSsize) ssl_fatal("VS overflow");
-              dVS[dVSptr] = dCS[dCSptr];
-              continue;
-       case oValuePushHere :
-              if (++dVSptr==dVSsize) ssl_fatal("VS overflow");
-              dVS[dVSptr] = w_here;
-              continue;
-       case oValueNegate :
-              dVS[dVSptr] = -dVS[dVSptr];
-              continue;
-       case oValueSwap :
-              dTemp = dVS[dVSptr];
-              dVS[dVSptr] = dVS[dVSptr-1];
-              dVS[dVSptr-1] = dTemp;
-              continue;
-       case oValueZero :
-              ssl_result = (dVS[dVSptr] == 0);
-              continue;
-       case oValuePop :
-              dVSptr--;
-              continue;
+    case oEmitInt :
+            w_outTable[w_here++] = ssl_param;
+            continue;
+    case Here :
+            ssl_result = w_here;
+            continue;
+    case oPatch :
+            w_outTable[ssl_argv(0,2)] = ssl_argv(1,2);
+            continue;
 
-       /* Mechanism shortForm */
 
-       case oShortFormAdd :
-              if (dStrTableNext==dStrTableSize)
+    /* Mechanism math */
+
+    case inc :
+            ssl_var_stack[ssl_param]++;
+            continue;
+    case dec :
+            ssl_var_stack[ssl_param]--;
+            continue;
+    case negate :
+            ssl_result = -ssl_param;
+            continue;
+    case equal_zero :
+            ssl_result = (ssl_param == 0);
+            continue;
+    case equal_node_type :
+            ssl_result = (ssl_argv(0,2) == ssl_argv(1,2));
+            continue;
+
+
+    /* Mechanism more_builtins */
+
+    case TOKEN_VALUE :
+            ssl_result = ssl_token.val;
+            continue;
+    case LAST_ID :
+            ssl_result = ssl_last_id;
+            continue;
+
+
+    /* Mechanism shortForm */
+
+    case oShortFormAdd :
+            if (dStrTableNext==dStrTableSize)
                 ssl_fatal("String table overflow");
-              dStrTable[dStrTableNext].buffer = strdup(ssl_strlit_buffer);
-              dStrTable[dStrTableNext++].decl_ptr = dOS[dOSptr];
-              continue;
-       case oShortFormLookup :
-              if (++dOSptr == dOSsize) ssl_fatal ("OS overflow");
-              dOS[dOSptr] = NULL;
-              for (dTemp = 0; dTemp < dStrTableNext; dTemp++)
-              {
-                  if (strcmp(ssl_strlit_buffer, dStrTable[dTemp].buffer) == 0)
-                  {
-                      dOS[dOSptr] = dStrTable[dTemp].decl_ptr;
-                      break;
-                  }
-              }
-              if (dOS[dOSptr] == NULL)
-                  ssl_error("String shortform is not defined");
-              continue;
+            dStrTable[dStrTableNext].buffer = strdup(ssl_strlit_buffer);
+            dStrTable[dStrTableNext++].decl_ptr = (NODE_PTR)ssl_param;
+            continue;
+    case oShortFormLookup :
+            dNode = NULL;
+            for (dTemp = 0; dTemp < dStrTableNext; dTemp++)
+            {
+                if (strcmp(ssl_strlit_buffer, dStrTable[dTemp].buffer) == 0)
+                {
+                    dNode = dStrTable[dTemp].decl_ptr;
+                    break;
+                }
+            }
+            if (dNode == Null)
+                ssl_error("String shortform is not defined");
+            ssl_var_stack[ssl_param] = (long) dNode;
+            continue;
 
-       /* Mechanism patch */
 
-       case oPatchMark :
-              if (++dPS[ssl_param].markPtr==dMarkSize)
-                    ssl_fatal("mark overflow");
-              dPS[ssl_param].mark[dPS[ssl_param].markPtr] = dPS[ssl_param].ptr;
-              continue;
-       case oPatchAtMark :
-              ssl_result = dPS[ssl_param].mark[dPS[ssl_param].markPtr] ==
+    /* Mechanism patch */
+
+    case oPatchMark :
+            if (++dPS[ssl_param].markPtr==dMarkSize)
+                ssl_fatal("mark overflow");
+            dPS[ssl_param].mark[dPS[ssl_param].markPtr] = dPS[ssl_param].ptr;
+            continue;
+    case oPatchAtMark :
+            ssl_result = dPS[ssl_param].mark[dPS[ssl_param].markPtr] ==
                          dPS[ssl_param].ptr;
-              if (ssl_result)
+            if (ssl_result)
                 dPS[ssl_param].markPtr--;
-              continue;
-       case oPatchPushHere :
-              if (++dPS[ssl_param].ptr==dPS[ssl_param].size)
-                    ssl_fatal("patch overflow");
-              dPS[ssl_param].stack[dPS[ssl_param].ptr] = w_here;
-              continue;
-       case oPatchPushIdent :
-              if (++dPS[ssl_param].ptr==dPS[ssl_param].size)
-                    ssl_fatal("patch overflow");
-              dPS[ssl_param].stack[dPS[ssl_param].ptr] = ssl_last_id;
-              continue;
-       case oPatchPushValue :
-              if (++dPS[ssl_param].ptr==dPS[ssl_param].size)
-                    ssl_fatal("patch overflow");
-              dPS[ssl_param].stack[dPS[ssl_param].ptr] = dVS[dVSptr];
-              continue;
-       case oPatchAnyEntries :
-              ssl_result = dPS[ssl_param].ptr > 0;
-              continue;              
-       case oPatchPopFwd :
-              dTemp = dPS[ssl_param].stack[dPS[ssl_param].ptr--];
-              w_outTable[dTemp] = w_here - dTemp;
-              continue;
-       case oPatchPopBack :
-              w_outTable[w_here] = w_here -
-                    dPS[ssl_param].stack[dPS[ssl_param].ptr--];
-              w_here++;
-              continue;
-       case oPatchPopValue :
-              w_outTable[w_here++] = dPS[ssl_param].stack[dPS[ssl_param].ptr--];
-              continue;
-       case oPatchPopCall :
-              dTemp = dPS[ssl_param].stack[dPS[ssl_param].ptr--];
-              /* Find identifier 'dTemp' in scope */
-              for (dSSlookup = dSSptr; dSSlookup > 0; dSSlookup--)
-              {  
-                  dNode = nodeFindValue (dSS[dSSlookup], qDecls, qIdent, dTemp);
-                  if (dNode != NULL)
-                      break;
-              }  
-              w_outTable[dPS[ssl_param].stack[dPS[ssl_param].ptr--]] =
-                      nodeGetValue (dNode, qValue);
-              continue;
-
-       /* Mechanism titleMech */
-
-       case oTitleSet :
-              strcpy(target_title, ssl_strlit_buffer);
-              continue;
-
-       /* Mechanism doc */
-
-       case oDocNewRule :
-              if (option_verbose)
-                  printf("Rule %s\n", ssl_token.name);
-              continue;
-       case oDocCheckpoint :
-              printf("Checkpoint %d (sp=%d) ",ssl_pc-1, ssl_sp);
-              /* t_printToken(); */
-              continue;
-
-       /* Mechanism include_mech */
-
-       case oInclude :
-              ssl_include_filename (ssl_strlit_buffer);
-              continue;
+            continue;
+    case oPatchPushHere :
+            if (++dPS[ssl_param].ptr==dPS[ssl_param].size)
+                ssl_fatal("patch overflow");
+            dPS[ssl_param].stack[dPS[ssl_param].ptr] = w_here;
+            continue;
+    case oPatchPushInt :
+            dTemp = ssl_argv(0,2);   /* Patch stack */
+            if (++dPS[dTemp].ptr==dPS[dTemp].size)
+                ssl_fatal("patch overflow");
+            dPS[dTemp].stack[dPS[dTemp].ptr] = ssl_argv(1,2);
+            continue;
+    case oPatchPushIdent :
+            if (++dPS[ssl_param].ptr==dPS[ssl_param].size)
+                ssl_fatal("patch overflow");
+            dPS[ssl_param].stack[dPS[ssl_param].ptr] = ssl_last_id;
+            continue;
+    case oPatchAnyEntries :
+            ssl_result = dPS[ssl_param].ptr > 0;
+            continue;              
+    case oPatchPopFwd :
+            dTemp = dPS[ssl_param].stack[dPS[ssl_param].ptr--];
+            w_outTable[dTemp] = w_here - dTemp;
+            continue;
+    case oPatchPopBack :
+            w_outTable[w_here] = w_here -
+                dPS[ssl_param].stack[dPS[ssl_param].ptr--];
+            w_here++;
+            continue;
+    case oPatchPopValue :
+            w_outTable[w_here++] = dPS[ssl_param].stack[dPS[ssl_param].ptr--];
+            continue;
+    case oPatchPopCall :
+            dTemp = dPS[ssl_param].stack[dPS[ssl_param].ptr--];
+            /* Find identifier 'dTemp' in scope */
+            for (dSSlookup = dSSptr; dSSlookup > 0; dSSlookup--)
+            {  
+                dNode = nodeFindValue (dSS[dSSlookup], qDecls, qIdent, dTemp);
+                if (dNode != NULL)
+                    break;
+            }  
+            w_outTable[dPS[ssl_param].stack[dPS[ssl_param].ptr--]] =
+                    nodeGetValue (dNode, qValue);
+            continue;
 
 
-       /* mechanism Node */
+    /* Mechanism titleMech */
 
-       case oNodeNew:      /* (node_type) -- create node, push on stack */
-              if (++dOSptr == dOSsize) ssl_fatal ("OS overflow");
-              dOS[dOSptr] = nodeNew (ssl_param);
-              continue;
-       case oNodeNewValue:
-              ssl_assert (dVSptr > 0);
-              if (++dOSptr == dOSsize) ssl_fatal ("OS overflow");
-              dOS[dOSptr] = nodeNew (dVS[dVSptr]);
-              continue;
-       case oNodeLink:    /*  (attr)  make attr of 2nd node point to top node; pop top */
-              ssl_assert (dOSptr > 1);
-              nodeLink (dOS[dOSptr-1], ssl_param, dOS[dOSptr]);
-              dOSptr--;
-              continue;
-       case oNodeLinkUnder1: /*  (attr)  */
-              ssl_assert (dOSptr >= 2);
-              nodeLink (dOS[dOSptr], ssl_param, dOS[dOSptr-1]);
-              continue;
-       case oNodeSetValue:  /* (attr)  set attr of top node from VS; pop VS */
-              ssl_assert (dOSptr > 0);
-              nodeSetValue (dOS[dOSptr], ssl_param, dVS[dVSptr]);
-              continue;
-       case oNodeSetIdent:  /* (attr)  set attr of top node with id# of current token */
-              ssl_assert (dOSptr > 0);
-              nodeSetValue (dOS[dOSptr], ssl_param, ssl_last_id);
-              continue;
-       case oNodeAppend:  /* (attr)  append top node to LIST attr of second node; pop top */
-              ssl_assert (dOSptr > 1);
-              nodeAppend (dOS[dOSptr-1], ssl_param, dOS[dOSptr]);
-              dOSptr--;
-              continue;
-       case oNodeAppendNode:  /* append top node to same LIST as second node; pop top */
-              ssl_assert (dOSptr > 1);
-              dOS[dOSptr-1] = nodeAppendList (dOS[dOSptr-1], dOS[dOSptr]);
-              dOSptr--;
-              continue;
-       case oNodeGet:  /* (attr)  get NODE attr of top node, push on node stack */
-                       /* If attr -> LIST header, then push 1st node of list */
-              ssl_assert (dOSptr > 0);
-              if (++dOSptr == dOSsize) ssl_fatal ("OS overflow");
-              dOS[dOSptr] = nodeGet (dOS[dOSptr-1], ssl_param);
-              continue;
-       case oNodeGetValue:  /* (attr)  get non-NODE attr of top node, push on VS */
-              ssl_assert (dOSptr > 0);
-              if (++dVSptr == dVSsize) ssl_fatal ("VS overflow");
-              dVS[dVSptr] = nodeGetValue (dOS[dOSptr], ssl_param);
-              continue;
-       case oNodeNull:   /* if top of OS == NULL, pop and return true */
-              ssl_assert (dOSptr > 0);
-              ssl_result = (dOS[dOSptr] == NULL);
-              if (ssl_result) dOSptr--;
-              continue;
-       case oNodePushNull:
-              if (++dOSptr == dOSsize) ssl_fatal ("OS overflow");
-              dOS[dOSptr] = NULL;
-              continue;
-       case oNodeNext:     /* replace node with node->next on stack */
-              ssl_assert (dOSptr > 0);
-              dOS[dOSptr] = nodeNext(dOS[dOSptr]);
-              continue;
-       case oNodeIsA:
-              ssl_assert (dOSptr > 0);
-              ssl_result = nodeIsA(dOS[dOSptr], ssl_param);
-              continue;
-       case oNodeChooseType:      /* return node type of top node */
-              ssl_assert (dOSptr > 0);
-              ssl_result = nodeType(dOS[dOSptr]);
-              continue;
-       case oNodeCompareExact:        /* compare for same nodes */
-              ssl_assert (dOSptr >= 2);
-              ssl_result = (dOS[dOSptr] == dOS[dOSptr-1]);
-              continue;
-       case oNodeCompareExactUnder2:  /* compare for same nodes */
-              ssl_assert (dOSptr >= 3);
-              ssl_result = (dOS[dOSptr] == dOS[dOSptr-2]);
-              continue;
-       case oNodeSwap:
-              ssl_assert (dOSptr >= 2);
-              dNode = dOS[dOSptr];
-              dOS[dOSptr] = dOS[dOSptr-1];
-              dOS[dOSptr-1] = dNode;
-              continue;
-       case oNodePop:
-              dOSptr--;
-              continue;
+    case oTitleSet :
+            strcpy(target_title, ssl_strlit_buffer);
+            continue;
 
-       case oNodeGetIntType:
-              if (++dOSptr == dOSsize) ssl_fatal ("OS overflow");
-              dOS[dOSptr] = dIntType;
-              continue;
 
-       /* mechanism Rule_mech */
+    /* Mechanism doc */
 
-       case oRuleSetCurrentRule:
-              dCurrentRule = dOS[dOSptr];
-              continue;
-       case oRuleGetCurrentRule:
-              if (++dOSptr == dOSsize) ssl_fatal ("OS overflow");
-              dOS[dOSptr] = dCurrentRule;
-              continue;
-       case oRuleSetNumLocals: /* (num) */
-              dRuleNumLocals = ssl_param;
-              continue;
-       case oRuleIncNumLocals:
-              dRuleNumLocals++;
-              continue;
-       case oRuleGetNumLocals:
-              if (++dVSptr == dVSsize) ssl_fatal ("VS overflow");
-              dVS[dVSptr] = dRuleNumLocals;
-              continue;
-       case oRuleSetLocalSpaceAddr:
-              dRuleLocalSpaceAddr = w_here;
-              continue;
-       case oRulePatchLocalSpace:
-              w_outTable[dRuleLocalSpaceAddr] = dRuleNumLocals;
-              continue;
+    case oDocNewRule :
+            if (option_verbose)
+                printf("Rule %s\n", ssl_token.name);
+            continue;
 
-       /* mechanism Scope */
 
-       case oScopeBegin:
-              dNode = nodeNew (nScope);
-              if (dSSptr > 0)
-                  nodeLink (dNode, qParentScope, dSS[dSSptr]);
-              if (++dOSptr == dOSsize) ssl_fatal ("OS overflow");
-              dOS[dOSptr] = dNode;
-              if (++dSSptr == dSSsize) ssl_fatal ("SS overflow");
-              dSS[dSSptr] = dNode;
-              continue;
-       case oScopeExtend:
-              if (++dSSptr == dSSsize) ssl_fatal ("SS overflow");
-              dSS[dSSptr] = dOS[dOSptr];
-              continue;
-       case oScopeEnd:
-              ssl_assert (dSSptr >= 1);
-              dSSptr--;
-              continue;
-       case oScopeDeclare:
-              ssl_assert (dSSptr >= 1);
-              ssl_assert (dOSptr >= 1);
-              nodeAppend (dSS[dSSptr], qDecls, dOS[dOSptr]);
-              dOSptr--;
-              continue;
-       case oScopeDeclareKeep:
-              ssl_assert (dSSptr >= 1);
-              ssl_assert (dOSptr >= 1);
-              nodeAppend (dSS[dSSptr], qDecls, dOS[dOSptr]);
-              continue;
-       case oScopeFind:   /* >> boolean */
-              for (dSSlookup = dSSptr; dSSlookup > 0; dSSlookup--)
-              {  
-                  dNode = nodeFindValue (dSS[dSSlookup], qDecls, qIdent, ssl_last_id);
-                  if (dNode != NULL)
-                      break;
-              }
-              if (dNode != NULL)
-              {
-                  if (++dOSptr == dOSsize) ssl_fatal ("OS overflow");
-                  dOS[dOSptr] = dNode;
-                  ssl_result = 1;
-              }     
-              else
-                  ssl_result = 0;
-              continue;
-       case oScopeFindRequire:
-              for (dSSlookup = dSSptr; dSSlookup > 0; dSSlookup--)
-              {  
-                  dNode = nodeFindValue (dSS[dSSlookup], qDecls, qIdent, ssl_last_id);
-                  if (dNode != NULL)
-                      break;
-              }  
-              if (++dOSptr == dOSsize) ssl_fatal ("OS overflow");
-              dOS[dOSptr] = dNode;
-              if (dOS[dOSptr] == NULL)
-              {
-                  dOSptr--;
-                  ssl_error ("Undefined symbol");
-                  ssl_pc--;
-                  ssl_error_recovery ();
-              }
-              continue;
+    /* Mechanism include_mech */
 
-       /* mechanism Install */
+    case oInclude :
+            ssl_include_filename (ssl_strlit_buffer);
+            continue;
 
-       case oInstallSystemOperations:
-              install_system_operations ();
-              continue;
-       case oInstallSystemTypes:
-              install_system_types ();
-              continue;
 
-       /* mechanism WriteTables */
+    /* mechanism Node */
 
-       case oWriteTables:     /* Expects global nScope on node stack */
-              set_global_scope (dOS[dOSptr]);
-              if (option_optimize)
-                  w_optimize_table();
-              if (option_list_code)
-                  list_generated_code ();
-              w_dump_tables ();
-              continue;
+    case oNodeNew:      /* (node_type) -- create node */
+            ssl_result = (long) nodeNew (ssl_param);
+            continue;
+    case oNodeSet:
+            nodeLink ((NODE_PTR)ssl_argv(0,3), ssl_argv(1,3), (NODE_PTR)ssl_argv(2,3));
+            continue;
+    case oNodeSetInt:
+    case oNodeSetBoolean:
+            nodeSetValue ((NODE_PTR)ssl_argv(0,3), ssl_argv(1,3), ssl_argv(2,3));
+            continue;
+    case oNodeGet:
+            ssl_result = (long) nodeGet ((NODE_PTR)ssl_argv(0,2), ssl_argv(1,2));
+            continue;
+    case oNodeGetInt:
+    case oNodeGetBoolean:
+            ssl_result = (long) nodeGetValue ((NODE_PTR)ssl_argv(0,2), ssl_argv(1,2));
+            continue;
+    case oNodeNull:
+            ssl_result = ((NODE_PTR)ssl_param == NULL);
+            continue;
+    case oNodeNext:
+            ssl_var_stack[ssl_param] = (long) nodeNext((NODE_PTR)ssl_var_stack[ssl_param]);
+            continue;
+    case oNodeType:
+            ssl_result = nodeType((NODE_PTR)ssl_param);
+            continue;
+    case oNodeEqual:
+            ssl_result = (ssl_argv(0,2) == ssl_argv(1,2));
+            continue;
+
+
+    /* mechanism Scope */
+
+    case oScopeBegin:
+            dNode = nodeNew (nScope);
+            if (dSSptr > 0)
+                nodeLink (dNode, qParentScope, dSS[dSSptr]);
+            ssl_var_stack[ssl_param] = (long) dNode;
+            if (++dSSptr == dSSsize) ssl_fatal ("SS overflow");
+            dSS[dSSptr] = dNode;
+            continue;
+    case oScopeOpen:
+            if (++dSSptr == dSSsize) ssl_fatal ("SS overflow");
+            dSS[dSSptr] = (NODE_PTR) ssl_param;
+            continue;
+    case oScopeEnd:
+            ssl_assert (dSSptr >= 1);
+            dSSptr--;
+            continue;
+    case oScopeDeclare:
+            ssl_assert (dSSptr >= 1);
+            nodeAppend (dSS[dSSptr], qDecls, (NODE_PTR)ssl_param);
+            continue;
+    case oScopeFind:
+            for (dSSlookup = dSSptr; dSSlookup > 0; dSSlookup--)
+            {  
+                dNode = nodeFindValue (dSS[dSSlookup], qDecls, qIdent, ssl_last_id);
+                if (dNode != NULL)
+                    break;
+            }
+            ssl_var_stack[ssl_param] = (long) dNode;
+            ssl_result = (dNode != NULL);
+            continue;
+    case oScopeFindRequire:
+            for (dSSlookup = dSSptr; dSSlookup > 0; dSSlookup--)
+            {  
+                dNode = nodeFindValue (dSS[dSSlookup], qDecls, qIdent, ssl_last_id);
+                if (dNode != NULL)
+                    break;
+            }  
+            ssl_var_stack[ssl_param] = (long) dNode;
+            if (dNode == NULL)
+            {
+                ssl_error ("Undefined symbol");
+                ssl_pc--;
+                ssl_error_recovery ();
+            }
+            continue;
+
+
+    /* mechanism Install */
+
+    case oInstallSystemOperations:
+            install_system_operations (&ssl_var_stack[ssl_param]);
+            continue;
+    case oInstallSystemTypes:
+            install_system_types (&(NODE_PTR)(ssl_var_stack[ssl_param]));
+            continue;
+
+
+    /* mechanism WriteTables */
+
+    case oWriteTables:
+            set_global_scope ((NODE_PTR)ssl_param);
+            if (option_optimize)
+                w_optimize_table();
+            if (option_list_code)
+                list_generated_code ();
+            w_dump_tables ();
+            continue;
+
 
 #include "ssl_end.h"
 
@@ -1127,7 +971,10 @@ w_dump_tables ()
                     prev = curr;
                     curr = curr->next;
                 }
-                prev->next = new_rule;
+                if (prev == NULL)
+                    head = new_rule;
+                else
+                    prev->next = new_rule;
                 new_rule->next = curr;
             }
         }
@@ -1200,14 +1047,30 @@ w_dump_tables ()
             case nError:
             case nValue:
             case nOperation:
-                fprintf(f_hdr, "#define %s %d\n", ssl_get_id_string(nodeGetValue(node_ptr, qIdent)),
+                fprintf(f_hdr, "#define %s %d\n",
+                               ssl_get_id_string(nodeGetValue(node_ptr, qIdent)),
                                nodeGetValue(node_ptr, qValue));
                 break;
+
+#if 0
+  /* This would allow operations to access global variables declared in SSL.
+   * But I don't want to do it, because it would force a recompile of the C code
+   * if any globals were added.
+   * I've been trying to avoid recompilation if only the stuff in "rules" changes.
+   * (Of course, that's assuming that the user didn't generate C code for the table).
+   */
+            case nGlobal:
+                fprintf(f_hdr, "#define var_%s (ssl_var_stack[%d])\n",
+                               ssl_get_id_string(nodeGetValue(node_ptr, qIdent)),
+                               nodeGetValue(node_ptr, qAddr));
+                break;
+#endif /* 0 */
+
             default:
                 break;
 
         }
-    }    
+    }
 
     count = 0;
     fprintf(f_hdr,"\n#ifdef SSL_INCLUDE_ERR_TABLE\n");
@@ -1302,12 +1165,15 @@ list_generated_code ()
             case iCall :
             case iSetResult :
             case iPop :
+            case iGlobalSpace :
             case iLocalSpace :
             case iGetParam :
             case iGetFromParam :
             case iGetLocal :
+            case iGetGlobal :
             case iGetAddrParam :
             case iGetAddrLocal :
+            case iGetAddrGlobal :
                 arg = w_outTable[pc++];
                 has_arg = 1;
                 break;
@@ -1461,12 +1327,15 @@ w_optimize_table ()
             case iCall :
             case iSetResult :
             case iPop :
+            case iGlobalSpace :
             case iLocalSpace :
             case iGetParam :
             case iGetFromParam :
             case iGetLocal :
+            case iGetGlobal :
             case iGetAddrParam :
             case iGetAddrLocal :
+            case iGetAddrGlobal :
                     pc++;
                     continue;
 
@@ -1560,4 +1429,35 @@ char                     *udata;
         printf ("\t%d\n", stack[stack_size]);
     }
 }
+
+int dump_short_int (variable, udata)
+char               *variable;
+char               *udata;
+{
+    short    *var;
+
+    var = (short *) variable;
+
+    printf ("\t%d\n", *var);
+}
+
+int dump_var_stack (variable, udata)
+char               *variable;
+char               *udata;
+{
+    int    addr;
+
+    for (addr = ssl_var_sp; addr > 0; addr--)
+    {
+        printf ("%4d: %d", addr, ssl_var_stack[addr]);
+        if (addr == ssl_var_sp)
+            printf ("  <-- sp");
+        if (addr == ssl_var_fp)
+            printf ("  <-- fp");
+        printf ("\n");
+    }
+
+}
+
+
 

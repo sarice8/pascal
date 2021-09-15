@@ -1,6 +1,6 @@
 %  sccsid = "%W% %G% %U% %P%";
 
-title: 'SSL Translator 1.3.1 -- August 29 ''93';
+title: 'SSL Translator 1.3.0 -- August 23 ''93';
 
 %
 % *****************************************************************************
@@ -156,7 +156,45 @@ error:
    ;
 
 
-include 'ssl_schema.ssl'
+
+% Generated automatically by schema
+
+type node_type:
+	nINVALID
+	Object
+	nScope
+	nDeclaration
+	nIdent
+	nInput
+	nOutput
+	nError
+	nType
+	nValue
+	nMechanism
+	nOperation
+	nRule
+	nVariable
+	nParam
+	nInParam
+	nOutParam
+	nInOutParam
+	nLocal
+	nGlobal
+	;
+
+type node_attribute:
+	qINVALID
+	qParentScope
+	qDecls
+	qIdent
+	qValue
+	qType
+	qParamScope
+	qScope
+	qAddrDefined
+	qTypeDefined
+	qAddr
+	;
 
 
 type boolean:
@@ -172,7 +210,6 @@ type number:
 
 type warning:
     wRuleMissingAtSign
-    wReturnValueIgnored
     ;
 
 type Node:     % A pointer to a node in the schema database (symbol database)
@@ -424,30 +461,16 @@ Error:
     @ValueList (nError, NextError, false, Null)
     ';';
 
-
 Type:
     Node  t
     int   next_value
 
-    pIdent
-    [ oScopeFind (t)
-        | false:
-            t = oNodeNew (nType)  oNodeSetInt (t, qIdent, LAST_ID)
-            oScopeDeclare (t)
-
-        | true:
-
-            % Extend existing definition (to add more values)
-            % Note, new values will start from 0 again unless told otherwise!
-
-            @RequireType (t)
-    ]
-
+    pIdent  t = oNodeNew (nType)  oNodeSetInt (t, qIdent, LAST_ID)
+    oScopeDeclare (t)
     ':'
     next_value = 0
     @ValueList (nValue, next_value, false, t)
     ';';
-
 
 Include:
     pStrLit oInclude;
@@ -1032,19 +1055,10 @@ CallRule (Node r):
 %  Implicitly declare a rule that has not previously been declared.
 %  Rule name is last accepted identifier.
 %  Implicitly declares InParam parameters, and no return type.
-%
-%  Rule is declared in GlobalScope.
 
 CallUndefinedRule:
     Node  r, s, t, p
     int   id, num_params, addr
-
-    % Global scope opened so that rule will be declared in it,
-    % and so the parameters we declare for the rule will have the
-    % correct ParentScope
-
-    oScopeOpen (GlobalScope)
-
 
     r = oNodeNew (nRule)  id = LAST_ID  oNodeSetInt (r, qIdent, id)
     oNodeSetBoolean(r, qAddrDefined, false)
@@ -1060,7 +1074,6 @@ CallUndefinedRule:
 
         {
             @Expr(t)
-            .iPushResult
             p = oNodeNew (nInParam)  oNodeSet(p, qType, t)
             oScopeDeclare(p)
             inc(num_params)
@@ -1069,7 +1082,6 @@ CallUndefinedRule:
               | * :   >
             ]
         }
-        ')'
 
         % Assign parameter addresses
 
@@ -1090,9 +1102,6 @@ CallUndefinedRule:
 
     oScopeEnd    % param scope
     oScopeDeclare (r)
-
-    oScopeEnd    % GlobalScope
-
 
     % Now call rule
 
@@ -1450,7 +1459,7 @@ RequireRule (Node i):
 
 RequireNoType (Node r):
     [ oNodeNull (oNodeGet(r, qType))
-        | false: oWarning(wReturnValueIgnored)  % #eChoiceOpRuleOutOfPlace
+        | false: #eChoiceOpRuleOutOfPlace
         | * :
     ];
 

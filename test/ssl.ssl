@@ -39,6 +39,8 @@ title: 'SSL Translator 1.3.0 -- August 23 ''93';
 %            |        | expressions with nested function calls.
 %            |        | (User program requires the 2.0 runtime model for new
 %            |        | instructions in generated code).
+%   08/29/93 |        | Reimplement compiler using above new language features
+%            |        | (typically using local variables rather than stacks)
 %            |        |
 % 
 % *****************************************************************************
@@ -46,20 +48,6 @@ title: 'SSL Translator 1.3.0 -- August 23 ''93';
 %   BUGS
 % -----------------------------------------------------------------------------
 %   01/28/90 | Doesn't complain if functions called but never declared!	
-%
-% *****************************************************************************
-%
-%   NOTES
-%
-%   *  The base counter in the count stack counts semantic operations.
-%
-%   *  When a new identifier is added to the table by the scanner,
-%      it is given a default kind kUnknown.  ** NOT ANYMORE, DO I DEPEND ON IT?
-%
-%   *  Stack entries that are read by an operation are left there,
-%      unless the operation contains the word 'Pop'.
-%      The emit statement never pops stack entries (i.e. .iConstant
-%      emits the value on the value stack, but does not pop it.)
 %
 % *****************************************************************************
 %
@@ -126,6 +114,7 @@ output:
     iPushResult      % push ssl_result on variable stack
     iPop             % (n)  discard n entries from variable stack
     iBreak           % instruction used by debugger
+    iGlobalSpace     % (n)  make space for n globals on variable stack (sets initial fp)
     iLocalSpace      % (n)  make space for n locals on variable stack
     iGetParam        % (n)  ssl_result = value of param n
     iGetFromParam    % (n)  ssl_result = value of variable whose address is in param n
@@ -142,85 +131,51 @@ output:
 
 %  other output
 
-    iSpace           % emit a dummy value; a value will be patched here later
-    iConstant;       % emit the value on the value stack
+    iSpace;          % emit a dummy value; a value will be patched here later
 
 error:
-   eMissingProgramBlock
-   eMissingEnd
    eWrongType
-   eNoShortFormHere
    eNotAType
    eNotAValue
    eNotInput
    eNotOutput
    eNotARule
-   eNotAStatement
-   eUndeclaredIdent
-   eBadStatement
    eNotAnErrSig
    eNotInLoop
-   eNotChoice     % rule or op
    eChoiceOpRuleOutOfPlace
-
-   eUnexpectedKind
-   eWrongNumberParams
-   eFwdRuleParamsNotSupportedYet
+   eUndeclRuleParamsNotSupported
    eNotTyped
    eIdentNotAllowedInExpr
-   eParamNotSupportedYet
    eIllegalLvalue
    eNotRuleOrGlobalDefn
+   eRuleBodyAlreadyDeclared
+   eReturnTypeMismatch
+   eParameterMismatch
+   eUndeclaredIdentifier
+    eAliasNotAllowed
    ;
 
 
-%include 'ssl_schema.ssl'
-
-% Generated automatically by schema
-
-type node_type:
-	nINVALID
-	Object
-	nScope
-	nDeclaration
-	nIdent
-	nInput
-	nOutput
-	nError
-	nType
-	nValue
-	nMechanism
-	nOperation
-	nRule
-	nVariable
-	nParam
-	nInParam
-	nOutParam
-	nInOutParam
-	nLocal
-	nGlobal
-	;
-
-type node_attribute:
-	qINVALID
-	qParentScope
-	qDecls
-	qIdent
-	qValue
-	qType
-	qParamScope
-	qScope
-	qAddr
-	;
+include 'ssl_schema.ssl'
 
 
 type boolean:
     false    = 0
-    true     = 1;
+    true     = 1
+    no       = 0
+    yes      = 1;
 
 type number:
     zero            = 0
     one             = 1
+    ;
+
+type warning:
+    wRuleMissingAtSign
+    ;
+
+type Node:     % A pointer to a node in the schema database (symbol database)
+    Null = 0
     ;
 
 type kind:
@@ -237,34 +192,33 @@ type kind:
     kVar
     ;
 
-mechanism count:
-    oCountPush(number)        % push a new counter, with initial value
-    oCountPushIntLit          % push value of integer just read
-    oCountPushValue           % push value from value stack
-    oCountPop                 % discard counter
-    oCountInc
-    oCountDec
-    oCountNegate              % negate top counter
-    oCountZero >> boolean;    % is the top counter 0?
+mechanism warning_mech:
+    oWarning (warning);       % issue warning message,
+                              % continue normally (not in error recovery mode)
 
-mechanism next_error:                % variable to determine error #
-    oNextErrorPushCount               % push variable onto Count stack
-    oNextErrorPopCount;               % pop variable off Count stack
+mechanism emit_mech:
+    oEmitInt (int)            % emit an integer into the generated code
+    Here >> int               % return the current address in the generated code
+    oPatch (int addr, int val) % patch an integer into any address in the generated code
+    ;
 
+mechanism math:
+    inc (inout int)
+    dec (inout int)
+    negate (int) >> int
+    equal_zero (int) >> boolean
+    equal_node_type (node_type, node_type) >> boolean     % Want equal_<type> for every type
+    ;
 
-mechanism value:                     % multi-purpose stack
-    oValuePush(number)                % push a constant value
-    oValuePushKind(kind)              % push a kind value
-    oValuePushNodeType(node_type)     % push a node type
-    oValuePushIdent                   % push ident# of last ident read
-    oValuePushIntLit                  % push integer just read
-    oValueChooseKind >> kind          % kind on top of stack
-    oValuePushCount                   % value on top of count stack
-    oValuePushHere                    % push current (output) address
-    oValueNegate                      % negate top value
-    oValueSwap                        % swap top two elements
-    oValueZero >> boolean             % is top value zero?
-    oValuePop;
+mechanism more_builtins:      % These should be built-in SSL operations
+    TOKEN_VALUE >> int        % value of just accepted token, e.g. IntLit token
+    LAST_ID >> int            % id number of last accepted identifier
+    ;
+
+mechanism shortForm:          % keep a table of string shortforms for input/output
+    oShortFormAdd (Node)      % associate current StrLit token with nDeclaration
+    oShortFormLookup (out Node);   % look up strLit, return associated nDeclaration
+
 
 % keep different patch stacks, each with a stack of position markers:
 
@@ -282,8 +236,8 @@ mechanism patch_mech:
                                            %   last mark are popped
                                            %   (mark is dropped if true)
     oPatchPushHere(patchStack)         % put current address on a patch stack
+    oPatchPushInt (patchStack, int)    % put int on a patch stack
     oPatchPushIdent(patchStack)        % put last ident on a patch stack
-    oPatchPushValue(patchStack)        % push value on value stack
     oPatchAnyEntries(patchStack) >> boolean    % are there any entries?
     oPatchPopFwd(patchStack)           % fix table, storing here-x at x,
                                        %   where x is on top of the stack
@@ -292,150 +246,137 @@ mechanism patch_mech:
     oPatchPopCall(patchStack);         % fix table, storing value of ident i
                                        %   at x, where i is on top of stack
                                        %   and x is under it  (pop both)
-mechanism shortForm:    % keep a table of string shortforms for input/output
-    oShortFormAdd       % associate current StrLit token with nDeclaration on node stack
-    oShortFormLookup;   % look up strLit, push associated nDeclaration on node stack
 
 mechanism titleMech:
     oTitleSet;          % define title to be strlit just read
 
 mechanism doc:         % display documentary info
-    oDocNewRule         % print "Rule <token>"
-    oDocCheckpoint;     % display current pc value, for debugging
+    oDocNewRule;        % print "Rule <token>"
 
 mechanism include_mech:
     oInclude;           % include the SSL file whose name is in the
                        % string token just accepted
 
 mechanism node_mech:
-    oNodeNew (node_type)               % create new node, push on node stack
-    oNodeNewValue                      % like oNodeNew, take node type from value stack
-    oNodeLink (node_attribute)         % link Node attribute of 2nd node to top node, pop
-    oNodeLinkUnder1 (node_attribute)   % link Node attribute of top node to 2nd node (top-1)
-    oNodeSetValue (node_attribute)     % set int attribute of node from value stack no pop
-    oNodeSetIdent (node_attribute)     % set attribute of node with id# of last accepted id
-    oNodeAppend (node_attribute)       % append top node to list attr of 2nd node
-    oNodeAppendNode                    % append top node to list starting with 2nd node
-    oNodeGet (node_attribute)          % push Node attribute on stack
-    oNodeGetValue (node_attribute)     % push int attribute on value stack
-    oNodeNull >> boolean               % is top node null (pop if it is)
-    oNodePushNull                      % push null on stack
-    oNodeNext                          % replace top node with next in list
-    oNodeIsA (node_type) >> boolean    % return true if top node IsA <class>
-    oNodeChooseType >> node_type       % return node type of top node in stack
-    oNodeCompareExact >> boolean       % compare top two nodes for equality
-                                       % Return true only if both are the same node
-    oNodeCompareExactUnder2 >> boolean % compare node on stack with node 2 under it
-                                       % Return true only if both are the same node
-    oNodeSwap
-    oNodePop
-
-    % Some global variables
-
-    oNodeGetIntType                    % Get nType node for system type "int"
-    ;
-
-mechanism rule_mech:
-    oRuleSetCurrentRule                % Global variable to hold current rule node
-    oRuleGetCurrentRule
-
-    oRuleSetNumLocals(number)          % set counter of #locals in rule
-    oRuleIncNumLocals                  % inc #locals_in_rule counter
-    oRuleGetNumLocals                  % push #locals_in_rule counter on value stack
-    oRuleSetLocalSpaceAddr             % set location of .iLocalSpace argument to patch
-    oRulePatchLocalSpace               % patch rule's .iLocalSpace argument with #locals_in_rule
-
-    oSetNumGlobals(number)    % set counter of #globals in program
-    oIncNumGlobals
-    oGetNumGlobals            % to value stack
-    oSetGlobalSpaceAddr       % similar to locals.  Program starts with .iLocalSpace(n) for globals on stack
-    oPatchGlobalSpace
+    oNodeNew (node_type) >> Node         % create new node
+    oNodeSet (Node, node_attribute, Node)   % set Node attribute of node
+    oNodeSetInt (Node, node_attribute, int) % set int attribute of node
+    oNodeSetBoolean (Node, node_attribute, boolean)
+    oNodeGet (Node, node_attribute) >> Node    % get Node attribute of node
+    oNodeGetInt (Node, node_attribute) >> int  % get int attribute of node
+    oNodeGetBoolean (Node, node_attribute) >> boolean  % get int attribute of node
+    oNodeNull (Node) >> boolean          % is node null?
+    oNodeNext (inout Node)               % advance Node to next in list    
+    oNodeType (Node) >> node_type        % return node type of node
+    oNodeEqual (Node, Node) >> boolean   % compare two nodes for equality
+                                         % (i.e. same node, not just same contents)
     ;
 
 mechanism scope_mech:
-    oScopeBegin                        % create a new scope.  Subsequent declarations will go here.
-                                       % Pushes nScope on node stack.  Sets nScope's qParent to parent scope.
-    oScopeExtend                       % Extend an existing scope, whose nScope node is on node stack.
-                                       % The nScope should have been previously created by oScopeBegin.
-    oScopeEnd                          % End current scope.  Subsequent declarations will go to parent scope.
-                                       % Does not remove nScope from node stack
-    oScopeDeclare                      % Add top node to declaration list of current scope.  Pop node.
-    oScopeDeclareKeep                  % Like oScopeDeclare, but keep node on stack.
-
-    oScopeFind >> boolean              % Find declaration of last accepted identifier.
-                                       % Push on stack if found.
-    oScopeFindRequire                  % Find declaration of last accepted identifier.
+    oScopeBegin (out Node)             % create a new scope.  Subsequent declarations will go here.
+                                       % Sets nScope's qParent to parent scope.
+    oScopeOpen (Node)                  % open an existing scope.  Its definitions become visible again.
+    oScopeEnd                          % end current scope.  Subsequent declarations will go to parent scope.
+    oScopeDeclare (Node)               % declare node in current scope
+    oScopeFind (out Node) >> boolean   % find declaration of last accepted identifier
+    oScopeFindRequire (out Node)       % find declaration of last accepted identifier.
                                        % Go into error recovery if not found.
     ;
 
 
 mechanism install_mech:
-    oInstallSystemOperations (inout int NextOperation)
-    oInstallSystemTypes;
+    oInstallSystemOperations (inout int next_operation)   % Predefine some operations
+    oInstallSystemTypes (out Node int_type)   % Predefine some types.
+                                              % Return nType declaration of int type.
+    ;
 
 mechanism write_mech:
-    oWriteTables;
-
-% ------- new in test -------
-
-type Addr:   % Addresses in generated code
-    ;
-
-mechanism Gen_mech:
-    Here >> Addr     % location in generated code
-    patch (Addr, int)
-    ;
-
-type Node:
-    Null = 0
-    ;
-
-mechanism node_more:
-    oNodeSetInt (node_attribute, int)
-    ;
-
-mechanism math:
-    inc (inout int);
+    oWriteTables (Node global_scope);   % Write files, given global scope of symbol table.
 
 rules
 
+% ---------------------- Global Variables --------------------
 
-%  Global variables
+Node    IntType             % nType node for built-in "int" type
+Node    CurrentRule         % nRule node for current rule being declared
+int     NumGlobals          % number of global variables in program
+int     NumLocals           % number of local variables in current rule
+int     RuleLocalSpaceAddr  % address of LocalSpace argument for rule
+int     NextOperation       % code for next semantic operation decl
+int     NextError           % next error code
+Node    GlobalScope         % global nScope
 
-int  NumGlobals, NextError, NextOperation
+% -------------------- Forward Declarations ------------------
 
+Section >> boolean;
+ValueList (node_type class, inout int value, boolean str_alias_allowed, Node t);
+OperationDefinition >> boolean;
+RuleSectionDefinition >> boolean;
+RuleBodyDefinition (Node r);
+RuleRedefinition (Node r);
+Statement >> boolean;
+CallOperation (Node o);
+ActualParams (Node r) >> int;
+CallRule (Node r);
+CallUndefinedRule;
+Assignment (Node i);
+CopyChoiceTable (int num_options);
+Expr (out Node t);
+Lvalue (out Node t);
+Lvalue_HaveIdent (Node i, out Node t);
+Const (out Node t) >> int;
+IntConst >> int;
+LookupType (out Node i);
+LookupInput (out Node i);
+LookupOutput (out Node i);
+LookupValue (out Node i);
+LookupError (out Node i);
+RequireType (Node i);
+RequireInput (Node i);
+RequireOutput (Node i);
+RequireValue (Node i);
+RequireError (Node i);
+RequireRule (Node i);
+RequireNoType (Node r);
+RequireMatchValueType (Node v, Node t);
+MatchType (Node t1, Node t2) >> boolean;
+RequireMatchType (Node t1, Node t2);
+MatchIntType (Node t) >> boolean;
+RequireMatchIntType (Node t);
+EmitValue (Node i);
+EmitAddr (Node v);
+
+% ------------------------- Main Parser ----------------------
 
 ProcessSSL:
+    int   global_space_addr  % address of iGlobalSpace arg for global vars
 
-    Addr  global_space
-
-    oScopeBegin
+    oScopeBegin (GlobalScope)
 
     NextError = 0
     NextOperation = 0
 
     oInstallSystemOperations (NextOperation)
-    oInstallSystemTypes
+    oInstallSystemTypes (IntType)
 
     NumGlobals = 0                 % Count global variables
-    .iLocalSpace                   % Make space for global variables
-    global_space = Here   .iSpace
+    .iGlobalSpace                  % Make space for global variables
+    global_space_addr = Here   .iSpace
 
 
-    {[ Section
+    {[ @Section
         | true:
         | *:  >
     ]}
 
     @FixForwardCalls
 
-    inc (NumGlobals)   % increase because globals addressed from 1 (addr 0 unused)
-    patch (global_space, NumGlobals)
+    inc (NumGlobals)   % because globals addressed from 1 (addr 0 unused)
+    oPatch (global_space_addr, NumGlobals)
 
     oScopeEnd
 
-    oWriteTables
-    oNodePop   % global nScope
+    oWriteTables (GlobalScope)
     ;
 
 
@@ -463,173 +404,178 @@ Section >> boolean:
 Title:
     ':' pStrLit oTitleSet ';' ;
 
-% Forward declaration
-% Returns next value after highest assigned
-% Note, return value may be ignored
-
-ValueList (node_type, int initial_value, boolean string_alias_allowed, Node value_type) >> int;
-
 Input:
-    ':' 
-    ValueList (nInput, 0, true, Null)
-    ';' ;
+    int  next_value
+    ':'
+    next_value = 0
+    @ValueList (nInput, next_value, true, Null)
+    ';';
 
 Output:
+    int  next_value
     ':'
-    ValueList (nOutput, 0, true, Null)
-    ';' ;
-
+    next_value = 0
+    @ValueList (nOutput, next_value, true, Null)
+    ';';
 
 Error:
     ':'
-    NextError = ValueList (nError, NextError, false, Null)
-    ';' ;
+    @ValueList (nError, NextError, false, Null)
+    ';';
 
 Type:
-    Node t
+    Node  t
+    int   next_value
 
-    pIdent    t = NodeNew(nType)  NodeSet(t, qIdent, Ident)
-              ScopeDeclare(t)
+    pIdent  t = oNodeNew (nType)  oNodeSetInt (t, qIdent, LAST_ID)
+    oScopeDeclare (t)
     ':'
-    ValueList (nValue, 0, false, t)
-    ';' ;
+    next_value = 0
+    @ValueList (nValue, next_value, false, t)
+    ';';
 
 Include:
     pStrLit oInclude;
 
 Mechanism:
-    Node m
+    Node  m
 
-    pIdent    m = NodeNew(nMechanism)  NodeSet(m, qIdent, Ident)
-              oScopeDeclare(t)
+    pIdent
+    m = oNodeNew (nMechanism)  oNodeSetInt(m, qIdent, LAST_ID)
+    oScopeDeclare (m)
+
     ':'
-    {[ OperationDefinition
+    {[ @OperationDefinition
         | true:
         | *:  >
     ]}
     ';' ;
 
 Rules:
-    {[ RuleSectionDefinition
+    {[ @RuleSectionDefinition
         | true:
         | *:  >
     ]}
     pEnd ;
 
 
-% ------------------------- Value Lists ----------------------
+% ------------------------- Value List ----------------------
 
-ValueList (node_type decl_type, int value, boolean string_alias_allowed, Node value_type) >> int:
-    Node p, const_type
+ValueList (node_type class, inout int value, boolean str_alias_allowed, Node t):
+    Node  p, t2
     {[
         | pIdent:
-            p = NodeNew(decl_type)  NodeSet (p, qIdent, Ident)
+            p = oNodeNew (class)  oNodeSetInt (p, qIdent, LAST_ID)
 
-            [ decl_type
-                | nType :    NodeSet (p, qType, t)
+            [ class
+                | nValue :    oNodeSet (p, qType, t)
                 | * :
             ]
 
             [ | pStrLit:
-                [ string_alias_allowed
+                [ str_alias_allowed
                     | true:  oShortFormAdd (p)   % Associate short form with declaration
                     | *:     #eAliasNotAllowed
                 ]
               | *:
             ]
 
-            [ | '=':       value = @Const(const_type)
-                           [ Match(const_type, value_type)
+            [ | '=':       value = @Const(t2)
+                           [ @MatchType (t, t2)
                                | true :
-                               | false :  RequireMatchType (const_type, IntType)
+                               | false :  @RequireMatchIntType(t2)
                            ]
               |*:
             ]
-            NodeSet (p, qValue, value)
+            oNodeSetInt (p, qValue, value)
+            inc (value)
 
             oScopeDeclare (p)
-            inc (value)
-        | *:  >
-    ]}
-    >> value ;
 
+        | *:  >
+    ]};
 
 % ------------------------- Variables ------------------------
 
-%  Declare a list of variables.
-%  class is class of variable (nGlobal or nLocal)
+%  Declare a list of variables, given class (local/global),
+%  nType, and a counter used to assign addresses for that class.
 
-DeclareVariables (node_type class, Node var_type, inout int address):
-    Node   v
+DeclareVariables (node_type class, Node t, inout int addr_counter):
+    Node  i
     {
         pIdent
-        v = NodeNew(class)  NodeSet(v, qIdent, Ident)
-        NodeSet (v, qType, var_type)
+        i = oNodeNew(class)  oNodeSetInt(i, qIdent, LAST_ID)
+        oNodeSet (i, qType, t)
 
-        % Assign address to local variable
-        inc (address)   NodeSet (v, qAddr, address)
+        % Assign address to variable
+        inc (addr_counter)   oNodeSetInt (i, qAddr, addr_counter)
 
-        ScopeDeclare (v)
+        oScopeDeclare (i)
 
         [ | ',' :
           | * :   >
         ]
     };
 
-DeclareGlobals (Node var_type)
-    DeclareVariables (nGlobal, var_type, NumGlobals);
+%  Declare a list of global variables, given nType.
 
-DeclareLocals (Node var_type)
-    DeclareVariables (nLocal, var_type, NumLocals);
+DeclareGlobals (Node t):
+    @DeclareVariables (nGlobal, t, NumGlobals);
 
+%  Declare a list of local variables, given nType.
+
+DeclareLocals (Node t):
+    @DeclareVariables (nLocal, t, NumLocals);
 
 
 %  Defines formal parameters (if any) in current scope.
 %  The caller should have called oScopeBegin to begin a
 %  scope just for parameters.  (This gives a simple way
 %  to check if an operation/rule has parameters).
-
+%  Does not end the scope.
+%
+%  nParam's may be named or unnamed (qIdent == 0)
+%
 %  Parameters are assigned addresses in reverse order
 %  from n to 1.  This is for efficient stack access.
 %  E.g. func(a,b,c):  address of a:3, b:2, c:1
-%
 %  (Later I would like to instead push actuals in reverse order)
 
-FormalParamDefinition:
-
-    int     num_params
-    Node    param, t
+FormalParamDefinition (Node scope):
+    int        num_params
+    node_type  dir
+    Node       p, t
 
     [ | '(' :
       | *   : >>
     ]
 
-    num_params = 0
+    num_params = 0      % Count the parameters, to assign addresses
 
     {
         inc (num_params)
 
         % parameter direction
         [
-            | pIn :     param = NodeNew (nInParam)
-            | pOut :    param = NodeNew (nOutParam)
-            | pInOut :  param = NodeNew (nInOutParam)
-            | * :       param = NodeNew (nInParam)
+            | pIn :     dir = nInParam
+            | pOut :    dir = nOutParam
+            | pInOut :  dir = nInOutParam
+            | * :       dir = nInParam
         ]
 
         % parameter type
-        pIdent    t = LookupType  NodeSet(param, qType, t)
+        pIdent  @LookupType (t)
+
+        p = oNodeNew(dir)
+        oNodeSet (p, qType, t)
 
         % parameter name
         [
-            | pIdent :  NodeSet(param, qIdent, Ident)   % named parameter
+            | pIdent :  oNodeSetInt (p, qIdent, LAST_ID)   % named parameter
             | * :       % unnamed parameter
         ]
 
-        % To do: assign an address (qAddr)
-
-        oScopeDeclare       % declare nParam
-        oNodePop            % pop nType
+        oScopeDeclare (p)       % declare nParam
 
         [
             | ',' :
@@ -641,128 +587,247 @@ FormalParamDefinition:
 
     %  Now go back and assign addresses to the parameters
 
-    oNodeGet (qDecls)
+    p = oNodeGet (scope, qDecls)
 
     {
-        [ oCountZero
+        [ equal_zero (num_params)
             | true:  >
             | false:
         ]
 
-        oValuePushCount oNodeSetValue(qAddr) oValuePop
+        oNodeSetInt (p, qAddr, num_params)
 
-        oCountDec
-        oNodeNext
+        dec (num_params)
+        oNodeNext (p)
     }
-    oNodePop % Null at end of param list
-    oCountPop
-
     ;
+
+%  Redefine formal parameters during declaration of actual rule (with body).
+%  Previously, parameters were declared by a forward declaration or by usage.
+%  Ensure that types match.  Update parameter names to new names given.
+%  (All parameters must be named since this will be the final declaration).
+%
+%  Previous parameter nScope is given, and scope has been opened.
+%  (Addresses were assigned previously, no need to do it again).
+%  NOTE: I probably don't really want to open the previous scope since the
+%  old param names are not valid.
+
+FormalParamRedefinition (Node scope):
+    Node      p
+    node_type dir, dir2
+    Node      t, t2
+
+    p = oNodeGet (scope, qDecls)       % previous param declarations
+
+    [ | '(' :
+      | *   : [ oNodeNull(p)
+                  | true :
+                  | * :    #eParameterMismatch
+              ]
+              >>
+    ]
+
+    {
+        [ oNodeNull(p)
+            | true :    #eParameterMismatch  % too many params given this time
+            | false :
+        ]
+
+        dir = oNodeType(p)         % previous direction
+        % parameter direction
+        [
+            | pIn :     dir2 = nInParam
+            | pOut :    dir2 = nOutParam
+            | pInOut :  dir2 = nInOutParam
+            | * :       dir2 = nInParam
+        ]
+        [ equal_node_type (dir, dir2)
+            | true :
+            | * :     #eParameterMismatch
+        ]
+
+        t = oNodeGet (p, qType)    % previous type
+        pIdent  @LookupType(t2)    % parameter type
+        @RequireMatchType (t, t2)
+
+        % parameter name
+        pIdent  oNodeSetInt (p, qIdent, LAST_ID)    % must be named
+
+        oNodeNext (p)
+
+        [
+            | ',' :
+            | * :   >
+        ]
+    }
+
+    ')'
+
+    [ oNodeNull(p)
+        | true :
+        | * :    #eParameterMismatch   % Not enough params given this time
+    ]
+    ;
+
 
 % ------------------------- Operations -----------------------
 
 %  Returns true if definition found
 
 OperationDefinition >> boolean:
-
+    Node  op, s, t
     [
         | pIdent:
         | *:        >> false
     ]
 
-    oNodeNew (nOperation)  oNodeSetIdent(qIdent)
-    oValuePushCount  oNodeSetValue (qValue)  oValuePop   % op# from counter
+    op = oNodeNew (nOperation)  oNodeSetInt (op, qIdent, LAST_ID)
+    oNodeSetInt (op, qValue, NextOperation)
+    inc (NextOperation)
 
-    oCountInc
+    oScopeBegin (s)   % parameter scope
 
-    oScopeBegin    % parameter scope
+    @FormalParamDefinition(s)
 
-    @FormalParamDefinition
+    oNodeSet (op, qParamScope, s)
 
-    oNodeLink (qParamScope)
-
-    [ | '>>': pIdent  @LookupType
-              oNodeLink (qType)
-      |*:     %  qType and qParamType are NULL by default
+    [ | '>>': pIdent  @LookupType (t)   oNodeSet (op, qType, t)
+      |*:     %  qType is Null by default
     ]
 
     oScopeEnd      % parameter scope
 
-    oScopeDeclare  % declare operation
+    oScopeDeclare (op)
 
     >> true
     ;
 
 % ------------------------- Rules ----------------------------
 
-%  Start a definition in the rules secition.
+%  Parse a definition in the rules secition.
 %  This could be:
 %      a rule definition, a rule prototype, or a global variable definition.
 %  Returns true if one of the above found
 
 RuleSectionDefinition >> boolean:
+    Node  i
     [
         | pIdent:
         | * :        >> false
     ]
 
-    [ oScopeFind
+    [ oScopeFind (i)
         | false:     @RuleDefinition
         | true:
-            [ oNodeChooseType
-                | nType :  @DeclareGlobals   oNodePop
-                | * :      oNodePop #eNotRuleOrGlobalDefn  >> true  % True to skip to next
+            [ oNodeType(i)
+                | nType :  @DeclareGlobals(i)
+                | nRule :  @RuleRedefinition(i)    % Should be body of fwd declared rule
+                | * :      #eNotRuleOrGlobalDefn  >> true  % True to skip to next
             ]
     ]
 
     >> true
     ;
 
+%   Define the parameters, and possibly the body, of a rule
+%   that has not been defined previously.
 %   Just parsed ident of rule.
+
 RuleDefinition:
+    Node  r
+    Node  s
+    Node  t
 
     oDocNewRule
 
-    oNodeNew (nRule)  oNodeSetIdent(qIdent)  oRuleSetCurrentRule
+    r = oNodeNew(nRule)  oNodeSetInt(r, qIdent, LAST_ID)
+    CurrentRule = r
 
-    oValuePushHere  oNodeSetValue (qValue)  oValuePop
 
-    oScopeBegin                % param scope
-    @FormalParamDefinition
-    oNodeLink (qParamScope)    % leave scope open, to access params during rule
+    oScopeBegin (s)                 % param scope
+    @FormalParamDefinition(s)
+    oNodeSet (r, qParamScope, s)    % leave scope open, to access params during rule
 
-    [ | '>>':
-          pIdent  @LookupType  oNodeLink (qType)
+    [ | '>>':   pIdent  @LookupType(t)  oNodeSet (r, qType, t)
       | * :
     ]
 
-    ':'
+    [
+        | ':' :  @RuleBodyDefinition (r)
+        | * :    % No body; a forward declaration of the rule.
+    ]
+    ';'
 
-    oScopeBegin       % rule variables scope
+    oScopeEnd            % parameters scope (already linked to nRule above)
 
-    oRuleSetNumLocals(zero)    % count local vars, to assign addresses and make space for them
+    oScopeDeclare (r)    % declare nRule
+                         % (Note, can't call rule recursively since not defined until end)
+    ;
+
+
+% Given the nRule node
+
+RuleBodyDefinition (Node r):
+    Node  s
+
+    oNodeSetInt (r, qValue, Here)      % Address of rule is now defined
+    oNodeSetBoolean (r, qAddrDefined, yes)
+
+    oScopeBegin (s)       % rule variables scope
+
+    NumLocals = 0
+
     .iLocalSpace 
-    oRuleSetLocalSpaceAddr .iSpace
+    RuleLocalSpaceAddr = Here   .iSpace
 
-    {[ Statement
+    {[ @Statement
         | true:
         | *:  >
     ]}
 
-    ';'
     .iReturn
 
-    oRulePatchLocalSpace
-
+    oPatch (RuleLocalSpaceAddr, NumLocals)
 
     oScopeEnd            % rule variables scope
-    oNodeLink (qScope)
+    oNodeSet (r, qScope, s)
 
-    oScopeEnd            % parameters scope (already linked to nRule above)
+    ;
 
-    oScopeDeclare        % declare nRule
-                         % (Note, can't call rule recursively
-                         % since not defined until end)
+
+%   Redefine a rule (to provide body of a forward-declared rule).
+%   Given the existing nRule declaration.
+
+RuleRedefinition (Node r):
+    Node  s, p
+    Node  t, t2
+
+    [ oNodeGetBoolean (r, qAddrDefined)
+        | yes :   #eRuleBodyAlreadyDeclared  >>
+        | * :
+    ]
+
+    oDocNewRule
+
+    CurrentRule = r
+
+    s = oNodeGet(r, qParamScope)
+    oScopeOpen (s)   % Make the existing parameters visible.
+                     % (Actually, probably don't want to do this).
+
+    @FormalParamRedefinition (s)   % verify types, update param names
+
+    % Verify return type matches previous declaration/usage
+    t = oNodeGet (r, qType)
+    [ | '>>':   pIdent  @LookupType(t2)  @RequireMatchType(t, t2)
+      | * :     @RequireMatchType(t, Null)
+    ]
+
+    ':'
+    @RuleBodyDefinition (r)
+    ';'
+
+    oScopeEnd            % parameters scope (already linked to nRule)
     ;
 
 % ------------------------- Statements -----------------------
@@ -770,65 +835,60 @@ RuleDefinition:
 %  Returns true if statement found
 
 Statement >> boolean:
+    Node  i
+    Node  t, t2
 
     [
         | pStrLit:           % input alias
-            oShortFormLookup @RequireInput
-            .iInput @EmitValue oNodePop
+            oShortFormLookup(i)  @RequireInput(i)
+            .iInput @EmitValue(i)
 
         | pIdent:            % input or operation
-            oScopeFindRequire
-            [ oNodeChooseType
+            oScopeFindRequire(i)
+            [ oNodeType(i)
 
-                | nInput:      .iInput @EmitValue  oNodePop
+                | nInput:      .iInput @EmitValue(i)
 
-                | nOperation:  @RequireNoType @CallOperation   oNodePop
+                | nOperation:  @RequireNoType(i) @CallOperation(i)
 
-                | nType:       @DeclareLocals     oNodePop
+                | nType:       @DeclareLocals(i)
 
-                | *:           @Assignment    % pops identifier
+                | *:           @Assignment(i)
             ]
 
 	| '#':
-            pIdent  @LookupError
-            .iError @EmitValue  oNodePop
+            pIdent  @LookupError(i)
+            .iError @EmitValue(i)
 
 	| '.':
-	    [ | pIdent:    @LookupOutput
-              | pStrLit:   oShortFormLookup @RequireOutput
+	    [ | pIdent:    @LookupOutput(i)
+              | pStrLit:   oShortFormLookup(i) @RequireOutput(i)
             ]
-            .iEmit @EmitValue  oNodePop
+            .iEmit @EmitValue(i)
 
 	| '@':
 	    pIdent
-            [ oScopeFind
+            [ oScopeFind(i)
                 | true :
-                    @RequireRule  @RequireNoType
-                    @CallRule
-                    oNodePop
+                    @RequireRule(i)  @RequireNoType(i)
+                    @CallRule(i)
 
                 | false :
                     @CallUndefinedRule
             ]
 
 	| '>>':
-            oRuleGetCurrentRule   % ugh.  To check return type of current rule.
-            oNodeGet (qType)
-	    [ oNodeNull
+            t = oNodeGet (CurrentRule, qType)
+	    [ oNodeNull(t)
                 | true :
-                | * :
-                    @Expr  @RequireMatchType
-                    oNodePop   % type of expr
-                    oNodePop   % type of rule
-
+                | * :       @Expr(t2)  @RequireMatchType(t, t2)
             ]
-            oNodePop   % current nRule
             .iReturn
 
 	| '{':
             oPatchPushHere (patchLoop)
             oPatchMark (patchBreak)
-	    {[ Statement
+	    {[ @Statement
 		| true:
 		| *:  >
 	    ]}
@@ -858,65 +918,65 @@ Statement >> boolean:
     >> true ;
 
 
-%  Called with nOperation on stack
+%  Given nOperation
 
-CallOperation:
-    @ActualParams     % pushes #params on value stack
+CallOperation (Node o):
+    int  num_params
 
-    @EmitValue        % call operation
+    num_params = @ActualParams (o)
 
-    [ oValueZero
+    @EmitValue(o)        % call operation
+
+    [ equal_zero (num_params)
         | true :
-        | false :     .iPop .iConstant
+        | false :     .iPop oEmitInt(num_params)
     ]
-    oValuePop
     ;
 
 
-%  Called with nOperation or nRule on stack
-%  Pushes number of parameters on value stack
+%  Given nOperation or nRule.  Returns number of parameters.
 
-ActualParams:
+ActualParams (Node r) >> int:
 
-    oNodeGet (qParamScope)    % nScope always present, but may be empty (no nParams)
-    oNodeGet (qDecls)         % first nParam
+    int   num_params
+    Node  param_scope, p
+    Node  t, t2
 
-    [ oNodeNull
+    param_scope = oNodeGet (r, qParamScope)  % Always present, but might contain no nParams
+    p = oNodeGet (param_scope, qDecls)
 
-        | true :    oValuePush (zero)   oNodePop  >>
+    [ oNodeNull(p)
+
+        | true :    >> 0
         | false :
     ]
 
-    oCountPush (zero)
+    num_params = 0
 
     '('
 
     {
-        oCountInc
+        inc (num_params)
 
         %  ----------------------------
 
-        %  One actual parameter.  Formal nParam is on stack.
+        %  One actual parameter.
 
-        [ oNodeChooseType
-            | nInParam :
-                oNodeGet (qType)   % type of formal param
-                @Expr              % type of actual param to stack
+        t = oNodeGet (p, qType)    % formal param type
 
-            | nOutParam, nInOutParam :
-                oNodeGet (qType)   % type of formal param
-                @Lvalue            % type (pointed to by lvalue) to stack
+        [ oNodeType(p)
+            | nInParam :                @Expr (t2)
+            | nOutParam, nInOutParam :  @Lvalue (t2)
         ]
-        @RequireMatchType
+        
+        @RequireMatchType (t, t2)
         .iPushResult
 
-        oNodePop oNodePop  % actual param type, formal param type
-
         %  ----------------------------
 
-        oNodeNext
+        oNodeNext (p)
 
-        [ oNodeNull
+        [ oNodeNull (p)
             | true :   >
             | false :
         ]
@@ -926,77 +986,133 @@ ActualParams:
 
     ')'
 
-    oNodePop    % param nScope
-    oValuePushCount oCountPop
+    >> num_params
     ;
 
 
 
-%  Called with nRule on stack
+%  Called for a nRule whose parameter types are defined.
+%  The rule address might not yet be known.
 
-CallRule:
-    @ActualParams      % pushes #params on value stack
+CallRule (Node r):
+    int  num_params
 
-    .iCall @EmitValue  % call rule
+    num_params = @ActualParams(r)
+
+    [ oNodeGetBoolean (r, qAddrDefined)     % A call to a forward-declared rule?
+        | yes :   .iCall @EmitValue(r)
+        | no :    .iCall oPatchPushHere(patchCall) 
+                         oPatchPushInt (patchCall, oNodeGetInt(r, qIdent))
+                         .iSpace
+    ]
 
     % Pop actual params
-    [ oValueZero
+    [ equal_zero (num_params)
         | true :
-        | false :     .iPop .iConstant
+        | false :     .iPop oEmitInt(num_params)
     ]
-    oValuePop
     ;
+
 
 %  Implicitly declare a rule that has not previously been declared.
 %  Rule name is last accepted identifier.
-%  NOTE, for now, I just don't declare it. This means we don't get
-%  consistency checking.  Should do some work and add qDeclared field.
+%  Implicitly declares InParam parameters, and no return type.
 
 CallUndefinedRule:
+    Node  r, s, t, p
+    int   id, num_params, addr
+
+    r = oNodeNew (nRule)  id = LAST_ID  oNodeSetInt (r, qIdent, id)
+    oNodeSetBoolean(r, qAddrDefined, false)
+
+    % Implicit parameters
+
+    oScopeBegin (s)
+    oNodeSet (r, qParamScope, s)
+
+    num_params = 0
+
+    [ | '(' :
+
+        {
+            @Expr(t)
+            p = oNodeNew (nInParam)  oNodeSet(p, qType, t)
+            oScopeDeclare(p)
+            inc(num_params)
+
+            [ | ',' :
+              | * :   >
+            ]
+        }
+
+        % Assign parameter addresses
+
+        addr = num_params
+        p = oNodeGet (s, qDecls)
+        {
+            [ oNodeNull(p)
+                | true :  >
+                | false :
+            ]
+            oNodeSetInt (p, qAddr, addr)
+            dec (addr)
+            oNodeNext (p)
+        }
+
+      | * :
+    ]
+
+    oScopeEnd    % param scope
+    oScopeDeclare (r)
+
+    % Now call rule
+
     .iCall
     oPatchPushHere (patchCall)
-    oPatchPushIdent (patchCall)
+    oPatchPushInt (patchCall, id)
     .iSpace
 
-    [ | '(' :  #eFwdRuleParamsNotSupportedYet
-      | *:
-    ]
-    ;
+    [ equal_zero (num_params)
+        | true :
+        | * :     .iPop oEmitInt(num_params)
+    ];
 
 
 %  Already parsed pIdent and determined it is not a rule/type/operation.
-%  nDeclaration is on stack.  Will be replaced with lvalue type.
 
-Assignment:
-    @Lvalue_HaveIdent     % replaces ident on stack with type referenced by lvalue
+Assignment (Node i):
+    Node t, t2
+    @Lvalue_HaveIdent(i,t)
     .iPushResult
     '='
-    @Expr  @RequireMatchType
-    oNodePop  oNodePop    % rvalue type, lvalue type
+    @Expr(t2)  @RequireMatchType(t,t2)
     .iAssign
     ;
 
 Choice:
+    int    num_options    % count the number of options in the choice
+    kind   choice_kind    % input choice, expr choice, expr undefined type choice
+    Node   choice_type    % type of expr choice
+    Node   t
+    Node   i
+    int    val
+
     %  Determine if this is an input choice or a value choice.
-    %  Push flag on value stack indicating which of the above cases this is.
-    %  Push type of value choice on node stack (or Null if not known yet)
+    %  For value choice, determine type of value (if known).
 
     [
         | '|' :
-            .iInputChoice   oValuePushKind (kInput)   % flag that this is an input choice
-
-            oNodePushNull   % dummy to hold place of choice nType
+            .iInputChoice   choice_kind = kInput
 
         | * :
-            @Expr  .iChoice
+            @Expr(choice_type)  .iChoice
 
-            % Expr indicates forward use of undefined rule by returning expr type NULL
-            % We will indicate this for ourselves by pushing value kUnknown
+            % Expr indicates forward use of undefined rule by returning type Null.
+            % We will indicate this for ourselves by setting kind to kUnknown.
 
-            [ oNodeNull
-                | true :    oNodePushNull    % keep Null type on stack for now
-                            oValuePushKind (kUnknown)
-                | false:    oValuePushKind (kType)  % flag that choice is typed
+            [ oNodeNull(choice_type)
+                | true :    choice_kind = kUnknown   % flag that this is expr choice, unknown type
+                | false:    choice_kind = kType      % flag that this is expr choice, known type
             ]
 
             '|'
@@ -1007,62 +1123,50 @@ Choice:
 
     oPatchMark (patchChoiceTable)    % build up choice table in this stack
     oPatchMark (patchChoiceExit)     % remember end of each option
-    oCountPush (zero)                % count options
+    num_options = 0                  % count options
 
     {
         [
             | '*':     % default code (must be last option)
                 ':'
-                @CopyChoiceTable
+                @CopyChoiceTable (num_options)
 
-                {[ Statement
+                {[ @Statement
                     | true :
                     | *: >
 	        ]}
                 ']'
 
-                % Clean up
-                oCountPop oValuePop
-                oNodePop     % choice nType
-
+                % Finish up
                 @FixChoiceExits
                 >>
 
             | * :
                 {
-                    [ oValueChooseKind   % kind of choice statement
+                    [ choice_kind
 
-                        | kType :         % rule/op choice
-                            @Const        % constant value to value stack, nType to node stack
-                            @RequireMatchType
-                            oNodePop      % type of constant
+                        | kType :         % expr choice
+                            val = @Const(t)
+                            @RequireMatchType (choice_type, t)
 
-                        | kUnknown :      % rule choice, rule type not known yet
+                        | kUnknown :      % expr choice, type not known yet
+                            val = @Const(choice_type)
 
-                            % Change flag to indicate the choice will be typed now
-                            oValuePop oValuePushKind (kType)
+                            % NOTE: now that we know type of forward rule in expr, we could update nRule
 
-                            % Get constant value on value stack,
-                            % and replace dummy nType with nType of constant.
-
-                            oNodePop     % dummy nType
-                            @Const       % get constant in value stack, type on node stack
-
-                            % NOTE: now that we know type of forward rule, we could update nRule
+                            % Now know type
+                            choice_kind = kType
 
                         | kInput :        % input choice
-                            [ | pIdent :  @LookupInput
-                              | pStrLit : oShortFormLookup @RequireInput
+                            [ | pIdent :  @LookupInput(i)
+                              | pStrLit : oShortFormLookup(i) @RequireInput(i)
                             ]
-                            oNodeGetValue (qValue)
-                            oNodePop
+                            val = oNodeGetInt (i, qValue)
                     ]
 
-                    % value of option is now on value stack
-
                     oPatchPushHere (patchChoiceTable)
-                    oPatchPushValue (patchChoiceTable)
-                    oValuePop  oCountInc
+                    oPatchPushInt  (patchChoiceTable, val)
+                    inc (num_options)
 
                     [
                         | ':' :   >
@@ -1073,7 +1177,7 @@ Choice:
 
         % Code for this option:
 
-        {[ Statement
+        {[ @Statement
             | true:
             | *:  >
         ]}
@@ -1082,11 +1186,7 @@ Choice:
             | ']' :     % end of choice, no default
                 .iJumpForward
                 oPatchPushHere (patchChoiceExit) .iSpace
-                @CopyChoiceTable
-
-                % Clean up
-                oCountPop oValuePop
-                oNodePop     % choice nType
+                @CopyChoiceTable (num_options)
 
                 .iEndChoice
 
@@ -1100,13 +1200,12 @@ Choice:
     };
 
 
-%  Install choice table here.
-%  #options is in the top counter.
+%  Install choice table here, given number of options.
 %  Order of options is opposite that in the source (note for error recovery)
 
-CopyChoiceTable:
+CopyChoiceTable (int num_options):
     oPatchPopFwd (patchChoiceTableAddr)    % fix pointer to table
-    oValuePushCount  .iConstant  oValuePop       % # entries
+    oEmitInt (num_options)                 % # table entries
     {[ oPatchAtMark (patchChoiceTable)
         | false :
             oPatchPopValue (patchChoiceTable)
@@ -1131,30 +1230,45 @@ FixForwardCalls:
 %  ------------------------------------------------------- 
 
 %  Emits code for expression (with result in ssl_result).
-%  Leaves nType of expression on node stack.
+%  Returns nType of expression.
 
-Expr:
+Expr (out Node t):
+    Node  i
     [
         | pIdent :
 
-            [ oScopeFind
+            [ oScopeFind (i)
                 | true :
-                    [ oNodeChooseType
-                        | nRule :        @CallRule
-                        | nOperation :   @CallOperation
-                        | nValue :       .iSetResult @EmitValue
-                        | nInParam :     .iGetParam  @EmitAddr
-                        | nOutParam :    .iGetFromParam @EmitAddr
-                        | nInOutParam :  .iGetFromParam @EmitAddr
-                        | nLocal :       .iGetLocal @EmitAddr
-                        | nGlobal :      .iGetGlobal @EmitAddr
+                    [ oNodeType (i)
+                        | nRule :        oWarning(wRuleMissingAtSign) @CallRule(i)
+                        | nOperation :   @CallOperation(i)
+                        | nValue :       .iSetResult    @EmitValue(i)
+                        | nInParam :     .iGetParam     @EmitAddr(i)
+                        | nOutParam :    .iGetFromParam @EmitAddr(i)
+                        | nInOutParam :  .iGetFromParam @EmitAddr(i)
+                        | nLocal :       .iGetLocal     @EmitAddr(i)
+                        | nGlobal :      .iGetGlobal    @EmitAddr(i)
                         | * : #eIdentNotAllowedInExpr
                     ]
-                    oNodeGet (qType)         % Get type of identifier
-                    oNodeSwap oNodePop       % Pop identifier, leaving its type
 
-                    [ oNodeNull
-                        | true:  oNodePushNull  #eNotTyped   % e.g. call with no return value
+                    t = oNodeGet (i, qType)         % Get type of identifier
+                    [ oNodeNull(t)
+                        | true:  #eNotTyped   % e.g. call with no return value
+                        | * :
+                    ]
+
+                | false :
+                    t = Null  #eUndeclaredIdentifier
+            ]
+
+        | '@' :
+	    pIdent
+            [ oScopeFind (i)
+                | true :
+                    @RequireRule(i) @CallRule(i)
+                    t = oNodeGet (i, qType)
+                    [ oNodeNull (t)
+                        | true:  #eNotTyped   % e.g. call with no return value
                         | * :
                     ]
 
@@ -1164,206 +1278,198 @@ Expr:
                     % This is really just allowed so we can have simple rules in a Choice expression.
 
                     @CallUndefinedRule
-
-                    oNodePushNull
+                    t = Null
             ]
 
         | '-' :
-            pIntLit
-            .iSetResult oValuePushIntLit oValueNegate .iConstant oValuePop
-            oNodeGetIntType
+            pIntLit   .iSetResult  oEmitInt(negate(TOKEN_VALUE))
+            t = IntType
         | pIntLit :
-            .iSetResult oValuePushIntLit .iConstant oValuePop
-            oNodeGetIntType
+            .iSetResult  oEmitInt(TOKEN_VALUE)
+            t = IntType
     ];
 
 %  Emits code for lvalue (putting address of variable in ssl_result).
-%  Leaves nType of the referenced value on node stack.
+%  Returns nType of the referenced value.
 
-Lvalue:
+Lvalue (out Node t):
+    Node i
     [
         | pIdent :
 
-            [ oScopeFind
-                | true :
-                    @Lvalue_HaveIdent
+            [ oScopeFind(i)
+                | true :      @Lvalue_HaveIdent(i,t)
 
-                | false :   % a forward use of rule, illegal as lvalue
-                    oNodePushNull #eIllegalLvalue
+                | false :     % a forward use of rule, illegal as lvalue
+                    t = Null  #eIllegalLvalue
             ]
 
-        | '-' :   pIntLit     oNodePushNull #eIllegalLvalue
-        | pIntLit :           oNodePushNull #eIllegalLvalue
+        | '-' :   pIntLit     t = Null    #eIllegalLvalue
+        | pIntLit :           t = Null    #eIllegalLvalue
     ];
 
-%  Emit code for lvalue, given nDeclaration of identifier on stack.
-%  Replace ident nDeclaration on stack, with the lvalue's nType
+%  Emit code for lvalue, given nDeclaration of identifier.
+%  Return lvalue's nType
 
-Lvalue_HaveIdent:
-    [ oNodeChooseType
-        | nInParam :     .iGetAddrParam  @EmitAddr
-        | nOutParam :    .iGetParam      @EmitAddr
-        | nInOutParam :  .iGetParam      @EmitAddr
-        | nLocal :       .iGetAddrLocal  @EmitAddr
-        | nLocal :       .iGetAddrGlobal @EmitAddr
+Lvalue_HaveIdent (Node i, out Node t):
+    [ oNodeType(i)
+        | nInParam :     .iGetAddrParam  @EmitAddr(i)
+        | nOutParam :    .iGetParam      @EmitAddr(i)
+        | nInOutParam :  .iGetParam      @EmitAddr(i)
+        | nLocal :       .iGetAddrLocal  @EmitAddr(i)
+        | nGlobal :      .iGetAddrGlobal @EmitAddr(i)
         | * : #eIllegalLvalue
     ]
-    oNodeGet (qType)         % Get type of identifier
-    oNodeSwap oNodePop       % Pop identifier, leaving its type
+    t = oNodeGet (i, qType)         % Get type of identifier
     ;
 
-%  Get constant value onto value stack.
-%  Push nType of value onto node stack.
-%  NOTE: Does not emit any code.
+%  Return a constant value.  Also return the type of the value.
+%  No code is generated.
 
-Const:
+Const (out Node t) >> int:
+    Node  i
+    int   val
     [
         | pIdent :
-            @LookupValue
-            oNodeGetValue (qValue)
-            oNodeGet (qType)
-            oNodeSwap oNodePop    % pop nValue, leave nType
+            @LookupValue (i)
+            val = oNodeGetInt (i, qValue)
+            t = oNodeGet (i, qType)
         | '-' :
-            pIntLit oValuePushIntLit oValueNegate
-            oNodeGetIntType
+            pIntLit
+            val = negate(TOKEN_VALUE)
+            t = IntType
         | pIntLit :
-            oValuePushIntLit
-            oNodeGetIntType
-    ];
+            val = TOKEN_VALUE
+            t = IntType
+    ]
+    >> val;
 
-%  Return integer constant on value stack.
-%  Only values of type "int" are permitted.
-%  Leave node stack unchanged.
-IntConst:
-    @Const
-    oNodeGetIntType  @RequireMatchType  oNodePop
-    oNodePop;
+%  Return integer constant.  Only values of type "int" are
+%  permitted.  No code is generated.
+
+IntConst >> int:
+    Node t
+    int  i
+    i = @Const (t)  @RequireMatchIntType (t)
+    >> i;
 
 %  ------------------------------------------------------- 
 
 %  Assert that the ident we just read is a particular kind of
-%  identifier.  Also, leave the declaration node of the name
-%  on the node stack.
+%  identifier.  Return the declaration node of the identifier.
 
-LookupType:
-    oScopeFindRequire
-    @RequireType;
+LookupType (out Node i):
+    oScopeFindRequire (i)
+    @RequireType (i);
 
-LookupInput:
-    oScopeFindRequire
-    @RequireInput;
+LookupInput (out Node i):
+    oScopeFindRequire (i)
+    @RequireInput (i);
 
-LookupOutput:
-    oScopeFindRequire
-    @RequireOutput;
+LookupOutput (out Node i):
+    oScopeFindRequire (i)
+    @RequireOutput (i);
 
-LookupValue:
-    oScopeFindRequire
-    @RequireValue;
+LookupValue (out Node i):
+    oScopeFindRequire (i)
+    @RequireValue (i);
 
-LookupError:
-    oScopeFindRequire
-    @RequireError;
+LookupError (out Node i):
+    oScopeFindRequire (i)
+    @RequireError (i);
 
-%  Assert that current nDeclaration on node stack represents
-%  a particular kind of declaration.
+%  Assert that the given nDeclaration represents a particular
+%  kind of declaration.
 
-RequireType:
-    [ oNodeChooseType
+RequireType (Node i):
+    [ oNodeType(i)
         | nType :
         | * :    #eNotAType
     ];
 
-RequireInput:
-    [ oNodeChooseType
+RequireInput (Node i):
+    [ oNodeType(i)
         | nInput :
         | * :    #eNotInput
     ];
 
-RequireOutput:
-    [ oNodeChooseType
+RequireOutput (Node i):
+    [ oNodeType(i)
         | nOutput :
         | * :    #eNotOutput
     ];
 
-RequireValue:
-    [ oNodeChooseType
+RequireValue (Node i):
+    [ oNodeType(i)
         | nValue :
         | * :    #eNotAValue
     ];
 
-RequireError:
-    [ oNodeChooseType
+RequireError (Node i):
+    [ oNodeType(i)
         | nError :
         | * :    #eNotAnErrSig
     ];
 
-RequireRule:
-    [ oNodeChooseType
+RequireRule (Node i):
+    [ oNodeType(i)
         | nRule :
         | * :    #eNotARule
     ];
 
 %  Require that rule/operation has no return type
 
-RequireNoType:
-    oNodeGet (qType)
-    [ oNodeNull
-        | false: #eChoiceOpRuleOutOfPlace  oNodePop
+RequireNoType (Node r):
+    [ oNodeNull (oNodeGet(r, qType))
+        | false: #eChoiceOpRuleOutOfPlace
         | * :
     ];
 
-%  Given a value nDeclaration on stack, and nType under it.
+%  Given a value nDeclaration, and a nType.
 %  Ensure that the value symbol has the type nType.
 
-RequireMatchValueType:
-    oNodeGet (qType)    % Get value's type
-    [ oNodeCompareExactUnder2
-        | true :
-        | * :    #eWrongType
-    ]
-    oNodePop;
-
-
-%  Given a nType on stack and a nType under it,
-%  ensure that the types are the same.
-
-RequireMatchType:
-    [ oNodeCompareExact
+RequireMatchValueType (Node v, Node t):
+    [ oNodeEqual (oNodeGet(v, qType), t)
         | true :
         | * :    #eWrongType
     ];
 
 
-%  Given nType on stack, and nType two under it.
+%  Do two types match?
 
-RequireMatchTypeUnder2:
-    [ oNodeCompareExactUnder2
+MatchType (Node t1, Node t2) >> boolean:
+    >> oNodeEqual (t1, t2);
+
+RequireMatchType (Node t1, Node t2):
+    [ oNodeEqual (t1, t2)
         | true :
         | * :    #eWrongType
     ];
 
-%  Is the top node the nType of "int" type?
+%  Is the nType "int"?
 
-MatchIntType >> boolean:
-    oNodeGetIntType
-    [ oNodeCompareExact
-        | true :  oNodePop  >> true
-        | * :     oNodePop  >> false
+MatchIntType (Node t) >> boolean:
+    >> oNodeEqual (t, IntType);
+
+RequireMatchIntType (Node t):
+    [ oNodeEqual (t, IntType)
+        | true :
+        | * :     #eWrongType
     ];
+
 
 %  ------------------------------------------------------- 
 
 
 %  Emit the value of an identifier declaration, given its nDeclaration
 
-EmitValue:
-    oNodeGetValue(qValue) .iConstant oValuePop;
+EmitValue (Node i):
+    oEmitInt (oNodeGetInt(i, qValue));
 
 %  Emit the addr of a variable, given its declaration
 
-EmitAddr:
-    oNodeGetValue(qAddr) .iConstant oValuePop;
+EmitAddr (Node v):
+    oEmitInt (oNodeGetInt(v, qAddr));
 
 end
 

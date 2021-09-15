@@ -1,13 +1,10 @@
 
-SSL 1.3.0    Aug 23 '93
+SSL 1.3.1     Aug 29 '93
 
-This is an enhanced version of the SSL language, introducing
-variables, expressions, functions with multiple parameters...
+This is a reimplementation of the SSL compiler using
+the new features of variables, parameterized rules, etc.
+introduced in SSL 1.3.0.
 
-It is built using SSL 1.2.8 and ssl_rt 1.1.
-It is also implemented using a "schema" database for the
-symbol table.
-
-However, client programs must use ssl_rt 2.0
-which implements the runtime model produced by this compiler.
+It is built using ssl_rt 2.0.  Client programs should
+also use ssl_rt 2.0.
 

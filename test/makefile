@@ -1,28 +1,25 @@
 
-# Test of the new SSL w/variables (nssl)
-# This is an implementation of the SSL compiler using the variables feature
+# SSL compiler, built using the SSL compiler that supports variables.
 
-COMPILERS_DIR  = /home/sarice/compilers
-NSSL_DIR       = ${COMPILERS_DIR}/nssl
+ROOT           = /home/sarice/compilers
 
 # Generic SSL runtime module
-SSL_RT_DIR     = ${NSSL_DIR}/ssl_rt
+SSL_RT_DIR     = ${ROOT}/ssl_rt_2.0
 SSL_RT_HEADERS = ${SSL_RT_DIR}/ssl_rt.h \
                  ${SSL_RT_DIR}/ssl_begin.h \
                  ${SSL_RT_DIR}/ssl_end.h
 
-SCHEMA_DIR     = ${COMPILERS_DIR}/ssl_rt/schema
+SCHEMA_DIR     = ${ROOT}/schema_1.3
 
-# Existing SSL compiler used to build this one
-SSL_DIR        = ${NSSL_DIR}
+SSL_DIR        = ${ROOT}/ssl_1.3.1
 
 
 # ---------------------------------------------------------
 
 # Debug objects only required if compile with -DDEBUG
 
-DEBUG_DIR      = ${COMPILERS_DIR}/debug
-SSLTOOL_DIR    = ${COMPILERS_DIR}/ssltool
+DEBUG_DIR      = ${ROOT}/debug_1.3.0
+SSLTOOL_DIR    = ${ROOT}/ssltool_1.2.7
 
 DEBUG_OBJS     = ${DEBUG_DIR}/debug.o
 DEBUG_STUBS    = ${DEBUG_DIR}/dbgstub.o
@@ -40,60 +37,50 @@ SSLTOOL_LIBS     = -lguide -lguidexv -lxview -lolgx -lX
 
 CFLAGS = -DDEBUG
 
-SSL_OBJS       = ssl.o \
-		 ssl_schema.o \
+TEST_OBJS      = t.o \
+		 t_schema.o \
 		 ${SCHEMA_DIR}/node.o \
                  ${SSL_RT_DIR}/ssl_rt.o \
                  ${SSL_RT_DIR}/ssl_scan.o
 
 
-all:    ssl ssltool
+all:    t ttool
 
 
-#  Cmdline ssl without debugger
-#ssl:    ${SSL_OBJS}
-#	cc -o ssl ${SSL_OBJS}
-#		${DEBUG_OBJS} ${DEBUG_STUBS}
-
-#  Integrated cmdline debugger, if ssl.o compiled with -DDEBUG
-ssl:  ${SSL_OBJS}
-	cc -o ssl ${SSL_OBJS} \
+#  Integrated cmdline debugger
+t:  ${TEST_OBJS}
+	cc -o t ${TEST_OBJS} \
 		${DEBUG_OBJS} ${DEBUG_STUBS}
 
-#  Integrated graphical debugger, if ssl.o compiled with -DDEBUG
-ssltool:  ${SSL_OBJS}
-	cc -o ssltool ${SSLTOOL_LIB_PATH} \
-		${SSL_OBJS} \
+#  Integrated graphical debugger
+ttool:  ${TEST_OBJS}
+	cc -o ttool ${SSLTOOL_LIB_PATH} \
+		${TEST_OBJS} \
 		${DEBUG_OBJS} ${SSLTOOL_OBJS} ${SSLTOOL_LIBS}
-
-# ssl.o depends on ssl.tbl when using C table from "ssl -c"
 
 
 # Compile for debugger (-DDEBUG):
-ssl.o:  ssl.c ssl.h ssl.tbl ${SSL_RT_HEADERS}
-	cc -c ssl.c ${CFLAGS} -g -I${SSL_RT_DIR} -I${DEBUG_DIR} -I${SCHEMA_DIR}
+t.o:  t.c t.h t.tbl ${SSL_RT_HEADERS}
+	cc -c t.c ${CFLAGS} -g -I${SSL_RT_DIR} -I${DEBUG_DIR} -I${SCHEMA_DIR}
 
 
 # Compile schema 
 
-ssl_schema.o:  ssl_schema.c
-	cc -c ssl_schema.c -g
-
-ssl_schema.c ssl_schema.ssl:  ssl.schema
-	${SCHEMA_DIR}/schema ssl
+t_schema.o:  t_schema.c
+	cc -c t_schema.c -g
 
 
 # Compile SSL code
 
-ssl.h:	ssl.ssl ssl_schema.ssl  ${SSL_DIR}/ssl
-	${SSL_DIR}/ssl -l -d -c -r ssl 
-	- rm -f ssl.h
-	- rm -f ssl.tbl
-	- rm -f ssl.lst
-	- rm -f ssl.dbg
-	mv ram_ssl.h   ssl.h
-	mv ram_ssl.tbl ssl.tbl
-	mv ram_ssl.lst ssl.lst
-	mv ram_ssl.dbg ssl.dbg
+t.h:	t.ssl
+	${SSL_DIR}/ssl -l -d -c -r t
+	- rm -f t.h
+	- rm -f t.tbl
+	- rm -f t.lst
+	- rm -f t.dbg
+	mv ram_t.h   t.h
+	mv ram_t.tbl t.tbl
+	mv ram_t.lst t.lst
+	mv ram_t.dbg t.dbg
 
 

@@ -8,4 +8,5 @@ how to process it.  It was typically used to implement individual passes in a co
 This is my own implementation of the language, for my personal compiler projects.
 
 Earlier versions of this tool were used to bootstrap this version.
+See git log for those earlier versions, along with tags marking the versions.
 
