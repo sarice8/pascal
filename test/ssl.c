@@ -144,10 +144,8 @@ NODE_PTR       dCurrentRule;  /* For operation oNodeSetCurrentRule */
 NODE_PTR       dIntType;      /* nType "int" node, for oNodeGetIntType */
 NODE_PTR       dGlobalScope;  /* Global nScope (only set at end of parsing) */
 
-int            dNumGlobals;   /* Count of global vars in program */
 int            dRuleNumLocals;   /* Count of local vars in rule */
 int            dRuleLocalSpaceAddr;  /* Addr of arg of rule's .iLocalSpace instruction */
-int            dGlobalSpaceAddr;  /* Addr of arg of .iGlobalSpace instruction for global vars */
 
 
 /*  Table of string aliases for declarations  */
@@ -192,7 +190,6 @@ struct dPSType {
 
 int dump_tree_short();
 int dump_short_int_stack();
-int dump_short_int();
 int dump_node_short();
 
 dbg_variables debug_variables[] =
@@ -204,7 +201,6 @@ dbg_variables debug_variables[] =
     "VS",          (char *)dVS,         (char *)&dVSptr, dump_short_int_stack,
     "CS",          (char *)dCS,         (char *)&dCSptr, dump_short_int_stack,
     "CurrentRule", (char *)&dCurrentRule, NULL,          dump_node_short,
-    "Here",        (char *)&w_here,       NULL,          dump_short_int,
 
     "",            NULL,                0,               NULL,
 };
@@ -501,8 +497,6 @@ init_my_operations()
     dGlobalScope = NULL;
     dRuleLocalSpaceAddr = 0;
     dRuleNumLocals = 0;
-    dGlobalSpaceAddr = 0;
-    dNumGlobals = 0;
     dIntType = NULL;
 
     /* link up patch stacks */
@@ -556,15 +550,12 @@ install_system_operations ()
         "oPushResult",
         "oPop",
         "oBreak",
-        "oGlobalSpace",
         "oLocalSpace",
         "oGetParam",
         "oGetFromParam",
         "oGetLocal",
-        "oGetGlobal",
         "oGetAddrParam",
         "oGetAddrLocal",
-        "oGetAddrGlobal",
         "oAssign",
 
         NULL,
@@ -627,22 +618,6 @@ short    dTemp;                            /* multi-purpose */
                                    continue;
               }
 
-       /* Mechanism warning_mech */
-
-       case oWarning :
-              switch (ssl_param)
-              {
-                  case wRuleMissingAtSign:
-                      ssl_warning ("Warning: Rule call is missing '@'");
-                      break;
-                  default:
-                      sprintf (ssl_error_buffer, "Warning #%d (no message)", ssl_param);
-                      ssl_warning (ssl_error_buffer);
-                      break;
-              }
-              continue;
-
-
        /* Mechanism count */
 
        case oCountPush :
@@ -686,7 +661,6 @@ short    dTemp;                            /* multi-purpose */
        /* Mechanism value */
 
        case oValuePush :
-       case oValuePushBoolean :
        case oValuePushKind :
        case oValuePushNodeType :
               if (++dVSptr==dVSsize) ssl_fatal("VS overflow");
@@ -701,7 +675,6 @@ short    dTemp;                            /* multi-purpose */
               dVS[dVSptr] = ssl_token.val;
               continue;
        case oValueChooseKind :
-       case oValueChooseBoolean :
               ssl_result = dVS[dVSptr];
               continue;
        case oValuePushCount :
@@ -722,9 +695,6 @@ short    dTemp;                            /* multi-purpose */
               continue;
        case oValueZero :
               ssl_result = (dVS[dVSptr] == 0);
-              continue;
-       case oValueMatch :
-              ssl_result = (dVS[dVSptr] == dVS[dVSptr-1]);
               continue;
        case oValuePop :
               dVSptr--;
@@ -903,11 +873,6 @@ short    dTemp;                            /* multi-purpose */
               ssl_assert (dOSptr > 0);
               ssl_result = nodeType(dOS[dOSptr]);
               continue;
-       case oNodeGetType:  /* get type of top node, push on VS */
-              ssl_assert (dOSptr > 0);
-              if (++dVSptr == dVSsize) ssl_fatal ("VS overflow");
-              dVS[dVSptr] = nodeType(dOS[dOSptr]);
-              continue;
        case oNodeCompareExact:        /* compare for same nodes */
               ssl_assert (dOSptr >= 2);
               ssl_result = (dOS[dOSptr] == dOS[dOSptr-1]);
@@ -957,23 +922,6 @@ short    dTemp;                            /* multi-purpose */
               w_outTable[dRuleLocalSpaceAddr] = dRuleNumLocals;
               continue;
 
-       case oSetNumGlobals: /* (num) */
-              dNumGlobals = ssl_param;
-              continue;
-       case oIncNumGlobals:
-              dNumGlobals++;
-              continue;
-       case oGetNumGlobals:
-              if (++dVSptr == dVSsize) ssl_fatal ("VS overflow");
-              dVS[dVSptr] = dNumGlobals;
-              continue;
-       case oSetGlobalSpaceAddr:
-              dGlobalSpaceAddr = w_here;
-              continue;
-       case oPatchGlobalSpace:
-              w_outTable[dGlobalSpaceAddr] = dNumGlobals;
-              continue;
-
        /* mechanism Scope */
 
        case oScopeBegin:
@@ -985,7 +933,7 @@ short    dTemp;                            /* multi-purpose */
               if (++dSSptr == dSSsize) ssl_fatal ("SS overflow");
               dSS[dSSptr] = dNode;
               continue;
-       case oScopeOpen:
+       case oScopeExtend:
               if (++dSSptr == dSSsize) ssl_fatal ("SS overflow");
               dSS[dSSptr] = dOS[dOSptr];
               continue;
@@ -1179,10 +1127,7 @@ w_dump_tables ()
                     prev = curr;
                     curr = curr->next;
                 }
-                if (prev == NULL)
-                    head = new_rule;
-                else
-                    prev->next = new_rule;
+                prev->next = new_rule;
                 new_rule->next = curr;
             }
         }
@@ -1238,7 +1183,6 @@ w_dump_tables ()
         fprintf(f_dbg,"%d\n", ssl_line_number);  /* # lines */
         for (i=1; i <= ssl_line_number; i++)
           fprintf(f_dbg,"%d\n",w_lineTable[i]);
-        dump_debug_symbols();
     }
 
     /*  Write header file  */
@@ -1256,30 +1200,14 @@ w_dump_tables ()
             case nError:
             case nValue:
             case nOperation:
-                fprintf(f_hdr, "#define %s %d\n",
-                               ssl_get_id_string(nodeGetValue(node_ptr, qIdent)),
+                fprintf(f_hdr, "#define %s %d\n", ssl_get_id_string(nodeGetValue(node_ptr, qIdent)),
                                nodeGetValue(node_ptr, qValue));
                 break;
-
-#if 0
-  /* This would allow operations to access global variables declared in SSL.
-   * But I don't want to do it, because it would force a recompile of the C code
-   * if any globals were added.
-   * I've been trying to avoid recompilation if only the stuff in "rules" changes.
-   * (Of course, that's assuming that the user didn't generate C code for the table).
-   */
-            case nGlobal:
-                fprintf(f_hdr, "#define var_%s (ssl_var_stack[%d])\n",
-                               ssl_get_id_string(nodeGetValue(node_ptr, qIdent)),
-                               nodeGetValue(node_ptr, qAddr));
-                break;
-#endif /* 0 */
-
             default:
                 break;
 
         }
-    }
+    }    
 
     count = 0;
     fprintf(f_hdr,"\n#ifdef SSL_INCLUDE_ERR_TABLE\n");
@@ -1301,56 +1229,6 @@ w_dump_tables ()
     fprintf(f_hdr,"\n#endif SSL_INCLUDE_ERR_TABLE\n");
 
 }
-
-dump_debug_symbols ()
-{
-    NODE_PTR  np, p;
-
-    for (np = nodeGet(dGlobalScope, qDecls); np != NULL; np = nodeNext(np))
-    {
-        switch (nodeType(np))
-        {
-            case nType:
-                fprintf(f_dbg, "%d %s %s\n", nodeNum(np),
-                                             ssl_get_id_string(nodeGetValue(np,qIdent)),
-                                             nodeTypeName(nodeType(np)));
-                break;
-            case nGlobal:
-                fprintf(f_dbg, "%d %s %s %d %d\n", nodeNum(np),
-                                             ssl_get_id_string(nodeGetValue(np,qIdent)),
-                                             nodeTypeName(nodeType(np)),
-                                             nodeNum(nodeGet(np,qType)),
-                                             nodeGetValue(np, qAddr));
-                break;
-            case nRule:
-                fprintf(f_dbg, "%d %s %s %d\n", nodeNum(np),
-                                             ssl_get_id_string(nodeGetValue(np,qIdent)),
-                                             nodeTypeName(nodeType(np)),
-                                             nodeGetValue(np, qValue));
-                for (p = nodeGet(nodeGet(np, qParamScope), qDecls); p != NULL; p = nodeNext(p))
-                {
-                    fprintf(f_dbg, "%d %s %s %d %d\n", nodeNum(p),
-                                             ssl_get_id_string(nodeGetValue(p,qIdent)),
-                                             nodeTypeName(nodeType(p)),
-                                             nodeNum(nodeGet(p,qType)),
-                                             nodeGetValue(p, qAddr));
-                }
-                for (p = nodeGet(nodeGet(np, qScope), qDecls); p != NULL; p = nodeNext(p))
-                {
-                    fprintf(f_dbg, "%d %s %s %d %d\n", nodeNum(p),
-                                             ssl_get_id_string(nodeGetValue(p,qIdent)),
-                                             nodeTypeName(nodeType(p)),
-                                             nodeNum(nodeGet(p,qType)),
-                                             nodeGetValue(p, qAddr));
-                }
-                break;
-
-            default:
-                break;
-        }
-    }
-}
-
 
 /*  Dump a listing of generated code to the listing file  */
 
@@ -1424,15 +1302,12 @@ list_generated_code ()
             case iCall :
             case iSetResult :
             case iPop :
-            case iGlobalSpace :
             case iLocalSpace :
             case iGetParam :
             case iGetFromParam :
             case iGetLocal :
-            case iGetGlobal :
             case iGetAddrParam :
             case iGetAddrLocal :
-            case iGetAddrGlobal :
                 arg = w_outTable[pc++];
                 has_arg = 1;
                 break;
@@ -1586,15 +1461,12 @@ w_optimize_table ()
             case iCall :
             case iSetResult :
             case iPop :
-            case iGlobalSpace :
             case iLocalSpace :
             case iGetParam :
             case iGetFromParam :
             case iGetLocal :
-            case iGetGlobal :
             case iGetAddrParam :
             case iGetAddrLocal :
-            case iGetAddrGlobal :
                     pc++;
                     continue;
 
@@ -1688,16 +1560,4 @@ char                     *udata;
         printf ("\t%d\n", stack[stack_size]);
     }
 }
-
-int dump_short_int (variable, udata)
-char               *variable;
-char               *udata;
-{
-    short    *var;
-
-    var = (short *) variable;
-
-    printf ("\t%d\n", *var);
-}
-
 

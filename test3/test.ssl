@@ -1,0 +1,68 @@
+
+title:  'Test program for SSL with variables';
+
+input:
+    pInvalid
+    pIdent
+    pIntLit
+    pStrLit
+    pEof
+    ;
+
+output:
+    ;
+
+error:
+    eErrorA
+    eErrorB
+    ;
+
+type boolean:
+    false = 0
+    true  = 1
+    yes   = true
+    no    = false;
+
+
+mechanism math:
+    oAdd (inout int n, int d)    % add d to n
+    print (int)
+    TOKEN_VAL >> int
+    ;
+
+rules
+
+int    global_count
+
+add (inout int, int);
+plus (int a, int b) >>int;
+
+main:
+    int   count, sum
+
+    count = 0
+    sum = 0
+    global_count = 0
+
+    {[
+        | pEof : >
+        | pIntLit :   sum = @plus(sum, TOKEN_VAL)
+        | * :         ?   count = @plus(count, 1)
+    ]}
+
+    print(sum)
+    print(count)
+    global_count = count
+    print (global_count)
+    ;
+
+add (inout int n, int d):
+    oAdd (n, d);
+
+plus (int x, int y) >> int:
+    int  a
+    a = x
+    @add (a, y)
+    >> a;
+
+end

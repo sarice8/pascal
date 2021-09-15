@@ -1,14 +1,13 @@
 
-SSL 1.2.8        Aug 23 '93
+SSL 1.3.0    Aug 23 '93
 
-This is a version of the SSL compiler that generates output
-compatible with the generic runtime module ssl_rt 1.1.
+This is an enhanced version of the SSL language, introducing
+variables, expressions, functions with multiple parameters...
 
-[ So, client programs may integrate with ssl_rt. ]
+It is built using SSL 1.2.8 and ssl_rt 1.1.
+It is also implemented using a "schema" database for the
+symbol table.
 
-In addition, this compiler is itself built using ssl_rt 1.1.
-So, it must be compiled by itself.
-
-The language permitted is the same as the original SSL, but some of the
-generated variable names are different (e.g. ssl_* instead of w_*)
+However, client programs must use ssl_rt 2.0
+which implements the runtime model produced by this compiler.
 

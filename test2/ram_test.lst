@@ -1,0 +1,452 @@
+   0: title: 'Schema 1.3 -- Database Schema Compiler -- Aug 24, 1993';
+      %
+      %  Schema.ssl
+      %
+      %  HISTORY
+      %    01May91   1.0   First version
+      %    05May91         Record attribute class
+      %    30May91   1.1   Added attribute tags
+      %    09Jun93   1.2   Use schema to define schema.  Construct tree
+      %                    of all definitions before tables dumped, allowing
+      %                    late addition of attributes (after other
+      %                    classes have been derived from this class)
+      %    24Aug93   1.3   Error if no class specified to receive attribute 
+      %
+      
+   0: input:
+      	% General
+      
+   0: 	pINVALID
+   0: 	pEOF
+   0: 	pIDENTIFIER
+      
+      	% Types
+      
+   0:         pBoolean1
+   0:         pCharacter1
+   0: 	pInteger4
+   0:         pInteger8
+   0:         pIntegerN
+   0:         pReal4
+   0:         pReal8
+   0:         pRealN
+   0:         pStringN
+   0:         pObjectType
+   0: 	pNode
+   0: 	pList
+      
+      	% Option Tags
+      
+   0: 	pPri
+   0: 	pAlt
+   0: 	pOpt
+   0:         pInt
+   0:         pExt
+   0:         pSys
+   0:         pTmp
+      
+      	% keywords
+      
+   0: 	pSchema
+   0: 	pRoot
+   0: 	pIs
+   0: 	pEnd
+      
+      	% Punctuation
+      
+   0: 	pDERIVES    '::='
+   0: 	pCONTAINS   '=>'
+   0: 	pCOLON      ':'
+   0: 	pCOMMA      ','
+   0: 	pLPAREN     '('
+   0: 	pRPAREN     ')'
+   0: 	pLSQUARE    '['
+   0: 	pRSQUARE    ']'
+   0: 	;
+      
+   0: output:
+   0: 	;
+      
+   0: error:
+   0: 	eNoClassForAttribute     % attribute defined while no current class set
+   0: 	;
+      
+      
+   0: type node_type:
+   0: 	nINVALID
+   0: 	Object
+   0: 	nSchema
+   0: 	nClass
+   0: 	nAttr
+   0: 	nConstraint
+   0: 	nAttrSym
+   0:         an_alias     = Object
+   0:         another_type = 22
+   0: 	;
+      
+   0: type node_attribute:
+   0: 	qINVALID
+   0: 	qClassTree
+   0: 	qAttrSyms
+   0: 	qIdent
+   0: 	qCode
+   0: 	qAttrs
+   0: 	qDerived
+   0: 	qAttrSym
+   0: 	qType
+   0: 	qConstraint
+   0: 	qTags
+   0: 	;
+      
+      
+   0: type aType:              % attribute type
+   0: 	type_INVALID  = 0
+   0: 	type_Integer4 = 4
+   0: 	type_Node     = 100
+   0: 	type_List     = 150
+   0: 	;
+      
+   0: type aTag:               % attribute tags (defined as bits)
+   0: 	tag_INVALID = 0
+   0: 	tag_Pri     = 1
+   0: 	tag_Opt     = 2
+   0: 	tag_Alt     = 4
+   0: 	;
+      
+   0: type boolean:
+   0: 	false       = 0
+   0:         true        = 1
+   0:         yes = true
+   0:         no  = false
+   0: 	;
+      
+   0: mechanism Class:		% operations on classes
+   0: 	oCreateEmptySchema	% create initial schema database, containing a SchemaRoot,
+      				% nInvalid class, qInvalid attribute symbol,
+      				% and 'Object' class for basis of all derivation.
+   0: 	oFindClass		% find class named by last accepted identifier (must exist).
+      				% Sets the Current class to that class.
+   0: 	oDeriveClass		% Create new class named by last accepted identifier
+      				% (must not exist already).  The new object is derived
+      				% from the Current class (found with oFindClass).
+   0: 	oThisClassWillGetAttrs	% Sets the GetsAttrs class to the Current class
+      				% (found with oFindClass).  attrs defined with the
+      				% Attr mechanism will be added to the GetsAttrs class.
+   0: 	oNoClassWillGetAttrs	% Sets GetsAttrs to NULL.  No attribute definitions
+      				% may be added to any class.
+   0: 	oAClassWillGetAttrs >> int   % Is there a class defined to accept attributes?
+   0:         oOpMultParams(node_type, int, boolean) >> int
+   0: 	;
+      
+   0: mechanism Attr:			% operations on attributes
+   0: 	oCreateAttrSym		% Searches for an nAttrSym with qIdent = the
+      				% last accepted identifier.
+      				% If doesn't exist yet, creates one and assigns
+      				% a new qCode to it (the code for the AttrSym)
+      				% and appends it to the schema's AttrSyms list.
+      				% Sets CurrentAttrSym to that AttrSym.
+      
+   0: 	oCreateAttr		% create new attribute.
+      				% Sets qAttrSym to CurrentAttrSym (found/created.
+      				% by oCreateAttrSym).
+      				% Sets CurrentAttr to that attribute.
+   0: 	oAttrType (aType)	% Sets the type of the CurrentAttr
+   0: 	oAttrTag (aTag)		% Sets a tag in the CurrentAttr.  Tag bits are 'or'd together.
+   0: 	;
+      
+   0: mechanism doc:
+   0: 	oDocDumpTable     % dump results
+      
+   0:    oMyOp (in int p1, out int p2)
+   0:    p1 (boolean proceed, out boolean status) >> int
+   0: 	;
+      
+      
+   0: rules
+      
+   0: main:
+   2:     @Schema;
+      
+      
+      
+   5: schema_header:
+   7: 	pSchema
+   9: 	pIDENTIFIER    % name of schema
+  11: 	pRoot
+  13: 	pIDENTIFIER    % name of root object
+  15: 	pIs
+  17: 	;
+      
+      
+  18: class_derivation:
+  20: 	oFindClass
+  21: 	pIDENTIFIER
+  23: 	oDeriveClass
+      
+  24: 	oNoClassWillGetAttrs	% disallow attribute definitions for now
+  25: 	;
+      
+  26: attribute_assignment:
+  28: 	oFindClass
+  29: 	oThisClassWillGetAttrs
+  30: 	;
+      
+  31: attribute_definition (int a, out int b, inout boolean c):
+      
+  33:         int  local, another_local, third_local
+      
+  33:         [ oOpMultParams(an_alias, -3, yes)
+  46: 	    | 55:
+  47: 	    | 100:  #eNoClassForAttribute     % attribute defined while no current class set
+  51: 	]
+      
+  59:         oMyOp (1, b)
+  68:         oMyOp (another_local, b)
+      
+  77:         [ local
+  80:             | 10 :
+  81:             | * :
+  86:         ]
+      
+  86: 	oCreateAttrSym
+  87: 	oCreateAttr
+      	
+  88: 	[
+  88:             | pBoolean1, pCharacter1, pInteger4, pInteger8, pIntegerN,
+  90:               pReal4, pReal8, pRealN, pStringN, pObjectType :
+  90:                            oAttrType (type_Integer4)
+  96: 	    | pList :      oAttrType (type_List)
+ 104: 	    | pNode :      oAttrType (type_Node)
+ 112: 	]
+      
+ 140: 	[
+ 140: 	    | '(' :  pIDENTIFIER    % constraint ignored for now
+ 144:                      ')'
+ 146: 	    | * :
+ 151: 	]
+      
+ 151: 	[
+ 151: 	    | '[' :  {[
+ 153: 	                 | pPri :  oAttrTag (tag_Pri)
+ 161: 	                 | pAlt :  oAttrTag (tag_Alt)
+ 169: 	                 | pOpt :  oAttrTag (tag_Opt)
+ 177: 	                 | ',' :
+ 179: 	                 | * :    >
+ 192: 	             ]}
+ 194: 	             ']'
+ 196: 	    | * :
+ 201: 	]
+ 201: 	;
+      
+ 202: Schema:
+ 204:         int     count
+ 204:         boolean status
+      
+ 204:         status = true
+ 210:         count  = -10
+      
+ 216: 	oCreateEmptySchema
+      
+ 217: 	@schema_header
+      
+ 219: 	{
+ 219: 	    [ | pEnd, pEOF : > | * : ]
+      
+ 230: 	    pIDENTIFIER
+ 232: 	    [
+ 232: 		| '::=' :	@class_derivation
+      
+ 236: 		| '=>' :	@attribute_assignment
+      
+ 240: 		| ':' :		@attribute_definition (1, count, status)
+ 255: 	    ]
+ 265: 	}
+      
+ 267: 	oDocDumpTable
+      
+ 268:         oMyOp (p1(yes, status), count)
+      
+         % oMyOp (in int p1, out int p2)
+         % p1 (boolean proceed, out boolean status) >> int
+      
+ 284: 	;
+      
+ 285: end
+      
+ 285: 
+
+Generated code:
+
+   0: oLocalSpace 0
+   2: oCall 202
+   4: oReturn
+   5: oLocalSpace 0
+   7: oInput 22
+   9: oInput 2
+  11: oInput 23
+  13: oInput 2
+  15: oInput 24
+  17: oReturn
+  18: oLocalSpace 0
+  20: oFindClass
+  21: oInput 2
+  23: oDeriveClass
+  24: oNoClassWillGetAttrs
+  25: oReturn
+  26: oLocalSpace 0
+  28: oFindClass
+  29: oThisClassWillGetAttrs
+  30: oReturn
+  31: oLocalSpace 3
+  33: oSetResult 1
+  35: oPushResult
+  36: oSetResult -3
+  38: oPushResult
+  39: oSetResult 1
+  41: oPushResult
+  42: oOpMultParams
+  43: oPop 3
+  45: oChoice 53
+  47: oJumpForward 59
+  49: oError 0
+  51: oJumpForward 59
+  53: Choice Lookup Table
+         100     49
+          55     47
+  58: oEndChoice
+  59: oSetResult 1
+  61: oPushResult
+  62: oGetParam 2
+  64: oPushResult
+  65: oMyOp
+  66: oPop 2
+  68: oGetLocal 2
+  70: oPushResult
+  71: oGetParam 2
+  73: oPushResult
+  74: oMyOp
+  75: oPop 2
+  77: oGetLocal 1
+  79: oChoice 83
+  81: oJumpForward 86
+  83: Choice Lookup Table
+          10     81
+  86: oCreateAttrSym
+  87: oCreateAttr
+  88: oInputChoice 114
+  90: oSetResult 4
+  92: oPushResult
+  93: oAttrType
+  94: oPop 1
+  96: oJumpForward 140
+  98: oSetResult 150
+ 100: oPushResult
+ 101: oAttrType
+ 102: oPop 1
+ 104: oJumpForward 140
+ 106: oSetResult 100
+ 108: oPushResult
+ 109: oAttrType
+ 110: oPop 1
+ 112: oJumpForward 140
+ 114: Choice Lookup Table
+          13    106
+          14     98
+          12     90
+          11     90
+          10     90
+           9     90
+           8     90
+           7     90
+           6     90
+           5     90
+           4     90
+           3     90
+ 139: oEndChoice
+ 140: oInputChoice 148
+ 142: oInput 2
+ 144: oInput 31
+ 146: oJumpForward 151
+ 148: Choice Lookup Table
+          30    142
+ 151: oInputChoice 198
+ 153: oInputChoice 181
+ 155: oSetResult 1
+ 157: oPushResult
+ 158: oAttrTag
+ 159: oPop 1
+ 161: oJumpForward 192
+ 163: oSetResult 4
+ 165: oPushResult
+ 166: oAttrTag
+ 167: oPop 1
+ 169: oJumpForward 192
+ 171: oSetResult 2
+ 173: oPushResult
+ 174: oAttrTag
+ 175: oPop 1
+ 177: oJumpForward 192
+ 179: oJumpForward 192
+ 181: Choice Lookup Table
+          29    179
+          17    171
+          16    163
+          15    155
+ 190: oJumpForward 194
+ 192: oJumpBack 153
+ 194: oInput 33
+ 196: oJumpForward 201
+ 198: Choice Lookup Table
+          32    153
+ 201: oReturn
+ 202: oLocalSpace 2
+ 204: oGetAddrLocal 2
+ 206: oPushResult
+ 207: oSetResult 1
+ 209: oAssign
+ 210: oGetAddrLocal 1
+ 212: oPushResult
+ 213: oSetResult -10
+ 215: oAssign
+ 216: oCreateEmptySchema
+ 217: oCall 5
+ 219: oInputChoice 225
+ 221: oJumpForward 267
+ 223: oJumpForward 230
+ 225: Choice Lookup Table
+           1    221
+          25    221
+ 230: oInput 2
+ 232: oInputChoice 257
+ 234: oCall 18
+ 236: oJumpForward 265
+ 238: oCall 26
+ 240: oJumpForward 265
+ 242: oSetResult 1
+ 244: oPushResult
+ 245: oGetAddrLocal 1
+ 247: oPushResult
+ 248: oGetAddrLocal 2
+ 250: oPushResult
+ 251: oCall 31
+ 253: oPop 3
+ 255: oJumpForward 265
+ 257: Choice Lookup Table
+          28    242
+          27    238
+          26    234
+ 264: oEndChoice
+ 265: oJumpBack 219
+ 267: oDocDumpTable
+ 268: oSetResult 1
+ 270: oPushResult
+ 271: oGetAddrLocal 2
+ 273: oPushResult
+ 274: p1
+ 275: oPop 2
+ 277: oPushResult
+ 278: oGetAddrLocal 1
+ 280: oPushResult
+ 281: oMyOp
+ 282: oPop 2
+ 284: oReturn

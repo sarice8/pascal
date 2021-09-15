@@ -1,0 +1,151 @@
+      
+   2: title:  'Test program for SSL with variables';
+      
+   2: input:
+   2:     pInvalid
+   2:     pIdent
+   2:     pIntLit
+   2:     pStrLit
+   2:     pEof
+   2:     ;
+      
+   2: output:
+   2:     ;
+      
+   2: error:
+   2:     eErrorA
+   2:     eErrorB
+   2:     ;
+      
+   2: type boolean:
+   2:     false = 0
+   2:     true  = 1
+   2:     yes   = true
+   2:     no    = false;
+      
+      
+   2: mechanism math:
+   2:     oAdd (inout int n, int d)    % add d to n
+   2:     print (int)
+   2:     TOKEN_VAL >> int
+   2:     ;
+      
+   2: rules
+      
+   2: int    global_count
+      
+   2: add (inout int, int);
+   2: plus (int a, int b) >>int;
+      
+   2: main:
+   4:     int   count, sum
+      
+   4:     count = 0
+  10:     sum = 0
+  16:     global_count = 0
+      
+  22:     {[
+  22:         | pEof : >
+  26:         | pIntLit :   sum = @plus(sum, TOKEN_VAL)
+  41:         | * :         ?   count = @plus(count, 1)
+  63:     ]}
+      
+  65:     print(sum)
+  71:     print(count)
+  77:     global_count = count
+  83:     print (global_count)
+  90:     ;
+      
+  90: add (inout int n, int d):
+  92:     oAdd (n, d);
+      
+ 102: plus (int x, int y) >> int:
+ 104:     int  a
+ 104:     a = x
+ 110:     @add (a, y)
+ 120:     >> a;
+      
+ 124: end
+
+Generated code:
+
+   0: oLocalSpace 2
+   2: oLocalSpace 2
+   4: oGetAddrLocal 1
+   6: oPushResult
+   7: oSetResult 0
+   9: oAssign
+  10: oGetAddrLocal 2
+  12: oPushResult
+  13: oSetResult 0
+  15: oAssign
+  16: oGetAddrGlobal 1
+  18: oPushResult
+  19: oSetResult 0
+  21: oAssign
+  22: oInputChoice 43
+  24: oJumpForward 65
+  26: oJumpForward 63
+  28: oGetAddrLocal 2
+  30: oPushResult
+  31: oGetLocal 2
+  33: oPushResult
+  34: TOKEN_VAL
+  35: oPushResult
+  36: oCall 102
+  38: oPop 2
+  40: oAssign
+  41: oJumpForward 63
+  43: Choice Lookup Table
+           2     28
+           4     24
+  48: oInputAny
+  49: oGetAddrLocal 1
+  51: oPushResult
+  52: oGetLocal 1
+  54: oPushResult
+  55: oSetResult 1
+  57: oPushResult
+  58: oCall 102
+  60: oPop 2
+  62: oAssign
+  63: oJumpBack 22
+  65: oGetLocal 2
+  67: oPushResult
+  68: print
+  69: oPop 1
+  71: oGetLocal 1
+  73: oPushResult
+  74: print
+  75: oPop 1
+  77: oGetAddrGlobal 1
+  79: oPushResult
+  80: oGetLocal 1
+  82: oAssign
+  83: oGetGlobal 1
+  85: oPushResult
+  86: print
+  87: oPop 1
+  89: oReturn
+  90: oLocalSpace 0
+  92: oGetParam 2
+  94: oPushResult
+  95: oGetParam 1
+  97: oPushResult
+  98: oAdd
+  99: oPop 2
+ 101: oReturn
+ 102: oLocalSpace 1
+ 104: oGetAddrLocal 1
+ 106: oPushResult
+ 107: oGetParam 2
+ 109: oAssign
+ 110: oGetAddrLocal 1
+ 112: oPushResult
+ 113: oGetParam 1
+ 115: oPushResult
+ 116: oCall 90
+ 118: oPop 2
+ 120: oGetLocal 1
+ 122: oReturn
+ 123: oReturn

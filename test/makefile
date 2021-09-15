@@ -1,26 +1,28 @@
 
-# SSL compiler, built using generic SSL runtime module & scanner
+# Test of the new SSL w/variables (nssl)
+# This is an implementation of the SSL compiler using the variables feature
 
-ROOT           = /home/sarice/compilers
+COMPILERS_DIR  = /home/sarice/compilers
+NSSL_DIR       = ${COMPILERS_DIR}/nssl
 
 # Generic SSL runtime module
-SSL_RT_DIR     = ${ROOT}/ssl_rt/1.1
+SSL_RT_DIR     = ${NSSL_DIR}/ssl_rt
 SSL_RT_HEADERS = ${SSL_RT_DIR}/ssl_rt.h \
                  ${SSL_RT_DIR}/ssl_begin.h \
                  ${SSL_RT_DIR}/ssl_end.h
 
-SCHEMA_DIR     = ${ROOT}/schema/1.3
+SCHEMA_DIR     = ${COMPILERS_DIR}/ssl_rt/schema
 
 # Existing SSL compiler used to build this one
-SSL_DIR        = ${ROOT}/ssl/1.2.8
+SSL_DIR        = ${NSSL_DIR}
 
 
 # ---------------------------------------------------------
 
 # Debug objects only required if compile with -DDEBUG
 
-DEBUG_DIR      = ${ROOT}/debug/1.2.8
-SSLTOOL_DIR    = ${ROOT}/ssltool/1.2.7
+DEBUG_DIR      = ${COMPILERS_DIR}/debug
+SSLTOOL_DIR    = ${COMPILERS_DIR}/ssltool
 
 DEBUG_OBJS     = ${DEBUG_DIR}/debug.o
 DEBUG_STUBS    = ${DEBUG_DIR}/dbgstub.o
@@ -83,8 +85,8 @@ ssl_schema.c ssl_schema.ssl:  ssl.schema
 
 # Compile SSL code
 
-ssl.h:	ssl.ssl ssl_schema.ssl
-	${SSL_DIR}/ssl -l -d -c ssl 
+ssl.h:	ssl.ssl ssl_schema.ssl  ${SSL_DIR}/ssl
+	${SSL_DIR}/ssl -l -d -c -r ssl 
 	- rm -f ssl.h
 	- rm -f ssl.tbl
 	- rm -f ssl.lst
