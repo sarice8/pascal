@@ -1,5 +1,5 @@
 /**/ 
-static char sccsid[] = "%W% %G% %U% %P%";
+static char sccsid[] = "@(#)debug.c	1.5 4/21/94 13:07:52 /files/home/sim/sarice/compilers/debug/1.3.0/SCCS/s.debug.c";
 /**/
 
 /*
@@ -24,11 +24,13 @@ static char sccsid[] = "%W% %G% %U% %P%";
 *   06/06/91 |        | Made this a general purpose SSL debugger.
 *            |        | Moved from vmain.c to vdebug.c
 *   06/08/93 |        | Moved into a generic module for any SSL program.
+*   03/11/94 |        | Added step-into-by-line, replaced old step with stepi
 *
 *****************************************************************************
 */
 
 #include <stdio.h>
+#include <string.h>
 
 #include "debug.h"
 
@@ -44,6 +46,44 @@ static char sccsid[] = "%W% %G% %U% %P%";
 
 
 /* ----------------------------------------------------------------------- */
+/*    Symbol table produced by SSL compiler (ssl 1.3.0 or greater)         */
+/* ----------------------------------------------------------------------- */
+
+#define DBG_SYMBOL_CLASS_type       1   /* No need to match schema definitions */
+#define DBG_SYMBOL_CLASS_rule       2
+#define DBG_SYMBOL_CLASS_global     3
+#define DBG_SYMBOL_CLASS_local      4
+#define DBG_SYMBOL_CLASS_inparam    5
+#define DBG_SYMBOL_CLASS_outparam   6
+#define DBG_SYMBOL_CLASS_inoutparam 7
+
+char *dbg_symbol_class_names[] =   /* Same order as above */
+{
+    "",
+    "nType",
+    "nRule",
+    "nGlobal",
+    "nLocal",
+    "nInParam",
+    "nOutParam",
+    "nInOutParam",
+    NULL,
+};
+
+struct dbg_symbol_struct {
+    int      num;       /* symbol reference number */
+    char    *name;
+    int      class;     /* symbol class (see above) */
+    int      type_num;  /* reference number of type */
+    struct dbg_symbol_struct *type;   /* type of symbol */
+    int      value;     /* value/addr */
+};
+
+#define DBG_SYMBOL_TABLE_SIZE 3000
+struct dbg_symbol_struct dbg_symbol_table[DBG_SYMBOL_TABLE_SIZE];
+int dbg_symbol_table_last;
+
+/* ----------------------------------------------------------------------- */
 /*    Local debugger variables                                             */
 /* ----------------------------------------------------------------------- */
 
@@ -57,8 +97,9 @@ local int      dbg_trace;                 /* trace source file?             */
 /* dbg_step_mode modes */
 #define DBG_STEP_NONE        0
 #define DBG_STEP_CONT        1    /* first step past bkpt as part of "cont" */
-#define DBG_STEP_INTO        2    /* step */
+#define DBG_STEP_INSTRUCTION 2    /* stepi */
 #define DBG_STEP_OVER        3    /* next */
+#define DBG_STEP_INTO        4    /* step */
 
 local int      dbg_step_mode;
 local int      dbg_step_count;            /* steps to take                  */
@@ -73,6 +114,7 @@ struct dbg_breakpoint_struct {
     short      code;       /* normal code at that address */
     int        line;       /* stop at <line> if line != -1 */
     char      *in_rule;    /* stop in <rule> if rule name != NULL */
+    int        input_line; /* stop at i<line> if line != -1 */
 };
 
 local struct dbg_breakpoint_struct dbg_breakpoint [DBG_MAX_BREAKPOINTS];
@@ -83,6 +125,14 @@ local int      dbg_breakpoints_installed;
 local short    oBreak_opcode;
 
 dbg_variables *dbg_vars;
+
+/* "up", "down" commands can modify display context */
+local short    display_pc;
+local short    display_sp;   /* call stack */
+local long     display_var_fp;
+
+local display_source_for_pc ();
+local display_context_vars ();
 
 /*
 *****************************************************************************
@@ -102,9 +152,9 @@ dbg_variables *dbg_vars;
 *****************************************************************************
 */
 
-public   dbg_init (debug_line_file, source_filename, input_filename, break_opcode,
+public   dbg_init (debug_data_file, source_filename, input_filename, break_opcode,
                    debug_variables)
-char              *debug_line_file;
+char              *debug_data_file;
 char              *source_filename;
 char              *input_filename;
 short              break_opcode;
@@ -131,9 +181,9 @@ dbg_variables     *debug_variables;
 
     /* Get debug information (line numbers) */
 
-    if ((fp = fopen(debug_line_file ,"r")) == NULL)
+    if ((fp = fopen(debug_data_file ,"r")) == NULL)
     {
-        printf ("Can't open debug file %s\n", debug_line_file);
+        printf ("Can't open debug file %s\n", debug_data_file);
         exit (10);
     }
 
@@ -146,12 +196,13 @@ dbg_variables     *debug_variables;
         fscanf (fp, "%d", &addr);
         dbg_line_table[line] = addr;
     }
+    dbg_read_symbol_table (fp);
     fclose (fp);
 
     /*  Init debugger variables  */
 
     dbg_trace = 1;
-    dbg_step_mode = DBG_STEP_INTO;
+    dbg_step_mode = DBG_STEP_INSTRUCTION;
     dbg_step_count = 0;
     dbg_num_breakpoints = 0;
     dbg_breakpoints_installed = 0;
@@ -173,8 +224,18 @@ public       dbg_check_step_count()
     short     line;
 
     if ((dbg_step_mode == DBG_STEP_NONE) || 
-        ((dbg_step_mode == DBG_STEP_INTO) && (dbg_step_count-- > 0)))
+        ((dbg_step_mode == DBG_STEP_INSTRUCTION) && (dbg_step_count-- > 0)))
         return(0);
+
+    /* step to next line or into call */
+    if (dbg_step_mode == DBG_STEP_INTO)
+    {
+        line = dbg_find_line (ssl_pc);
+        if (line == dbg_line_step_line)
+            return(0);
+        if (--dbg_step_count > 0)
+            return(0);
+    }
 
     /* 'cont' command requires initial step past breakpoint location,
        then install breakpoints & run free.  */
@@ -202,6 +263,23 @@ public       dbg_check_step_count()
 }
 
 
+/*  Called at the beginning of each input line.
+    Returns TRUE if we have hit an input-line breakpoint. */
+
+public       dbg_check_input_breakpoint (input_line, input_col)
+short                                    input_line, input_col;
+{
+    int  i;
+
+    for (i = 0; i < dbg_num_breakpoints; i++)
+    {
+        if (dbg_breakpoint[i].input_line == input_line)
+            return (1);
+    }
+    return (0);
+}
+
+
 /*
 *****************************************************************************
 *
@@ -224,7 +302,7 @@ char                      *command;
     int       v;
     long      node_number;
 
-    dbg_step_mode = DBG_STEP_INTO;
+    dbg_step_mode = DBG_STEP_INSTRUCTION;
 
     split_args (command, &argc, argv);
 
@@ -234,6 +312,7 @@ char                      *command;
     {
         dbg_step_mode = DBG_STEP_INTO;
         dbg_step_count = 1;                 /* single-step */
+        dbg_line_step_line = dbg_find_line(ssl_pc);
 
         dbg_run();
         dbg_display_position();
@@ -243,6 +322,14 @@ char                      *command;
         dbg_step_mode = DBG_STEP_OVER;      /* next line */
         dbg_line_step_call_level = ssl_sp;
         dbg_line_step_line = dbg_find_line(ssl_pc);
+
+        dbg_run();
+        dbg_display_position();
+    }
+    else if ((strcmp(argv[0],"si") == 0) || (strcmp(argv[0],"stepi") == 0))
+    {
+        dbg_step_mode = DBG_STEP_INSTRUCTION;
+        dbg_step_count = 1;                 /* single-step */
 
         dbg_run();
         dbg_display_position();
@@ -314,6 +401,22 @@ char                      *command;
                 dbg_breakpoint[dbg_num_breakpoints].line = -1;
                 dbg_breakpoint[dbg_num_breakpoints].pc = i;
                 dbg_breakpoint[dbg_num_breakpoints].code = ssl_code_table[i];
+                dbg_breakpoint[dbg_num_breakpoints].input_line = -1;
+                dbg_num_breakpoints++;
+            }
+            else if (argv[2][0] == 'i')         /* stop at i<input_line> */
+            {
+                i = atoi(argv[2]+1);
+                if (i < 1)
+                {
+                    printf ("Illegal input line %d\n", i);
+                    return(0);
+                }
+                dbg_breakpoint[dbg_num_breakpoints].in_rule = NULL;
+                dbg_breakpoint[dbg_num_breakpoints].line = -1;
+                dbg_breakpoint[dbg_num_breakpoints].pc = -1;
+                dbg_breakpoint[dbg_num_breakpoints].code = 0;
+                dbg_breakpoint[dbg_num_breakpoints].input_line = i;
                 dbg_num_breakpoints++;
             }
             else                           /* stop at <line> */
@@ -329,6 +432,7 @@ char                      *command;
                 dbg_breakpoint[dbg_num_breakpoints].line = line;
                 dbg_breakpoint[dbg_num_breakpoints].in_rule = NULL;
                 dbg_breakpoint[dbg_num_breakpoints].code = ssl_code_table[i];
+                dbg_breakpoint[dbg_num_breakpoints].input_line = -1;
                 dbg_num_breakpoints++;
             }
         }
@@ -340,6 +444,7 @@ char                      *command;
             dbg_breakpoint[dbg_num_breakpoints].in_rule = ssl_rule_name(i);
             dbg_breakpoint[dbg_num_breakpoints].pc = i;
             dbg_breakpoint[dbg_num_breakpoints].code = ssl_code_table[i];
+                dbg_breakpoint[dbg_num_breakpoints].input_line = -1;
             dbg_num_breakpoints++;
         }
         else
@@ -354,6 +459,8 @@ char                      *command;
                 printf ("(%d) stop in %s\n", i+1, dbg_breakpoint[i].in_rule);
             else if (dbg_breakpoint[i].line != -1)
                 printf ("(%d) stop at %d\n", i+1, dbg_breakpoint[i].line);
+            else if (dbg_breakpoint[i].input_line != -1)
+                printf ("(%d) stop at i%d [input line]\n", i+1, dbg_breakpoint[i].input_line);
             else
                 printf ("(%d) stop at #%d\n", i+1, dbg_breakpoint[i].pc);
         }
@@ -374,6 +481,9 @@ char                      *command;
         dbg_num_breakpoints--;
         dbg_breakpoint[i].pc = dbg_breakpoint[dbg_num_breakpoints].pc;
         dbg_breakpoint[i].code = dbg_breakpoint[dbg_num_breakpoints].code;
+        dbg_breakpoint[i].in_rule = dbg_breakpoint[dbg_num_breakpoints].in_rule;
+        dbg_breakpoint[i].line = dbg_breakpoint[dbg_num_breakpoints].line;
+        dbg_breakpoint[i].input_line = dbg_breakpoint[dbg_num_breakpoints].input_line;
     }
     else if (strcmp(argv[0], "status") == 0)
     {
@@ -383,6 +493,8 @@ char                      *command;
                 printf ("(%d) stop in %s\n", i+1, dbg_breakpoint[i].in_rule);
             else if (dbg_breakpoint[i].line != -1)
                 printf ("(%d) stop at %d\n", i+1, dbg_breakpoint[i].line);
+            else if (dbg_breakpoint[i].input_line != -1)
+                printf ("(%d) stop at i%d [input line]\n", i+1, dbg_breakpoint[i].input_line);
             else
                 printf ("(%d) stop at #%d\n", i+1, dbg_breakpoint[i].pc);
         }
@@ -401,10 +513,47 @@ char                      *command;
     {
         for (v = 0; dbg_vars[v].display_method != NULL; v++)
         {
+            if (dbg_vars[v].address == DBG_TYPE_DISPLAY)
+                continue;   /* This is a type display routine, not a variable */
             printf ("%s:\n", dbg_vars[v].name);
             (*dbg_vars[v].display_method) (dbg_vars[v].address, dbg_vars[v].udata);
         }
         printf ("--------------------\n");
+        display_context_vars (display_pc, display_var_fp, 1, NULL);
+        printf ("--------------------\n");
+    }
+    else if (strcmp(argv[0], "dump") == 0)
+    {
+        display_context_vars (display_pc, display_var_fp, 0, NULL);
+        printf ("--------------------\n");
+    }
+    else if (strcmp(argv[0], "up") == 0)
+    {
+        if (display_sp > 0)
+        {
+            display_pc = ssl_stack[display_sp]-2;
+            display_sp--;
+            display_var_fp = ssl_var_stack[display_var_fp];
+            display_source_for_pc (display_pc);
+        }
+    }
+    else if (strcmp(argv[0], "down") == 0)
+    {
+        if (display_sp < ssl_sp)
+        {
+            display_sp++;
+            if (display_sp == ssl_sp)
+                display_pc = ssl_pc;
+            else
+                display_pc = ssl_stack[display_sp+1]-2;
+
+            /* Can only find lower frame by searching from last frame */
+            display_var_fp = ssl_var_fp;
+            for (i = ssl_sp - display_sp; i > 0; i--)
+                display_var_fp = ssl_var_stack[display_var_fp];
+
+            display_source_for_pc (display_pc);
+        }
     }
     else if (strcmp(argv[0], "p") == 0)
     {
@@ -416,14 +565,21 @@ char                      *command;
         }
         else
         {
+            /* Display any internal variable by that name */
             for (v = 0; dbg_vars[v].display_method != NULL; v++)
             {
+                if (dbg_vars[v].address == DBG_TYPE_DISPLAY)
+                    continue;   /* This is a type display routine, not a variable */
                 if (strcmp(dbg_vars[v].name, argv[1]) == 0)
                 {
-                    printf ("%s:\t", dbg_vars[v].name);
+                    printf ("%s:\n", dbg_vars[v].name);
                     (*dbg_vars[v].display_method) (dbg_vars[v].address, dbg_vars[v].udata);
                 }
             }
+
+            /* Display any variable in SSL program by that name */
+            display_context_vars (display_pc, display_var_fp, 1, argv[1]);
+
             printf ("--------------------\n");
         }
     }
@@ -432,9 +588,10 @@ char                      *command;
         printf ("-------------- commands: ---------------\n");
         printf ("s               (step)\n");
         printf ("n               (next line)\n");
-        printf ("stop at <line>  (set a breakpoint)\n");
-        printf ("stop at #<addr> (set a breakpoint)\n");
-        printf ("stop in <rule>  (set a breakpoint)\n");
+        printf ("stop at <line>  (set breakpoint at program line)\n");
+        printf ("stop at i<line> (set breakpoint at input line)\n");
+        printf ("stop at #<addr> (set breakpoint at code address)\n");
+        printf ("stop in <rule>  (set breakpoint in program rule)\n");
         printf ("delete n        (delete a breakpoint)\n");
         printf ("status          (display all breakpoints)\n");
         printf ("run n           (execute n instructions)\n");
@@ -474,6 +631,10 @@ dbg_run ()
     else if (status == 2)       /* reached end of step-count */
     {
     }
+    else if (status == 3)       /* hit input-line breakpoint */
+    {
+        dbg_hit_input_breakpoint();
+    }
     else
     {
         printf ("debug: unknown run status %d\n", status);
@@ -482,29 +643,41 @@ dbg_run ()
     return (done);
 }
 
-dbg_display_position()
+/* Display current position */
+dbg_display_position ()
 {
     short     line;
     char      buffer[50];
-
     short     input_line, input_col;
+
+    /* Reset displayed context for up/down commands */
+    display_pc = ssl_pc;
+    display_sp = ssl_sp;
+    display_var_fp = ssl_var_fp;
 
     if (dbg_trace)
     {
         /* Move source window to current position */
 
-        line = dbg_find_line (ssl_pc);
-
-        dbgui_at_line (line);
+        display_source_for_pc (ssl_pc);
 
         ssl_get_input_position (&input_line, &input_col);
-
         dbgui_at_input_position (input_line, input_col);
 
         sprintf (buffer, "pc: %d", ssl_pc);
         dbgui_execution_status (buffer);
     }
 }
+
+local display_source_for_pc (pc)
+short                        pc;
+{
+    short     line;
+
+    line = dbg_find_line (pc);
+    dbgui_at_line (line);
+}
+
 
 local    dbg_install_breakpoints()
 {
@@ -514,6 +687,9 @@ local    dbg_install_breakpoints()
     for (i = 0; i < dbg_num_breakpoints; i++)
     {
         pc = dbg_breakpoint[i].pc;
+        if (pc == -1)
+            continue;     /* No breakpoint address (e.g. break at input position) */
+
         if (ssl_code_table[pc] != oBreak_opcode)
         {
             dbg_breakpoint[i].code = ssl_code_table[pc];
@@ -529,6 +705,9 @@ local   dbg_remove_breakpoints()
 
     for (i = 0; i < dbg_num_breakpoints; i++)
     {
+        if (dbg_breakpoint[i].pc == -1)
+            continue;     /* No breakpoint address (e.g. break at input position) */
+
         ssl_code_table[dbg_breakpoint[i].pc] = dbg_breakpoint[i].code;
     }
     dbg_breakpoints_installed = 0;
@@ -585,6 +764,9 @@ public    dbg_hit_breakpoint()
 
     for (i = 0; i < dbg_num_breakpoints; i++)
     {
+        if (dbg_breakpoint[i].pc == -1)
+            continue;   /* a watch breakpoint */
+
         if (ssl_pc == dbg_breakpoint[i].pc)
         {
             if (dbg_breakpoint[i].in_rule != NULL)
@@ -602,7 +784,23 @@ public    dbg_hit_breakpoint()
 
     dbg_remove_breakpoints();
 
-    dbg_step_mode = DBG_STEP_INTO;     /* Go into single step mode */
+    dbg_step_mode = DBG_STEP_INSTRUCTION;     /* Go into single step mode */
+    dbg_step_count = 1;
+}
+
+/* Similar to above, but hit breakpoint on input line */
+public    dbg_hit_input_breakpoint ()
+{
+    short    i;
+    short    input_line, input_col;
+
+    ssl_get_input_position (&input_line, &input_col);
+
+    printf ("Hit breakpoint at input line %d\n", input_line);
+
+    dbg_remove_breakpoints();
+
+    dbg_step_mode = DBG_STEP_INSTRUCTION;     /* Go into single step mode */
     dbg_step_count = 1;
 }
 
@@ -753,4 +951,193 @@ char                   *status_string;
 {
     ssltool_execution_status (status_string);
 }
+
+dbg_read_symbol_table (fp)
+FILE *fp;
+{
+    int   num, class, type_num;
+    char  name_buf[256];
+    int   index, t;
+
+    dbg_symbol_table_last = 0;
+
+    while (fscanf (fp, "%d", &num) != EOF)
+    {
+        dbg_symbol_table_last++;
+        if (dbg_symbol_table_last == DBG_SYMBOL_TABLE_SIZE)
+        {
+            printf ("Debug warning: symbol table full\n");
+            dbg_symbol_table_last--;
+            break;
+        }
+
+        dbg_symbol_table[dbg_symbol_table_last].num = num;
+
+        fscanf (fp, "%s", name_buf);
+        dbg_symbol_table[dbg_symbol_table_last].name = strdup(name_buf);
+
+        fscanf (fp, "%s", name_buf);
+        for (class = 1; dbg_symbol_class_names[class] != NULL; class++)
+            if (strcmp(name_buf, dbg_symbol_class_names[class]) == 0)
+                break;
+        dbg_symbol_table[dbg_symbol_table_last].class = class;
+
+        switch (class)
+        {
+            case DBG_SYMBOL_CLASS_global:
+            case DBG_SYMBOL_CLASS_local:
+            case DBG_SYMBOL_CLASS_inparam:
+            case DBG_SYMBOL_CLASS_outparam:
+            case DBG_SYMBOL_CLASS_inoutparam:
+                fscanf (fp, "%d", &(dbg_symbol_table[dbg_symbol_table_last].type_num));
+                break;
+        }
+
+        switch (class)
+        {
+            case DBG_SYMBOL_CLASS_rule:
+            case DBG_SYMBOL_CLASS_global:
+            case DBG_SYMBOL_CLASS_local:
+            case DBG_SYMBOL_CLASS_inparam:
+            case DBG_SYMBOL_CLASS_outparam:
+            case DBG_SYMBOL_CLASS_inoutparam:
+                fscanf (fp, "%d", &(dbg_symbol_table[dbg_symbol_table_last].value));
+                break;
+        }
+    }
+
+    /*  Now link up type references  */
+    for (index = 1; index <= dbg_symbol_table_last; index++)
+    {
+        type_num = dbg_symbol_table[index].type_num;
+        if (type_num != 0)
+        {
+            for (t = 1; t <= dbg_symbol_table_last; t++)
+            {
+                if (dbg_symbol_table[t].num == type_num)
+                {
+                    dbg_symbol_table[index].type = &(dbg_symbol_table[t]);
+                    break;
+                }
+            }
+        }
+    }
+}
+
+local display_value (type_name, symbol_name, value)
+char                *type_name;
+char                *symbol_name;
+long                 value;
+{
+    int  v;
+
+    printf ("%s %s = ", type_name, symbol_name);
+
+    for (v = 0; dbg_vars[v].display_method != NULL; v++)
+    {
+        if (dbg_vars[v].address != DBG_TYPE_DISPLAY)
+            continue;
+
+        if (strcmp(dbg_vars[v].name, type_name) == 0)
+        {
+            (*dbg_vars[v].display_method) (&value, dbg_vars[v].udata);
+            return;
+        }
+    }
+
+    /* Default display as int */
+    printf ("\t%d\n", value);
+}
+
+/* If a var_name given, only variable(s) with matching name
+ * will be displayed.
+ */
+local display_context_vars (pc, fp, show_globals, var_name)
+short                       pc;
+long                        fp;
+int                         show_globals;
+char                       *var_name;
+{
+    int    symbol;
+    char  *rule;
+    long   value;
+    char  *type_name;
+    char  *symbol_name;
+
+
+    /*  Globals  */
+
+    if (show_globals)
+    {
+        for (symbol = 1; symbol <= dbg_symbol_table_last; symbol++)
+        {
+            if (dbg_symbol_table[symbol].class == DBG_SYMBOL_CLASS_global)
+            {
+                symbol_name = dbg_symbol_table[symbol].name;
+                if ((var_name == NULL) || (strcmp(var_name, symbol_name) == 0))
+                {
+                    type_name = (dbg_symbol_table[symbol].type)->name;
+                    value = ssl_var_stack[dbg_symbol_table[symbol].value];
+
+                    display_value (type_name, symbol_name, value);
+                }
+            }
+        }
+
+        if (var_name == NULL)
+            printf ("--------------------\n");
+    }
+
+
+    /*  Parameters & Locals */
+
+    /*  First, find rule symbol.  Param/local symbols follow it in table.  */
+
+    rule = ssl_rule_name(pc);
+    for (symbol = 1; symbol <= dbg_symbol_table_last; symbol++)
+    {
+        if ((dbg_symbol_table[symbol].class == DBG_SYMBOL_CLASS_rule) &&
+            (strcmp(dbg_symbol_table[symbol].name, rule) == 0))
+        {
+            break;
+        }
+    }
+
+    while ((++symbol <= dbg_symbol_table_last) &&
+           ((dbg_symbol_table[symbol].class == DBG_SYMBOL_CLASS_local) ||
+            (dbg_symbol_table[symbol].class == DBG_SYMBOL_CLASS_inparam) ||
+            (dbg_symbol_table[symbol].class == DBG_SYMBOL_CLASS_outparam) ||
+            (dbg_symbol_table[symbol].class == DBG_SYMBOL_CLASS_inoutparam)))
+    {
+        symbol_name = dbg_symbol_table[symbol].name;
+        if ((var_name != NULL) && (strcmp(var_name, symbol_name) != 0))
+            continue;
+
+        type_name = (dbg_symbol_table[symbol].type)->name;
+
+        switch (dbg_symbol_table[symbol].class)
+        {
+            case DBG_SYMBOL_CLASS_local:
+                if (fp == ssl_var_sp)   /* Local space not allocated for this rule yet */
+                    value = 0;          /* Display it as if it will be cleared on allocation */
+                else
+                    value = ssl_var_stack[fp + dbg_symbol_table[symbol].value];
+                break;
+
+            case DBG_SYMBOL_CLASS_inparam:
+                value = ssl_var_stack[fp - dbg_symbol_table[symbol].value];
+                break;
+
+            case DBG_SYMBOL_CLASS_outparam:
+            case DBG_SYMBOL_CLASS_inoutparam:
+                value = ssl_var_stack[ssl_var_stack[fp - dbg_symbol_table[symbol].value]];
+                break;
+        }
+
+        display_value (type_name, symbol_name, value);
+
+    }
+}
+
+
 

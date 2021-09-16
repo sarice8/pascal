@@ -1,7 +1,7 @@
 # sccsid[] = "%W% %G% %U% %P%";
 
 ROOT = /home/sarice/compilers
-SSL_RT_DIR = ${ROOT}/ssl_rt/1.1
+SSL_RT_DIR = ${ROOT}/ssl_rt/2.0
 
 CC        = cc
 CFLAGS    = -c

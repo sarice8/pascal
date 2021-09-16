@@ -1,7 +1,8 @@
 
-This is a generic SSL debugger module that may be integrated
-with a program compiled by SSL 1.2.8.
+Debug  1.3.0     Aug 31 '93
 
-Note, for a graphical front end to the debugger, ssltool 1.2.7
-may still be used with this module.
+This version of the SSL debugger can display global/local variables
+in the SSL program.  It adds commands:  up, down, dump.
+
+It should be used in client programs built by SSL 1.3.0 or higher.
 

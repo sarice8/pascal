@@ -19,4 +19,11 @@ typedef struct dbg_variables_struct {
 } dbg_variables;
  
 
+/*  Set address field in dbg_variables to this, to register a
+ *  generic display routine for a type (defined in SSL).
+ *  The routine will be called with the address of the variable
+ *  and the udata (just like a variable display method).
+ */
+#define DBG_TYPE_DISPLAY  ((char *)0x1)
+
 
