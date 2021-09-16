@@ -1,12 +1,12 @@
 
-SSL generic runtime module, version 1.1      Aug 18 '93
+ssl_rt 2.0   August 27 '93
 
-This is a generic module providing a table walker and scanner
-for clients built using SSL.  
+[ To be used in client programs built with SSL 1.3.0 or higher. ]
 
-It implements the runtime model:
+SSL generic runtime module, for runtime model:
 
-    "RT 1.1 - Original SSL model, generic ssl_rt - 08/18/93";
+    "RT 2.0 - Variable stack - 08/27/93";
 
-which is produced by SSL compiler version 1.2.8.
+Consisting of files:
+    ssl_rt.o, ssl_rt.h, ssl_scan.o
 

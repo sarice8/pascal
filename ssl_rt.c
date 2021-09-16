@@ -18,6 +18,7 @@ static char sccsid[] = "%W% %G% %U% %P%";
 *   HISTORY
 *----------------------------------------------------------------------------
 *   08/18/93 | Steve  | Based on SSL interpreter in my Schema compiler
+*   08/27/93 | Steve  | RT 2.0, with value stack (parameters, local vars)
 *            |        | 
 *
 *****************************************************************************
@@ -48,7 +49,7 @@ static char sccsid[] = "%W% %G% %U% %P%";
  *     #include "ssl_begin.h"
  *
  *         case <operation> :
- *             operation code, referring to ssl_param, ssl_result,
+ *             operation code, referring to ssl_param, ssl_argv(arg,arc), ssl_result,
  *                             ssl_error, ssl_fatal, ssl_assert, ssl_warning
  *             continue;
  *
@@ -117,10 +118,13 @@ jmp_buf  ssl_fatal_jmp_buf;
 short    ssl_stack [ssl_stackSize];       /* Call stack */
 short    ssl_sp;
 
+long     ssl_var_stack [ssl_var_stackSize];  /* Variable stack */
+long     ssl_var_sp;                      /* Var stack sp */
+long     ssl_var_fp;                      /* Var stack frame pointer, used by Rule calls */
+
 short    ssl_pc;                          /* program counter                */
 short    ssl_tmp;                         /* used for error recovery        */
-short    ssl_result;                      /* value from oSetResult          */
-short    ssl_param;                       /* value for oSetParam            */
+long     ssl_result;                      /* value from oSetResult          */
 short    ssl_choice_options;              /* number of choice options       */
 char     ssl_error_buffer[256];           /* err message construction area  */
 short    ssl_error_count;                 /* number of err signals emitted  */
@@ -349,6 +353,7 @@ char                 *program_filename;
     int     entries;
     int     temp;
     int     addr;
+    char    tmp_buffer[256];
 
     if ((program_file = fopen(program_filename, "r"))==NULL)
     {
@@ -357,17 +362,34 @@ char                 *program_filename;
     }
 
     fgets (ssl_title_string, 256, program_file);
+
     fgets (ssl_runtime_vrs,  256, program_file);
+    ssl_runtime_vrs[strlen(ssl_runtime_vrs)-1] = '\0';   /* Remove trailing \n */
 
     fscanf (program_file,"%d",&entries);       /* size of SSL code */
 
     /*  NEED A PROTOCOL FOR THIS  */
-    /*  ssl_code_table_size = entries;  */
+    ssl_code_table_size = entries;
 
     for (addr=0; addr < entries; addr++)
     {
         fscanf (program_file, "%d", &temp);
         ssl_code_table[addr] = temp;
+    }
+
+    /*  Get rule addresses  */
+
+    /*  Note, at the moment the application must also provide the
+        ssl_rule_table[] global array.  The C table form is a global array
+        and we need to be consistent. */
+
+    fscanf (program_file, "%d", &entries);
+
+    for (ssl_rule_table_size = 0; ssl_rule_table_size < entries; ssl_rule_table_size++)
+    {   
+        fscanf (program_file, "%s %d", tmp_buffer, &temp);
+        ssl_rule_table[ssl_rule_table_size].addr = temp;
+        ssl_rule_table[ssl_rule_table_size].name = (char *) strdup (tmp_buffer);
     }
 
     fclose (program_file);

@@ -28,8 +28,9 @@ static char sccsid[] = "%W% %G% %U% %P%";
 #define bzero(p,n)   memset(p,'\0',n)
 #endif AMIGA
 
-#define SSL_RUNTIME_VRS "RT 1.1 - Original SSL model, generic ssl_rt - 08/18/93"
+#define SSL_RUNTIME_VRS "RT 2.0 - Variable stack - 08/27/93"
 #if 0
+#define SSL_RUNTIME_VRS "RT 1.1 - Original SSL model, generic ssl_rt - 08/18/93"
 #define SSL_RUNTIME_VRS "RT 1.0 - Original SSL Runtime Model - 09/07/89"
 #endif /* 0 */
 
@@ -80,6 +81,7 @@ struct ssl_special_codes_struct
     short  ident;      /* identifier */
     short  intlit;     /* integer literal */
     short  strlit;     /* string literal */
+    short  reallit;    /* float literal */
 };
 
 /*
@@ -100,9 +102,12 @@ ssl_init ();
  *
  *  The application must define the table variable in its own file:
  *
- *  short ssl_code_table [ssl_code_table_size];
+ *  short ssl_code_table [SSL_CODE_TABLE_SIZE + (some margin for growth) ];
+ *  int   ssl_code_table_size;   -- will be set to actual size
  *  char  ssl_title_string [256];
  *  char  ssl_runtime_vrs [256];
+ *  struct ssl_rule_table_struct ssl_rule_table[ (>= #rules in application) ];
+ *  int   ssl_rule_table_size;   -- Will be set to actual #rules
  *
  *  Returns 0 on success.
  */
@@ -179,6 +184,12 @@ ssl_include_filename (/* char *filename */);
 
 
 /*
+ *  Reset the input to the start of the source file,
+ *  for multiple passes through input text
+ */
+ssl_reset_input ();
+
+/*
  *
  *  Execute the SSL program.
  *
@@ -192,6 +203,22 @@ int ssl_run_program ();
  *               Functions for use in semantic operations
  * --------------------------------------------------------------------------
  */
+
+/*
+ *  For semantic operations to access parameters.
+ *
+ *  arg is the operation argument from 0 to argc-1
+ *  argc is the number of arguments the operation accepts
+ *      (argc must be provided by the user's code in the operation)
+ *
+ */
+#define ssl_argv(arg,argc)   (ssl_var_stack[ssl_var_sp-(argc)+1+(arg)])
+
+/*
+ *  This macro is provided as a convenience for the case of
+ *  an operation that just accepts one parameter.
+ */
+#define ssl_param (ssl_argv(0,1))
 
 /*
  *  Report a fatal message and abort.
@@ -269,12 +296,11 @@ ssl_accept_token ();
 extern short    ssl_recovery_token;
 extern short    ssl_eof_token;
 
+extern char     ssl_input_filename [];
 extern int      ssl_debug;
 
 extern short    ssl_pc;
 extern short    ssl_tmp;
-extern short    ssl_result;
-extern short    ssl_param;
 extern short    ssl_choice_options;
 extern char     ssl_error_buffer[];
 extern int      ssl_walking;
@@ -282,6 +308,14 @@ extern int      ssl_walking;
 extern short    ssl_sp;
 extern short    ssl_stack [];
 #define         ssl_stackSize  200     /* Need to define elsewhere */
+
+extern long     ssl_var_stack [];
+extern long     ssl_var_sp;
+extern long     ssl_var_fp;
+extern long     ssl_result;
+#define         ssl_var_stackSize 5000   /* Define elsewhere */
+
+extern short    ssl_error_count;
 
 /*  Should set this in ssl_rt.c to avoid need for <setjmp.h> in application */
 #include <setjmp.h>
@@ -319,7 +353,9 @@ extern char   ssl_strlit_buffer [];
 
 extern short ssl_line_number;  /* Current line of scanner */
 extern char  ssl_line_listed;  /* Should be walker var, not scanner */
+
 extern short ssl_last_id;      /* Should be walker var, not scanner */
+extern char  ssl_last_id_text [];
 
 #define ssl_id_table_size      4000
 struct ssl_id_table_struct

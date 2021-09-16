@@ -1,8 +1,8 @@
 
 #  SSL runtime modules
 
-ROOT         = /home/sarice/compilers
-DEBUG_DIR    = ${ROOT}/debug/1.2.8
+ROOT          = /home/sarice/compilers
+DEBUG_DIR     = ${ROOT}/debug/1.3.0
 
 
 ssl_rt:    ssl_rt.o ssl_scan.o

@@ -45,14 +45,17 @@ struct  ssl_id_table_struct ssl_id_table [ssl_id_table_size];
 short   ssl_id_table_next;
 
 
-#define ssl_id_buffer_size     5000        /* initial identifier string space       */
-char   *ssl_id_buffer;                     /* Mutliple buffers may be allocated */
+#define ssl_id_buffer_size     5000        /* identifier string space       */
+char   *ssl_id_buffer;                     /* Multiple buffers may be allocated */
 short   ssl_id_buffer_next;
 
 
 short  ssl_line_number;
 char   ssl_line_listed;
+
 short  ssl_last_id;                     /* last accepted identifier      */
+char   ssl_last_id_text [SSL_NAME_SIZE+1];
+
 
 
 struct ssl_token_struct ssl_token;      /* current token                 */
@@ -78,6 +81,7 @@ static char   s_punct_multi [256];
 
 static s_lookup_id ();
 static s_hit_eof ();
+static s_restart_scanner_input_position ();
 
 static int    s_including_file;   /* "Include" application source files */
 static FILE  *s_src_includer;
@@ -158,6 +162,26 @@ struct ssl_special_codes_struct      *special_codes;
     s_including_file = 0;
 }
 
+/*  Used by some compilers to pass multiple times through input text.  */
+ssl_reset_input ()
+{
+    fclose (ssl_src_file);
+
+    if (s_including_file)
+    {
+        fclose (s_src_includer);
+        s_including_file = 0;
+    }
+
+    if ((ssl_src_file=fopen(ssl_input_filename, "r"))==NULL)
+    {
+        printf ("SSL: Can't open source file %s\n", ssl_input_filename);
+        return (-1);
+    }
+
+    s_restart_scanner_input_position ();
+}
+
 
 ssl_include_filename (include_filename)
 char                 *include_filename;
@@ -197,14 +221,20 @@ ssl_restart_scanner ()
     for (i=0; s_keyword_table[i].name != NULL; i++)
         (void) ssl_add_id (s_keyword_table[i].name, s_keyword_table[i].code);
 
+    s_restart_scanner_input_position ();
+}
 
+/*  Set scanner input position to start of file (except that
+    actual file variable is assumed to be there already)  */
+
+static s_restart_scanner_input_position ()
+{
     ssl_line_buffer[0] = '\0';          /* set up scanner */
     s_src_ptr = ssl_line_buffer;
     ssl_line_number = 0;
     ssl_line_listed = 1;
     ssl_token.code = s_special_codes->invalid;  /* Should not be 'eof' */
     ssl_token.accepted = 1;
-
 }  
 
 
@@ -415,7 +445,10 @@ ssl_accept_token ()
     }  
 
     if (ssl_token.code == s_special_codes->ident)
+    {
         ssl_last_id = ssl_token.val;
+        strcpy (ssl_last_id_text, ssl_token.name);  /* Keep text -- could do better */
+    }
 }
 
 
@@ -485,7 +518,6 @@ short          code;
 
     namelen = strlen(name);
     ssl_id_table [ssl_id_table_next].namelen = namelen;
-    if (ssl_id_buffer_next+namelen >= ssl_id_buffer_size)
     if (ssl_id_buffer_next+namelen >= ssl_id_buffer_size)
     {
         ssl_id_buffer = (char *)malloc(ssl_id_buffer_size);

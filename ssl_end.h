@@ -162,13 +162,21 @@ printf ("%d ", ssl_pc);
               if (++ssl_sp==ssl_stackSize) ssl_fatal ("SSL: call stack overflow");
               ssl_stack[ssl_sp] = ssl_pc+1;
               ssl_pc = ssl_code_table[ssl_pc];
+              if (++ssl_var_sp==ssl_var_stackSize) ssl_fatal ("SSL: var stack overflow");
+              ssl_var_stack[ssl_var_sp] = ssl_var_fp;
+              ssl_var_fp = ssl_var_sp;
               continue;
        case oReturn :
               if (ssl_sp) {
                 ssl_pc = ssl_stack[ssl_sp--];
+                ssl_var_sp = ssl_var_fp-1;
+                ssl_var_fp = ssl_var_stack[ssl_var_fp];
                 continue;
               } else {
                 ssl_pc--;   /* Leave recovery mode before final Return of program */
+                ssl_var_sp = 0;
+                ssl_var_fp = 0;
+                ssl_walking = 0;
                 done_loop = 1;
               }
               continue;
@@ -187,8 +195,55 @@ printf ("%d ", ssl_pc);
               continue;
        case oEndChoice :           /* choice or inputChoice didn't match */
               continue;            /* shouldn't occur during recovery */
-       case oSetParameter :
-              ssl_param = ssl_code_table[ssl_pc++];
+       case oPushResult :
+              if (++ssl_var_sp==ssl_var_stackSize) ssl_fatal ("SSL: var stack overflow");
+              ssl_var_stack[ssl_var_sp] = ssl_result;
+              continue;
+       case oPop :
+              ssl_var_sp -= ssl_code_table[ssl_pc++];
+              continue;
+       case oGlobalSpace :
+#ifdef SSL_DEBUG
+              /* Clear vars on every entry, to aid in debugging.
+               * (schema nodes will thus be Null or valid nodes).
+               */
+              bzero (&(ssl_var_stack[ssl_var_sp+1]), ssl_code_table[ssl_pc]*sizeof(ssl_var_stack[0]));
+#endif /* SSL_DEBUG */
+              ssl_var_sp += ssl_code_table[ssl_pc++];
+              ssl_var_fp = ssl_var_sp-1;
+              continue; 
+       case oLocalSpace :
+#ifdef SSL_DEBUG
+              /* Clear vars on every entry, to aid in debugging.
+               * (schema nodes will thus be Null or valid nodes).
+               */
+              bzero (&(ssl_var_stack[ssl_var_sp+1]), ssl_code_table[ssl_pc]*sizeof(ssl_var_stack[0]));
+#endif /* SSL_DEBUG */
+              ssl_var_sp += ssl_code_table[ssl_pc++];
+              continue; 
+       case oGetParam :
+              ssl_result = ssl_var_stack[ssl_var_fp - ssl_code_table[ssl_pc++]];
+              continue;
+       case oGetFromParam :
+              ssl_result = ssl_var_stack[ssl_var_stack[ssl_var_fp - ssl_code_table[ssl_pc++]]];
+              continue;
+       case oGetLocal :
+              ssl_result = ssl_var_stack[ssl_var_fp + ssl_code_table[ssl_pc++]];
+              continue;
+       case oGetGlobal :
+              ssl_result = ssl_var_stack[ssl_code_table[ssl_pc++]];
+              continue;
+       case oGetAddrParam :
+              ssl_result = ssl_var_fp - ssl_code_table[ssl_pc++];
+              continue;   
+       case oGetAddrLocal :
+              ssl_result = ssl_var_fp + ssl_code_table[ssl_pc++];
+              continue;   
+       case oGetAddrGlobal :
+              ssl_result = ssl_code_table[ssl_pc++];
+              continue;
+       case oAssign :
+              ssl_var_stack[ssl_var_stack[ssl_var_sp--]] = ssl_result;
               continue;
 
        default :                   /* all semantic mechanisms ignored */
