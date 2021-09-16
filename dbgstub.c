@@ -1,5 +1,5 @@
 /**/
-static char sccsid[] = "@(#)dbgstub.c	1.2 5/28/93 18:32:37 /files/home/sim/sarice/compilers/new/debug_1.2.7/SCCS/s.dbgstub.c";
+static char sccsid[] = "%W% %G% %U% %P%";
 /**/
 
 /*

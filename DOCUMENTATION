@@ -1,5 +1,5 @@
 #
-# Documentation sccsid[] = "@(#)DOCUMENTATION	1.1 8/20/93 19:27:38 /files/home/sim/sarice/compilers/new/debug_1.2.7/SCCS/s.DOCUMENTATION";
+# Documentation sccsid[] = "%W% %G% %U% %P%";
 #
 
 SSL Debugger Module
@@ -16,22 +16,22 @@ To integrate this ssl debugger into an ssl program:
         "",        NULL,       0,        NULL,
     };
 
-*   Create a w_restart() function that opens all user input/output files,
+*   Create a ssl_restart() function that opens all user input/output files,
     initializes scanner, semantic operations, walker, and debugger:
-    [ For now, the debugger calls "t_cleanup()" and "w_restart()" directly ]
+    [ For now, the debugger calls "ssl_cleanup()" and "ssl_restart()" directly ]
 
-    w_restart ()
+    ssl_restart ()
     {
-        t_src = fopen (...) ...
-        t_initScanner();
-        w_pc = 0; ...
+        ssl_src_file = fopen (...) ...
+        ssl_init_scanner();
+        ssl_pc = 0; ...
 
         /* initialize debugger */
 
         #define DEBUG_FILE    "program.dbg"
         #define DEBUG_SOURCE  "program.lst"
 
-        if (w_debug)
+        if (ssl_debug)
             dbg_init (DEBUG_FILE, DEBUG_SOURCE, input_filename, oBreak, debug_variables);
 
         print title string
@@ -39,27 +39,33 @@ To integrate this ssl debugger into an ssl program:
 
 *   Change main execution to:
 
-    w_restart ();
+    ssl_restart ();
 
     /* execute SSL program */
 
-    if (w_debug)
+    if (ssl_debug)
         dbg_walkTable();
     else
-        w_walkTable();
+        ssl_walkTable();
 
-*   In walker function: return status now meaningful.
+*   In walker function: the return status is now meaningful.
 
-    w_walkTable()
+    /*  Return status:
+     *    0 = finished execution of program
+     *    1 = completed single stepping
+     *    2 = hit breakpoint
+     */
+
+    ssl_walkTable()
     {
-        w_walking = 1;       /* For improved error trapping */
+        ssl_walking = 1;       /* For improved error trapping */
 
-        if (w_debug)
+        if (ssl_debug)
         {
-            if (setjmp (t_fatal_jmp_buf))   /* Return here from t_fatal() */
+            if (setjmp (ssl_fatal_jmp_buf))   /* Return here from ssl_fatal() */
             {
-                w_walking = 0;
-                t_error ("Stopped at fatal error");
+                ssl_walking = 0;
+                ssl_error ("Stopped at fatal error");
                 return (0);
             }
         }
@@ -67,16 +73,16 @@ To integrate this ssl debugger into an ssl program:
 
         while (1)
         {
-            if (w_debug)
+            if (ssl_debug)
             {
                 if (dbg_check_step_count ())
                 {
-                    w_walking = 0;
+                    ssl_walking = 0;
                     return (2);
                 }
             }
 
-            switch (w_codeTable[w_pc++])
+            switch (ssl_code_table[w_pc++])
             {
                 ..
                 case oReturn:
@@ -84,7 +90,7 @@ To integrate this ssl debugger into an ssl program:
                     return (0);
 
                 case oBreak:
-                    w_walking = 0;
+                    ssl_walking = 0;
                     return (1);    /* Hit breakpoint */
             }
         }
@@ -93,20 +99,20 @@ To integrate this ssl debugger into an ssl program:
 *   Change error handling functions for better error trapping:
 
     #include <setjmp.h>
-    jmp_buf  t_fatal_jmp_buf;
+    jmp_buf  ssl_fatal_jmp_buf;
 
-    t_fatal (msg)
+    ssl_fatal (msg)
     {
-        t_error (...msg...)
-        t_abort ();
+        ssl_error (...msg...)
+        ssl_abort ();
     }
 
-    t_abort ()
+    ssl_abort ()
     {
-        w_traceback();
-        t_cleanup();
-        if (w_debug && w_walking)
-            longjmp (t_fatal_jmp_buf, 1);
+        ssl_traceback();
+        ssl_cleanup();
+        if (ssl_debug && ssl_walking)
+            longjmp (ssl_fatal_jmp_buf, 1);
         exit (5);
     }
 
@@ -138,14 +144,16 @@ To integrate this ssl debugger into an ssl program:
 
 *   Your walker/scanner needs the following functions and variables:
 
+------------ THIS PORTION OF THE DOCUMENTATION IS NOT UP TO DATE YET ---------
+
     short w_codeTable_size = w_codeTableSize;   /* Number of entries in table */
            /* NOTE: ssl defines macro w_codeTableSize in <program>.h
                     debugger reads value from variable w_codeTable_size */
            /* NOTE: My other programs don't set w_codeTable_size if they use C file,
                     which explains why "stop at #addr" doesn't work for them */
 
-    t_get_input_position (line_ptr, col_ptr)
-    short                *line_ptr, *col_ptr;
+    ssl_get_input_position (line_ptr, col_ptr)
+    short                  *line_ptr, *col_ptr;
     {
         if (t_token.accepted == 0)
         {

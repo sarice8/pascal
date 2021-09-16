@@ -1,5 +1,5 @@
 /**/ 
-static char sccsid[] = "@(#)debug.c	2.1 8/20/93 19:25:47 /files/home/sim/sarice/compilers/new/debug_1.2.7/SCCS/s.debug.c";
+static char sccsid[] = "%W% %G% %U% %P%";
 /**/
 
 /*
@@ -40,15 +40,7 @@ static char sccsid[] = "@(#)debug.c	2.1 8/20/93 19:25:47 /files/home/sim/sarice/
 /*    SSL walker variables that must be visible to the debugger            */
 /* ----------------------------------------------------------------------- */
 
-extern short    w_pc;
-extern short    w_codeTable[];
-extern short    w_codeTable_size;
-extern short    w_sp;
-extern short    w_stack[];
-
-extern char    *w_rule_name ();
-extern short    w_rule_addr ();
-extern          w_restart ();
+#include "ssl_rt.h"
 
 
 /* ----------------------------------------------------------------------- */
@@ -147,9 +139,9 @@ dbg_variables     *debug_variables;
 
     fscanf (fp, "%d", &entries);
 
-    dbg_line_table = (short *) malloc (entries * sizeof(short));
+    dbg_line_table = (short *) malloc ((entries+1) * sizeof(short));
     dbg_line_table[0] = entries;
-    for (line = 1; line < entries; line++)
+    for (line = 1; line <= entries; line++)
     {
         fscanf (fp, "%d", &addr);
         dbg_line_table[line] = addr;
@@ -199,9 +191,9 @@ public       dbg_check_step_count()
 
     if (dbg_step_mode == DBG_STEP_OVER)    /* line step */
     {
-        if (w_sp > dbg_line_step_call_level)
+        if (ssl_sp > dbg_line_step_call_level)
             return(0);
-        line = dbg_find_line (w_pc);
+        line = dbg_find_line (ssl_pc);
         if (line == dbg_line_step_line)
             return(0);
     }
@@ -249,16 +241,16 @@ char                      *command;
     else if ((strcmp(argv[0],"n") == 0) || (strcmp(argv[0],"next") == 0))
     {
         dbg_step_mode = DBG_STEP_OVER;      /* next line */
-        dbg_line_step_call_level = w_sp;
-        dbg_line_step_line = dbg_find_line(w_pc);
+        dbg_line_step_call_level = ssl_sp;
+        dbg_line_step_line = dbg_find_line(ssl_pc);
 
         dbg_run();
         dbg_display_position();
     }
     else if (strcmp(argv[0],"run") == 0)
     {
-        t_cleanup();
-        w_restart();    /* Restart session with same source, breakpoints */
+        ssl_cleanup();
+        ssl_restart();    /* Restart session with same source, breakpoints */
 
         dbg_step_mode = DBG_STEP_NONE;   /* Restart & run automatically */
 
@@ -313,7 +305,7 @@ char                      *command;
             if (argv[2][0] == '#')         /* stop at #<address> */
             {
                 i = atoi(argv[2]+1);
-                if (i < 0 || i >= w_codeTable_size)
+                if (i < 0 || i >= ssl_code_table_size)
                 {
                     printf ("Illegal address %d\n", i);
                     return(0);
@@ -321,7 +313,7 @@ char                      *command;
                 dbg_breakpoint[dbg_num_breakpoints].in_rule = NULL;
                 dbg_breakpoint[dbg_num_breakpoints].line = -1;
                 dbg_breakpoint[dbg_num_breakpoints].pc = i;
-                dbg_breakpoint[dbg_num_breakpoints].code = w_codeTable[i];
+                dbg_breakpoint[dbg_num_breakpoints].code = ssl_code_table[i];
                 dbg_num_breakpoints++;
             }
             else                           /* stop at <line> */
@@ -336,18 +328,18 @@ char                      *command;
                 dbg_breakpoint[dbg_num_breakpoints].pc = i;
                 dbg_breakpoint[dbg_num_breakpoints].line = line;
                 dbg_breakpoint[dbg_num_breakpoints].in_rule = NULL;
-                dbg_breakpoint[dbg_num_breakpoints].code = w_codeTable[i];
+                dbg_breakpoint[dbg_num_breakpoints].code = ssl_code_table[i];
                 dbg_num_breakpoints++;
             }
         }
         else if (strcmp(argv[1], "in") == 0)
         {
-            i = w_rule_addr (argv[2]);
+            i = ssl_rule_addr (argv[2]);
             if (i < 0)
                 return(0);
-            dbg_breakpoint[dbg_num_breakpoints].in_rule = w_rule_name(i);
+            dbg_breakpoint[dbg_num_breakpoints].in_rule = ssl_rule_name(i);
             dbg_breakpoint[dbg_num_breakpoints].pc = i;
-            dbg_breakpoint[dbg_num_breakpoints].code = w_codeTable[i];
+            dbg_breakpoint[dbg_num_breakpoints].code = ssl_code_table[i];
             dbg_num_breakpoints++;
         }
         else
@@ -397,11 +389,11 @@ char                      *command;
     }
     else if (strcmp(argv[0], "where") == 0)
     {
-        printf("%d\t%s", w_pc, w_rule_name(w_pc));
-        for (i = w_sp; i > 0; i--)
+        printf("%d\t%s", ssl_pc, ssl_rule_name(ssl_pc));
+        for (i = ssl_sp; i > 0; i--)
         {
             printf("\tcalled from\n%d\t%s",
-                   w_stack[i]-2, w_rule_name(w_stack[i]-2));
+                   ssl_stack[i]-2, ssl_rule_name(ssl_stack[i]-2));
         }
         printf ("\n");
     }
@@ -416,9 +408,24 @@ char                      *command;
     }
     else if (strcmp(argv[0], "p") == 0)
     {
-        node_number = atoi(argv[1]);
-        nodeDumpTreeNum (node_number);  /* TO DO, remove from debugger */
-        printf ("_________________________________________________________________________\n");
+        if ((argv[1][0] >= '0') && (argv[1][0] <= '9'))
+        {
+            node_number = atoi(argv[1]);
+            nodeDumpTreeNum (node_number);  /* TO DO, remove from debugger */
+            printf ("_________________________________________________________________________\n");
+        }
+        else
+        {
+            for (v = 0; dbg_vars[v].display_method != NULL; v++)
+            {
+                if (strcmp(dbg_vars[v].name, argv[1]) == 0)
+                {
+                    printf ("%s:\t", dbg_vars[v].name);
+                    (*dbg_vars[v].display_method) (dbg_vars[v].address, dbg_vars[v].udata);
+                }
+            }
+            printf ("--------------------\n");
+        }
     }
     else
     {
@@ -453,7 +460,7 @@ dbg_run ()
 
     done = 0;
 
-    status = w_walkTable();     /* walk table until breakpoint, step-count, or end */
+    status = ssl_walkTable();     /* walk table until breakpoint, step-count, or end */
 
     if (status == 0)
     {
@@ -486,15 +493,15 @@ dbg_display_position()
     {
         /* Move source window to current position */
 
-        line = dbg_find_line (w_pc);
+        line = dbg_find_line (ssl_pc);
 
         dbgui_at_line (line);
 
-        t_get_input_position (&input_line, &input_col);
+        ssl_get_input_position (&input_line, &input_col);
 
         dbgui_at_input_position (input_line, input_col);
 
-        sprintf (buffer, "pc: %d", w_pc);
+        sprintf (buffer, "pc: %d", ssl_pc);
         dbgui_execution_status (buffer);
     }
 }
@@ -507,10 +514,10 @@ local    dbg_install_breakpoints()
     for (i = 0; i < dbg_num_breakpoints; i++)
     {
         pc = dbg_breakpoint[i].pc;
-        if (w_codeTable[pc] != oBreak_opcode)
+        if (ssl_code_table[pc] != oBreak_opcode)
         {
-            dbg_breakpoint[i].code = w_codeTable[pc];
-            w_codeTable[pc] = oBreak_opcode;
+            dbg_breakpoint[i].code = ssl_code_table[pc];
+            ssl_code_table[pc] = oBreak_opcode;
         }
     }
     dbg_breakpoints_installed = 1;
@@ -522,7 +529,7 @@ local   dbg_remove_breakpoints()
 
     for (i = 0; i < dbg_num_breakpoints; i++)
     {
-        w_codeTable[dbg_breakpoint[i].pc] = dbg_breakpoint[i].code;
+        ssl_code_table[dbg_breakpoint[i].pc] = dbg_breakpoint[i].code;
     }
     dbg_breakpoints_installed = 0;
 }
@@ -574,24 +581,24 @@ public    dbg_hit_breakpoint()
 {
     short    i;
 
-    w_pc--;
+    ssl_pc--;
 
     for (i = 0; i < dbg_num_breakpoints; i++)
     {
-        if (w_pc == dbg_breakpoint[i].pc)
+        if (ssl_pc == dbg_breakpoint[i].pc)
         {
             if (dbg_breakpoint[i].in_rule != NULL)
                 printf ("Hit breakpoint in %s\n", dbg_breakpoint[i].in_rule);
             else if (dbg_breakpoint[i].line != -1)
                 printf ("Hit breakpoint at %d\n", dbg_breakpoint[i].line);
             else
-                printf ("Hit breakpoint at #%d\n", w_pc);
+                printf ("Hit breakpoint at #%d\n", ssl_pc);
             break;
         }
     }
 
     if (i >= dbg_num_breakpoints)
-        printf ("Hit unexpected breakpoint at %d\n", w_pc);
+        printf ("Hit unexpected breakpoint at %d\n", ssl_pc);
 
     dbg_remove_breakpoints();
 
@@ -649,7 +656,7 @@ dbg_walkTable()
     /* Program has terminated, should remember it is no longer valid to execute */
 #if 0
     /*  Taken from 'quit' command ... maybe I don't always want to do this...? */
-    t_cleanup();
+    ssl_cleanup();
     exit (1);
 #endif /* 0 */
 }
@@ -692,7 +699,7 @@ cmdline_main_loop ()
 
     while (!done)
     {
-        printf ("ssl.%d> ",w_pc);
+        printf ("ssl.%d> ",ssl_pc);
         gets (cmdbuf);
 
         done = dbg_command (cmdbuf);

@@ -1,4 +1,7 @@
 
 This is a generic SSL debugger module that may be integrated
-with a program compiled by SSL 1.2.7.
+with a program compiled by SSL 1.2.8.
+
+Note, for a graphical front end to the debugger, ssltool 1.2.7
+may still be used with this module.
 

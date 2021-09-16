@@ -1,5 +1,5 @@
 /**/
-/* static char sccsid[] = "@(#)debug.h	1.2 5/13/93 22:50:44 /files/home/sim/sarice/compilers/new/debug_1.2.7/SCCS/s.debug.h"; */
+/* static char sccsid[] = "%W% %G% %U% %P%"; */
 /**/
 
 /*  vdebug.h  */
