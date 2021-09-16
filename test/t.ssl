@@ -1,0 +1,196 @@
+title: 'Test Program';
+%
+%  Purpose:  Test the integration and operation of the
+%            new generic ssl_rt module.
+%            (This test is the SSL code from Schema)
+%
+
+input:
+	% General
+
+	pINVALID
+	pEOF
+	pIDENTIFIER
+
+	% Types
+
+        pBoolean1
+        pCharacter1
+	pInteger4
+        pInteger8
+        pIntegerN
+        pReal4
+        pReal8
+        pRealN
+        pStringN
+        pObjectType
+	pNode
+	pList
+
+	% Option Tags
+
+	pPri
+	pAlt
+	pOpt
+        pInt
+        pExt
+        pSys
+        pTmp
+
+	% keywords
+
+	pSchema
+	pRoot
+	pIs
+	pEnd
+
+	% Punctuation
+
+	pDERIVES    '::='
+	pCONTAINS   '=>'
+	pCOLON      ':'
+	pCOMMA      ','
+	pLPAREN     '('
+	pRPAREN     ')'
+	pLSQUARE    '['
+	pRSQUARE    ']'
+	;
+
+output:
+	;
+
+error:
+	;
+
+include 't_schema.ssl'
+
+type aType:              % attribute type
+	type_INVALID  = 0
+	type_Integer4 = 4
+	type_Node     = 100
+	type_List     = 150
+	;
+
+type aTag:               % attribute tags (defined as bits)
+	tag_INVALID = 0
+	tag_Pri     = 1
+	tag_Opt     = 2
+	tag_Alt     = 4
+	;
+
+mechanism Class:		% operations on classes
+	oCreateEmptySchema	% create initial schema database, containing a SchemaRoot,
+				% nInvalid class, qInvalid attribute symbol,
+				% and 'Object' class for basis of all derivation.
+	oFindClass		% find class named by last accepted identifier (must exist).
+				% Sets the Current class to that class.
+	oDeriveClass		% Create new class named by last accepted identifier
+				% (must not exist already).  The new object is derived
+				% from the Current class (found with oFindClass).
+	oThisClassWillGetAttrs	% Sets the GetsAttrs class to the Current class
+				% (found with oFindClass).  attrs defined with the
+				% Attr mechanism will be added to the GetsAttrs class.
+	oNoClassWillGetAttrs	% Sets GetsAttrs to NULL.  No attribute definitions
+				% may be added to any class.
+	;
+
+mechanism Attr:			% operations on attributes
+	oCreateAttrSym		% Searches for an nAttrSym with qIdent = the
+				% last accepted identifier.
+				% If doesn't exist yet, creates one and assigns
+				% a new qCode to it (the code for the AttrSym)
+				% and appends it to the schema's AttrSyms list.
+				% Sets CurrentAttrSym to that AttrSym.
+
+	oCreateAttr		% create new attribute.
+				% Sets qAttrSym to CurrentAttrSym (found/created.
+				% by oCreateAttrSym).
+				% Sets CurrentAttr to that attribute.
+	oAttrType (aType)	% Sets the type of the CurrentAttr
+	oAttrTag (aTag)		% Sets a tag in the CurrentAttr.  Tag bits are 'or'd together.
+	;
+
+mechanism doc:
+	oDocDumpTable     % dump results
+	;
+
+
+rules
+
+Schema:
+	oCreateEmptySchema
+
+	@schema_header
+
+	{
+	    [ | pEnd, pEOF : > | * : ]
+
+	    pIDENTIFIER
+	    [
+		| '::=' :	@class_derivation
+
+		| '=>' :	@attribute_assignment
+
+		| ':' :		@attribute_definition
+	    ]
+	}
+
+	oDocDumpTable
+	;
+
+
+schema_header:
+	pSchema
+	pIDENTIFIER    % name of schema
+	pRoot
+	pIDENTIFIER    % name of root object
+	pIs
+	;
+
+
+class_derivation:
+	oFindClass
+	pIDENTIFIER
+	oDeriveClass
+
+	oNoClassWillGetAttrs	% disallow attribute definitions for now
+	;
+
+attribute_assignment:
+	oFindClass
+	oThisClassWillGetAttrs
+	;
+
+attribute_definition:
+	oCreateAttrSym
+	oCreateAttr
+	
+	[
+            | pBoolean1, pCharacter1, pInteger4, pInteger8, pIntegerN,
+              pReal4, pReal8, pRealN, pStringN, pObjectType :
+                           oAttrType (type_Integer4)
+	    | pList :      oAttrType (type_List)
+	    | pNode :      oAttrType (type_Node)
+	]
+
+	[
+	    | '(' :  pIDENTIFIER    % constraint ignored for now
+                     ')'
+	    | * :
+	]
+
+	[
+	    | '[' :  {[
+	                 | pPri :  oAttrTag (tag_Pri)
+	                 | pAlt :  oAttrTag (tag_Alt)
+	                 | pOpt :  oAttrTag (tag_Opt)
+	                 | ',' :
+	                 | * :    >
+	             ]}
+	             ']'
+	    | * :
+	]
+	;
+
+end
+
