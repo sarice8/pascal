@@ -1,0 +1,189 @@
+title: 'Schema 1.1 -- Database Schema Compiler -- May 30, 1991';
+%
+% sccsid: '%W% Steve Rice (C) %G% %U% %P%'
+%
+%  Schema.ssl
+%
+%  HISTORY
+%    01May91   1.0   First version
+%    05May91         Record attribute class
+%    30May91   1.1   Added attribute tags
+%
+
+input:
+	% General
+
+	pINVALID
+	pEOF
+	pIDENTIFIER
+
+	% Types
+
+        pBoolean1
+        pCharacter1
+	pInteger4
+        pInteger8
+        pIntegerN
+        pReal4
+        pReal8
+        pRealN
+        pStringN
+        pObjectType
+	pNode
+	pList
+
+	% Option Tags
+
+	pPri
+	pAlt
+	pOpt
+        pInt
+        pExt
+        pSys
+        pTmp
+
+	% keywords
+
+	pSchema
+	pRoot
+	pIs
+	pEnd
+
+	% Punctuation
+
+	pDERIVES    '::='
+	pCONTAINS   '=>'
+	pCOLON      ':'
+	pCOMMA      ','
+	pLPAREN     '('
+	pRPAREN     ')'
+	pLSQUARE    '['
+	pRSQUARE    ']'
+	;
+
+output:
+	;
+
+error:
+	;
+
+type ac_type:              % attribute class
+	acINVALID  = 0
+	acInteger4 = 4
+	acNode     = 100
+	acList     = 150
+	;
+
+type a_tags:               % attribute tags (defined as bits)
+	atINVALID = 0
+	atPri     = 1
+	atOpt     = 2
+	atAlt     = 4
+	;
+
+mechansim tag_stack:
+	oTagPush (a_tags)  % push a tag on stack (used by oAttrDefineNS)
+	;
+
+mechanism name_stack:
+	oNSPush            % push current id on stack
+	;
+
+mechanism object:
+	oObjectDefine     % define an object who's name is current id;
+                          % (unless it's already defined)
+                          % push object id on object stack.
+	oObjectDefineNS   % same as oObjectDefine, but get name from NS;
+                          % pop NS.
+	oObjectDerive     % object on top of OS derives from second on OS;
+                          % pop both object id's.
+	oObjectPop        % pop object stack.
+	;
+
+mechanism attr:
+	oAttrDefineNS     % top of NS is an attribute name of object whose
+                          % id is on top of object stack. Pop NS.
+                          % Top of AC is attribute class (e.g. NODE). Pop AC.
+                          % Contents of Tag stack are tag bits. Pop whole stack.
+	oAttrClass (ac_type)    % push attribute class on AC stack
+	;
+
+mechanism doc:
+	oDocDumpTable     % dump results
+	;
+
+
+rules
+
+Schema:
+	@schema_header
+	pIDENTIFIER
+	oObjectDefine
+	{[
+	    | '::=' :  pIDENTIFIER      % derived object
+	               oObjectDefine
+	               oObjectDerive
+	               [
+	                   | pEnd, pEOF : >
+	                   | * :
+	               ]
+	               pIDENTIFIER      % start of next thing
+	               oObjectDefine
+	    | '=>'  :  @contains
+	    | pEnd, pEOF :
+	               >
+	]}
+	oDocDumpTable
+	;
+
+schema_header:
+	pSchema
+	pIDENTIFIER    % name of schema
+	pRoot
+	pIDENTIFIER    % name of root object
+	pIs
+	;
+
+contains:
+	{
+	    [
+	        | pIDENTIFIER :  oNSPush   % push name on name stack
+	                                   % (could be attr or object)
+	        | * :            >>
+	    ]
+	    [
+                | ':' :  @attribute_definition
+	        | *   :  oObjectPop        % done defining current object attr's
+	                 oObjectDefineNS   % take new object from NS
+	                 >>
+	    ]
+	};
+
+attribute_definition:
+	[
+            | pBoolean1, pCharacter1, pInteger4, pInteger8, pIntegerN,
+              pReal4, pReal8, pRealN, pStringN, pObjectType :
+                           oAttrClass (acInteger4)
+	    | pList :      oAttrClass (acList)
+	    | pNode :      oAttrClass (acNode)
+	]
+	[
+	    | '(' :  pIDENTIFIER
+                     ')'
+	    | * :
+	]
+	[
+	    | '[' :  {[
+	                 | pPri :  oTagPush (atPri)
+	                 | pAlt :  oTagPush (atAlt)
+	                 | pOpt :  oTagPush (atOpt)
+	                 | ',' :
+	                 | * :    >
+	             ]}
+	             ']'
+	    | * :
+	]
+	oAttrDefineNS;
+
+end
+
