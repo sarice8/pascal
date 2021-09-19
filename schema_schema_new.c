@@ -13,14 +13,8 @@ static short dAttributeOffset [7][11] = {
 	 -1,  -1,  -1,   0,   4,  -1,  -1,  -1,  -1,  -1,   8, 
 };
 
-static short dAttributeType [7][11] = {
-	 -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1, 
-	 -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1, 
-	 -1, 150, 150,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1, 
-	 -1,  -1,  -1,   4,   4, 150, 150,  -1,  -1,  -1,  -1, 
-	 -1,  -1,  -1,  -1,  -1,  -1,  -1, 100, 100,   4,  -1, 
-	 -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1, 
-	 -1,  -1,  -1,   4,   4,  -1,  -1,  -1,  -1,  -1,   4, 
+static short dAttributeType [11] = {
+	 -1, 150, 150,   4,   4, 150, 150, 100, 100,   4,   4,
 };
 
 static short dAttributeTags [7][11] = {
@@ -86,11 +80,10 @@ short                      attribute;
     return (dAttributeOffset[class][attribute]);  
 }                                                 
                                                   
-short dGetAttributeType (class, attribute)        
-short                    class;                   
+short dGetAttributeType (attribute)        
 short                    attribute;               
 {                                                 
-    return (dAttributeType[class][attribute]);    
+    return (dAttributeType[attribute]);    
 }                                                 
                                                   
 short dGetAttributeTags (class, attribute)        

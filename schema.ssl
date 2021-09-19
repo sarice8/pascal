@@ -1,4 +1,4 @@
-title: 'Schema 1.3 -- Database Schema Compiler -- Aug 24, 1993';
+title: 'Schema 1.4 (boot) -- Database Schema Compiler -- April 21 ''94';
 %
 %  Schema.ssl
 %
@@ -11,6 +11,8 @@ title: 'Schema 1.3 -- Database Schema Compiler -- Aug 24, 1993';
 %                    late addition of attributes (after other
 %                    classes have been derived from this class)
 %    24Aug93   1.3   Error if no class specified to receive attribute 
+%    21Apr94   1.4   Improved database list representation, new PI,
+%                    generation of C macros
 %
 
 input:
@@ -71,13 +73,16 @@ error:
 	eNoClassForAttribute     % attribute defined while no current class set
 	;
 
-include 'schema_schema.ssl'
+include 'schema_schema.ssl.new'
 
 type aType:              % attribute type
-	type_INVALID  = 0
-	type_Integer4 = 4
-	type_Node     = 100
-	type_List     = 150
+	type_INVALID    = 0
+	type_Boolean1   = 1
+	type_Character1 = 2
+	type_Integer4   = 4
+	type_StringN    = 10
+	type_Node       = 100
+	type_List       = 150
 	;
 
 type aTag:               % attribute tags (defined as bits)
@@ -187,11 +192,18 @@ attribute_definition:
 	oCreateAttr
 	
 	[
-            | pBoolean1, pCharacter1, pInteger4, pInteger8, pIntegerN,
-              pReal4, pReal8, pRealN, pStringN, pObjectType :
-                           oAttrType (type_Integer4)
-	    | pList :      oAttrType (type_List)
-	    | pNode :      oAttrType (type_Node)
+            | pBoolean1 :      oAttrType (type_Boolean1)
+            | pCharacter1 :    oAttrType (type_Character1)
+            | pInteger4,
+              pInteger8,
+              pIntegerN,
+              pReal4,
+              pReal8,
+              pRealN,
+              pObjectType :    oAttrType (type_Integer4)
+            | pStringN :       oAttrType (type_StringN)
+	    | pList :          oAttrType (type_List)
+	    | pNode :          oAttrType (type_Node)
 	]
 
 	[

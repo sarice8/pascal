@@ -4,19 +4,19 @@
 ROOT             = /home/sarice/compilers
 
 # Existing schema compiler used to build this one
-SCHEMA_DIR       = ${ROOT}/schema/1.2
+SCHEMA_DIR       = ${ROOT}/schema/1.3
 
 # Generic SSL runtime module
-SSL_RT_DIR       = ${ROOT}/ssl_rt/1.1
+SSL_RT_DIR       = ${ROOT}/ssl_rt/2.0
 SSL_RT_HEADERS   = ${SSL_RT_DIR}/ssl_rt.h \
 		   ${SSL_RT_DIR}/ssl_begin.h \
 		   ${SSL_RT_DIR}/ssl_end.h
 
-SSL_DIR          = ${ROOT}/ssl/1.2.8
+SSL_DIR          = ${ROOT}/ssl/1.3.2
 
 # ---------------------------------------------------------
 
-DEBUG_DIR        = ${ROOT}/debug/1.2.8
+DEBUG_DIR        = ${ROOT}/debug/1.3.0
 SSLTOOL_DIR      = ${ROOT}/ssltool/1.2.7
 
 DEBUG_OBJS       = ${DEBUG_DIR}/debug.o
@@ -29,7 +29,7 @@ SSLTOOL_LIBS     = -lguide -lguidexv -lxview -lolgx -lX
 
 # ---------------------------------------------------------
 
-SCHEMA_OBJS      = schema.o schema_scan.o schema_schema.o node.o \
+SCHEMA_OBJS      = schema.o schema_scan.o schema_schema_new.o schema_db.o \
 		   ${SSL_RT_DIR}/ssl_rt.o \
 		   ${SSL_RT_DIR}/ssl_scan.o
 
@@ -43,7 +43,7 @@ schema_tool:  ${SCHEMA_OBJS}
 		${DEBUG_OBJS} ${SSLTOOL_OBJS} ${SSLTOOL_LIBS}
 
 # schema.o depends on schema.tbl when using "ssl -c"
-schema.o:   schema.c schema.h node.h schema.tbl ${SSL_RT_HEADERS}
+schema.o:   schema.c schema.h schema_db.h schema.tbl ${SSL_RT_HEADERS}
 	cc -c schema.c -g -I${DEBUG_DIR} -I${SSL_RT_DIR}
 
 schema_scan.o:   schema_scan.c schema.h ${SSL_RT_HEADERS}
@@ -52,10 +52,16 @@ schema_scan.o:   schema_scan.c schema.h ${SSL_RT_HEADERS}
 schema_schema.o:  schema_schema.c
 	cc -c schema_schema.c -g
 
-node.o:   node.c node.h
-	cc -c node.c -g
+schema_schema_new.o:  schema_schema_new.c
+	cc -c schema_schema_new.c -g
 
-schema.h: schema.ssl schema_schema.ssl
+schema_db.o:   schema_db.c schema_db.h
+	cc -c schema_db.c -g
+
+schema_schema.ssl.new: schema_schema.ssl
+	cat schema_schema.ssl | sed -e 's/^	q/	T_q/' > schema_schema.ssl.new
+
+schema.h: schema.ssl schema_schema.ssl.new
 	${SSL_DIR}/ssl -l -d -c schema
 	- rm -f schema.h
 	- rm -f schema.tbl
@@ -67,6 +73,12 @@ schema.h: schema.ssl schema_schema.ssl
 	mv ram_schema.dbg schema.dbg
 
 ssl: schema.h
+
+schema_schema_new.c:  schema_schema.c
+	@echo ""
+	@echo "Note: May need to hand-edit schema_schema_new.c"
+	@echo ""
+	touch schema_schema_new.c
 
 schema_schema.c schema_schema.ssl:  schema.schema
 	${SCHEMA_DIR}/schema schema

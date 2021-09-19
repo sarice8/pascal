@@ -3,7 +3,7 @@ Schema SCH Root nClass Is
 
 Object ::= nSchema
 nSchema =>
-	qClassTree:	Node		(nClass)		[Pri]
+	qClassTree:	List		(nClass)		[Pri]
 	qAttrSyms:	List		(nAttrSym)		[Pri,Opt]
 
 Object ::= nClass
@@ -16,7 +16,6 @@ nClass =>
 Object ::= nAttr
 nAttr =>
 	qAttrSym:	Node		(nAttrSym)		[Alt]
-	qType:		Integer4	% Node, List, Integer4 ...
 	qConstraint:	Node		(nConstraint)		[Pri,Opt]
 	qTags:		Integer4
 
@@ -27,5 +26,6 @@ Object ::= nAttrSym
 nAttrSym =>
 	qIdent:		Integer4
 	qCode:		Integer4
+	qType:		Integer4	% Node, List, Integer4 ...
 
 End
