@@ -1,4 +1,4 @@
-   2: title: 'Schema 1.4 (boot) -- Database Schema Compiler -- April 21 ''94';
+   2: title: 'Schema 1.4 (boot2) -- Database Schema Compiler -- April 21 ''94';
       %
       %  Schema.ssl
       %
@@ -73,7 +73,7 @@
    2: 	eNoClassForAttribute     % attribute defined while no current class set
    2: 	;
       
-   2: include 'schema_schema.ssl.new'
+   2: include 'schema_schema.ssl'
       
       % Generated automatically by schema
       
@@ -92,6 +92,7 @@
    2: 	T_qClassTree
    2: 	T_qAttrSyms
    2: 	T_qIdent
+   2: 	T_qText
    2: 	T_qCode
    2: 	T_qAttrs
    2: 	T_qDerived

@@ -3,34 +3,24 @@
 
 /* Private Data */
 
-static short dAttributeOffset [7][11] = {
-	 -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1, 
-	 -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1, 
-	 -1,   0,   4,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1, 
-	 -1,  -1,  -1,   0,   4,   8,  12,  -1,  -1,  -1,  -1, 
-	 -1,  -1,  -1,  -1,  -1,  -1,  -1,   0,   4,   8,  -1, 
-	 -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1, 
-	 -1,  -1,  -1,   0,   4,  -1,  -1,  -1,  -1,  -1,   8, 
+static short dAttributeOffset [7][12] = {
+	 -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1, 
+	 -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1, 
+	 -1,   0,   4,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1, 
+	 -1,  -1,  -1,   0,   4,   8,  12,  16,  -1,  -1,  -1,  -1, 
+	 -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,   0,   4,   8,  -1, 
+	 -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1, 
+	 -1,  -1,  -1,   0,   4,   8,  -1,  -1,  -1,  -1,  -1,  12, 
 };
 
-static short dAttributeType [7][11] = {
-	 -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1, 
-	 -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1, 
-	 -1, 150, 150,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1, 
-	 -1,  -1,  -1,   4,   4, 150, 150,  -1,  -1,  -1,  -1, 
-	 -1,  -1,  -1,  -1,  -1,  -1,  -1, 100, 100,   4,  -1, 
-	 -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1, 
-	 -1,  -1,  -1,   4,   4,  -1,  -1,  -1,  -1,  -1,   4, 
-};
-
-static short dAttributeTags [7][11] = {
-	  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 
-	  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 
-	  0,   1,   3,   0,   0,   0,   0,   0,   0,   0,   0, 
-	  0,   0,   0,   0,   0,   3,   3,   0,   0,   0,   0, 
-	  0,   0,   0,   0,   0,   0,   0,   4,   3,   0,   0, 
-	  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 
-	  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 
+static short dAttributeTags [7][12] = {
+	  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 
+	  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 
+	  0,   1,   3,   0,   0,   0,   0,   0,   0,   0,   0,   0, 
+	  0,   0,   0,   0,   0,   0,   3,   3,   0,   0,   0,   0, 
+	  0,   0,   0,   0,   0,   0,   0,   0,   4,   3,   0,   0, 
+	  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 
+	  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 
 };
 
 static short dClassIsA [7][7] = {
@@ -47,7 +37,7 @@ static short dClassIsA [7][7] = {
 /* Public Data */
 
 short dObjectSize [7] = {
-	0, 0, 8, 16, 12, 0, 12, 
+	0, 0, 8, 20, 12, 0, 16, 
 };
 
 int   dObjects = 7;
@@ -61,12 +51,13 @@ char *dObjectName [7] = {
 	"nAttrSym",
 };
 
-int   dAttributes = 11;
-char *dAttributeName [11] = {
+int   dAttributes = 12;
+char *dAttributeName [12] = {
 	"qINVALID",
 	"qClassTree",
 	"qAttrSyms",
 	"qIdent",
+	"qText",
 	"qCode",
 	"qAttrs",
 	"qDerived",
@@ -74,6 +65,10 @@ char *dAttributeName [11] = {
 	"qConstraint",
 	"qTags",
 	"qType",
+};
+
+short dAttributeType [12] = {
+	  0, 150, 150,   4,  10,   4, 150, 150, 100, 100,   4,   4, 
 };
 
 
@@ -86,11 +81,10 @@ short                      attribute;
     return (dAttributeOffset[class][attribute]);  
 }                                                 
                                                   
-short dGetAttributeType (class, attribute)        
-short                    class;                   
+short dGetAttributeType (attribute)               
 short                    attribute;               
 {                                                 
-    return (dAttributeType[class][attribute]);    
+    return (dAttributeType[attribute]);           
 }                                                 
                                                   
 short dGetAttributeTags (class, attribute)        

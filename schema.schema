@@ -9,6 +9,7 @@ nSchema =>
 Object ::= nClass
 nClass =>
 	qIdent:		Integer4
+	qText:		StringN
 	qCode:		Integer4
 	qAttrs:		List		(nAttr)			[Pri,Opt]
 	qDerived:	List		(nClass)		[Pri,Opt]
@@ -25,6 +26,7 @@ Object ::= nConstraint		% not used yet
 Object ::= nAttrSym
 nAttrSym =>
 	qIdent:		Integer4
+	qText:		StringN
 	qCode:		Integer4
 	qType:		Integer4	% Node, List, Integer4 ...
 

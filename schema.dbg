@@ -1,4 +1,4 @@
-256
+257
 2
 -1
 -1
@@ -88,6 +88,7 @@
 2
 2
 -1
+2
 2
 2
 2
@@ -259,11 +260,11 @@
 29 token nType
 65 node_type nType
 73 node_attribute nType
-85 aType nType
-93 aTag nType
-98 boolean nType
-128 Schema nRule 2
-130 schema_header nRule 46
-132 class_derivation nRule 59
-134 attribute_assignment nRule 67
-136 attribute_definition nRule 72
+86 aType nType
+94 aTag nType
+99 boolean nType
+129 Schema nRule 2
+131 schema_header nRule 46
+133 class_derivation nRule 59
+135 attribute_assignment nRule 67
+137 attribute_definition nRule 72

@@ -30,6 +30,7 @@
  */
 
 typedef char                     Boolean1;
+typedef char                     Character1;
 typedef long                     Integer4;
 typedef char                    *StringN;
 
@@ -137,6 +138,8 @@ Item     NullItem (/* */);
 Boolean1 IsEmpty  (/* List L */);
 List     ListOf   (/* Item I */);
 int      ListLength (/* List L */);
+
+#define  FOR_EACH_ITEM(I,L)  for (I=FirstItem(L); I != NULL; I = NextItem(I))
 
 /*
  *  Debugger

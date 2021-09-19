@@ -310,6 +310,7 @@ init_my_operations ()
               dTemp = ssl_add_id ("nINVALID", pIDENTIFIER);   /* Add to ident table */
               dNode = NewNode (nClass);
               SetqIdent (dNode, dTemp);
+              SetqText (dNode, "nINVALID");
               SetqAttrs (dNode, NewList(nAttr));
               SetqDerived (dNode, NewList(nClass));
               AddLast (qClassTree(SchemaRoot), dNode);
@@ -318,6 +319,7 @@ init_my_operations ()
               dTemp = ssl_add_id ("Object", pIDENTIFIER);   /* Add to ident table */
               dNode = NewNode (nClass);
               SetqIdent (dNode, dTemp);
+              SetqText (dNode, "Object");
               SetqAttrs (dNode, NewList(nAttr));
               SetqDerived (dNode, NewList(nClass));
               AddLast (qClassTree(SchemaRoot), dNode);
@@ -326,6 +328,7 @@ init_my_operations ()
               dTemp = ssl_add_id ("qINVALID", pIDENTIFIER);   /* Add to ident table */
               dNode = NewNode (nAttrSym);
               SetqIdent (dNode, dTemp);
+              SetqText (dNode, "qINVALID");
               SetqCode (dNode, NumAttrSyms);
               AddLast (qAttrSyms(SchemaRoot), dNode);
               NumAttrSyms++;
@@ -342,6 +345,7 @@ init_my_operations ()
                   ssl_fatal("Multiply defined class");
               dNode = NewNode (nClass);
               SetqIdent (dNode, ssl_last_id);
+              SetqText (dNode, ssl_last_id_text);
               SetqAttrs (dNode, NewList(nAttr));
               SetqDerived (dNode, NewList(nClass));
               AddLast (qDerived(CurrentClass), dNode);
@@ -368,6 +372,7 @@ init_my_operations ()
               {
                   dNode = NewNode (nAttrSym);
                   SetqIdent (dNode, ssl_last_id);
+                  SetqText (dNode, ssl_last_id_text);
                   SetqCode (dNode, NumAttrSyms);
                   SetqType (dNode, type_INVALID);   /* Type not yet set */
                   dItem = AddLast (qAttrSyms(SchemaRoot), dNode);
@@ -497,8 +502,6 @@ w_dump_table ()
     fprintf (f_out, "};\n\n");
 
 
-
-
     fprintf (f_out, "static short dAttributeTags [%d][%d] = {\n", NumClasses, NumAttrSyms);
 
     attr_tags = (short *) malloc (sizeof(short) * NumAttrSyms);
@@ -544,7 +547,6 @@ w_dump_table ()
     fprintf (f_out, "};\n\n");
 
     w_dump_c_attr_types (qAttrSyms(SchemaRoot));
-
 
     fprintf (f_out, "\n/* Public Functions */\n\n");
 
@@ -848,6 +850,8 @@ w_dump_h_macros ()
     Item        I;
     Node        N;
 
+    printf ("Writing C macros to %s\n", H_out_filename);
+
     fprintf (f_h_out, "/* Generated automatically by schema */\n");
 
     fprintf (f_h_out, "\n");
@@ -866,11 +870,36 @@ w_dump_h_macros ()
     for (I = FirstItem(qAttrSyms(SchemaRoot)); I != NULL; I = NextItem(I))
     {
         N = Value(I);
-        fprintf (f_h_out, "#define Set%s(N,V)		SetAttr(T_%s, N, (void*)(V))\n",
+        fprintf (f_h_out, "#define Set%s(N,V)\t\tSetAttr(T_%s, N, (void*)(V))\n",
                  ssl_get_id_string(qIdent(N)),
                  ssl_get_id_string(qIdent(N)));
     }
 
+    fprintf (f_h_out, "\n");
+
+    w_dump_class_macros (qClassTree(SchemaRoot));
+
+    fprintf (f_h_out, "\n");
+}
+
+w_dump_class_macros (class_tree)
+List                 class_tree;
+{
+    Item       I;
+    Node       N;
+
+    FOR_EACH_ITEM (I, class_tree)
+    {
+        N = Value(I);
+        fprintf (f_h_out, "#define New%s()\t\tNewNode(%s)\n",
+                 ssl_get_id_string (qIdent(N)),
+                 ssl_get_id_string (qIdent(N)));
+
+        if (!IsEmpty (qDerived(N)))
+        {
+            w_dump_class_macros (qDerived(N));
+        }
+    }
 }
 
 
@@ -900,4 +929,72 @@ long             node_number;
     N = SCH_LookupNode (node_number);
     DumpNodeLong (N);
 }
+
+
+/*
+ *  Scanner
+ */
+
+struct ssl_token_table_struct my_keyword_table[] =
+{
+    "Boolean1",      pBoolean1,
+    "Character1",    pCharacter1,
+    "Integer4",      pInteger4,
+    "Integer8",      pInteger8,
+    "IntegerN",      pIntegerN,
+    "Real4",         pReal4,
+    "Real8",         pReal8,
+    "RealN",         pRealN,
+    "StringN",       pStringN,
+    "ObjectType",    pObjectType,
+    "Node",          pNode,
+    "List",          pList,
+
+    "Pri",           pPri,
+    "Alt",           pAlt,
+    "Opt",           pOpt,
+    "Int",           pInt,
+    "Ext",           pExt,
+    "Sys",           pSys,
+    "Tmp",           pTmp,
+
+    "Schema",        pSchema,
+    "Is",            pIs,
+    "Root",          pRoot,
+    "End",           pEnd,
+
+    NULL,            0
+};
+
+
+struct ssl_token_table_struct my_operator_table[] =
+{
+    ":",             pCOLON,
+    ",",             pCOMMA,
+    "(",             pLPAREN,
+    ")",             pRPAREN,
+    "[",             pLSQUARE,
+    "]",             pRSQUARE,
+    "::=",           pDERIVES,
+    "=>",            pCONTAINS,
+
+    NULL,            0   
+};
+
+struct ssl_special_codes_struct my_special_codes;
+
+
+init_my_scanner ()
+{
+    my_special_codes.invalid = pINVALID;
+    my_special_codes.eof     = pEOF;
+    my_special_codes.ident   = pIDENTIFIER;
+
+    my_special_codes.intlit  = pINVALID;   /* Don't want integers for now */
+    my_special_codes.strlit  = pINVALID;   /* Don't want strings for now */
+
+    ssl_init_scanner (my_keyword_table, my_operator_table, &my_special_codes);
+    ssl_set_case_sensitive (0);   /* Not case sensitive */
+}
+
 

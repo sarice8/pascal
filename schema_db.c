@@ -48,6 +48,7 @@ extern int      dObjects;
 extern char    *dObjectName [];
 extern int      dAttributes;
 extern char    *dAttributeName [];
+extern short    dAttributeType [];
 
 
 /*
@@ -143,7 +144,13 @@ int             attr_code;
 Node            N;
 void           *value;
 {
-    void  **attr_ptr;
+    void      **attr_ptr;
+
+    if ((dAttributeType[attr_code] == SCH_Type_StringN) &&
+        (value != NULL))
+    {
+        value = strdup (value);
+    }
 
     attr_ptr = SCH_GetAttrPtr (N, attr_code);
     *attr_ptr = value;
@@ -406,15 +413,30 @@ Node                N;
         if (dGetAttributeOffset(N->kind, attr_code) >= 0)
         {
             attr_ptr = SCH_GetAttrPtr (N, attr_code);
-            switch (dGetAttributeType (attr_code))
+            SCH_indent_printf (indent, "%s:\t\t", dAttributeName[attr_code]);
+
+            switch (dGetAttributeType(attr_code))
             {
+                case SCH_Type_Boolean1:
+                    printf ("%s\n", *(long*)attr_ptr ? "True" : "False");
+                    break;
+
+                case SCH_Type_Character1:
+                    printf ("'%c'\n", *(char*)attr_ptr);
+                    break;
+
                 case SCH_Type_Integer4:
-                    SCH_indent_printf (indent, "%s:\t\t%d\n", dAttributeName[attr_code],
-                                       *(long*)attr_ptr);
+                    printf ("%d\n", *(long*)attr_ptr);
+                    break;
+
+                case SCH_Type_StringN:
+                    if (*(char**)attr_ptr == NULL)
+                        printf ("Null\n");
+                    else
+                        printf ("\"%s\"\n", *(char**)attr_ptr);
                     break;
 
                 case SCH_Type_Node:
-                    SCH_indent_printf (indent, "%s:\t\t", dAttributeName[attr_code]);
                     if (*(Node *)attr_ptr == NULL)
                         printf ("Null\n");
                     else if (dGetAttributeTags(N->kind, attr_code) & SCH_Tag_Alt)
@@ -424,7 +446,6 @@ Node                N;
                     break;
 
                 case SCH_Type_List:
-                    SCH_indent_printf (indent, "%s:\t\t", dAttributeName[attr_code]);
                     L = *(List *) attr_ptr;
                     if (L == NULL)
                         printf ("Null\n");
@@ -527,14 +548,14 @@ int                     type;
 {
     switch (type)
     {
-        case SCH_Type_Boolean1:  return ("Boolean1");
-        case SCH_Type_Character1:return ("Character1");
-        case SCH_Type_Integer4:  return ("Integer4");
-        case SCH_Type_StringN:   return ("StringN");
-        case SCH_Type_Node:      return ("Node");
-        case SCH_Type_List:      return ("List");
+        case SCH_Type_Boolean1:    return ("Boolean1");
+        case SCH_Type_Character1:  return ("Character1");
+        case SCH_Type_Integer4:    return ("Integer4");
+        case SCH_Type_StringN:     return ("StringN");
+        case SCH_Type_Node:        return ("Node");
+        case SCH_Type_List:        return ("List");
 
-        default:                 return ("Integer4");
+        default:                   return ("Integer4");
     }
 }
 

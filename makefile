@@ -3,8 +3,8 @@
 
 ROOT             = /home/sarice/compilers
 
-# Existing schema compiler used to build this one
-SCHEMA_DIR       = ${ROOT}/schema/1.3
+# Currently built by bootstrap (hand-edited) version of schema 1.4
+SCHEMA_DIR       = ${ROOT}/schema/1.4/boot1
 
 # Generic SSL runtime module
 SSL_RT_DIR       = ${ROOT}/ssl_rt/2.0
@@ -29,7 +29,7 @@ SSLTOOL_LIBS     = -lguide -lguidexv -lxview -lolgx -lX
 
 # ---------------------------------------------------------
 
-SCHEMA_OBJS      = schema.o schema_scan.o schema_schema_new.o schema_db.o \
+SCHEMA_OBJS      = schema.o schema_schema.o schema_db.o \
 		   ${SSL_RT_DIR}/ssl_rt.o \
 		   ${SSL_RT_DIR}/ssl_scan.o
 
@@ -46,22 +46,13 @@ schema_tool:  ${SCHEMA_OBJS}
 schema.o:   schema.c schema.h schema_db.h schema.tbl ${SSL_RT_HEADERS}
 	cc -c schema.c -g -I${DEBUG_DIR} -I${SSL_RT_DIR}
 
-schema_scan.o:   schema_scan.c schema.h ${SSL_RT_HEADERS}
-	cc -c schema_scan.c -g -I${SSL_RT_DIR}
-
 schema_schema.o:  schema_schema.c
 	cc -c schema_schema.c -g
-
-schema_schema_new.o:  schema_schema_new.c
-	cc -c schema_schema_new.c -g
 
 schema_db.o:   schema_db.c schema_db.h
 	cc -c schema_db.c -g
 
-schema_schema.ssl.new: schema_schema.ssl
-	cat schema_schema.ssl | sed -e 's/^	q/	T_q/' > schema_schema.ssl.new
-
-schema.h: schema.ssl schema_schema.ssl.new
+schema.h: schema.ssl schema_schema.ssl
 	${SSL_DIR}/ssl -l -d -c schema
 	- rm -f schema.h
 	- rm -f schema.tbl
@@ -73,12 +64,6 @@ schema.h: schema.ssl schema_schema.ssl.new
 	mv ram_schema.dbg schema.dbg
 
 ssl: schema.h
-
-schema_schema_new.c:  schema_schema.c
-	@echo ""
-	@echo "Note: May need to hand-edit schema_schema_new.c"
-	@echo ""
-	touch schema_schema_new.c
 
 schema_schema.c schema_schema.ssl:  schema.schema
 	${SCHEMA_DIR}/schema schema

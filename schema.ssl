@@ -1,4 +1,4 @@
-title: 'Schema 1.4 (boot) -- Database Schema Compiler -- April 21 ''94';
+title: 'Schema 1.4 (boot2) -- Database Schema Compiler -- April 21 ''94';
 %
 %  Schema.ssl
 %
@@ -73,7 +73,7 @@ error:
 	eNoClassForAttribute     % attribute defined while no current class set
 	;
 
-include 'schema_schema.ssl.new'
+include 'schema_schema.ssl'
 
 type aType:              % attribute type
 	type_INVALID    = 0
