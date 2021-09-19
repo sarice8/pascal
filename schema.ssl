@@ -1,6 +1,6 @@
-title: 'Schema 1.1 -- Database Schema Compiler -- May 30, 1991';
+title: 'Schema 1.2 -- Database Schema Compiler -- June 9, 1993';
 %
-% sccsid: '%W% Steve Rice (C) %G% %U% %P%'
+% sccsid: '@(#)schema.ssl	1.2 Steve Rice (C) 6/11/93 14:54:02 /files/home/sim/sarice/compilers/schema/SCCS/s.schema.ssl'
 %
 %  Schema.ssl
 %
@@ -8,6 +8,10 @@ title: 'Schema 1.1 -- Database Schema Compiler -- May 30, 1991';
 %    01May91   1.0   First version
 %    05May91         Record attribute class
 %    30May91   1.1   Added attribute tags
+%    09Jun93   1.2   Use schema to define schema.  Construct tree
+%                    of all definitions before tables dumped, allowing
+%                    late addition of attributes (after other
+%                    classes have been derived from this class)
 %
 
 input:
@@ -67,45 +71,52 @@ output:
 error:
 	;
 
-type ac_type:              % attribute class
-	acINVALID  = 0
-	acInteger4 = 4
-	acNode     = 100
-	acList     = 150
+include 'schema_schema.ssl'
+
+type aType:              % attribute type
+	type_INVALID  = 0
+	type_Integer4 = 4
+	type_Node     = 100
+	type_List     = 150
 	;
 
-type a_tags:               % attribute tags (defined as bits)
-	atINVALID = 0
-	atPri     = 1
-	atOpt     = 2
-	atAlt     = 4
+type aTag:               % attribute tags (defined as bits)
+	tag_INVALID = 0
+	tag_Pri     = 1
+	tag_Opt     = 2
+	tag_Alt     = 4
 	;
 
-mechansim tag_stack:
-	oTagPush (a_tags)  % push a tag on stack (used by oAttrDefineNS)
+mechanism Class:		% operations on classes
+	oCreateEmptySchema	% create initial schema database, containing a SchemaRoot,
+				% nInvalid class, qInvalid attribute symbol,
+				% and 'Object' class for basis of all derivation.
+	oFindClass		% find class named by last accepted identifier (must exist).
+				% Sets the Current class to that class.
+	oDeriveClass		% Create new class named by last accepted identifier
+				% (must not exist already).  The new object is derived
+				% from the Current class (found with oFindClass).
+	oThisClassWillGetAttrs	% Sets the GetsAttrs class to the Current class
+				% (found with oFindClass).  attrs defined with the
+				% Attr mechanism will be added to the GetsAttrs class.
+	oNoClassWillGetAttrs	% Sets GetsAttrs to NULL.  No attribute definitions
+				% may be added to any class.
 	;
 
-mechanism name_stack:
-	oNSPush            % push current id on stack
-	;
+mechanism Attr:			% operations on attributes
+	oCreateAttrSym		% Searches for an nAttrSym with qIdent = the
+				% last accepted identifier.
+				% If doesn't exist yet, creates one and assigns
+				% a new qCode to it (the code for the AttrSym)
+				% and appends it to the schema's AttrSyms list.
+				% Sets CurrentAttrSym to that AttrSym.
 
-mechanism object:
-	oObjectDefine     % define an object who's name is current id;
-                          % (unless it's already defined)
-                          % push object id on object stack.
-	oObjectDefineNS   % same as oObjectDefine, but get name from NS;
-                          % pop NS.
-	oObjectDerive     % object on top of OS derives from second on OS;
-                          % pop both object id's.
-	oObjectPop        % pop object stack.
-	;
-
-mechanism attr:
-	oAttrDefineNS     % top of NS is an attribute name of object whose
-                          % id is on top of object stack. Pop NS.
-                          % Top of AC is attribute class (e.g. NODE). Pop AC.
-                          % Contents of Tag stack are tag bits. Pop whole stack.
-	oAttrClass (ac_type)    % push attribute class on AC stack
+	oCreateAttr		% create new attribute.
+				% Sets qAttrSym to CurrentAttrSym (found/created.
+				% by oCreateAttrSym).
+				% Sets CurrentAttr to that attribute.
+	oAttrType (aType)	% Sets the type of the CurrentAttr
+	oAttrTag (aTag)		% Sets a tag in the CurrentAttr.  Tag bits are 'or'd together.
 	;
 
 mechanism doc:
@@ -116,25 +127,26 @@ mechanism doc:
 rules
 
 Schema:
+	oCreateEmptySchema
+
 	@schema_header
-	pIDENTIFIER
-	oObjectDefine
-	{[
-	    | '::=' :  pIDENTIFIER      % derived object
-	               oObjectDefine
-	               oObjectDerive
-	               [
-	                   | pEnd, pEOF : >
-	                   | * :
-	               ]
-	               pIDENTIFIER      % start of next thing
-	               oObjectDefine
-	    | '=>'  :  @contains
-	    | pEnd, pEOF :
-	               >
-	]}
+
+	{
+	    [ | pEnd, pEOF : > | * : ]
+
+	    pIDENTIFIER
+	    [
+		| '::=' :	@class_derivation
+
+		| '=>' :	@attribute_assignment
+
+		| ':' :		@attribute_definition
+	    ]
+	}
+
 	oDocDumpTable
 	;
+
 
 schema_header:
 	pSchema
@@ -144,46 +156,50 @@ schema_header:
 	pIs
 	;
 
-contains:
-	{
-	    [
-	        | pIDENTIFIER :  oNSPush   % push name on name stack
-	                                   % (could be attr or object)
-	        | * :            >>
-	    ]
-	    [
-                | ':' :  @attribute_definition
-	        | *   :  oObjectPop        % done defining current object attr's
-	                 oObjectDefineNS   % take new object from NS
-	                 >>
-	    ]
-	};
+
+class_derivation:
+	oFindClass
+	pIDENTIFIER
+	oDeriveClass
+
+	oNoClassWillGetAttrs	% disallow attribute definitions for now
+	;
+
+attribute_assignment:
+	oFindClass
+	oThisClassWillGetAttrs
+	;
 
 attribute_definition:
+	oCreateAttrSym
+	oCreateAttr
+	
 	[
             | pBoolean1, pCharacter1, pInteger4, pInteger8, pIntegerN,
               pReal4, pReal8, pRealN, pStringN, pObjectType :
-                           oAttrClass (acInteger4)
-	    | pList :      oAttrClass (acList)
-	    | pNode :      oAttrClass (acNode)
+                           oAttrType (type_Integer4)
+	    | pList :      oAttrType (type_List)
+	    | pNode :      oAttrType (type_Node)
 	]
+
 	[
-	    | '(' :  pIDENTIFIER
+	    | '(' :  pIDENTIFIER    % constraint ignored for now
                      ')'
 	    | * :
 	]
+
 	[
 	    | '[' :  {[
-	                 | pPri :  oTagPush (atPri)
-	                 | pAlt :  oTagPush (atAlt)
-	                 | pOpt :  oTagPush (atOpt)
+	                 | pPri :  oAttrTag (tag_Pri)
+	                 | pAlt :  oAttrTag (tag_Alt)
+	                 | pOpt :  oAttrTag (tag_Opt)
 	                 | ',' :
 	                 | * :    >
 	             ]}
 	             ']'
 	    | * :
 	]
-	oAttrDefineNS;
+	;
 
 end
 

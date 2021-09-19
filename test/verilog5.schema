@@ -1,0 +1,623 @@
+%
+% static char sccsid[] = "%W% %G% %U% %P%";
+%
+
+%  
+%****************************************************************************
+%
+%  verilog.schema
+%
+%  by Steve Rice
+%
+%  May 1, 1991
+%
+%****************************************************************************
+%
+%   Describes the tree used to represent the parsed Verilog program.
+%
+%   HISTORY
+%----------------------------------------------------------------------------
+%   05/01/91 | Steve  | Created.
+%   05/09/91 |        | Added nodes for expressions and lvalues.
+%   05/12/91 |        | Added nodes for gate instances.
+%   05/13/91 |        | Added net declarations.
+%   05/23/91 |        | Added nSym node, to list all declarations.
+%   06/05/91 |        | Added nodes for statements.
+%   04/12/93 |        | Added regions; consolidated declarations into one
+%            |        | qDecls list in region.
+%
+%****************************************************************************
+%
+
+Schema VERILOG Root Object Is
+
+%  Object is the initial item.
+%  Any object can be made into a LIST, if nodes are appended together.
+%  Each object has a LIST or NODE flag.
+%  Each object has a unique object number, to save tree to a file.
+%  Each object has a NEXT field, so an object can be part of one (1) LIST.
+
+
+
+% -----------------------------------------------------------------------
+% Regions 
+% -----------------------------------------------------------------------
+
+Object ::= nRegion
+nRegion =>
+	qSyms:		List		(nSymbol)		[Pri,Opt]
+	qShared:	List		(Object)		[Pri,Opt]
+% qShared is a primary link to shared nodes in the region
+
+nRegion ::= nDeclarationList
+nDeclarationList =>
+	qDecls:		List		(nDeclaration)		[Pri,Opt]
+
+nRegion ::= nBlock
+nBlock =>
+	qDecls:		List		(nDeclaration)		[Pri,Opt]
+	qStmts:		List		(nStatement)		[Pri,Opt]
+
+nRegion ::= nStatementList
+nStatementList =>
+	qStmts:		List		(nStatement)		[Pri,Opt]
+
+
+nDeclarationList ::= nSourceFile   % top level region for source file
+
+
+% -----------------------------------------------------------------------
+% Symbols
+% -----------------------------------------------------------------------
+
+Object ::= nExpr
+
+nExpr ::= nSymbol
+
+nSymbol ::= nSymbolDef
+nSymbolDef =>
+	qIdent:		Integer4
+	qDef:		Node		(Object)		[Alt,Opt]
+
+nSymbol ::= nSymbolRef
+nSymbolRef =>
+	qSym:		Node		(Object)		[Alt,Opt]
+
+
+% -----------------------------------------------------------------------
+% Declarations
+% -----------------------------------------------------------------------
+
+
+Object ::= nDeclaration
+nDeclaration =>
+	qDeclName:	Node		(nSymbolDef)		[Alt,Opt]
+%%	qLine:		Integer4
+
+nDeclaration ::= nDesignUnit
+nDesignUnit =>
+	qRegion:	Node		(nRegion)		[Pri]
+
+nDesignUnit ::= nModule			% qRegion -> nBlock
+
+nDesignUnit ::= nMacromodule		% TBD
+
+nDesignUnit ::= nPrimitive		% TBD
+
+
+% 'object' is a value holder
+
+nDeclaration ::= nObjectDecl
+nObjectDecl =>
+	qRange:		Node		(nRange)		[Alt,Opt]
+		   % bit range (or expandrange) -- Pri link in qShared
+	qMode:		Integer4	% In, Out, InOut, Internal, Undef
+
+nObjectDecl ::= nPortDecl   % input, output ...
+
+nObjectDecl ::= nNetDecl
+nNetDecl =>
+	qNetType:	Integer4	% wire, wand, ...
+	qDelay:		Node		(nDelay)		[Alt,Opt]
+
+nNetDecl ::= nImplicitNetDecl
+
+nNetDecl ::= nTriregDecl
+nTriregDecl =>
+	qCharge:	Integer4	% small, medium, large
+
+nObjectDecl ::= nRegDecl
+nRegDecl =>
+	qArrayLeft:	Node		(nExpr)			[Pri,Opt]
+	qArrayRight:	Node		(nExpr)			[Pri,Opt]
+
+nRegDecl ::= nIntegerDecl
+
+nRegDecl ::= nTimeDecl
+
+nRegDecl ::= nRealDecl
+
+
+nObjectDecl ::= nParamDecl
+nParamDecl =>
+	qValue:		Node		(nExpr)			[Pri]
+
+nObjectDecl ::= nEventDecl
+
+
+nDeclaration ::= nExternalModuleDecl     % a reference to another module
+
+nDeclaration ::= nLabelDecl   % e.g. a gate instance name; qLabelled -> nGateInst statement
+nLabelDecl =>
+	qLabelled:	Node		(Object)		[Alt,Opt]  % typically a statement
+
+Object ::= nRange
+nRange =>
+	qLeft:		Node		(nExpr)			[Pri]
+	qRight:		Node		(nExpr)			[Pri]
+
+nRange ::= nVectoredRange
+
+nRange ::= nScalaredRange
+
+Object ::= nStrength
+nStrength =>
+	qStrength0:	Integer4
+	qStrength1:	Integer4
+
+
+% -----------------------------------------------------------------------
+% Expressions -- Possibly temporary, put in for now
+% -----------------------------------------------------------------------
+
+nExpr ::= nUnaryOperator
+nUnaryOperator =>
+	qOp:        Integer4
+	qExpr:      Node      (nExpr)           [Pri]
+
+nExpr ::= nBinaryOperator
+nBinaryOperator =>
+	qOp:        Integer4
+	qLeft:      Node      (nExpr)           [Pri]
+	qRight:     Node      (nExpr)           [Pri]
+
+nExpr ::= nIfOperator      % expr ? expr : expr
+nIfOperator =>
+	qExpr:      Node      (nExpr)           [Pri]
+	qLeft:      Node      (nExpr)           [Pri]   % Or, "qTrue" ?
+	qRight:     Node      (nExpr)           [Pri]
+
+nExpr ::= nFunctionCall
+nFunctionCall =>
+	qIdent:     Integer4
+	qArgs:      List      (nExpr)           [Pri]
+
+nFunctionCall ::= nFunctionCallSys
+
+nExpr ::= nInteger4
+nInteger4 =>
+	qInteger4: Integer4
+
+nExpr ::= nDelay
+nDelay =>
+	qRiseDelay:    List      (nExpr)           [Pri]
+	qFallDelay:    List      (nExpr)           [Pri]
+	qTurnOffDelay: List      (nExpr)           [Pri]
+
+% Used for event control
+nExpr ::= nEventExpr
+nEventExpr =>
+	qEdge:      Integer4    % pPosEdge pNegEdge or 0 if none
+	qExpr:      Node         (nExpr)           [Pri]  % symbol ref or one-bit expr
+
+
+% Used when we need a node to represent a list of expressions
+nExpr ::= nExprList
+nExprList =>
+	qExprs:		List		(nExpr)		[Pri,Opt]
+
+
+nExpr ::= nTO_DO
+
+% -----------------------------------------------------------------------
+% Statements -- Possibly temporary, put in for now
+% -----------------------------------------------------------------------
+
+Object ::= nStatement
+
+nStatement ::= nAssign
+nAssign =>
+	qLvalue:	Node		(nExpr)			[Pri]
+	qExpr:		Node		(nExpr)			[Pri]
+ 
+nAssign ::= nContinuousAssign
+nContinuousAssign =>
+	qStrength:	Node		(nStrength)		[Alt]  %(alt for now, in qShared)
+ 
+nStatement ::= nIf
+nIf =>
+	qExpr:		Node		(nExpr)			[Pri]
+	qThen:		Node		(nStatement)		[Opt,Pri]
+	qElse:		Node		(nStatement)		[Opt,Pri]
+
+nStatement ::= nAlways
+nAlways =>
+	qStmt:      Node      (nStatement)      [Opt,Pri]
+
+nStatement ::= nInitial
+nInitial =>
+	qStmt:      Node      (nStatement)      [Opt,Pri]
+
+nStatement ::= nEventCtrlStatement    % statement controlled by event ctrl
+nEventCtrlStatement =>
+	qEvents:    List      (nEventExpr)      [Pri]   % list: or'd events
+	qStmt:      Node      (nStatement)      [Opt,Pri]
+
+nStatement ::= nDelayCtrlStatement
+nDelayCtrlStatement =>
+	qDelay:     Node      (nDelay)          [Alt,Opt]
+			% just uses single 'rise' delay
+
+			%% NOTE: qDelay should be [Pri] but above used it as
+			% Alt,Opt and current compiler only allows one choice.
+			% So, I use Alt here & call oRegionShared in ssl code.
+
+	qStmt:      Node      (nStatement)      [Opt,Pri]
+
+
+nStatement ::= nInstance
+nInstance =>
+	qTerminals:	List		(nExpr)			[Pri,Opt]
+
+nInstance ::= nGateInst
+nGateInst =>
+	qGateType:	Integer4				% wire, wand, ...
+	qDelay:		Node		(nDelay)		[Alt,Opt]
+	qStrength:	Node		(nStrength)		[Alt]  %(alt for now, in qShared)
+						       % strength not allowed for all gates
+
+nInstance ::= nModuleInst
+nModuleInst =>
+	qModuleSym:	Node		(nSym)			[Alt]  % module type
+	qParamValues:	Node		(nExprList)		[Alt,Opt] %alt for now
+					% nExprList rather than list of nExpr so we can
+					% add list to qShared
+
+End
+
+% -----------------------------------------------------------------------
+% ----- OLD ***************************************** OLD *************
+% -----------------------------------------------------------------------
+
+
+Object ::= nDecl
+nDecl =>
+	qIdentRef   Node      (nIdent)          [Pri,Opt]
+
+
+Object ::= nIdent
+nIdent =>
+	qIdent:     Integer4
+	qDecl:      Node      (nDecl)           [Alt,Opt]
+
+
+Object ::= nDeclHead
+
+nDeclHead ::= nModule
+nModule =>
+	qIdent:     Integer4
+	qSyms:      List      (nSym)            [Pri,Opt]  % name space
+	qPorts:     List      (nPort)           [Pri,Opt]
+	qParams:    List      (nParamDecl)      [Pri,Opt]
+	qInputs:    List      (nInputDecl)      [Pri,Opt]
+	qOutputs:   List      (nOutputDecl)     [Pri,Opt]
+	qInOuts:    List      (nInOutDecl)      [Pri,Opt]
+	qNets:      List      (nNetDecl)        [Pri,Opt]
+	qRegs:      List      (nRegDecl)        [Pri,Opt]
+	qTimes:     List      (nTimeDecl)       [Pri,Opt]
+	qIntegers:  List      (nIntegerDecl)    [Pri,Opt]
+	qReals:     List      (nRealDecl)       [Pri,Opt]
+        qEventDecls:List      (nEventDecl)      [Pri,Opt]
+	qGates:     List      (nGateHead)       [Pri,Opt]
+	qDefParams: List      (nParamDecl)      [Pri,Opt]
+	qContAssign:List      (nContAssign)     [Pri,Opt]  % continuous assign
+	qInitial:   List      (nStatement)      [Pri,Opt]
+	qAlways:    List      (nStatement)      [Pri,Opt]
+
+
+Object ::= nPort
+nPort =>
+	qIdent:     Integer4
+	qPortExpr:  List      (nPortRef)        [Pri,Opt]
+	            % if >1 nPortRef in List, they are concated refs using {}
+
+Object ::= nPortRef
+nPortRef =>
+	qIdent:     Integer4
+	qLow:       Node      (nConstExpr)      [Pri,Opt]
+	qHigh:      Node      (nConstExpr)      [Pri,Opt]
+
+nDeclHead ::= nInputDecl
+nInputDecl =>
+	qLow:       Node      (nConstExpr)      [Pri,Opt]
+	qHigh:      Node      (nConstExpr)      [Pri,Opt]
+	qVars:      List      (nVar)            [Pri,Opt]
+
+nDeclHead ::= nOutputDecl
+nOutputDecl =>
+	qLow:       Node      (nConstExpr)      [Pri,Opt]
+	qHigh:      Node      (nConstExpr)      [Pri,Opt]
+	qVars:      List      (nVar)            [Pri,Opt]
+
+nDeclHead ::= nInOutDecl
+nInOutDecl =>
+	qLow:       Node      (nConstExpr)      [Pri,Opt]
+	qHigh:      Node      (nConstExpr)      [Pri,Opt]
+	qVars:      List      (nVar)            [Pri,Opt]
+
+nDeclHead ::= nParamDecl
+nParamDecl =>
+	qAssigns:   List      (nAssign)         [Pri,Opt]
+
+Object ::= nVar
+nVar =>
+	qIdent:     Integer4
+
+nDeclHead ::= nRegDecl
+nRegDecl =>
+	qLow:       Node      (nConstExpr)      [Pri,Opt]
+	qHigh:      Node      (nConstExpr)      [Pri,Opt]
+	qRegVars:   List      (nRegVar)         [Pri]
+
+Object ::= nRegVar
+nRegVar =>
+	qIdent:     Integer4
+	qLow:       Node      (nConstExpr)      [Pri,Opt]  % if present, require
+	qHigh:      Node      (nConstExpr)      [Pri,Opt]  % both qLow and qHigh
+
+nDeclHead ::= nTimeDecl
+nTimeDecl =>
+	qRegVars:   List      (nRegVar)         [Pri]
+
+nDeclHead ::= nIntegerDecl
+nIntegerDecl =>
+	qRegVars:   List      (nRegVar)         [Pri]
+
+nDeclHead ::= nRealDecl
+nRealDecl =>
+	qVars:      List      (nVar)            [Pri,Opt]
+
+
+Object ::= nMacromodule
+	% TO BE DEFINED
+
+Object ::= nPrimitive
+	% TO BE DEFINED
+
+Object ::= nPort
+	% TO BE DEFINED
+
+Object ::= nAssign
+nAssign =>
+	qLvalue:    Node      (nLvalue)         [Pri]
+	qExpr:      Node      (nExpr)           [Pri]
+
+Object ::= nLvalue
+	% TO BE DEFINED
+
+Object ::= nEventCtrl      % either nIdentRef or List of nEventExpr
+                           % A List of nEventExpr indicates they are 'or'ed
+
+Object ::= nEventExpr
+nEventExpr =>
+	qEdge:      Integer4     % pPosedge, pNegedge   0 = none specified
+	qExpr:      Node      (nExpr)           [Pri]
+
+Object ::= nExpr
+
+nExpr ::= nUnaryOperator
+nUnaryOperator =>
+	qOp:        Integer4
+	qExpr:      Node      (nExpr)           [Pri]
+
+nExpr ::= nBinaryOperator
+nBinaryOperator =>
+	qOp:        Integer4
+	qLeft:      Node      (nExpr)           [Pri]
+	qRight:     Node      (nExpr)           [Pri]
+
+nExpr ::= nIfOperator      % expr ? expr : expr
+nIfOperator =>
+	qExpr:      Node      (nExpr)           [Pri]
+	qLeft:      Node      (nExpr)           [Pri]   % Or, "qTrue" ?
+	qRight:     Node      (nExpr)           [Pri]
+
+Object ::= nString
+nString =>
+	qString:    Integer4        % CHANGE to String (C string)
+
+nExpr ::= nDecimalNumber
+nDecimalNumber =>
+	qDecimalNumber: Integer4
+
+nExpr ::= nIdentRef
+nIdentRef =>
+	qIdentPath: List      (nIdent)          [Pri]
+	qLow:       Node      (nExpr)           [Opt,Pri]
+	qHigh:      Node      (nConstExpr)      [Opt,Pri]   % if present,then
+	                                                    % both are constant
+Object ::= nIdent
+nIdent =>
+	qIdent:     Integer4
+
+nExpr ::= nFunctionCall
+nFunctionCall =>
+	qIdent:     Integer4
+	qArgs:      List      (nExpr)           [Pri]
+
+nFunctionCall ::= nFunctionCallSys
+
+nExpr ::= nConcat
+nConcat =>
+	qArgs:      List      (nExpr)           [Pri]
+
+nExpr ::= nMultConcat
+nMultConcat =>
+	qLeft:      Node      (nExpr)           [Pri]   % iterations
+	qRight:     Node      (nExpr)           [Pri]   % an nConcat node
+
+nDeclHead ::= nGateHead   % head of a list of gate instances
+nGateHead =>
+	qGateType:  Integer4
+	qStrength1: Integer4                    [Opt]
+	qStrength0: Integer4                    [Opt]
+	qDelay:     Node      (nDelay)          [Pri,Opt]
+	qGateInst:  List      (nGateInst)       [Pri]
+
+Object ::= nGateInst
+nGateInst =>
+	qIdent:     Integer4
+	qTerminals: List      (nExpr)           [Pri]
+
+Object ::= nDelay      % could actually be LIST of nIdent,
+	               % nDecimalNumber, or LIST of nExpr (or nMinTypMax)
+
+% mintypmax -- if only one part given, then it's just one nExpr node
+
+nExpr ::= nMinTypMax
+nMinTypMax =>
+	qMin:       Node      (nExpr)           [Pri]
+	qTyp:       Node      (nExpr)           [Pri]
+	qMax:       Node      (nExpr)           [Pri]
+
+nDeclHead ::= nNetDecl
+nNetDecl =>
+	qNetType:   Integer4
+	qCharge:    Integer4                    [Opt]   % for trireg only
+	qStrength1: Integer4                    [Opt]
+	qStrength0: Integer4                    [Opt]
+	qExpand:    Integer4                    [Opt]  % pVectored,pScalared
+	qLow:       Node      (nExpr)           [Pri,Opt] 
+	qHigh:      Node      (nExpr)           [Pri,Opt]
+	qDelay:     Node      (nDelay)          [Pri,Opt]
+	qVars:      List      (nVar)            [Pri,Opt]
+	qAssigns:   List      (nAssign)         [Pri,Opt]
+
+Object ::= nContAssign    % continuous assign
+nContAssign =>
+	qStrength1: Integer4                    [Opt]
+	qStrength0: Integer4                    [Opt]
+	qDelay:     Node      (nDelay)          [Pri,Opt]
+	qAssigns:   List      (nAssign)         [Pri,Opt]
+
+nDeclHead ::= nEventDecl
+nEventDecl =>
+	qEvents:    List      (nEvent)          [Pri,Opt]
+
+Object ::= nEvent
+nEvent =>
+	qIdent:     Integer4
+
+Object ::= nStatement
+
+nStatement ::= nStmtAssign
+nStmtAssign =>
+	qLvalue:    Node      (nLvalue)         [Pri]
+	qExpr:      Node      (nExpr)           [Pri]
+
+nStmtAssign ::= nStmtContAssign   % "quasi" continuous assign (p.67)
+
+nStmtAssign ::= nStmtAssignDelay
+nStmtAssignDelay =>
+	qDelayCtrl: Node      (nExpr)           [Pri]
+
+nStmtAssign ::= nStmtAssignEvent
+nStmtAssignEvent =>
+	qEventCtrl: Node      (nEventCtrl)      [Pri]
+
+nStatement ::= nStmtIf
+nStmtIf =>
+	qExpr:      Node      (nExpr)           [Pri]
+	qStatement: Node      (nStatement)      [Pri,Opt]
+	qElse:      Node      (nStatement)      [Pri,Opt]
+
+nStatement ::= nStmtForever
+nStmtForever =>
+	qStatement: Node      (nStatement)      [Pri,Opt]
+
+nStatement ::= nStmtRepeat
+nStmtRepeat =>
+	qExpr:      Node      (nExpr)           [Pri]
+	qStatement: Node      (nStatement)      [Pri,Opt]
+
+nStatement ::= nStmtWhile
+nStmtWhile =>
+	qExpr:      Node      (nExpr)           [Pri]
+	qStatement: Node      (nStatement)      [Pri,Opt]
+
+nStatement ::= nStmtWait
+nStmtWait =>
+	qExpr:      Node      (nExpr)           [Pri]
+	qStatement: Node      (nStatement)      [Pri,Opt]
+
+nStatement ::= nStmtFor
+nStmtFor =>
+	qAssign1:   Node      (nAssign)         [Pri]
+	qExpr:      Node      (nExpr)           [Pri]
+	qAssign2:   Node      (nAssign)         [Pri]
+	qStatement: Node      (nStatement)      [Pri,Opt]
+
+nStatement ::= nStmtDelayCtrl
+nStmtDelayCtrl =>
+	qDelayCtrl: Node      (nExpr)           [Pri]
+	qStatement: Node      (nStatement)      [Pri,Opt]
+
+nStatement ::= nStmtEventCtrl
+nStmtEventCtrl =>
+	qEventCtrl: Node      (nEventCtrl)      [Pri]
+	qStatement: Node      (nStatement)      [Pri,Opt]
+
+nStatement ::= nStmtEvent
+nStmtEvent =>
+	qIdent:     Integer4
+
+nStatement ::= nStmtDeassign
+nStmtDeassign =>
+	qLvalue:    Node      (nLvalue)         [Pri]
+
+nStatement ::= nStmtTask
+nStmtTask =>
+	qIdent:     Integer4
+	qArgs:      List      (nExpr)           [Pri]
+
+nStmtTask ::= nStmtTaskSys
+
+nStatement ::= nBlock
+nBlock =>
+	qIdent:     Integer4
+	qParams:    List      (nParamDecl)      [Pri,Opt]
+	qRegs:      List      (nRegDecl)        [Pri,Opt]
+	qIntegers:  List      (nIntegerDecl)    [Pri,Opt]
+	qReals:     List      (nRealDecl)       [Pri,Opt]
+	qTimes:     List      (nTimeDecl)       [Pri,Opt]
+        qEventDecls:List      (nEventDecl)      [Pri,Opt]
+	qStatements:List      (nStatement)      [Pri,Opt]
+
+
+nBlock ::= nBlockSeq
+
+nBlock ::= nBlockPar
+
+
+
+Object ::= nSym
+nSym =>
+	qIdent:     Integer4
+	qDeclHead:  Node      (nDeclHead)       [Alt,Opt]
+        qDeclInst:  Node      (Object)          [Alt,Opt]
+        qValue:     Node      (nExpr)           [Alt,Opt]  % initial value
+
+Object ::= nTO_DO      % indicates that tree building
+	               % not implemented yet; just a placeholder
+
+End

@@ -1,0 +1,9 @@
+
+Schema  1.2       June 9, '93
+
+This is the schema compiler.  It is built using a schema
+so it must be compiled by itself.
+
+It is not integrated with the SSL runtime module, and
+should be compiled with SSL 1.2.7 or earlier.
+

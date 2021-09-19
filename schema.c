@@ -1,3 +1,7 @@
+/**/ 
+static char sccsid[] = "@(#)schema.c	1.4 8/23/93 20:10:04 /files/home/sim/sarice/compilers/schema/SCCS/s.schema.c";
+/**/
+
 /*
 *****************************************************************************
 *
@@ -38,17 +42,27 @@
 #endif AMIGA
 
 
+/*  Trap fatal errors in debug version */
+#include <setjmp.h>
+jmp_buf  t_fatal_jmp_buf;
+
+
+/* Schema database access functions */
+#include "node.h"
+
 
 #define  SSL_INCLUDE_ERR_TABLE
 #include "schema.h"
 
 #include "schema_glob.h"
 
+#include "debug.h"
 
 
 #define TABLE_FILE "schema.tbl"         /* File with SSL code to interpret */
 
 #define DEBUG_FILE "schema.dbg"         /* SSL debug information */
+#define DEBUG_SOURCE "schema.lst"
 
 
 /*
@@ -77,6 +91,9 @@
 short   w_codeTable [w_codeTableSize];    /* SSL code to interpret */
 #endif  USE_C_TABLE
 
+short    w_codeTable_size;
+
+char     input_filename[256];             /* schema source */
 
 FILE    *t_src;                           /* source                         */
 FILE    *t_lst;                           /* listing file                   */
@@ -110,15 +127,9 @@ short    w_here;                          /* position in output table       */
 
 #define  w_assert(expr)  w_assert_fun((expr),__LINE__)
 
-/* Variables for debugger mode */
 
 int      w_debug;                         /* full screen debug mode         */
-#define  w_lineTableSize 3000
-short    w_lineTable [w_lineTableSize];   /* positions of lines in code     */
-int      dbg_trace;                       /* trace source file?             */
-int      dbg_count;                       /* instructions to execute        */
-int      dbg_nocount;            /* true = no count limit (just breakpoint) */
-
+int      w_walking;                       /* currently in walker            */
 
 
 
@@ -130,49 +141,21 @@ short    dTemp2;                          /* multi-purpose                  */
 short   *dPtr;                            /* multi-purpose                  */
 short    dWords;                          /* multi-purpose                  */
 short    dSym;                            /* index of symbol in ST          */
+long     dLong;                           /* multi-purpose                  */
+NODE_PTR dNode;
 
+NODE_PTR SchemaRoot;                      /* Root of schema database */
+NODE_PTR CurrentClass;                    /* class found with oFindClass */
+NODE_PTR GetsAttrsClass;                  /* class to get attributes */
+NODE_PTR CurrentAttr;                     /* current attribute */
+NODE_PTR CurrentAttrSym;                  /* current attribute symbol */
+long     NumAttrSyms;                     /* count of attribute symbols */
+long     NumClasses;                      /* count of created/derived classes */
 
-#define dNSsize 40                        /* NS: name stack                 */
-short          dNS[dNSsize];
-short          dNSptr;
-
-#define dOSsize 40                        /* OS: object stack               */
-short          dOS[dOSsize];
-short          dOSptr;
-
-#define dACsize 2                         /* AC: attribute class stack      */
-short          dAC[dACsize];              /* Only expect to need one entry  */
-short          dACptr;
-
-#define dTSsize 10                        /* TS: tag stack                  */
-short          dTS[dTSsize];
-short          dTSptr;
-
-
-/*  Maintained by w_define_obj(), w_define_attr() to hold definitions  */
-
-struct attr_struct {
-       short   attr;                      /* attr # */
-       struct  attr_struct *next;
+dbg_variables debug_variables[] = {
+    /* "Name", address,    udata,    function */
+    "",        NULL,       0,        NULL,
 };
-
-#define dOLsize 200
-struct dOL_struct {                       /* OL: object list */
-       short   id;                        /*     -- id# of object */
-       struct  attr_struct *attr;         /*     -- list of attributes */
-}              dOL[dOLsize];
-short          dOLptr;
-
-/*  Entry in attribute list is common for all uses of attribute  */
-
-#define dALsize 200                       /* AL: attribute list             */
-struct dAL_struct {
-       short   id;                        /*     -- id# of attribute        */
-       char    class;                     /* 4=Integer4, 100=NODE, 150=LIST */
-       char    tags;                      /* bits for Pri, Alt, Opt         */
-       short   type;                      /* object #, if NODE or LIST      */
-}              dAL[dALsize];
-short          dALptr;
 
 
 short w_define_obj ();                    /* Define an object given an id   */
@@ -221,11 +204,7 @@ char *argv[];
             if (argv[arg][i]=='L' || argv[arg][i]=='l')
                 t_listing = 1;
             else if (argv[arg][i]=='D' || argv[arg][i]=='d')
-#ifdef AMIGA
                 w_debug = 1;
-#else  AMIGA
-                printf ("The debug option is only available on the Amiga.\n")
-#endif AMIGA
         }
     }
 
@@ -243,52 +222,60 @@ char *argv[];
 #endif  USE_C_TABLE
 
 
-    /* Get debug information (line numbers) */
-
-    if (w_debug)
-    {
-        if ((t_src=fopen(DEBUG_FILE,"r"))==NULL)
-        {
-            printf ("Can't open debug file %s\n", TABLE_FILE);
-            exit (10);
-        }
-        fscanf (t_src,"%d",&entries);           /* size of SSL code */
-        if (entries > w_lineTableSize)
-        {
-            printf ("Debug file too big; must recompile %s.c\n",argv[0]);
-            exit (10);
-        }
-        w_lineTable[0] = entries;
-        for (w_pc=1; w_pc<entries; w_pc++)
-        {
-            fscanf (t_src,"%d",&temp);
-            w_lineTable[w_pc] = temp;
-        }
-        fclose (t_src);
-    }
-
-
     /* open other files */
 
-    strcpy (tmp_buffer, argv[arg]);
+    strcpy (input_filename, argv[arg]);
     if ((strlen(argv[arg]) < 7) ||
-        (strcmp(tmp_buffer+strlen(argv[arg])-7,".schema") != 0))
-        strcpy(tmp_buffer+strlen(argv[arg]),".schema");
+        (strcmp(input_filename+strlen(argv[arg])-7,".schema") != 0))
+        strcpy(input_filename+strlen(argv[arg]),".schema");
 
-    if ((t_src=fopen(tmp_buffer,"r"))==NULL)
+    sprintf (C_out_filename, "%s_schema.c", argv[arg]);
+    sprintf (SSL_out_filename, "%s_schema.ssl", argv[arg]);
+
+    w_restart ();
+
+#ifdef AMIGA
+    onbreak(&t_hitBreak);
+#endif AMIGA
+
+
+    /* execute SSL program */
+
+    if (w_debug)
+        dbg_walkTable();
+    else
+        w_walkTable();
+
+
+    /* program has completed */
+
+    if (w_errorCount)
+        printf ("\n%d error(s)\n", w_errorCount);
+
+    t_cleanup();
+
+    if (w_errorCount)
+        exit(5);
+
+    exit(0);
+}
+
+
+w_restart ()
+{
+
+    if ((t_src=fopen(input_filename,"r"))==NULL)
     {
-        printf ("Can't open source file %s\n",tmp_buffer);
+        printf ("Can't open source file %s\n", input_filename);
         exit (10);
     }
 
-    sprintf (C_out_filename, "%s_schema.h", argv[arg]);
     if ((t_out=fopen(C_out_filename,"w"))==NULL)
     {
         printf ("Can't open output file %s\n", C_out_filename);
         exit (10);
     }
 
-    sprintf (SSL_out_filename, "%s_schema.ssl", argv[arg]);
     if ((t_ssl_out=fopen(SSL_out_filename,"w"))==NULL)
     {
         printf ("Can't open output file %s\n", SSL_out_filename);
@@ -310,14 +297,6 @@ char *argv[];
         }
     }
 
-    printf ("%s\n", w_title_string);        /* print title */
-
-
-#ifdef AMIGA
-    onbreak(&t_hitBreak);
-#endif AMIGA
-
-
     /* initialize scanner */
 
     t_initScanner();
@@ -329,31 +308,23 @@ char *argv[];
     w_sp = 0;
     w_here = 0;
     w_errorCount = 0;
+    w_walking = 0;
 
-    /* initialize debugger */
-
-    if (w_debug)
-        w_initDebugger();
 
     /* initialize semantic operations */
 
     w_initSemanticOperations();
 
 
-    /* execute SSL program */
+    /* initialize debugger */
 
-    w_walkTable();
+    if (w_debug)
+    {
+        dbg_init (DEBUG_FILE, DEBUG_SOURCE, input_filename, oBreak,
+                  debug_variables);
+    }
 
-
-    /* program has completed */
-
-    if (w_errorCount)
-        printf ("\n%d error(s)\n", w_errorCount);
-
-    t_cleanup();
-
-    if (w_errorCount)
-        exit(5);
+    printf ("%s\n", w_title_string);        /* print title */
 }
 
 
@@ -374,6 +345,7 @@ char       *progname;
     fgets (w_title_string, 256, t_src);         /* title string */
 
     fscanf (t_src,"%d",&entries);           /* size of SSL code */
+    w_codeTable_size = entries;
     if (entries > w_codeTableSize)
     {
         printf ("Table file too big; must recompile %s.c\n", progname);
@@ -404,27 +376,47 @@ short err;
 
 w_initSemanticOperations ()
 {
-    dNSptr = 0;
-    dOSptr = 0;
-    dOLptr = 0;   dOL[dOLptr].attr = NULL;
-    dALptr = 0;
-    dACptr = 0;
-    dTSptr = 0;
+    nodeInit ();   /* Init node package */
+
+    SchemaRoot = NULL;
+    CurrentClass = NULL;
+    GetsAttrsClass = NULL;
+    CurrentAttr = NULL;
+    CurrentAttrSym = NULL;
+    NumAttrSyms = 0;
+    NumClasses = 0;
 }
 
 
 w_walkTable()
 {
    char  tmp_buffer [256];
+   short  t_addId();   /* For one of the mechanisms. From scanner.  Should make public. */
+   NODE_PTR  w_find_class();  /* For a mechanism. Code below. */
+
+   w_walking = 1;
+
+   if (w_debug)
+   {
+       if (setjmp (t_fatal_jmp_buf))   /* Return here from calls to t_fatal() during run */
+       { 
+           w_walking = 0;
+           t_error ("Stopped at fatal error");
+           return (0);   /* I guess we say that the program is complete: hit fatal error */
+       } 
+   }
+
 
    while (1) {
 
-#ifdef AMIGA
-
      if (w_debug)
-         w_debugCommand();
-
-#endif AMIGA
+     {
+        if (dbg_check_step_count ())
+        {
+            w_walking = 0;
+            return (2);
+        }
+     }
 
 
      switch (w_codeTable[w_pc++]) {
@@ -505,8 +497,11 @@ w_walkTable()
               if (w_sp) {
                 w_pc = w_stack[w_sp--];
                 continue;
-              } else
-                return;            /* done walking table */
+              } else {
+                w_pc--;
+                w_walking = 0;
+                return(0);            /* done walking table */
+              }
        case oSetResult :
               w_result = w_codeTable[w_pc++];
               continue;
@@ -531,61 +526,89 @@ w_walkTable()
        case oSetParameter :
               w_param = w_codeTable[w_pc++];
               continue;
+        case oBreak :
+              w_walking = 0;
+              return(1);   /* hit breakpoint */
 
 
        /* Semantic Mechanisms */
 
 
-       /* mechanism name_stack */
+       /* mechanism Class */
 
-       case oNSPush :
-              if (++dNSptr == dNSsize) t_fatal ("NS overflow");
-              dNS[dNSptr] = t_token.val;
+       case oCreateEmptySchema :
+              SchemaRoot = nodeNew ((short) nSchema);
+
+              dTemp = t_addId ("nINVALID", pIDENTIFIER);   /* Add to ident table */
+              dNode = nodeNew ((short) nClass);
+              nodeSetValue (dNode, qIdent, (long)dTemp);
+              nodeAppend (SchemaRoot, qClassTree, dNode);
+              NumClasses++;
+
+              dTemp = t_addId ("Object", pIDENTIFIER);   /* Add to ident table */
+              dNode = nodeNew ((short) nClass);
+              nodeSetValue (dNode, qIdent, (long)dTemp);
+              nodeAppend (SchemaRoot, qClassTree, dNode);
+              NumClasses++;
+
+              dTemp = t_addId ("qINVALID", pIDENTIFIER);   /* Add to ident table */
+              dNode = nodeNew ((short) nAttrSym);
+              nodeSetValue (dNode, qIdent, (long)dTemp);
+              nodeSetValue (dNode, qCode, (long) NumAttrSyms);
+              nodeAppend (SchemaRoot, qAttrSyms, dNode);
+              NumAttrSyms++;
+
+              continue;
+       case oFindClass :
+              CurrentClass = w_find_class (nodeGet(SchemaRoot, qClassTree), (long) t_lastId);
+              if (CurrentClass == NULL)
+                  t_fatal("Undefined class");
+              continue;
+       case oDeriveClass :
+              /* Verify class not already defined */
+              if (w_find_class (nodeGet(SchemaRoot, qClassTree), (long) t_lastId) != NULL)
+                  t_fatal("Multiply defined class");
+              dNode = nodeNew ((short) nClass);
+              nodeSetValue (dNode, qIdent, (long) t_lastId);
+              nodeAppend (CurrentClass, qDerived, dNode);
+              NumClasses++;
+              continue;
+       case oThisClassWillGetAttrs :
+              GetsAttrsClass = CurrentClass;
+              continue;
+       case oNoClassWillGetAttrs :
+              GetsAttrsClass = NULL;
               continue;
 
 
-       /* mechanism object */
+       /* mechanism Attr */
 
-       case oObjectDefine :
-              if (++dOSptr == dOSsize) t_fatal ("OS overflow");
-              dOS[dOSptr] = w_define_obj (t_token.val);
+       case oCreateAttrSym :
+              for (dNode = nodeGet(SchemaRoot, qAttrSyms); dNode != NULL; dNode = nodeNext(dNode))
+                  if (nodeGetValue(dNode, qIdent) == t_lastId)
+                      break;
+              if (dNode == NULL)
+              {
+                  dNode = nodeNew ((short) nAttrSym);
+                  nodeSetValue (dNode, qIdent, (long) t_lastId);
+                  nodeSetValue (dNode, qCode, (long) NumAttrSyms);
+                  nodeAppend (SchemaRoot, qAttrSyms, dNode);
+                  NumAttrSyms++;
+              }
+              CurrentAttrSym = dNode;
               continue;
-       case oObjectDefineNS :
-              if (++dOSptr == dOSsize) t_fatal ("OS overflow");
-              dOS[dOSptr] = w_define_obj (dNS[dNSptr--]);
+       case oCreateAttr :
+              CurrentAttr = nodeNew ((short) nAttr);
+              nodeLink (CurrentAttr, qAttrSym, CurrentAttrSym);
+              nodeAppend (GetsAttrsClass, qAttrs, CurrentAttr);
               continue;
-       case oObjectDerive :
-              w_derive_obj (dOS[dOSptr], dOS[dOSptr-1]);
-              dOSptr -= 2;
+       case oAttrType :
+              nodeSetValue (CurrentAttr, qType, (long) w_param);
               continue;
-       case oObjectPop :
-              dOSptr--;
+       case oAttrTag :
+              dLong = nodeGetValue (CurrentAttr, qTags);
+              nodeSetValue (CurrentAttr, qTags, (long) (dLong | w_param));
               continue;
-
-
-       /* mechanism attr */
-
-       case oAttrDefineNS :
-              dTemp2 = 0;          /* collect tag bits */
-              while (dTSptr > 0)
-                  dTemp2 = dTemp2 | dTS[dTSptr--];
-              dTemp = w_define_attr (dNS[dNSptr--], dAC[dACptr--], dTemp2);
-              w_define_attr_of_obj (dTemp, dOS[dOSptr]);
-              continue;
-
-       case oAttrClass :
-              if (++dACptr == dACsize) t_fatal ("AC overflow");
-              dAC[dACptr] = w_param;
-              continue;
-
-
-       /* mechanism tag */
-
-       case oTagPush :
-              if (++dTSptr == dTSsize) t_fatal ("TS overflow");
-              dTS[dTSptr] = w_param;
-              continue;
-
 
        /* mechanism doc */
 
@@ -606,185 +629,436 @@ w_walkTable()
 
 
 /* --------- FOR SEMANTIC MECHANISMS --------- */
-short w_define_obj (id_val)
-short               id_val;
+
+NODE_PTR  w_find_class (root, ident)
+NODE_PTR                root;
+long                    ident;
 {
-    short o;
+    NODE_PTR   derived;
+    NODE_PTR   find_in_derived;
 
-    for (o = 1; o <= dOLptr; o++)
-        if (dOL[o].id == id_val)
-            return (o);
-
-    if (++dOLptr == dOLsize) t_fatal ("OL overflow");
-    dOL[dOLptr].id = id_val;
-    dOL[dOLptr].attr = NULL;
-    return (dOLptr);
-}
-
-short w_define_attr (id_val, attr_class, tags)
-short                id_val;
-short                attr_class;
-short                tags;
-{
-    short a;
-
-    for (a = 1; a <= dALptr; a++)
-        if (dAL[a].id == id_val)
-        {
-            if (dAL[a].class != attr_class)
-                t_fatal ("Inconsistent class of attribute");
-            if (dAL[a].tags != tags)
-                t_fatal ("Attribute tags inconsistent with previous definition");
-            return (a);
-        }
-
-    if (++dALptr == dALsize) t_fatal ("AL overflow");
-    dAL[dALptr].id = id_val;
-    dAL[dALptr].class = attr_class;
-    dAL[dALptr].tags = tags;
-    return (dALptr);
-}
-
-w_define_attr_of_obj (attr_num, obj_num)
-short          attr_num;
-short          obj_num;
-{
-    struct attr_struct *as, *p;
-
-    as = (struct attr_struct *) malloc (sizeof (struct attr_struct));
-    as->attr = attr_num;
-    as->next = NULL;
-
-    if (dOL[obj_num].attr == NULL)
-        dOL[obj_num].attr = as;
-    else
+    while (root != NULL)
     {
-        for (p = dOL[obj_num].attr; p->next != NULL; p = p->next);
-        p->next = as;
+        if (nodeGetValue (root, (short) qIdent) == ident)
+            return (root);
+
+        derived = nodeGet (root, (short) qDerived);
+        find_in_derived = w_find_class (derived, ident);
+        if (find_in_derived != NULL)
+            return (find_in_derived);
+
+        root = nodeNext(root);
     }
+    return (NULL);
 
 }
 
-
-/*  when deriving object, copy all the old object's attributes  */
-/*  STILL TO DO:  record in a table that this object is derived */
-
-w_derive_obj (new_obj, old_obj)
-short         new_obj, old_obj;
-{
-    struct attr_struct *attr;
-
-    for (attr = dOL[old_obj].attr; attr != NULL; attr = attr->next)
-    {
-        w_define_attr_of_obj (attr->attr, new_obj);
-    }
-
-/*
-    printf ("%s derives from %s\n",
-            t_idTable[dOL[new_obj].id].name,
-            t_idTable[dOL[old_obj].id].name);
-*/
-}
 
 w_dump_table ()
 {
-    struct attr_struct  *attr;
-    short                o;
-    short                a;
-    short               *attr_offsets;
+    NODE_PTR             class;
     short               *obj_sizes;
+    char                *obj_isa;
+    short               *attr_offsets;
+    short               *attr_types;
+    short               *attr_tags;
     short                next_offset;
+    short                a, c;
+    int                  current_class_code;
 
     printf ("------- Writing SSL code to %s --------\n", SSL_out_filename);
 
-    fprintf (t_ssl_out, "% Generated automatically by schema\n\n");
+    fprintf (t_ssl_out, "\n%% Generated automatically by schema\n\n");
 
     fprintf (t_ssl_out, "type node_type:\n");
-    fprintf (t_ssl_out, "\tnINVALID = 0\n");
-    for (o = 1; o <= dOLptr; o++)
-        fprintf (t_ssl_out, "\t%s\n", t_idTable[dOL[o].id].name);
+
+    w_dump_ssl_class (nodeGet(SchemaRoot, qClassTree));
+
     fprintf (t_ssl_out, "\t;\n\n");
 
     fprintf (t_ssl_out, "type node_attribute:\n");
-    fprintf (t_ssl_out, "\tqINVALID = 0\n");
-    for (a = 1; a <= dALptr; a++)
-        fprintf (t_ssl_out, "\t%s\n", t_idTable[dAL[a].id].name);
+
+    w_dump_ssl_attr ();
+
     fprintf (t_ssl_out, "\t;\n\n");
 
     printf ("------- Writing C code to %s --------\n", C_out_filename);
 
-    fprintf (t_out, "/* Generated automatically by schema */\n\n");
+    fprintf (t_out, "\n/* Generated automatically by schema */\n\n");
 
-    attr_offsets = (short *) malloc (sizeof(short) * (dALptr+1));
-    obj_sizes = (short *) malloc (sizeof(short) * (dOLptr+1));
+    fprintf (t_out, "/* Private Data */\n\n");
 
-    fprintf (t_out, "short dAttributeOffset [%d][%d] = {\n", dOLptr+1, dALptr+1);
-    for (o = 0; o <= dOLptr; o++)
+
+
+    /* Initialize memory layout assignments before any classes created */
+
+    attr_offsets = (short *) malloc (sizeof(short) * NumAttrSyms);
+    obj_sizes    = (short *) malloc (sizeof(short) * NumClasses);
+    obj_isa      = (char  *) malloc (sizeof(char)  * NumClasses);
+
+    for (a = 0; a < NumAttrSyms; a++)
+        attr_offsets[a] = -1;
+
+    for (c = 0; c < NumClasses; c++)
+        obj_sizes[c] = 0;
+
+    for (c = 0; c < NumClasses; c++)
+        obj_isa[c] = 0;
+
+
+    /* Print entries for class tree */
+
+    next_offset = 0;
+    current_class_code = -1;
+
+    fprintf (t_out, "static short dAttributeOffset [%d][%d] = {\n", NumClasses, NumAttrSyms);
+
+    w_dump_c_attr_offsets (nodeGet(SchemaRoot, qClassTree), attr_offsets, next_offset,
+                           &current_class_code, obj_sizes);
+    fprintf (t_out, "};\n\n");
+
+
+    fprintf (t_out, "static short dAttributeType [%d][%d] = {\n", NumClasses, NumAttrSyms);
+
+    attr_types = (short *) malloc (sizeof(short) * NumAttrSyms);
+    for (a = 0; a < NumAttrSyms; a++)
+        attr_types[a] = -1;
+
+    w_dump_c_attr_types (nodeGet(SchemaRoot, qClassTree), attr_types);
+
+    fprintf (t_out, "};\n\n");
+
+
+    fprintf (t_out, "static short dAttributeTags [%d][%d] = {\n", NumClasses, NumAttrSyms);
+
+    attr_tags = (short *) malloc (sizeof(short) * NumAttrSyms);
+    for (a = 0; a < NumAttrSyms; a++)
+        attr_tags[a] = 0;
+
+    w_dump_c_attr_tags (nodeGet(SchemaRoot, qClassTree), attr_tags);
+
+    fprintf (t_out, "};\n\n");
+
+
+    current_class_code = -1;
+
+    fprintf (t_out, "static short dClassIsA [%d][%d] = {\n", NumClasses, NumClasses);
+
+    w_dump_c_class_isa (nodeGet(SchemaRoot, qClassTree), &current_class_code, obj_isa);
+    fprintf (t_out, "};\n\n");
+
+
+    fprintf (t_out, "\n/* Public Data */\n\n");
+
+    fprintf (t_out, "short dObjectSize [%d] = {\n\t", NumClasses);
+    for (c = 0; c < NumClasses; c++)
     {
-        next_offset = 0;
-        for (a = 0; a <= dALptr; a++)
-            attr_offsets[a] = -1;
+        fprintf (t_out, "%d, ", obj_sizes[c]);
+        if ((c & 15) == 15)
+            fprintf (t_out, "\n\t");
+    }
+    fprintf (t_out, "\n};\n\n");
 
-        for (attr = dOL[o].attr; attr != NULL; attr = attr->next)
+    fprintf (t_out, "int   dObjects = %d;\n", NumClasses);
+    fprintf (t_out, "char *dObjectName [%d] = {\n", NumClasses);
+
+    w_dump_c_class_names (nodeGet(SchemaRoot, qClassTree));
+
+    fprintf (t_out, "};\n\n");
+
+    fprintf (t_out, "int   dAttributes = %d;\n", NumAttrSyms);
+    fprintf (t_out, "char *dAttributeName [%d] = {\n", NumAttrSyms);
+
+    w_dump_c_attr_names ();
+
+    fprintf (t_out, "};\n\n");
+
+
+
+    fprintf (t_out, "\n/* Public Functions */\n\n");
+
+    fprintf (t_out, "short dGetAttributeOffset (class, attribute)      \n");
+    fprintf (t_out, "short                      class;                 \n");
+    fprintf (t_out, "short                      attribute;             \n");
+    fprintf (t_out, "{                                                 \n");
+    fprintf (t_out, "    return (dAttributeOffset[class][attribute]);  \n");
+    fprintf (t_out, "}                                                 \n");
+    fprintf (t_out, "                                                  \n");
+    fprintf (t_out, "short dGetAttributeType (class, attribute)        \n");
+    fprintf (t_out, "short                    class;                   \n");
+    fprintf (t_out, "short                    attribute;               \n");
+    fprintf (t_out, "{                                                 \n");
+    fprintf (t_out, "    return (dAttributeType[class][attribute]);    \n");
+    fprintf (t_out, "}                                                 \n");
+    fprintf (t_out, "                                                  \n");
+    fprintf (t_out, "short dGetAttributeTags (class, attribute)        \n");
+    fprintf (t_out, "short                    class;                   \n");
+    fprintf (t_out, "short                    attribute;               \n");
+    fprintf (t_out, "{                                                 \n");
+    fprintf (t_out, "    return (dAttributeTags[class][attribute]);    \n");
+    fprintf (t_out, "}                                                 \n");
+    fprintf (t_out, "                                                  \n");
+    fprintf (t_out, "int   dGetClassIsA      (class, isaclass)         \n");
+    fprintf (t_out, "short                    class;                   \n");
+    fprintf (t_out, "short                    isaclass;                \n");
+    fprintf (t_out, "{                                                 \n");
+    fprintf (t_out, "    return (dClassIsA[class][isaclass]);          \n");
+    fprintf (t_out, "}                                                 \n");
+    fprintf (t_out, "                                                  \n");
+}
+
+
+w_dump_ssl_class (root)
+NODE_PTR          root;
+{
+    NODE_PTR   NP;
+
+    for (NP = root; NP != NULL; NP = nodeNext(NP))
+    {
+        fprintf (t_ssl_out, "\t%s\n", t_getIdString(nodeGetValue(NP, qIdent)));
+        w_dump_ssl_class (nodeGet(NP, qDerived));
+    }
+}
+
+w_dump_ssl_attr ()
+{
+    NODE_PTR   NP;
+
+    for (NP = nodeGet(SchemaRoot, qAttrSyms); NP != NULL; NP = nodeNext(NP))
+    {
+        fprintf (t_ssl_out, "\t%s\n", t_getIdString(nodeGetValue(NP, qIdent)));
+    }
+}
+
+w_dump_c_attr_offsets (NP, parent_offsets, parent_next_offset,
+                       class_code_ptr, obj_sizes)
+NODE_PTR               NP;
+short                 *parent_offsets;
+short                  parent_next_offset;
+int                   *class_code_ptr;
+short                 *obj_sizes;
+{
+    short    *attr_offsets;
+    short     next_offset;
+    short     a;
+    NODE_PTR  Attr;
+    NODE_PTR  Derived;
+    long      attr_code;
+
+    attr_offsets = (short *) malloc (sizeof(short) * NumAttrSyms);
+
+    for (; NP != NULL; NP = nodeNext(NP))
+    {
+        (*class_code_ptr)++;
+
+        /* Derive attributes from parent */
+
+        for (a = 0; a < NumAttrSyms; a++)
+            attr_offsets[a] = parent_offsets[a];
+
+        next_offset = parent_next_offset;
+
+        /* Add attributes to this class */
+
+        for (Attr = nodeGet(NP, qAttrs); Attr != NULL; Attr = nodeNext(Attr))
         {
-            attr_offsets[attr->attr] = next_offset;
+            attr_code = nodeGetValue(nodeGet(Attr, qAttrSym), qCode);
+            attr_offsets[attr_code] = next_offset;
             next_offset += 4;
         }
 
-        obj_sizes[o] = next_offset;
+        obj_sizes[*class_code_ptr] = next_offset;
+
+        /* Print class layout to file */
 
         fprintf (t_out, "\t");
-        for (a = 0; a <= dALptr; a++)
+        for (a = 0; a < NumAttrSyms; a++)
+        {
             fprintf (t_out, "%3d, ", attr_offsets[a]);
+        }
         fprintf (t_out, "\n");
-    }
-    fprintf (t_out, "};\n\n");
 
-    fprintf (t_out, "short dObjectSize [%d] = {\n\t", dOLptr+1);
-    for (o = 0; o <= dOLptr; o++)
-    {
-        fprintf (t_out, "%d, ", obj_sizes[o]);
-        if ((o & 15) == 15)
-            fprintf (t_out, "\n\t");
-    }
-    fprintf (t_out, "\n};\n\n");
+        /* Now derive any other classes from this class */
 
-    fprintf (t_out, "int   dObjects = %d;\n", dOLptr+1);
-    fprintf (t_out, "char *dObjectName [%d] = {\n", dOLptr+1);
-    for (o = 0; o <= dOLptr; o++)
-    {
-        fprintf (t_out, "\t\"%s\",\n", t_idTable[dOL[o].id].name);
+        Derived = nodeGet(NP, qDerived);
+        if (Derived != NULL)
+        {
+            w_dump_c_attr_offsets (Derived, attr_offsets, next_offset,
+                                   class_code_ptr, obj_sizes);
+        }
     }
-    fprintf (t_out, "};\n\n");
 
-    fprintf (t_out, "int   dAttributes = %d;\n", dALptr+1);
-    fprintf (t_out, "char *dAttributeName [%d] = {\n", dALptr+1);
-    for (a = 0; a <= dALptr; a++)
-    {
-        fprintf (t_out, "\t\"%s\",\n", t_idTable[dAL[a].id].name);
-    }
-    fprintf (t_out, "};\n\n");
-
-    fprintf (t_out, "short dAttributeClass [%d] = {\n\t", dALptr+1);
-    for (a = 0; a <= dALptr; a++)
-    {
-        fprintf (t_out, "%d, ", dAL[a].class);
-        if ((a & 15) == 15)
-            fprintf (t_out, "\n\t");
-    }
-    fprintf (t_out, "\n};\n\n");
-
-    fprintf (t_out, "short dAttributeTags [%d] = {\n\t", dALptr+1);
-    for (a = 0; a <= dALptr; a++)
-    {
-        fprintf (t_out, "%d, ", dAL[a].tags);
-        if ((a & 15) == 15)
-            fprintf (t_out, "\n\t");
-    }
-    fprintf (t_out, "\n};\n\n");
-
+    free (attr_offsets);
 }
 
+
+w_dump_c_attr_types   (NP, parent_attr_types)
+NODE_PTR               NP;
+short                 *parent_attr_types;
+{
+    short    *attr_types;
+    short     a;
+    NODE_PTR  Attr;
+    NODE_PTR  Derived;
+    long      attr_code;
+
+    attr_types = (short *) malloc (sizeof(short) * NumAttrSyms);
+
+    for (; NP != NULL; NP = nodeNext(NP))
+    {
+
+        /* Derive attributes from parent */
+
+        for (a = 0; a < NumAttrSyms; a++)
+            attr_types[a] = parent_attr_types[a];
+
+        /* Add attributes to this class */
+
+        for (Attr = nodeGet(NP, qAttrs); Attr != NULL; Attr = nodeNext(Attr))
+        {
+            attr_code = nodeGetValue(nodeGet(Attr, qAttrSym), qCode);
+            attr_types[attr_code] = nodeGetValue(Attr, qType);
+        }
+
+        /* Print to file */
+
+        fprintf (t_out, "\t");
+        for (a = 0; a < NumAttrSyms; a++)
+        {
+            fprintf (t_out, "%3d, ", attr_types[a]);
+        }
+        fprintf (t_out, "\n");
+
+        /* Now derive any other classes from this class */
+
+        Derived = nodeGet(NP, qDerived);
+        if (Derived != NULL)
+        {
+            w_dump_c_attr_types (Derived, attr_types);
+        }
+    }
+
+    free (attr_types);
+}
+
+
+w_dump_c_attr_tags    (NP, parent_attr_tags)
+NODE_PTR               NP;
+short                 *parent_attr_tags;
+{
+    short    *attr_tags;
+    short     a;
+    NODE_PTR  Attr;
+    NODE_PTR  Derived;
+    long      attr_code;
+
+    attr_tags = (short *) malloc (sizeof(short) * NumAttrSyms);
+
+    for (; NP != NULL; NP = nodeNext(NP))
+    {
+
+        /* Derive attributes from parent */
+
+        for (a = 0; a < NumAttrSyms; a++)
+            attr_tags[a] = parent_attr_tags[a];
+
+        /* Add attributes to this class */
+
+        for (Attr = nodeGet(NP, qAttrs); Attr != NULL; Attr = nodeNext(Attr))
+        {
+            attr_code = nodeGetValue(nodeGet(Attr, qAttrSym), qCode);
+            attr_tags[attr_code] = nodeGetValue(Attr, qTags);
+        }
+
+        /* Print to file */
+
+        fprintf (t_out, "\t");
+        for (a = 0; a < NumAttrSyms; a++)
+        {
+            fprintf (t_out, "%3d, ", attr_tags[a]);
+        }
+        fprintf (t_out, "\n");
+
+        /* Now derive any other classes from this class */
+
+        Derived = nodeGet(NP, qDerived);
+        if (Derived != NULL)
+        {
+            w_dump_c_attr_tags (Derived, attr_tags);
+        }
+    }
+
+    free (attr_tags);
+}
+
+
+w_dump_c_class_names (root)
+NODE_PTR              root;
+{
+    NODE_PTR    NP;
+
+    for (NP = nodeFirst(root); NP != NULL; NP = nodeNext(NP))
+    {
+        fprintf (t_out, "\t\"%s\",\n", t_getIdString(nodeGetValue(NP, qIdent)));
+        w_dump_c_class_names (nodeGet(NP, qDerived));
+    }
+}
+
+w_dump_c_attr_names ()
+{
+    NODE_PTR    NP;
+
+    for (NP = nodeGet(SchemaRoot, qAttrSyms); NP != NULL; NP = nodeNext(NP))
+    {
+        fprintf (t_out, "\t\"%s\",\n", t_getIdString(nodeGetValue(NP, qIdent)));
+    }
+}
+
+w_dump_c_class_isa (NP, class_code_ptr, parent_obj_isa)
+NODE_PTR               NP;
+int                   *class_code_ptr;
+char                  *parent_obj_isa;
+{
+    char     *obj_isa;
+    short     o;
+    NODE_PTR  Derived;
+
+    obj_isa = (char *) malloc (sizeof(char) * NumClasses);
+
+    for (; NP != NULL; NP = nodeNext(NP))
+    {
+        (*class_code_ptr)++;
+
+        /* Derive IsA flags from parent */
+
+        for (o = 0; o < NumClasses; o++)
+            obj_isa[o] = parent_obj_isa[o];
+
+        /* We are also our own object class */
+
+        obj_isa[(*class_code_ptr)] = 1;
+
+
+        /* Print IsA flags to file */
+
+        fprintf (t_out, "\t");
+        for (o = 0; o < NumClasses; o++)
+        {
+            fprintf (t_out, "%1d, ", obj_isa[o]);
+        }
+        fprintf (t_out, "\n");
+
+        /* Now derive any other classes from this class */
+
+        Derived = nodeGet(NP, qDerived);
+        if (Derived != NULL)
+        {
+            w_dump_c_class_isa (Derived, class_code_ptr, obj_isa);
+        }
+    }
+
+    free (obj_isa);
+}
 /* ------------------------------------------- */
 
 
@@ -998,6 +1272,10 @@ t_abort()
 {
     w_traceback();
     t_cleanup();
+
+    if (w_debug && w_walking)
+        longjmp (t_fatal_jmp_buf, 1);
+
     exit(5);
 }
 
@@ -1062,167 +1340,30 @@ t_dumpTables()
 #endif 0
 }
 
-
-/* ---------------------------- debugger -------------------------- */
-
-
-#define MAXARGS 10
-
-
-w_debugCommand ()
+char *w_rule_name (pc)
+short        pc; 
 {
-  short line;
-  char cmdbuf[100];
-  int argc;
-  char *argv[MAXARGS];
+    short    i;
 
-  if (dbg_nocount || --dbg_count > 0)     /* time to halt execution? */
-    return;
-
-  /* check for breakpoints */
-
-
-  dbg_nocount = 0;    /* halt non-stop execution */
-
-  if (dbg_trace)
-  {
-    /* Move source window to current position */
-
-    for (line = 1;
-         w_lineTable[line] < w_pc &&
-         line <= w_lineTable[0];
-         line++);
-    if (w_lineTable[line] > w_pc)
-      for (line--;
-           line > 0 && w_lineTable[line] < 0;
-           line--);
-
-#ifdef AMIGA
-    sprintf (cmdbuf, "rx 'address \"TxEd Plus1/c\" jump %d 0'", line);
-    Execute (cmdbuf, 0,0);
-#else  AMIGA
-    printf ("[line %d]\n", line);
-#endif AMIGA
-
-  }
-
-  while (1)
-  {
-    printf ("ssl.%d>",w_pc);
-    gets (cmdbuf);
-    split_args (cmdbuf, &argc, argv);
-
-    if (argc == 0)
-      continue;
-    else if (strcmp(argv[0],"s") == 0)
+    for (i = 1; i < w_ruleTableSize; i++)
     {
-      dbg_count = 1;                 /* single-step */
-      return;
+        if (pc < w_ruleTable[i].addr)
+            return (w_ruleTable[i-1].name);
     }
-    else if (strcmp(argv[0],"run") == 0)
-    {
-      if (argc < 2)
-        dbg_count = 100;   /* some default count */
-      else
-        dbg_count = atoi(argv[1]);
-      return;
-    }
-    else if (strcmp(argv[0],"cont") == 0)
-    {
-      dbg_nocount = 1;
-      return;
-    }
-    else if (strcmp(argv[0],"trace") == 0)
-    {
-      if (argc < 2)
-      {
-        dbg_trace = !dbg_trace;
-        printf ("trace is now %s\n", dbg_trace ? "on" : "off");
-      }
-      else if (strcmp(argv[1],"on") == 0)
-        dbg_trace = 1;
-      else if (strcmp(argv[1],"off") == 0)
-        dbg_trace = 0;
-      else
-        printf ("invalid argument\n");
-    }
-    else if (strcmp(argv[0],"quit") == 0)
-    {
-      t_cleanup();
-      exit (1);
-    }
-    else if (strcmp(argv[0],"p") == 0)
-    {
-      dbg_print();
-    }
-    else
-    {
-      printf ("-------------- commands: ---------------\n");
-      printf ("s              (step)\n");
-      printf ("p              (print variables)\n");
-      printf ("run n          (execute n instructions)\n");
-      printf ("cont           (execute until breakpoint)\n");
-      printf ("trace on|off   (trace SSL code in TxEd1 window)\n");
-      printf ("quit           (quit program)\n");
-    }
-  }
+    return (w_ruleTable[i-1].name);
 }
 
-
-split_args (cmdbuf, argc, argv)
-char *cmdbuf;
-int *argc;
-char **argv;
+short w_rule_addr (name)
+char        *name;
 {
-  char *p;
+    short    i;
 
-  *argc = 0;
-
-  p = cmdbuf;
-  while (1)
-  {
-    while (*p == ' ' || *p == '\t' || *p == '\n')
-      p++;
-    if (*p == '\0')
-      break;
-    argv[*argc] = p;
-    (*argc)++;
-    while (*p && *p != ' ' && *p != '\t' && *p != '\n')
-      p++;
-    if (*p == '\0')
-      break;
-    *p = '\0';
-    p++;
-  }
-
+    for (i = 0; i < w_ruleTableSize; i++)
+    {
+        if (strcmp (name, w_ruleTable[i].name) == 0)
+            return (w_ruleTable[i].addr);
+    }
+    printf ("Unknown rule name: '%s'\n", name);
+    return ((short) -1);
 }
-
-w_initDebugger ()
-{
-  dbg_trace = 1;    /* trace source */
-  dbg_count = 0;
-  dbg_nocount = 0;
-}
-
-
-/*  debugger "p" command -- dump interesting variables  */
-
-dbg_print ()
-{
-    int i;
-
-    printf ("OS:\t"); for (i = dOSptr; i>0; i--) printf (" %d", dOS[i]);
-    printf ("\n");
-
-    printf ("NS:\t"); for (i = dNSptr; i>0; i--) printf (" %d", dNS[i]);
-    printf ("\n");
-
-    printf ("Token:\t%s", t_getCodeName(t_token.code));
-    if (t_token.code == pIDENTIFIER)
-        printf (":  %s", t_token.name);
-    printf ("  [%saccepted]\n", t_token.accepted ? "" : "not ");
-}
-
-
-
 

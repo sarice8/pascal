@@ -1,20 +1,31 @@
 
 Schema SCH Root nClass Is
 
+Object ::= nSchema
+nSchema =>
+	qClassTree:	Node		(nClass)		[Pri]
+	qAttrSyms:	List		(nAttrSym)		[Pri,Opt]
+
 Object ::= nClass
 nClass =>
 	qIdent:		Integer4
+	qCode:		Integer4
 	qAttrs:		List		(nAttr)			[Pri,Opt]
 	qDerived:	List		(nClass)		[Pri,Opt]
 
 Object ::= nAttr
 nAttr =>
-	qIdent:		Integer4
+	qAttrSym:	Node		(nAttrSym)		[Alt]
 	qType:		Integer4	% Node, List, Integer4 ...
 	qConstraint:	Node		(nConstraint)		[Pri,Opt]
 	qTags:		Integer4
 
 
 Object ::= nConstraint		% not used yet
+
+Object ::= nAttrSym
+nAttrSym =>
+	qIdent:		Integer4
+	qCode:		Integer4
 
 End

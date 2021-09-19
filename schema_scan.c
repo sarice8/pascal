@@ -1,3 +1,7 @@
+/**/ 
+static char sccsid[] = "@(#)schema_scan.c	1.2 6/11/93 16:15:16 /files/home/sim/sarice/compilers/schema/SCCS/s.schema_scan.c";
+/**/
+
 /*
 *****************************************************************************
 *
@@ -100,16 +104,32 @@ struct t_kwTableType {                  /* keyword table                 */
   char *name;                           /* (later loaded into id table)  */
   short code;
 } t_kwTable[] = {
-    "Alt",           pAlt,
-    "End",           pEnd,
+
+    "Boolean1",      pBoolean1,
+    "Character1",    pCharacter1,
     "Integer4",      pInteger4,
-    "Is",            pIs,
-    "List",          pList,
+    "Integer8",      pInteger8,
+    "IntegerN",      pIntegerN,
+    "Real4",         pReal4,
+    "Real8",         pReal8,
+    "RealN",         pRealN,
+    "StringN",       pStringN,
+    "ObjectType",    pObjectType,
     "Node",          pNode,
-    "Opt",           pOpt,
+    "List",          pList,
+
     "Pri",           pPri,
-    "Root",          pRoot,
+    "Alt",           pAlt,
+    "Opt",           pOpt,
+    "Int",           pInt,
+    "Ext",           pExt,
+    "Sys",           pSys,
+    "Tmp",           pTmp,
+
     "Schema",        pSchema,
+    "Is",            pIs,
+    "Root",          pRoot,
+    "End",           pEnd,
     "", 0
 };
 
@@ -324,6 +344,25 @@ t_getNextToken ()
 }
 
 
+/* Used by debugger: get current input file position */
+
+t_get_input_position (line_ptr, col_ptr)
+short                *line_ptr;
+short                *col_ptr;
+{
+    if (t_token.accepted == 0)
+    {
+        *line_ptr = t_token.lineNumber;
+        *col_ptr  = t_token.colNumber;
+    }
+    else
+    {
+        *line_ptr = t_lineNumber;
+        *col_ptr  = t_ptr - t_lineBuffer;
+    }
+}
+
+
 /*
 *****************************************************************************
 *
@@ -450,4 +489,10 @@ int code;
     return (p);
 }
 
+
+char *t_getIdString (id)
+long id;
+{
+    return (t_idTable[id].name);
+}
 

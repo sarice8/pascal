@@ -1,0 +1,233 @@
+   0: title: 'Schema 1.2 -- Database Schema Compiler -- June 9, 1993';
+      %
+      % sccsid: '@(#)schema.ssl	1.2 Steve Rice (C) 6/11/93 14:54:02 /files/home/sim/sarice/compilers/schema/SCCS/s.schema.ssl'
+      %
+      %  Schema.ssl
+      %
+      %  HISTORY
+      %    01May91   1.0   First version
+      %    05May91         Record attribute class
+      %    30May91   1.1   Added attribute tags
+      %    09Jun93   1.2   Use schema to define schema.  Construct tree
+      %                    of all definitions before tables dumped, allowing
+      %                    late addition of attributes (after other
+      %                    classes have been derived from this class)
+      %
+      
+   0: input:
+      	% General
+      
+   0: 	pINVALID
+   0: 	pEOF
+   0: 	pIDENTIFIER
+      
+      	% Types
+      
+   0:         pBoolean1
+   0:         pCharacter1
+   0: 	pInteger4
+   0:         pInteger8
+   0:         pIntegerN
+   0:         pReal4
+   0:         pReal8
+   0:         pRealN
+   0:         pStringN
+   0:         pObjectType
+   0: 	pNode
+   0: 	pList
+      
+      	% Option Tags
+      
+   0: 	pPri
+   0: 	pAlt
+   0: 	pOpt
+   0:         pInt
+   0:         pExt
+   0:         pSys
+   0:         pTmp
+      
+      	% keywords
+      
+   0: 	pSchema
+   0: 	pRoot
+   0: 	pIs
+   0: 	pEnd
+      
+      	% Punctuation
+      
+   0: 	pDERIVES    '::='
+   0: 	pCONTAINS   '=>'
+   0: 	pCOLON      ':'
+   0: 	pCOMMA      ','
+   0: 	pLPAREN     '('
+   0: 	pRPAREN     ')'
+   0: 	pLSQUARE    '['
+   0: 	pRSQUARE    ']'
+   0: 	;
+      
+   0: output:
+   0: 	;
+      
+   0: error:
+   0: 	;
+      
+   0: include 'schema_schema.ssl'
+      
+      % Generated automatically by schema
+      
+   0: type node_type:
+   0: 	nINVALID
+   0: 	Object
+   0: 	nSchema
+   0: 	nClass
+   0: 	nAttr
+   0: 	nConstraint
+   0: 	nAttrSym
+   0: 	;
+      
+   0: type node_attribute:
+   0: 	qINVALID
+   0: 	qClassTree
+   0: 	qAttrSyms
+   0: 	qIdent
+   0: 	qCode
+   0: 	qAttrs
+   0: 	qDerived
+   0: 	qAttrSym
+   0: 	qType
+   0: 	qConstraint
+   0: 	qTags
+   0: 	;
+      
+      
+   0: type aType:              % attribute type
+   0: 	type_INVALID  = 0
+   0: 	type_Integer4 = 4
+   0: 	type_Node     = 100
+   0: 	type_List     = 150
+   0: 	;
+      
+   0: type aTag:               % attribute tags (defined as bits)
+   0: 	tag_INVALID = 0
+   0: 	tag_Pri     = 1
+   0: 	tag_Opt     = 2
+   0: 	tag_Alt     = 4
+   0: 	;
+      
+   0: mechanism Class:		% operations on classes
+   0: 	oCreateEmptySchema	% create initial schema database, containing a SchemaRoot,
+      				% nInvalid class, qInvalid attribute symbol,
+      				% and 'Object' class for basis of all derivation.
+   0: 	oFindClass		% find class named by last accepted identifier (must exist).
+      				% Sets the Current class to that class.
+   0: 	oDeriveClass		% Create new class named by last accepted identifier
+      				% (must not exist already).  The new object is derived
+      				% from the Current class (found with oFindClass).
+   0: 	oThisClassWillGetAttrs	% Sets the GetsAttrs class to the Current class
+      				% (found with oFindClass).  attrs defined with the
+      				% Attr mechanism will be added to the GetsAttrs class.
+   0: 	oNoClassWillGetAttrs	% Sets GetsAttrs to NULL.  No attribute definitions
+      				% may be added to any class.
+   0: 	;
+      
+   0: mechanism Attr:			% operations on attributes
+   0: 	oCreateAttrSym		% Searches for an nAttrSym with qIdent = the
+      				% last accepted identifier.
+      				% If doesn't exist yet, creates one and assigns
+      				% a new qCode to it (the code for the AttrSym)
+      				% and appends it to the schema's AttrSyms list.
+      				% Sets CurrentAttrSym to that AttrSym.
+      
+   0: 	oCreateAttr		% create new attribute.
+      				% Sets qAttrSym to CurrentAttrSym (found/created.
+      				% by oCreateAttrSym).
+      				% Sets CurrentAttr to that attribute.
+   0: 	oAttrType (aType)	% Sets the type of the CurrentAttr
+   0: 	oAttrTag (aTag)		% Sets a tag in the CurrentAttr.  Tag bits are 'or'd together.
+   0: 	;
+      
+   0: mechanism doc:
+   0: 	oDocDumpTable     % dump results
+   0: 	;
+      
+      
+   0: rules
+      
+   0: Schema:
+   0: 	oCreateEmptySchema
+      
+   1: 	@schema_header
+      
+   3: 	{
+   3: 	    [ | pEnd, pEOF : > | * : ]
+      
+  14: 	    pIDENTIFIER
+  16: 	    [
+  18: 		| '::=' :	@class_derivation
+      
+  20: 		| '=>' :	@attribute_assignment
+      
+  24: 		| ':' :		@attribute_definition
+  28: 	    ]
+  38: 	}
+      
+  40: 	oDocDumpTable
+  41: 	;
+      
+      
+  42: schema_header:
+  42: 	pSchema
+  44: 	pIDENTIFIER    % name of schema
+  46: 	pRoot
+  48: 	pIDENTIFIER    % name of root object
+  50: 	pIs
+  52: 	;
+      
+      
+  53: class_derivation:
+  53: 	oFindClass
+  54: 	pIDENTIFIER
+  56: 	oDeriveClass
+      
+  57: 	oNoClassWillGetAttrs	% disallow attribute definitions for now
+  58: 	;
+      
+  59: attribute_assignment:
+  59: 	oFindClass
+  60: 	oThisClassWillGetAttrs
+  61: 	;
+      
+  62: attribute_definition:
+  62: 	oCreateAttrSym
+  63: 	oCreateAttr
+      	
+  64: 	[
+  66:             | pBoolean1, pCharacter1, pInteger4, pInteger8, pIntegerN,
+  66:               pReal4, pReal8, pRealN, pStringN, pObjectType :
+  66:                            oAttrType (type_Integer4)
+  69: 	    | pList :      oAttrType (type_List)
+  74: 	    | pNode :      oAttrType (type_Node)
+  79: 	]
+      
+ 107: 	[
+ 109: 	    | '(' :  pIDENTIFIER    % constraint ignored for now
+ 111:                      ')'
+ 113: 	    | * :
+ 118: 	]
+      
+ 118: 	[
+ 120: 	    | '[' :  {[
+ 122: 	                 | pPri :  oAttrTag (tag_Pri)
+ 125: 	                 | pAlt :  oAttrTag (tag_Alt)
+ 130: 	                 | pOpt :  oAttrTag (tag_Opt)
+ 135: 	                 | ',' :
+ 137: 	                 | * :    >
+ 150: 	             ]}
+ 152: 	             ']'
+ 154: 	    | * :
+ 159: 	]
+ 159: 	;
+      
+ 160: end
+      
+ 160: 

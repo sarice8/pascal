@@ -1,3 +1,6 @@
+/*
+static char sccsid[] = "@(#)schema_glob.h	1.2 6/11/93 14:54:01 /files/home/sim/sarice/compilers/schema/SCCS/s.schema_glob.h";
+*/
 
 /*  vglob.h  */
 

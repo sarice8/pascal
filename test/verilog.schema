@@ -88,7 +88,4 @@ Object ::= nMacromodule
 Object ::= nPrimitive
 	% TO BE DEFINED
 
-Object ::= nPort
-	% TO BE DEFINED
-
 End
