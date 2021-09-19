@@ -1,4 +1,4 @@
-#define w_codeTableSize 210
+#define SSL_CODE_TABLE_SIZE 225
 
 #define oJumpForward 0
 #define oJumpBack 1
@@ -48,6 +48,7 @@
 #define pRPAREN 31
 #define pLSQUARE 32
 #define pRSQUARE 33
+#define eNoClassForAttribute 0
 #define nINVALID 0
 #define Object 1
 #define nSchema 2
@@ -74,25 +75,26 @@
 #define tag_Pri 1
 #define tag_Opt 2
 #define tag_Alt 4
+#define false 0
+#define true 1
 #define oCreateEmptySchema 14
 #define oFindClass 15
 #define oDeriveClass 16
 #define oThisClassWillGetAttrs 17
 #define oNoClassWillGetAttrs 18
-#define oCreateAttrSym 19
-#define oCreateAttr 20
-#define oAttrType 21
-#define oAttrTag 22
-#define oDocDumpTable 23
+#define oAClassWillGetAttrs 19
+#define oCreateAttrSym 20
+#define oCreateAttr 21
+#define oAttrType 22
+#define oAttrTag 23
+#define oDocDumpTable 24
 
 #ifdef SSL_INCLUDE_ERR_TABLE
 
-struct w_errTableType {
-  char *msg;
-  short val;
-} w_errTable[] = {
+struct ssl_error_table_struct ssl_error_table[] = {
+   "eNoClassForAttribute", 0,
    "", 0
 };
-#define w_errTableSize 0
+int ssl_error_table_size = 1;
 
 #endif SSL_INCLUDE_ERR_TABLE

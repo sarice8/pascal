@@ -114,4 +114,24 @@ int       nodeIsA        (/* fromNP, node_type */);
           nodeDumpNodeShort (/* fromNP */);
           nodeDumpTreeNum (/* node_num */);
 
+int       nodeNum        (/* fromNP */);
 NODE_PTR  nodeNumToPtr   (/* node_num */);
+
+
+/*  The following operations are defined as macros for speed.
+    However, anyone using them needs to know the NODE interal definition.
+    I might decide to limit their use to the implementation of node.c  */
+
+#define nodeNext_M(NP)           ((NP)->next)
+#define nodeType_M(NP)           ((NP)->node_type)
+#define nodeGetValue_M(NP,attr)  (*(long *)nodeGetAttrPtr((NP),(attr)))
+
+/* Note, this does NO error checking! */
+#define nodeGetAttrPtr_M(NP,attr) (((char *)&((NP)->attribute[0])) + dGetAttributeOffset(nodeType_M(NP),(attr)))
+
+/* Note, this does NO error checking! */
+#define nodeGetValue_M_NoErrorChecking(NP,attr) (*(long *)nodeGetAttrPtr_M((NP),(attr)))
+
+/* Note, this does NO error checking! */
+NODE_PTR nodeFindValue_NoErrorChecking (/* fromNP, fromAttr, findAttr, findValue */);
+

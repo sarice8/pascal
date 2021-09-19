@@ -1,5 +1,5 @@
 /**/ 
-static char sccsid[] = "@(#)node.c	1.6 8/20/93 19:47:48 /files/home/sim/sarice/compilers/new/schema_1.2/SCCS/s.node.c";
+static char sccsid[] = "%W% %G% %U% %P%";
 /**/
 
 /*
@@ -23,6 +23,14 @@ static char sccsid[] = "@(#)node.c	1.6 8/20/93 19:47:48 /files/home/sim/sarice/c
 *****************************************************************************
 */
 
+/*  TO CLEAN UP:
+ *
+ *  -- Makes direct calls to SSL/application functions:
+ *
+ *     ssl_error (msg)
+ *     ssl_fatal (msg)
+ *     char *ssl_get_id_string (id)
+ */
 
 #include <stdio.h>
 #include <string.h>
@@ -321,6 +329,8 @@ NODE_PTR      fromNP;
 
 /* Search list at fromNP.fromAttr, searching nodes for findAttr with
    value findValue.  Return NULL if not found. */
+/* Implemented using fast node marcros, for speed.  But these macros
+   still perform error checking.  */
 
 NODE_PTR   nodeFindValue (fromNP, fromAttr, findAttr, findValue)
 NODE_PTR                  fromNP;
@@ -332,9 +342,30 @@ long                      findValue;
 
     for (NP = nodeGet (fromNP, fromAttr);
          NP != NULL;
-         NP = nodeNext(NP))
+         NP = nodeNext_M(NP))
     {
-        if (nodeGetValue (NP, findAttr) == findValue)
+        if (nodeGetValue_M (NP, findAttr) == findValue)
+            return (NP);
+    }
+    return (NULL);
+}
+
+
+/*  Does no error checking, all nodes in list must be valid for search  */
+
+NODE_PTR   nodeFindValue_NoErrorChecking (fromNP, fromAttr, findAttr, findValue)
+NODE_PTR                  fromNP;
+short                     fromAttr;
+short                     findAttr;
+long                      findValue;
+{
+    NODE_PTR  NP;
+
+    for (NP = nodeGet (fromNP, fromAttr);
+         NP != NULL;
+         NP = nodeNext_M(NP))
+    {
+        if (nodeGetValue_M_NoErrorChecking (NP, findAttr) == findValue)
             return (NP);
     }
     return (NULL);
@@ -357,21 +388,21 @@ short                 attr;
         dList = (LIST_PTR) dNode;
         sprintf (errbuf, "Attempt to access attribute '%s' of a LIST of '%s'",
                  dAttributeName [attr], dObjectName [dList->head->node_type]);
-        t_fatal (errbuf);
+        ssl_fatal (errbuf);
     }
 
     if (dNode->node_type >= dObjects || dNode->node_type < 0)
-        t_fatal ("Illegal node type observed in node");
+        ssl_fatal ("Illegal node type observed in node");
 
     if (attr >= dAttributes || attr < 0)
-        t_fatal ("Illegal attribute used in node access");
+        ssl_fatal ("Illegal attribute used in node access");
 
     offset = dGetAttributeOffset(dNode->node_type, attr);
     if (offset < 0)
     {
         sprintf (errbuf, "Attempt to access attribute '%s' in object '%s'",
                  dAttributeName [attr], dObjectName [dNode->node_type]);
-        t_fatal (errbuf);
+        ssl_fatal (errbuf);
     }
     return (((char *) &(dNode->attribute[0])) + offset);
 }
@@ -445,7 +476,7 @@ NODE_PTR            root;
                                 {
     sprintf (error_buf, "Attempt to follow '%s' of '%s' after converted to int",
              dAttributeName [attr], dObjectName [root->node_type]);
-    t_error (error_buf);
+    ssl_error (error_buf);
                                 }
                                 else
                                 {
@@ -491,7 +522,6 @@ int          indent;
 {
     short    attr;
     char    *Attr;
-    char    *t_getIdString();  /* from *scan.c */
 
     if (root == NULL)
     {
@@ -525,7 +555,7 @@ int          indent;
                                indent_printf (indent, "%s:", dAttributeName [attr]);
                                /* Kludge special case: print qIdent names. Later should be a String attr. */
                                if (strcmp(dAttributeName[attr], "qIdent") == 0)
-                                   printf ("\t\t%d   \"%s\"\n", *(long *)Attr, t_getIdString(*(long*)Attr));
+                                   printf ("\t\t%d   \"%s\"\n", *(long *)Attr, ssl_get_id_string(*(long*)Attr));
                                else
                                    printf ("\t\t%d\n", *(long *)Attr);
                                break;
@@ -620,6 +650,15 @@ NODE_PTR     NP;
 }
 
 
+int  nodeNum (NP)
+NODE_PTR      NP;
+{
+    if (NP == NULL)
+        return (0);
+    else
+        return (NP->node_num);
+}
+
 /* For debugging.  Get node ptr given node number.
    Not so efficient. */
 
@@ -645,7 +684,7 @@ int      line_num;
     if (!expr)
     {
         sprintf (buffer, "Assertion error in node functions, line %d", line_num);
-        t_fatal (buffer);
+        ssl_fatal (buffer);
     }
 }
 

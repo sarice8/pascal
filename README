@@ -1,9 +1,15 @@
 
-Schema  1.2       June 9, '93
+Schema  1.3    Aug 24 '93
 
-This is the schema compiler.  It is built using a schema
-so it must be compiled by itself.
+This is the Schema compiler, built using SSL 1.2.8 and the
+generic SSL runtime module (ssl_rt 1.1).
 
-It is not integrated with the SSL runtime module, and
-should be compiled with SSL 1.2.7 or earlier.
+It also includes a schema, so it should compile itself.
+[ schema 1.2 can be used to compile this, but the
+  schema runtime module node.o should be taken from 1.3 ]
 
+The language accepted is the same as the previous schema compilers
+and the output is also the same.
+
+The runtime module node.c is compatible with clients
+compiled using SSL 1.2.8 or higher.
