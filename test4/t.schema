@@ -1,0 +1,17 @@
+
+schema T root FuncDef is
+
+Object ::= AddressedObject
+AddressedObject =>
+	qAddr:		Integer4
+
+AddressedObject ::= FuncDef
+FuncDef =>
+	qAddr:		Node (Object)
+	qBody:		List (Object)
+
+Object ::= XObject
+XObject =>
+	qBody:		Node (Object)
+
+End

@@ -1,0 +1,57 @@
+
+% Generated automatically by schema
+
+type node_type:
+	nINVALID
+	Object
+	AddressedObject
+	FuncDef
+	Expression
+	Var
+	Const
+	Address
+	BinaryOperator
+	Compare
+	Add
+	And
+	Or
+	BitAnd
+	UnaryOperator
+	Invert
+	Statement
+	Call
+	Assign
+	Inc
+	Goto
+	NotSupported
+	StructureStatement
+	If
+	While
+	For
+	;
+
+type node_attribute:
+	T_qINVALID
+	T_qAddr
+	T_qLocalSpace
+	T_qParamSpace
+	T_qReturnAddr
+	T_qBody
+	T_qDeclAddr
+	T_qValue
+	T_qLeft
+	T_qRight
+	T_qCompareType
+	T_qExpr
+	T_qCommitted
+	T_qTargetAddr
+	T_qParams
+	T_qTarget
+	T_qPostfix
+	T_qText
+	T_qThen
+	T_qElse
+	T_qInit
+	T_qIncr
+	;
+

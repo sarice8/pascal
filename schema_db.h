@@ -40,6 +40,13 @@ typedef struct SCH_ItemStruct   *Item;
 
 
 /*
+ *  Primitive values
+ */
+
+#define  True      1
+#define  False     0
+
+/*
  *  --------------------------------------------------------------------
  *
  *  Internal representation -- private
@@ -64,35 +71,57 @@ typedef struct SCH_ItemStruct   *Item;
 
 
 struct SCH_NodeStruct {
-    short       kind;
-    char        signature;      /* constant to verify a valid node */
-    char        pad1;           /* unused */
-    long        node_num;
-    long        attribute[1];   /* replaced by node attributes */
+    short         kind;
+    unsigned char signature;      /* constant to verify a valid node */
+    char          pad1;           /* unused */
+    long          node_num;
+    long          attribute[1];   /* replaced by node attributes */
 };
 
 struct SCH_ListStruct {
-    short       kind;           /* constraint type for members of list */
-    char        signature;      /* constant to verify a valid list */
-    char        pad1;           /* unused */
-    Item        first;
-    Item        last;
-    int         length;
+    short         kind;           /* constraint type for members of list */
+    unsigned char signature;      /* constant to verify a valid list */
+    char          pad1;           /* unused */
+    Item          first;
+    Item          last;
+    int           length;
 };
 
 struct SCH_ItemStruct {
-    short       pad0;
-    char        signature;
-    char        pad1;
-    List        list;           /* owning list */
-    Item        next;
-    Item        prev;
-    Node        value;
+    short         pad0;
+    unsigned char signature;
+    char          pad1;
+    List          list;           /* owning list */
+    Item          next;
+    Item          prev;
+    Node          value;
 };
 
 #define SCH_NODE_SIGNATURE 0xAB
 #define SCH_LIST_SIGNATURE 0xCD
 #define SCH_ITEM_SIGNATURE 0xEF
+
+#define SCH_VERIFY_NODE(N,Ret) { \
+    if ((N)==NULL) \
+       { SCH_Error("Schema: Null Node"); return Ret; } \
+    else if ((N)->signature != SCH_NODE_SIGNATURE) \
+       { SCH_Error("Schema: Invalid Node"); return Ret; } \
+}
+
+#define SCH_VERIFY_LIST(L,Ret) { \
+    if ((L)==NULL) \
+       { SCH_Error("Schema: Null List"); return Ret; } \
+    else if ((L)->signature != SCH_LIST_SIGNATURE) \
+       { SCH_Error("Schema: Invalid List"); return Ret; } \
+}
+
+#define SCH_VERIFY_ITEM(I,Ret) { \
+    if ((I)==NULL) \
+       { SCH_Error("Schema: Null Item"); return Ret; } \
+    else if ((I)->signature != SCH_ITEM_SIGNATURE) \
+       { SCH_Error("Schema: Invalid Item"); return Ret; } \
+}
+
 
 /*
  *  End of private internal representation
@@ -120,6 +149,7 @@ Boolean1 IsA      (/* int object_type_1, int object_type_2 */);
 Boolean1 IsNull   (/* Node N */);
 void     SetAttr  (/* int attr_code, Node node, void *value */);
 void    *GetAttr  (/* int attr_code, Node node */);
+void     FreeNode (/* Node N, Boolean1 recurse */);
 
 /*
  *  Lists
@@ -130,16 +160,29 @@ Item     AddFirst (/* List L, Node N */);
 Item     AddLast  (/* List L, Node N */);
 Item     AddNext  (/* Item I, Node N */);
 Item     AddPrev  (/* Item I, Node N */);
+Node     RemoveFirst (/* List L */);
+Node     RemoveLast  (/* List L */);
+Node     RemoveItem  (/* Item I */);
 Item     FirstItem (/* List L */);
+Item     LastItem (/* List L */);
 Item     NextItem (/* Item I */);
 Item     PrevItem (/* Item I */);
 Node     Value    (/* Item I */);
+Item     FindItem (/* List L, Node N */);
 Item     NullItem (/* */);
 Boolean1 IsEmpty  (/* List L */);
 List     ListOf   (/* Item I */);
 int      ListLength (/* List L */);
+void     FreeList (/* List L, Boolean1 recurse */);
 
 #define  FOR_EACH_ITEM(I,L)  for (I=FirstItem(L); I != NULL; I = NextItem(I))
+
+/*
+ *  Database I/O
+ */
+
+void     SCH_SaveAscii (/* Node root, char *filename */);
+Node     SCH_LoadAscii (/* char *filename */);
 
 /*
  *  Debugger

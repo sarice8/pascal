@@ -1,0 +1,31 @@
+
+Schema SCH Root SchemaRoot Is
+
+Object ::= SchemaRoot
+SchemaRoot =>
+	qClassTree:	Node		(Class)			[Pri]
+	qAttrSyms:	List		(AttrSym)		[Pri,Opt]
+
+Object ::= Class
+Class =>
+	qIdent:		Integer4
+	qCode:		Integer4
+	qAttrs:		List		(Attr)			[Pri,Opt]
+	qDerived:	List		(Class)			[Pri,Opt]
+
+Object ::= Attr
+Attr =>
+	qAttrSym:	Node		(AttrSym)		[Alt]
+	qType:		Integer4	% Node, List, Integer4 ...
+	qConstraint:	Node		(Constraint)		[Pri,Opt]
+	qTags:		Integer4
+
+
+Object ::= Constraint		% not used yet
+
+Object ::= AttrSym
+AttrSym =>
+	qIdent:		Integer4
+	qCode:		Integer4
+
+End

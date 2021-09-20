@@ -15,7 +15,6 @@ type node_attribute:
 	T_qINVALID
 	T_qClassTree
 	T_qAttrSyms
-	T_qAllClasses
 	T_qIdent
 	T_qText
 	T_qCode

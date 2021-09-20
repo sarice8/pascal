@@ -1,0 +1,312 @@
+%
+% static char sccsid[] = "%W% %G% %U% %P%";
+%
+
+%  
+%****************************************************************************
+%
+%  verilog.schema
+%
+%  by Steve Rice
+%
+%  May 1, 1991
+%
+%****************************************************************************
+%
+%   Describes the tree used to represent the parsed Verilog program.
+%
+%   HISTORY
+%----------------------------------------------------------------------------
+%   05/01/91 | Steve  | Created.
+%   05/09/91 |        | Added nodes for expressions and lvalues.
+%   05/12/91 |        | Added nodes for gate instances.
+%   05/13/91 |        | Added net declarations.
+%   05/23/91 |        | Added nSym node, to list all declarations.
+%   06/05/91 |        | Added nodes for statements.
+%   04/12/93 |        | Added regions; consolidated declarations into one
+%            |        | qDecls list in region.
+%
+%****************************************************************************
+%
+
+Schema VERILOG Root Object Is
+
+%  Object is the initial item.
+%  Any object can be made into a LIST, if nodes are appended together.
+%  Each object has a LIST or NODE flag.
+%  Each object has a unique object number, to save tree to a file.
+%  Each object has a NEXT field, so an object can be part of one (1) LIST.
+
+
+
+% -----------------------------------------------------------------------
+% Regions 
+% -----------------------------------------------------------------------
+
+Object ::= nRegion
+nRegion =>
+	qSyms:		List		(nSymbol)		[Pri,Opt]
+	qShared:	List		(Object)		[Pri,Opt]
+% qShared is a primary link to shared nodes in the region
+
+nRegion ::= nDeclarationList
+nDeclarationList =>
+	qDecls:		List		(nDeclaration)		[Pri,Opt]
+
+nRegion ::= nBlock
+nBlock =>
+	qDecls:		List		(nDeclaration)		[Pri,Opt]
+	qStmts:		List		(nStatement)		[Pri,Opt]
+
+nRegion ::= nStatementList
+nStatementList =>
+	qStmts:		List		(nStatement)		[Pri,Opt]
+
+
+nDeclarationList ::= nSourceFile   % top level region for source file
+
+
+% -----------------------------------------------------------------------
+% Symbols
+% -----------------------------------------------------------------------
+
+Object ::= nExpr
+
+nExpr ::= nSymbol
+
+nSymbol ::= nSymbolDef
+nSymbolDef =>
+	qIdent:		Integer4
+	qDef:		Node		(Object)		[Alt,Opt]
+
+nSymbol ::= nSymbolRef
+nSymbolRef =>
+	qSym:		Node		(Object)		[Alt,Opt]
+
+
+% -----------------------------------------------------------------------
+% Declarations
+% -----------------------------------------------------------------------
+
+
+Object ::= nDeclaration
+nDeclaration =>
+	qDeclName:	Node		(nSymbolDef)		[Alt,Opt]
+%%	qLine:		Integer4
+
+nDeclaration ::= nDesignUnit
+nDesignUnit =>
+	qRegion:	Node		(nRegion)		[Pri]
+
+nDesignUnit ::= nModule			% qRegion -> nBlock
+
+nDesignUnit ::= nMacromodule		% TBD
+
+nDesignUnit ::= nPrimitive		% TBD
+
+
+% 'object' is a value holder
+
+nDeclaration ::= nObjectDecl
+nObjectDecl =>
+	qRange:		Node		(nRange)		[Alt,Opt]
+		   % bit range (or expandrange) -- Pri link in qShared
+	qMode:		Integer4	% In, Out, InOut, Internal, Undef
+
+nObjectDecl ::= nPortDecl   % input, output ...
+
+nObjectDecl ::= nNetDecl
+nNetDecl =>
+	qNetType:	Integer4	% wire, wand, ...
+	qDelay:		Node		(nDelay)		[Alt,Opt]
+
+nNetDecl ::= nImplicitNetDecl
+
+nNetDecl ::= nTriregDecl
+nTriregDecl =>
+	qCharge:	Integer4	% small, medium, large
+
+nObjectDecl ::= nRegDecl
+nRegDecl =>
+	qArrayLeft:	Node		(nExpr)			[Pri,Opt]
+	qArrayRight:	Node		(nExpr)			[Pri,Opt]
+
+nRegDecl ::= nIntegerDecl
+
+nRegDecl ::= nTimeDecl
+
+nRegDecl ::= nRealDecl
+
+
+nObjectDecl ::= nParamDecl
+nParamDecl =>
+	qValue:		Node		(nExpr)			[Pri]
+
+nObjectDecl ::= nEventDecl
+
+
+nDeclaration ::= nExternalModuleDecl     % a reference to another module
+
+nDeclaration ::= nLabelDecl   % e.g. a gate instance name; qLabelled -> nGateInst statement
+nLabelDecl =>
+	qLabelled:	Node		(Object)		[Alt,Opt]  % typically a statement
+
+Object ::= nRange
+nRange =>
+	qLeft:		Node		(nExpr)			[Pri]
+	qRight:		Node		(nExpr)			[Pri]
+
+nRange ::= nVectoredRange
+
+nRange ::= nScalaredRange
+
+Object ::= nStrength
+nStrength =>
+	qStrength0:	Integer4
+	qStrength1:	Integer4
+
+
+% -----------------------------------------------------------------------
+% Expressions -- Possibly temporary, put in for now
+% -----------------------------------------------------------------------
+
+nExpr ::= nOperator
+nOperator =>
+	qOp:        Integer4
+	
+nOperator ::= nUnaryOperator
+nUnaryOperator =>
+	qExpr:      Node      (nExpr)           [Pri]
+
+nOperator ::= nBinaryOperator
+nBinaryOperator =>
+	qLeft:      Node      (nExpr)           [Pri]
+	qRight:     Node      (nExpr)           [Pri]
+
+nOperator ::= nIfOperator      % expr ? expr : expr
+nIfOperator =>
+	qExpr:      Node      (nExpr)           [Pri]
+	qLeft:      Node      (nExpr)           [Pri]   % Or, "qTrue" ?
+	qRight:     Node      (nExpr)           [Pri]
+
+nExpr ::= nFunctionCall
+nFunctionCall =>
+	qIdent:     Integer4
+	qArgs:      List      (nExpr)           [Pri]
+
+nFunctionCall ::= nFunctionCallSys
+
+nExpr ::= nLiteral
+
+nLiteral ::= nInteger4
+nInteger4 =>
+	qInteger4: Integer4
+
+nExpr ::= nDelay
+nDelay =>
+	qRiseDelay:    List      (nExpr)           [Pri]
+	qFallDelay:    List      (nExpr)           [Pri]
+	qTurnOffDelay: List      (nExpr)           [Pri]
+
+% Used for event control
+nExpr ::= nEventExpr
+nEventExpr =>
+	qEdge:      Integer4    % pPosEdge pNegEdge or 0 if none
+	qExpr:      Node         (nExpr)           [Pri]  % symbol ref or one-bit expr
+
+
+nExpr ::= nBitSelect
+nBitSelect =>
+	qVector:    Node         (nExpr)           [Pri]  % symbol ref
+	qIndex:     Node         (nExpr)           [Pri]  % bit index
+
+nExpr ::= nPartSelect
+nPartSelect =>
+	qVector:    Node         (nExpr)           [Pri]  % symbol ref
+	qLeft:      Node         (nExpr)           [Pri]
+	qRight:     Node         (nExpr)           [Pri]
+
+
+% Used when we need a node to represent a list of expressions
+nExpr ::= nExprList
+nExprList =>
+	qExprs:		List		(nExpr)		[Pri,Opt]
+
+
+nExpr ::= nTO_DO
+
+% -----------------------------------------------------------------------
+% Statements -- Possibly temporary, put in for now
+% -----------------------------------------------------------------------
+
+Object ::= nStatement
+
+nStatement ::= nAssign
+nAssign =>
+	qLvalue:	Node		(nExpr)			[Pri]
+	qExpr:		Node		(nExpr)			[Pri]
+ 
+nAssign ::= nContinuousAssign
+nContinuousAssign =>
+	qStrength:	Node		(nStrength)		[Alt]  %(alt for now, in qShared)
+ 
+nStatement ::= nIf
+nIf =>
+	qExpr:		Node		(nExpr)			[Pri]
+	qThen:		Node		(nStatement)		[Opt,Pri]
+	qElse:		Node		(nStatement)		[Opt,Pri]
+
+nStatement ::= nAlways
+nAlways =>
+	qStmt:      Node      (nStatement)      [Opt,Pri]
+
+nStatement ::= nInitial
+nInitial =>
+	qStmt:      Node      (nStatement)      [Opt,Pri]
+
+nStatement ::= nEventCtrlStatement    % statement controlled by event ctrl
+nEventCtrlStatement =>
+	qEvents:    List      (nEventExpr)      [Pri]   % list: or'd events
+	qStmt:      Node      (nStatement)      [Opt,Pri]
+
+nStatement ::= nDelayCtrlStatement
+nDelayCtrlStatement =>
+	qDelay:     Node      (nDelay)          [Pri]
+			% just uses single 'rise' delay
+	qStmt:      Node      (nStatement)      [Opt,Pri]
+
+
+nStatement ::= nInstance
+nInstance =>
+	qTerminals:	List		(nExpr)			[Pri,Opt]
+
+nInstance ::= nGateInst
+nGateInst =>
+	qGateType:	Integer4				% wire, wand, ...
+	qDelay:		Node		(nDelay)		[Alt,Opt]
+	qStrength:	Node		(nStrength)		[Alt]  %(alt for now, in qShared)
+						       % strength not allowed for all gates
+
+nInstance ::= nModuleInst
+nModuleInst =>
+	qModuleSym:	Node		(nSymbolDef)		[Alt]  % module type
+	qParamValues:	Node		(nExprList)		[Alt,Opt] %alt for now
+					% nExprList rather than list of nExpr so we can
+					% add list to qShared
+
+
+% -----------------------------------------------------------------------
+% Code Generation -- Extensions to the above classes
+% -----------------------------------------------------------------------
+
+nObjectDecl =>
+	qAddr:		Integer4	% runtime address
+	qType:		Integer4	% value type
+
+nRange =>
+	qLeftValue:	Integer4	% determined during elaboration
+	qRightValue:	Integer4
+	qLength:	Integer4
+
+End
+

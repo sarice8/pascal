@@ -1,0 +1,367 @@
+title: 'Schema 1.3 -- Database Schema Compiler -- Aug 24, 1993';
+%
+%  Schema.ssl
+%
+%  HISTORY
+%    01May91   1.0   First version
+%    05May91         Record attribute class
+%    30May91   1.1   Added attribute tags
+%    09Jun93   1.2   Use schema to define schema.  Construct tree
+%                    of all definitions before tables dumped, allowing
+%                    late addition of attributes (after other
+%                    classes have been derived from this class)
+%    24Aug93   1.3   Error if no class specified to receive attribute 
+%
+
+input:
+	% General
+
+	pINVALID
+	pEOF
+	pIDENTIFIER
+
+	% Types
+
+        pBoolean1
+        pCharacter1
+	pInteger4
+        pInteger8
+        pIntegerN
+        pReal4
+        pReal8
+        pRealN
+        pStringN
+        pObjectType
+	pNode
+	pList
+
+	% Option Tags
+
+	pPri
+	pAlt
+	pOpt
+        pInt
+        pExt
+        pSys
+        pTmp
+
+	% keywords
+
+	pSchema
+	pRoot
+	pIs
+	pEnd
+
+	% Punctuation
+
+	pDERIVES    '::='
+	pCONTAINS   '=>'
+	pCOLON      ':'
+	pCOMMA      ','
+	pLPAREN     '('
+	pRPAREN     ')'
+	pLSQUARE    '['
+	pRSQUARE    ']'
+	;
+
+output:
+	;
+
+error:
+	eNoClassForAttribute     % attribute defined while no current class set
+	;
+
+type boolean:
+	false       = 0
+        true        = 1
+	;
+
+include 'schema_schema.ssl'
+
+% ----------------------------------------------------------------
+%
+% Should also be declared with schema_schema.ssl
+% (perhaps via a nested include file)
+
+type void:      % represents any type (in ssl, all types are scalar)
+	Null = 0		% e.g. could assign to Node, List, Item, String
+	;
+
+type String:
+	;
+
+type Node:
+	;
+
+type List:
+	;
+
+type Item:
+	;
+
+type AttrCode:
+	Attr_Invalid = 0
+	Attr_qIdent
+	Attr_qType
+	Attr_qAttrSym
+	;
+
+mechanism NodeMech:
+	IsNull (void) >> boolean
+	IsEmpty (List) >> boolean
+	SetAttr (Node, AttrCode attr, void value)
+	GetAttr (Node, AttrCode attr) >> void
+	Append  (List, Node)
+	Find (List, AttrCode, void value) >> Node
+
+	% iterate keyword uses functions based on
+	% type of iterator variable provided. (in this case, Node)
+	% If an optional third parameter is given, a local variable
+	% is allocated to assist in iteration.
+	% If either of the functions returns false, iteration ends.
+
+	iterate_Node_start (out Node,   in List, out   Item) >> boolean
+	iterate_Node_next  (inout Node, in List, inout Item) >> boolean
+	;
+
+
+% Could have schema generate macro definitions for SSL source:
+%
+%   define  qIdent (node)             = GetAttr (node, Attr_qIdent);
+%   define  SetqIdent (node, value)   = SetAttr (node, Attr_qIdent, value);
+%
+%   define  qAttrSym (node)           = GetAttr (node, Attr_qAttrSym);
+%   define  SetqAttrSym (node, value) = SetAttr (node, Attr_qAttrSym, value);
+%
+% or generate individual functions:
+%
+%   mechanism SchemaMech:
+%       qIdent (Node) >> void
+%       SetqIdent (Node, void)
+%
+% Either way will take up space in SSL symbol table.
+% Second approach need to generate C implementation code for schema,
+% to include in C mechanism code.  Need that anyway for first case,
+% but there it is generic for any schema (GetAttr, etc).
+% Pick first for now.
+% Also, this form of macro definition is handy.  Can define anything,
+% and less syntax-sensitive than C.  
+%     define <name> [ '(' <params> ')' ] '=' <replacement> ';'
+
+% But for now we don't have 'define', so provide the individual funcs we need:
+mechanism SchemaMech:
+	NewSchemaRoot >> Node
+	SetqType (Node, int)
+	SetqAttrSym (Node, Node)
+	qClassTree (Node) >> List
+	qAttrSyms (Node) >> List
+	;
+
+mechanism ssl:
+	LastId >> int		% integer code of last accepted identifier
+	AddId (String) >> int	% Adds string to identifier table (as IDENTIFIER)
+				% and returns ident code.  Equivalent of ssl_add_id()
+	Inc (inout int)
+	Plus (int, int) >> int
+	Equals (int, int) >> boolean
+	Not (boolean) >> boolean
+	;
+
+%
+% ----------------------------------------------------------------
+
+type aType:              % attribute type
+	type_INVALID  = 0
+	type_Integer4 = 4
+	type_Node     = 100
+	type_List     = 150
+	;
+
+type aTag:               % attribute tags (defined as bits)
+	tag_INVALID = 0
+	tag_Pri     = 1
+	tag_Opt     = 2
+	tag_Alt     = 4
+	;
+
+
+mechanism doc:
+	oDocDumpTable     % dump results
+	;
+
+
+rules
+
+Node    schema_root
+Node    current_class
+int     next_attr_code
+
+Schema:
+	current_class = Null
+	next_attr_code = 0
+
+	@create_empty_schema
+
+	@schema_header
+
+	{
+	    [ | pEnd, pEOF : > | * : ]
+
+	    pIDENTIFIER
+	    [
+		| '::=' :	@class_derivation
+
+		| '=>' :	@attribute_assignment
+
+		| ':' :		@attribute_definition
+	    ]
+	}
+
+	oDocDumpTable
+	;
+
+
+schema_header:
+	pSchema
+	pIDENTIFIER    % name of schema
+	pRoot
+	pIDENTIFIER    % name of root object
+	pIs
+	;
+
+
+class_derivation:
+	Node  superclass, subclass
+
+	superclass = @find_class (LastId)
+	pIDENTIFIER
+	subclass   = @derive_class (superclass, LastId)
+
+	current_class = Null	% disallow attribute definitions for now
+	;
+
+attribute_assignment:
+	current_class = @find_class (LastId)
+	;
+
+attribute_definition:
+	Node  sym, attr
+
+	if IsNull (current_class)
+	    #eNoClassForAttribute     % attribute defined while no current class set
+
+	sym = @create_attr_sym (LastId)
+
+	attr = NewAttr			%    attr = new Attr
+	SetqAttrSym (attr, sym)		%    attr->qAttrSym = sym
+
+	[
+            | pBoolean1,
+	      pCharacter1,
+	      pInteger4,
+	      pInteger8,
+	      pIntegerN,
+              pReal4,
+	      pReal8,
+	      pRealN,
+	      pStringN,
+	      pObjectType :	SetqType (attr, type_Integer4)
+	    | pList :		SetqType (attr, type_List)
+	    | pNode :		SetqType (attr, type_Node)
+	]
+
+	[
+	    | '(' :  pIDENTIFIER   ')'    % constraint ignored for now
+	    | * :
+	]
+
+	[
+	    | '[' :  {[
+	                 | pPri :  SetqTags(attr, Plus(tag_Pri, qTags(attr)))
+	                 | pAlt :  SetqTags(attr, Plus(tag_Alt, qTags(attr)))
+	                 | pOpt :  SetqTags(attr, Plus(tag_Opt, qTags(attr)))
+	                 | ','  :
+	                 | * :     >
+	             ]}
+	             ']'
+	    | * :
+	]
+	;
+
+
+create_empty_schema:
+	Node  n
+
+	schema_root = NewSchemaRoot
+
+	n = NewClass
+	SetqIdent (n, AddId('nINVALID'))
+	Append (qClassTree(schema_root), n)
+
+	n = NewClass
+	SetqIdent (n, AddId('Object'))
+	Append (qClassTree(schema_root), n)
+
+	n = NewAttrSym
+	SetqIdent (n, AddId('qINVALID'))
+	SetqCode (n, next_attr_code)
+	Inc(next_attr_code)
+	Append (qAttrSyms(schema_root), n)
+	;
+
+find_class (int ident) >> Node:
+	Node  class
+
+	class = @find_class_in_tree (qClassTree(schema_root), ident)
+	
+	if IsNull(class)
+	    #eUndefinedClass
+
+	>> class
+	;
+
+find_class_in_tree (List roots, int ident) >> Node:
+	Node  n
+
+	iterate n roots
+	{
+	    if Equals(qIdent(n), ident)
+		>> n
+
+	    find_in_derived = @find_class_in_tree (qDerived(n), ident)
+	    if Not(IsNull (find_in_derived))
+		>> find_in_derived
+	}
+
+	>> Null
+	;
+
+derive_class (Node superclass, int ident) >> Node:
+	Node  class
+
+	if Not(IsNull (@find_class (ident)))
+	    #eMultiplyDefinedClass
+
+	class = NewClass
+	SetqIdent (class, ident)
+	Append (qDerived(superclass), class)
+	>> class
+	;
+
+create_attr_sym (int ident) >> Node:
+	Node  sym
+
+	sym = Find (qAttrSyms(schema_root), Attr_qIdent, ident)
+	[ IsNull (sym)
+	    sym = NewAttrSym
+	    SetqIdent (sym, ident)
+	    Inc(next_attr_code)
+	    SetqCode (sym, next_attr_code)
+	    Append (qAttrSyms(schema_root), sym)
+	]
+
+	>> sym
+	;
+
+end
+

@@ -440,6 +440,7 @@ w_dump_table ()
 {
     Node                 class;
     Item                 I;
+    Node                 N;
     short               *obj_sizes;
     char                *obj_isa;
     short               *attr_offsets;
@@ -449,20 +450,26 @@ w_dump_table ()
     short                a, c;
     int                  current_class_code;
 
+    w_create_all_classes_list ();
+
     printf ("\n");
     printf ("Writing SSL code to %s\n", SSL_out_filename);
 
     fprintf (f_ssl_out, "\n%% Generated automatically by schema\n\n");
 
     fprintf (f_ssl_out, "type node_type:\n");
-
-    w_dump_ssl_class_tree (qClassTree(SchemaRoot));
+    FOR_EACH_ITEM (I, qAllClasses(SchemaRoot))
+    {
+        fprintf (f_ssl_out, "\t%s\n", ssl_get_id_string(qIdent(Value(I))));
+    }
 
     fprintf (f_ssl_out, "\t;\n\n");
 
     fprintf (f_ssl_out, "type node_attribute:\n");
-
-    w_dump_ssl_attr ();
+    FOR_EACH_ITEM (I, qAttrSyms(SchemaRoot))
+    {
+        fprintf (f_ssl_out, "\tT_%s\n", ssl_get_id_string(qIdent(Value(I))));
+    }
 
     fprintf (f_ssl_out, "\t;\n\n");
 
@@ -535,14 +542,20 @@ w_dump_table ()
     fprintf (f_out, "int   dObjects = %d;\n", NumClasses);
     fprintf (f_out, "char *dObjectName [%d] = {\n", NumClasses);
 
-    w_dump_c_class_names (qClassTree(SchemaRoot));
+    FOR_EACH_ITEM (I, qAllClasses(SchemaRoot))
+    {
+        fprintf (f_out, "\t\"%s\",\n", ssl_get_id_string(qIdent(Value(I))));
+    }
 
     fprintf (f_out, "};\n\n");
 
     fprintf (f_out, "int   dAttributes = %d;\n", NumAttrSyms);
     fprintf (f_out, "char *dAttributeName [%d] = {\n", NumAttrSyms);
 
-    w_dump_c_attr_names ();
+    FOR_EACH_ITEM (I, qAttrSyms(SchemaRoot))
+    {
+        fprintf (f_out, "\t\"%s\",\n", ssl_get_id_string(qIdent(Value(I))));
+    }
 
     fprintf (f_out, "};\n\n");
 
@@ -585,29 +598,30 @@ w_dump_table ()
 }
 
 
-w_dump_ssl_class_tree (class_tree)
-List                   class_tree;
+/*  This list can be used to traverse all classes in schema  */
+w_create_all_classes_list ()
 {
-    Node       N;
-    Item       I;
+    List   L;
 
-    for (I = FirstItem(class_tree); I != NULL; I = NextItem(I))
-    {
-        N = Value(I);
-        fprintf (f_ssl_out, "\t%s\n", ssl_get_id_string(qIdent(N)));
-        w_dump_ssl_class_tree (qDerived(N));
-    }
+    L = NewList (nClass);
+
+    w_create_all_classes_sub (qClassTree(SchemaRoot), L);
+
+    SetqAllClasses (SchemaRoot, L);
 }
 
-w_dump_ssl_attr ()
+w_create_all_classes_sub (class_tree, L)
+List                      class_tree;
+List                      L;
 {
-    Node       N;
     Item       I;
+    Node       N;
 
-    for (I = FirstItem(qAttrSyms(SchemaRoot)); I != NULL; I = NextItem(I))
+    FOR_EACH_ITEM (I, class_tree)
     {
         N = Value(I);
-        fprintf (f_ssl_out, "\tT_%s\n", ssl_get_id_string(qIdent(N)));
+        AddLast (L, N);
+        w_create_all_classes_sub (qDerived(N), L);
     }
 }
 
@@ -772,32 +786,6 @@ short                 *parent_attr_tags;
 }
 
 
-w_dump_c_class_names (class_tree)
-List                  class_tree;
-{
-    Item        I;
-    Node        N;
-
-    for (I = FirstItem(class_tree); I != NULL; I = NextItem(I))
-    {
-        N = Value(I);
-        fprintf (f_out, "\t\"%s\",\n", ssl_get_id_string(qIdent(N)));
-        w_dump_c_class_names (qDerived(N));
-    }
-}
-
-w_dump_c_attr_names ()
-{
-    Item        I;
-    Node        N;
-
-    for (I = FirstItem(qAttrSyms(SchemaRoot)); I != NULL; I = NextItem(I))
-    {
-        N = Value(I);
-        fprintf (f_out, "\t\"%s\",\n", ssl_get_id_string(qIdent(N)));
-    }
-}
-
 w_dump_c_class_isa (class_tree, class_code_ptr, parent_obj_isa)
 List                   class_tree;
 int                   *class_code_ptr;
@@ -853,21 +841,47 @@ w_dump_h_macros ()
     printf ("Writing C macros to %s\n", H_out_filename);
 
     fprintf (f_h_out, "/* Generated automatically by schema */\n");
-
+    fprintf (f_h_out, "\n");
+    fprintf (f_h_out, "#include \"schema_db.h\"\n");
     fprintf (f_h_out, "\n");
 
-    for (I = FirstItem(qAttrSyms(SchemaRoot)); I != NULL; I = NextItem(I))
+    /* Define Classes and Attributes, in case the definitions aren't
+     * read from an SSL header.
+     */
+
+    fprintf (f_h_out, "#ifndef Object\n");
+
+    fprintf (f_h_out, "typedef enum {\n");
+    FOR_EACH_ITEM (I, qAllClasses(SchemaRoot))
+    {
+        fprintf (f_h_out, "    %s,\n", ssl_get_id_string(qIdent(Value(I))));
+    }
+    fprintf (f_h_out, "} ObjectType;\n");
+
+    fprintf (f_h_out, "\n");
+    fprintf (f_h_out, "typedef enum {\n");
+    FOR_EACH_ITEM (I, qAttrSyms(SchemaRoot))
+    {
+        fprintf (f_h_out, "    T_%s,\n", ssl_get_id_string(qIdent(Value(I))));
+    }
+    fprintf (f_h_out, "} AttrCode;\n");
+
+    fprintf (f_h_out, "#endif /* Object */\n");
+    fprintf (f_h_out, "\n");
+
+    /* Define query and set macros */
+
+    FOR_EACH_ITEM (I, qAttrSyms(SchemaRoot))
     {
         N = Value(I);
-        fprintf (f_h_out, "#define %s(N)		(%s)	GetAttr(T_%s, N)\n",
+        fprintf (f_h_out, "#define %s(N)\t\t(%s)\tGetAttr(T_%s, N)\n",
                  ssl_get_id_string(qIdent(N)),
                  SCH_GetTypeName(qType(N)),
                  ssl_get_id_string(qIdent(N)));
     }
 
     fprintf (f_h_out, "\n");
-
-    for (I = FirstItem(qAttrSyms(SchemaRoot)); I != NULL; I = NextItem(I))
+    FOR_EACH_ITEM (I, qAttrSyms(SchemaRoot))
     {
         N = Value(I);
         fprintf (f_h_out, "#define Set%s(N,V)\t\tSetAttr(T_%s, N, (void*)(V))\n",
@@ -876,30 +890,15 @@ w_dump_h_macros ()
     }
 
     fprintf (f_h_out, "\n");
-
-    w_dump_class_macros (qClassTree(SchemaRoot));
-
-    fprintf (f_h_out, "\n");
-}
-
-w_dump_class_macros (class_tree)
-List                 class_tree;
-{
-    Item       I;
-    Node       N;
-
-    FOR_EACH_ITEM (I, class_tree)
+    FOR_EACH_ITEM (I, qAllClasses(SchemaRoot))
     {
         N = Value(I);
         fprintf (f_h_out, "#define New%s()\t\tNewNode(%s)\n",
                  ssl_get_id_string (qIdent(N)),
                  ssl_get_id_string (qIdent(N)));
-
-        if (!IsEmpty (qDerived(N)))
-        {
-            w_dump_class_macros (qDerived(N));
-        }
     }
+
+    fprintf (f_h_out, "\n");
 }
 
 

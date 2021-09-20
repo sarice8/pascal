@@ -4,7 +4,7 @@
 ROOT             = /home/sarice/compilers
 
 # Currently built by bootstrap (hand-edited) version of schema 1.4
-SCHEMA_DIR       = ${ROOT}/schema/1.4/boot1
+SCHEMA_DIR       = ${ROOT}/schema/1.4/boot2
 
 # Generic SSL runtime module
 SSL_RT_DIR       = ${ROOT}/ssl_rt/2.0
@@ -33,7 +33,7 @@ SCHEMA_OBJS      = schema.o schema_schema.o schema_db.o \
 		   ${SSL_RT_DIR}/ssl_rt.o \
 		   ${SSL_RT_DIR}/ssl_scan.o
 
-all: schema schema_tool
+all: schema schema_tool browser.o
 
 schema:   ${SCHEMA_OBJS}
 	cc -o schema ${SCHEMA_OBJS} ${DEBUG_OBJS} ${DEBUG_STUBS}
@@ -67,4 +67,7 @@ ssl: schema.h
 
 schema_schema.c schema_schema.ssl:  schema.schema
 	${SCHEMA_DIR}/schema schema
+
+browser.o:   browser.c schema_db.h
+	cc -c browser.c -g
 
