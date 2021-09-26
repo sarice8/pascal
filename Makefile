@@ -13,6 +13,9 @@ SSL_RT_HEADERS = ${SSL_RT_DIR}/ssl_rt.h \
 # This SSL compiler used to build this one ...
 SSL_DIR        = ${RELEASE}/ssl/1.2.8
 
+# This is the directory we would export our own build to
+OUR_RELEASE_DIR = $(RELEASE)/ssl/1.2.8
+
 
 # ---------------------------------------------------------
 
@@ -49,8 +52,8 @@ SRCS = \
 OBJS = $(SRCS:%.c=$(OBJDIR)/%.o)
 
 LINK_OBJS = \
-  $(SSL_RT_DIR)/ssl_rt.o \
-  $(SSL_RT_DIR)/ssl_scan.o \
+  $(SSL_RT_DIR)/obj-$(OSTYPE)/ssl_rt.o \
+  $(SSL_RT_DIR)/obj-$(OSTYPE)/ssl_scan.o \
 
 ALL_OBJS = $(OBJS) $(LINK_OBJS)
 
@@ -65,14 +68,15 @@ EXEC = $(BINDIR)/ssl
 
 # Note:  | $(BINDIR)   means the exec depends on existence of $BINDIR, but its timestamp is irrelevant.
 $(EXEC):  $(OBJS) | $(BINDIR)
-	cc $^ $(LINK_OBJS) -o $@
+#	cc $^ $(LINK_OBJS) -o $@
+	cc $^ $(DBG_OBJS) $(LINK_OBJS) $(DBG_STUBS) -o $@
 
 
 # Tool with integrated cmdline debugger
 EXEC_DBG = $(BINDIR)/ssldbg
 
 $(EXEC_DBG):  $(OBJS) | $(BINDIR)
-	cc $^ $(DBG_OBJS) $(LINK_OBJS) $(DBG_STUBS)
+	cc $^ $(DBG_OBJS) $(LINK_OBJS) $(DBG_STUBS) -o $@
 
 
 #  Integrated graphical debugger
@@ -112,4 +116,12 @@ $(BINDIR):
 #	mv ram_ssl.lst ssl.lst
 #	mv ram_ssl.dbg ssl.dbg
 #
+
+
+# Release
+
+release:
+	mkdir -p $(OUR_RELEASE_DIR)
+	mkdir -p $(OUR_RELEASE_DIR)/bin-$(OSTYPE)
+	cp -p $(BINDIR)/ssl $(OUR_RELEASE_DIR)/bin-$(OSTYPE)/ssl
 
