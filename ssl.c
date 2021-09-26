@@ -50,10 +50,11 @@ static char sccsid[] = "%W% %G% %U% %P%";
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #ifdef AMIGA
 #include <dos.h>
-#endif AMIGA
+#endif // AMIGA
 
 /*  SSL Runtime module definitions  */
 #include "ssl_rt.h"
@@ -200,11 +201,20 @@ dbg_variables debug_variables[] =
 #endif /* DEBUG */
 
 
+// Forward declarations
+
+void open_my_files();
+void init_my_scanner();
+void close_my_files();
+int hit_break_key();
+void w_optimize_table();
+void w_dump_tables();
+
 /* ----------------------------------------------------------------- */
 
 /*  Callbacks  */
-int  my_listing_function ();
-int  init_my_operations ();
+void my_listing_function( char* source_line, int token_accepted );
+void init_my_operations();
 
 
 /* ----------------------------------------------------------------- */
@@ -219,11 +229,11 @@ int  init_my_operations ();
 */
 
 
+void
 main (argc, argv)
 int   argc;
 char *argv[];
 {
-    int     hit_break_key();
     short   arg;
     char   *p;
     int     status;
@@ -320,7 +330,7 @@ char *argv[];
 
 #ifdef AMIGA
     onbreak(&hit_break_key);
-#endif AMIGA
+#endif // AMIGA
 
 
     /*  Execute SSL program  */
@@ -353,7 +363,7 @@ char *argv[];
  *  Line supplied to us containing '\n' for now.
  */
 
-int my_listing_function (source_line, token_accepted)
+void my_listing_function (source_line, token_accepted)
 char                    *source_line;
 int                      token_accepted;
 {
@@ -397,6 +407,8 @@ int                      token_accepted;
     }
 }
 
+
+void
 open_my_files ()
 {
     if ((f_out = fopen(tbl_out_filename, "w")) == NULL)
@@ -431,6 +443,8 @@ open_my_files ()
 
 }
 
+
+void
 close_my_files ()
 {
     fclose (f_out);
@@ -444,6 +458,8 @@ close_my_files ()
         fclose (f_dbg);
 }
 
+
+int
 hit_break_key()
 {
   printf("Breaking...\n");
@@ -455,6 +471,7 @@ hit_break_key()
 /* --------------------------- Semantic Operations ----------------------- */
 
 
+void
 init_my_operations()
 {
     register short i;
@@ -831,6 +848,7 @@ struct ssl_token_table_struct my_operator_table[] =
 struct ssl_special_codes_struct my_special_codes;
 
 
+void
 init_my_scanner ()
 {
     my_special_codes.invalid = pInvalid;
@@ -843,6 +861,7 @@ init_my_scanner ()
 }
 
 
+void
 w_dump_tables()
 {
     short             i;
@@ -975,7 +994,7 @@ w_dump_tables()
         }
     }
     fprintf(f_hdr,"   \"\", 0\n};\nint ssl_error_table_size = %d;\n",count);
-    fprintf(f_hdr,"\n#endif SSL_INCLUDE_ERR_TABLE\n");
+    fprintf(f_hdr,"\n#endif // SSL_INCLUDE_ERR_TABLE\n");
 
 }
 
@@ -988,6 +1007,7 @@ w_dump_tables()
  *        compiler that generated the output table.
  */
 
+void
 w_optimize_table ()
 {
     short  pc, target, final_target;
@@ -1111,6 +1131,7 @@ w_optimize_table ()
                 improved_case_jump_count);
 }
 
+
 short find_ultimate_destination (pc)
 short                      pc;
 {
@@ -1137,6 +1158,7 @@ short                      pc;
 /*  Need this stub function for now, if integrating with debugger
     but not schema database  */
 
+void
 nodeDumpTreeNum ()
 {
     printf ("Schema database not used in this program\n");

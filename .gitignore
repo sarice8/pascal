@@ -1,0 +1,13 @@
+ 
+# Files to be ignored by git.
+# Any file not ignored will be noticed, and reported as "untracked"
+# until it is added to the repository or added to this ignore file.
+
+bin-*/
+obj-*/
+.vscode
+
+# vim swap files
+*.swp
+*.swo
+
