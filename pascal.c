@@ -12,10 +12,12 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <assert.h>
 
 #ifdef AMIGA
 #include <dos.h>
-#endif AMIGA
+#endif // AMIGA
 
 #define  SSL_INCLUDE_ERR_TABLE
 #include "pascal.h"
@@ -134,6 +136,26 @@ struct t_kwTableType {
 };
 
 
+// Forward declarations
+void t_initScanner ();
+void t_getNextToken();
+void t_lookupId();
+short t_addId( char* name, short code );
+short lookup(short id);
+int t_hitBreak();
+void t_cleanup();
+void t_fatal( char* msg );
+void t_printToken();
+void t_error( char* msg );
+void t_dumpTables();
+
+void w_initSemanticOperations();
+void w_walkTable();
+void w_traceback();
+void w_errorSignal( short err );
+
+
+
 #define t_getToken()   { if (t_token.accepted) t_getNextToken(); }
 
 /* Variables for table walker */
@@ -226,11 +248,11 @@ struct dPStype {
     dPatchI, 0, dPatchIsize};
 
 
+void
 main(argc,argv)
 int argc;
 char *argv[];
 {
-  int t_hitBreak();
   int entries,temp;                /* I can't seem to read a 'short' */
   short arg;
 
@@ -251,14 +273,17 @@ char *argv[];
     printf("Can't open table file %s\n",TABLE_FILE);
     exit(10);
   }
-  fgets(t_lineBuffer,t_lineSize,t_src);   /* get title string */
-  fscanf(t_src,"%d",&entries);
+  char* p = fgets(t_lineBuffer,t_lineSize,t_src);   /* get title string */
+  assert( p != NULL );
+  int read = fscanf(t_src,"%d",&entries);
+  assert( read == 1 );
   if (entries>w_codeTableSize) {
     printf("Table file too big; must recompile %s.c\n",argv[0]);
     exit(10);
   }
   for (w_pc=0; w_pc<entries; w_pc++) {
-    fscanf(t_src,"%d",&temp);
+    read = fscanf(t_src,"%d",&temp);
+    assert( read == 1 );
     w_codeTable[w_pc] = temp;
   }
   fclose(t_src);
@@ -286,7 +311,7 @@ char *argv[];
 
 #ifdef AMIGA
   onbreak(&t_hitBreak);
-#endif AMIGA
+#endif // AMIGA
 
   t_initScanner();
 
@@ -310,8 +335,8 @@ char *argv[];
 
 /*********** S e m a n t i c   O p e r a t i o n s ***********/
 
-w_errorSignal(err)
-short err;
+void
+w_errorSignal( short err )
 {
   short i;
   i = err;
@@ -321,10 +346,9 @@ short err;
   t_error(w_errBuffer);
 }
 
+void
 w_initSemanticOperations()
 {
-  short t_addId();
-
   /* Symbol display level 0 is for global symbols.
      Symbol table entry 0 is unused; it is referenced when an undefined
      name is searched for. */
@@ -380,10 +404,9 @@ w_initSemanticOperations()
 }
 
 
+void
 w_walkTable()
 {
-   short lookup();
-
    while (1) {
      switch (w_codeTable[w_pc++]) {
 
@@ -720,8 +743,8 @@ w_walkTable()
 /* Search the symbol table for the id given.  If found, return index in
    table.  Otherwise, return 0. */
 
-short lookup(id)
-short id;
+short
+lookup( short id )
 {
   short i;
   for (i=dSTptr; i>=1; i--)
@@ -731,6 +754,7 @@ short id;
 }
 
 
+void
 w_traceback()
 {
   short i;
@@ -748,6 +772,7 @@ w_traceback()
 
 /************************ S c a n n e r *********************/
 
+void
 t_initScanner ()
 {
   register short i;
@@ -806,6 +831,8 @@ t_initScanner ()
     (void) t_addId(t_kwTable[i].name,t_kwTable[i].code);
 }  
 
+
+void
 t_getNextToken()
 {
   char *p;
@@ -933,9 +960,8 @@ t_getNextToken()
   }
 }
 
-short t_addId(name,code)
-char *name;
-short code;
+
+short t_addId( char* name, short code )
 {
   short namelen;
   if (t_idTableNext >= t_idTableSize)
@@ -951,9 +977,11 @@ short code;
   return(t_idTableNext++);
 }
 
+
+void
 t_lookupId()
 {
-  short i,t_addId();
+  short i;
   register char *a,*b;
 
   for (i=0;i<t_idTableNext;i++) {
@@ -972,6 +1000,8 @@ t_lookupId()
   t_token.val = t_addId(t_token.name,pIdent);
 }
 
+
+int
 t_hitBreak()
 {
   printf("Breaking...\n");
@@ -979,6 +1009,8 @@ t_hitBreak()
   return(1);
 }
 
+
+void
 t_cleanup()
 {
   t_dumpTables();
@@ -988,8 +1020,9 @@ t_cleanup()
   if (t_listing) fclose(t_lst);
 }
 
-t_fatal(msg)
-char *msg;
+
+void
+t_fatal( char* msg )
 {
   printf("[FATAL] ");
   fprintf(t_doc,"[FATAL] ");
@@ -999,6 +1032,8 @@ char *msg;
   exit(5);
 }
 
+
+void
 t_printToken()
 {
   printf(" (Token=");
@@ -1018,8 +1053,9 @@ t_printToken()
   }
 }
 
-t_error(msg)
-char *msg;
+
+void
+t_error( char* msg )
 {
   char *p,spaceBuf[256];
   short col;
@@ -1036,6 +1072,8 @@ char *msg;
   /* t_printToken(); */
 }
 
+
+void
 t_dumpTables()
 {
   short i,col;

@@ -17,7 +17,7 @@ BEGIN
   while (i <= 10) do
     begin
       y := i * 5;
-      writeln (x, y, x+y);
+      writeln (x, ', ', y, ', ', x+y);
       i := i + 1;
     end;
 END.

@@ -15,10 +15,12 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <assert.h>
 
 #ifdef AMIGA
 #include <dos.h>
-#endif AMIGA
+#endif // AMIGA
 
 #include "pascal.h"
 
@@ -37,11 +39,20 @@ short data[dataMax];         /* Data memory */
 short temp, *ptr1, *ptr2;
 char trace, underflow, dump;
 
+
+// Forward declarations
+void walkTable();
+void dumpTable();
+void hitBreak();
+void fatal( char* msg );
+void cleanup();
+
+
+void
 main(argc,argv)
 int argc;
 char *argv[];
 {
-  int hitBreak();
   int temp;                /* I can't seem to read a 'short' */
   short arg;
   short address,count;
@@ -53,7 +64,7 @@ char *argv[];
   arg = 1;
   if (arg>=argc) {
     printf("Usage:  stackmachine -trace -underflow -dump <file>\n");
-    return(-1);
+    exit(-1);
   }
   while (argv[arg][0]=='-') {
     if (argv[arg][1]=='t' || argv[arg][1]=='T')
@@ -66,17 +77,19 @@ char *argv[];
   }
   if((src=fopen(argv[arg],"r"))==NULL) {
     printf("Can't open program file %s\n",argv[arg]);
-    return(-1);
+    exit(-1);
   }
-  fscanf(src,"%d",&temp);
+  int read = fscanf(src,"%d",&temp);
+  assert( read == 1 );
   codeWords = temp;
   if (codeWords >= codeMax) {
     printf("Program code too big for buffer\n");
-    return(-1);
+    exit(-1);
   }
   printf("Stack Machine ");
   for (pc=0; pc<codeWords; pc++) {
-    fscanf(src,"%d",&temp);
+    read = fscanf(src,"%d",&temp);
+    assert( read == 1 );
     code[pc] = temp;
   } 
 
@@ -85,10 +98,12 @@ char *argv[];
 
   while (fscanf(src,"%d",&temp) != EOF) {
     address = temp;
-    fscanf(src,"%d",&temp);
+    read = fscanf(src,"%d",&temp);
+    assert( read == 1 );
     count = temp;
     while (count--) {
-      fscanf(src,"%d",&temp);
+      read = fscanf(src,"%d",&temp);
+      assert( read == 1 );
       data[address++] = temp;
     }
   }
@@ -98,11 +113,11 @@ char *argv[];
 
 #ifdef AMIGA
   onbreak(&hitBreak);
-#endif AMIGA
+#endif // AMIGA
 
   if (dump) {
     dumpTable();
-    return(0);
+    exit(0);
   }
 
   /* Execute code */
@@ -116,6 +131,8 @@ char *argv[];
   cleanup();
 }
 
+
+void
 walkTable()
 {
 
@@ -269,13 +286,15 @@ walkTable()
               pc++;
               continue;
        case tPutInt :
-              printf("% d",stack[sp--]);
+              printf("%d",stack[sp--]);
               continue;
        case tPutBool :
               printf(stack[sp--] ? "TRUE" : "FALSE");
               continue;
        case tPutStr :
-              printf("%s",&data[stack[sp--]]);
+              // SARICE 9/26/2021 - string literals are stored in the intermediate file
+              //   as pairs of characters in a short, so have an endian problem.
+              printf("%s",(char*)&data[stack[sp--]]);
               continue;
        case tPutPtr :
               printf(" <%d>",stack[sp--]);
@@ -291,9 +310,11 @@ walkTable()
    }
 }
 
+
 #define op0(str) { fprintf(dmp,"%s\n",str); continue; }
 #define op1(str) { fprintf(dmp,"%s\t%4d\n",str,code[pc++]); continue; }
 
+void
 dumpTable()
 {
   if((dmp=fopen("a.dmp","w"))==NULL) {
@@ -349,22 +370,27 @@ dumpTable()
    }
 }
 
+
+void
 hitBreak()
 {
   printf(".Breaking...\n");
   cleanup();
-  return(1);
+  //return(1);
+  exit(1);
 }
 
-fatal(msg)
-char *msg;
+
+void
+fatal( char* msg )
 {
   printf(".FATAL - %s at %d\n",msg,pc);
   exit(5);
 }
 
+
+void
 cleanup()
 {
-  fclose(src);
 }
 
