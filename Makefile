@@ -91,37 +91,24 @@ $(BINDIR):
 
 
 
-# schema.o depends on schema.tbl when using "ssl -c"
-#schema.o:   schema.c schema.h node.h schema.tbl ${SSL_RT_HEADERS}
-#	cc -c schema.c -g -I${DEBUG_DIR} -I${SSL_RT_DIR}
-
-#schema_scan.o:   schema_scan.c schema.h ${SSL_RT_HEADERS}
-#	cc -c schema_scan.c -g -I${SSL_RT_DIR}
-
-#schema_schema.o:  schema_schema.c
-#	cc -c schema_schema.c -g
-
-#node.o:   node.c node.h
-#	cc -c node.c -g
-
-#schema.h: schema.ssl schema_schema.ssl
-#	${SSL_DIR}/ssl -l -d -c schema
-#	- rm -f schema.h
-#	- rm -f schema.tbl
-#	- rm -f schema.lst
-#	- rm -f schema.dbg
-#	mv ram_schema.h schema.h
-#	mv ram_schema.tbl schema.tbl
-#	mv ram_schema.lst schema.lst
-#	mv ram_schema.dbg schema.dbg
-
-#ssl: schema.h
-
-
 # Compile schema of schema
 
 schema_schema.c schema_schema.ssl:  schema.schema
 	${SCHEMA_DIR}/bin-$(OSTYPE)/schema schema
+
+
+# Compile SSL code
+
+schema.h: schema.ssl schema_schema.ssl
+	$(SSL_DIR)/bin-$(OSTYPE)/ssl -l -d -c schema
+	- rm -f schema.h
+	- rm -f schema.tbl
+	- rm -f schema.lst
+	- rm -f schema.dbg
+	mv ram_schema.h schema.h
+	mv ram_schema.tbl schema.tbl
+	mv ram_schema.lst schema.lst
+	mv ram_schema.dbg schema.dbg
 
 
 # Release
