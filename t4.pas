@@ -14,7 +14,7 @@ begin
   for i := 1 to 9 do
     begin
       if i = 3 then
-        cycle;
+        cycle;   { "Cycle is a Mac Pascal extension. Borland Pascal has Continue instead." }
       for j := 1 to 2 do
         a1[i][j,j] := i;
     end;

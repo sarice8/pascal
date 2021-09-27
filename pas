@@ -1,4 +1,4 @@
-#!/bin/csh -f
+#!/bin/sh
 
-pascal $1
-sm a.out
+./bin-${OSTYPE}/pascal $1
+./bin-${OSTYPE}/sm a.out
