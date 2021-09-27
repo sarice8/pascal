@@ -34,22 +34,27 @@ static char sccsid[] = "%W% %G% %U% %P%";
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <stdarg.h>
 
 #ifdef AMIGA
 #include <dos.h>
-#endif AMIGA
+#endif // AMIGA
 
 
 #include "node.h"
+#include "ssl_rt.h"
+
 
 /* Schema definitions, defined in *_schema.c */
 /* NOTE, should read from *_schema.h */
 
 /* -------------------------------------------------------- */
 
-extern short dGetAttributeOffset (/* class, attribute */);
-extern short dGetAttributeType   (/* class, attribute */);
-extern short dGetAttributeTags   (/* class, attribute */);
+short dGetAttributeOffset ( short theClass, short attribute );
+short dGetAttributeType   ( short theClass, short attribute );
+short dGetAttributeTags   ( short theClass, short attribute );
+int   dGetClassIsA        ( short theClass, short isaclass );
 
 extern short dObjectSize [];
 
@@ -60,6 +65,11 @@ extern int   dAttributes;
 extern char *dAttributeName [];
 
 /* -------------------------------------------------------- */
+
+void node_assert_fun (int expr, int line_num);
+void nodeSaveNodeToFile ( FILE* t_out, void* data_ptr, int data_size );
+void indent_printf ( int indent, char* message, ... ) __attribute__ ((format (printf, 2, 3 )));
+
 
 #define node_assert(expr)  node_assert_fun((expr),__LINE__)
 
@@ -75,6 +85,7 @@ static struct nodeLookupStruct *NodeLookupList;
 
 
 /* Initialize node package */
+void
 nodeInit ()
 {
     NodeNextNum = 1;
@@ -84,8 +95,8 @@ nodeInit ()
 }
 
 
-NODE_PTR   nodeNew (node_type)
-short               node_type;
+NODE_PTR
+nodeNew( short node_type )
 {
     short      size;
     NODE_PTR   NP;
@@ -113,10 +124,9 @@ short               node_type;
     return (NP);
 }
 
-nodeLink (fromNP, fromAttr, toNP)
-NODE_PTR  fromNP;
-short     fromAttr;
-NODE_PTR  toNP;
+
+void
+nodeLink( NODE_PTR fromNP, short fromAttr, NODE_PTR toNP )
 {
     void      *attrP;
 
@@ -124,10 +134,9 @@ NODE_PTR  toNP;
     *(NODE_PTR *)attrP = toNP;
 }
 
-nodeSetValue (fromNP, fromAttr, value)
-NODE_PTR      fromNP;
-short         fromAttr;
-long          value;
+
+void
+nodeSetValue ( NODE_PTR fromNP, short fromAttr, long value )
 {
     void      *attrP;
 
@@ -138,10 +147,8 @@ long          value;
 
 /*  Append toNP to LIST attribute of fromNP  */
 
-nodeAppend (fromNP, fromAttr, toNP)
-NODE_PTR    fromNP;
-short       fromAttr;
-NODE_PTR    toNP;
+void
+nodeAppend ( NODE_PTR fromNP, short fromAttr, NODE_PTR toNP )
 {
     void      *attrP;
     NODE_PTR   NP;
@@ -154,12 +161,12 @@ NODE_PTR    toNP;
     *(NODE_PTR *)attrP = nodeAppendList (NP, toNP);
 }
 
+
 /*  Append toNP to same list as fromNP.
     Returns new head of list  */
 
-NODE_PTR  nodeAppendList (fromNP, toNP)
-NODE_PTR                  fromNP;
-NODE_PTR                  toNP;
+NODE_PTR
+nodeAppendList ( NODE_PTR fromNP, NODE_PTR toNP )
 {
     LIST_PTR   LP;
 
@@ -189,11 +196,11 @@ NODE_PTR                  toNP;
     }
 }
 
+
 /*  Get a NODE attribute.  If points to a LIST, returns first node of list.  */
 
-NODE_PTR nodeGet (fromNP, fromAttr)
-NODE_PTR          fromNP;
-short             fromAttr;
+NODE_PTR
+nodeGet ( NODE_PTR fromNP, short fromAttr )
 {
     void      *attrP;
     NODE_PTR   NP;
@@ -206,10 +213,10 @@ short             fromAttr;
         return (((LIST_PTR)NP)->head);
 }
 
+
 /*  Get an INTEGER attribute.  */
-long   nodeGetValue (fromNP, fromAttr)
-NODE_PTR             fromNP;
-short                fromAttr;
+long
+nodeGetValue ( NODE_PTR fromNP, short fromAttr )
 {
     void      *attrP;
     NODE_PTR   NP;
@@ -217,6 +224,7 @@ short                fromAttr;
     attrP = nodeGetAttrPtr (fromNP, fromAttr);
     return (*(long *)attrP);
 }
+
 
 /*  Return the first node in a LIST.
     Usually not necessary since this is automatically done
@@ -226,8 +234,8 @@ short                fromAttr;
     list head directly (it may be a list head structure
     rather than a node). */
 
-NODE_PTR  nodeFirst (fromNP)
-NODE_PTR            fromNP;
+NODE_PTR
+nodeFirst ( NODE_PTR fromNP )
 {
     if ((fromNP == NULL) || (!fromNP->list))
         return (fromNP);
@@ -235,19 +243,22 @@ NODE_PTR            fromNP;
         return (((LIST_PTR)fromNP)->head);
 }
 
+
 /*  Return the next node in a LIST  */
-NODE_PTR  nodeNext (fromNP)
-NODE_PTR            fromNP;
+NODE_PTR
+nodeNext ( NODE_PTR fromNP )
 {
     return (fromNP->next);
 }
 
+
 /*  Return the node's type  */
-int       nodeType (fromNP)
-NODE_PTR            fromNP;
+int
+nodeType ( NODE_PTR fromNP )
 {
     return (fromNP->node_type);
 }
+
 
 /*  Compare two node trees for equivalent contents.
     If nodes contain Alt links, they must point to
@@ -255,10 +266,8 @@ NODE_PTR            fromNP;
     Alt links, and will fail unless alt links point
     to the same node). */
 
-
-int       nodeCompare (NP1, NP2)
-NODE_PTR               NP1;
-NODE_PTR               NP2;
+int
+nodeCompare ( NODE_PTR NP1, NODE_PTR NP2 )
 {
     short     attr;
     short     node_type;
@@ -318,10 +327,10 @@ NODE_PTR               NP2;
     return (1);   /* Match */
 }
 
+
 /* Save tree to file  */
-nodeSaveTree (t_out, fromNP)
-FILE         *t_out;
-NODE_PTR      fromNP;
+void
+nodeSaveTree ( FILE* t_out, NODE_PTR fromNP )
 {
     nodeSaveTreeToFile (t_out, fromNP);
 }
@@ -332,11 +341,8 @@ NODE_PTR      fromNP;
 /* Implemented using fast node marcros, for speed.  But these macros
    still perform error checking.  */
 
-NODE_PTR   nodeFindValue (fromNP, fromAttr, findAttr, findValue)
-NODE_PTR                  fromNP;
-short                     fromAttr;
-short                     findAttr;
-long                      findValue;
+NODE_PTR
+nodeFindValue ( NODE_PTR fromNP, short fromAttr, short findAttr, long findValue )
 {
     NODE_PTR  NP;
 
@@ -353,11 +359,8 @@ long                      findValue;
 
 /*  Does no error checking, all nodes in list must be valid for search  */
 
-NODE_PTR   nodeFindValue_NoErrorChecking (fromNP, fromAttr, findAttr, findValue)
-NODE_PTR                  fromNP;
-short                     fromAttr;
-short                     findAttr;
-long                      findValue;
+NODE_PTR
+nodeFindValue_NoErrorChecking ( NODE_PTR fromNP, short fromAttr, short findAttr, long findValue )
 {
     NODE_PTR  NP;
 
@@ -375,9 +378,8 @@ long                      findValue;
 /*  Given a node and an attribute code, return a pointer to
     the attribute field within the node.                    */
 
-void *nodeGetAttrPtr (dNode, attr)
-NODE_PTR              dNode;
-short                 attr;
+void*
+nodeGetAttrPtr ( NODE_PTR dNode, short attr )
 {
     short     offset;
     char      errbuf [256];
@@ -427,15 +429,15 @@ short                    node_type;
 
 #define nodeConvertToNum(ptr) (NODE_PTR) ((ptr) ? (ptr)->node_num : 0)
 
-nodeSaveTreeToFile (t_out, root)
-FILE               *t_out;
-NODE_PTR            root;
+
+void
+nodeSaveTreeToFile ( FILE* t_out, NODE_PTR root )
 {
     short       attr;
     LIST_PTR    list;
     NODE_PTR    node_ptr;
     NODE_PTR   *attr_ptr;
-    static      error_buf[256];
+    static char error_buf[256];
 
     if (root == NULL)
         return;
@@ -469,7 +471,7 @@ NODE_PTR            root;
                             *attr_ptr = nodeConvertToNum (*attr_ptr);
                             if ((dGetAttributeTags(root->node_type, attr) & 4) == 0)  /* not Alt */
                                 nodeSaveTreeToFile (t_out, node_ptr);
-#else 0    /*  For Testing  */
+#else      /*  For Testing  */
                             if (node_ptr != NULL)
                             {
                                 if (((unsigned long) node_ptr) < 5000)
@@ -485,7 +487,7 @@ NODE_PTR            root;
                                         nodeSaveTreeToFile (t_out, node_ptr); /*not Alt*/
                                 }
                             }
-#endif 0
+#endif  
                             break;
                     default:
                             break;
@@ -502,23 +504,21 @@ NODE_PTR            root;
 }
 
 
-nodeSaveNodeToFile (t_out, data_ptr, data_size)
-FILE                *t_out;
-char                *data_ptr;
-int                  data_size;
+void
+nodeSaveNodeToFile ( FILE* t_out, void* data_ptr, int data_size )
 {
-    int    i;
+    char* char_ptr = (char*) data_ptr;
 
+    int    i;
     for (i = 0; i < data_size; i++)
-        fputc (data_ptr[i], t_out);
+        fputc (char_ptr[i], t_out);
 }
 
 
 /*  Dump a tree to the screen, given the root node  */
 
-nodeDumpTree (root, indent)
-NODE_PTR     root;
-int          indent;
+void
+nodeDumpTree ( NODE_PTR root, int indent )
 {
     short    attr;
     char    *Attr;
@@ -538,7 +538,7 @@ int          indent;
     }
     else
     {
-        indent_printf (indent, "%s\t\t[%d]\n", dObjectName [root->node_type],
+        indent_printf (indent, "%s\t\t[%ld]\n", dObjectName [root->node_type],
                                 root->node_num);
 
         indent += 4;
@@ -555,9 +555,9 @@ int          indent;
                                indent_printf (indent, "%s:", dAttributeName [attr]);
                                /* Kludge special case: print qIdent names. Later should be a String attr. */
                                if (strcmp(dAttributeName[attr], "qIdent") == 0)
-                                   printf ("\t\t%d   \"%s\"\n", *(long *)Attr, ssl_get_id_string(*(long*)Attr));
+                                   printf ("\t\t%ld   \"%s\"\n", *(long *)Attr, ssl_get_id_string(*(long*)Attr));
                                else
-                                   printf ("\t\t%d\n", *(long *)Attr);
+                                   printf ("\t\t%ld\n", *(long *)Attr);
                                break;
 
                     case 100:  /* Node */
@@ -573,7 +573,7 @@ int          indent;
                                if (dGetAttributeTags(root->node_type, attr) & 4)  /* Alt */
                                {
                                    if (*(NODE_PTR *)Attr != NULL)
-                                       printf ("\t\t[Alt %d]\n",
+                                       printf ("\t\t[Alt %ld]\n",
                                              (*(NODE_PTR *)Attr)->node_num);
                                    else
                                        printf ("\n");
@@ -599,21 +599,23 @@ int          indent;
 }
 
 
-indent_printf (indent, message, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9)
-int            indent;
-char          *message;
-int            p0, p1, p2, p3, p4, p5, p6, p7, p8, p9;
+void
+indent_printf ( int indent, char* message, ... )
 {
+    va_list    arglist;
     int        i;
 
     for (i = 0; i < indent; i++)
         putchar (' ');
-    printf (message, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9);
+
+    va_start( arglist, message );
+    vprintf( message, arglist );
+    va_end( arglist );
 }
 
 
-nodeDumpTreeNum (node_number)
-long             node_number;
+void
+nodeDumpTreeNum ( long node_number )
 {
     NODE_PTR    NP;
 
@@ -621,8 +623,9 @@ long             node_number;
     nodeDumpTree (NP, 0);
 }
 
-nodeDumpNodeShort (NP)
-NODE_PTR     NP;
+
+void
+nodeDumpNodeShort ( NODE_PTR NP )
 {
     short    attr;
     char    *Attr;
@@ -638,20 +641,20 @@ NODE_PTR     NP;
         NP = ((LIST_PTR)NP)->head;
         while (NP != NULL)
         {
-            printf ("%d ", NP->node_num);
+            printf ("%ld ", NP->node_num);
             NP = NP->next;
         }
         printf ("\n");
     }
     else
     {
-        printf ("\t%d: %s\n", NP->node_num, dObjectName[NP->node_type]);
+        printf ("\t%ld: %s\n", NP->node_num, dObjectName[NP->node_type]);
     }
 }
 
 
-int  nodeNum (NP)
-NODE_PTR      NP;
+int
+nodeNum ( NODE_PTR NP )
 {
     if (NP == NULL)
         return (0);
@@ -659,11 +662,12 @@ NODE_PTR      NP;
         return (NP->node_num);
 }
 
+
 /* For debugging.  Get node ptr given node number.
    Not so efficient. */
 
-NODE_PTR  nodeNumToPtr (node_number)
-long                    node_number;
+NODE_PTR
+nodeNumToPtr ( long node_number )
 {
     struct nodeLookupStruct *nl;
 
@@ -675,9 +679,8 @@ long                    node_number;
 }
 
 
-node_assert_fun (expr, line_num)
-int      expr;
-int      line_num;
+void
+node_assert_fun (int expr, int line_num)
 {
     char   buffer[100];
 

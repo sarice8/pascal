@@ -30,10 +30,11 @@ static char sccsid[] = "@(#)schema.c	1.4 8/23/93 20:10:04 /files/home/sim/sarice
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #ifdef AMIGA
 #include <dos.h>
-#endif AMIGA
+#endif // AMIGA
 
 /*  SSL Runtime module  */
 #include "ssl_rt.h"
@@ -54,6 +55,10 @@ static char sccsid[] = "@(#)schema.c	1.4 8/23/93 20:10:04 /files/home/sim/sarice
 
 
 #include "schema.tbl"
+
+
+// Defined in schema_scan.c but no header file for that yet!
+void init_my_scanner();
 
 
 char     input_filename[256];             /* schema source */
@@ -86,10 +91,19 @@ long     NumClasses;                      /* count of created/derived classes */
 
 short w_define_obj ();                    /* Define an object given an id   */
 short w_define_attr ();                   /* Define an attribute given id   */
-w_define_attr_of_obj ();                  /* ...given attr # and object #   */
-w_derive_obj ();                          /* obj1 derives from obj2         */
-w_dump_table ();
+// w_define_attr_of_obj ();               /* ...given attr # and object #   */
+// w_derive_obj ();                       /* obj1 derives from obj2         */
+void w_dump_table ();
 NODE_PTR w_find_class();
+void w_dump_ssl_class ( NODE_PTR root );
+void w_dump_ssl_attr();
+void w_dump_c_attr_offsets ( NODE_PTR NP, short* parent_offsets, short parent_next_offset,
+                             int* class_code_ptr, short* obj_sizes );
+void w_dump_c_attr_types ( NODE_PTR NP, short* parent_attr_types );
+void w_dump_c_attr_tags( NODE_PTR NP, short* parent_attr_tags );
+void w_dump_c_class_names ( NODE_PTR root );
+void w_dump_c_attr_names();
+void w_dump_c_class_isa ( NODE_PTR NP, int* class_code_ptr, char* parent_obj_isa );
 
 
 char           C_out_filename[100];
@@ -100,8 +114,8 @@ int            option_list;
 int            option_debug;
 
 
-print_node();
-print_long();
+void print_node( char* variable, char* udata );
+void print_long( char* variable, char* udata );
 
 dbg_variables debug_variables[] =
 {
@@ -118,8 +132,11 @@ dbg_variables debug_variables[] =
     "",                NULL,                       0,        NULL,
 };
 
-int   my_listing_function ();
-int   init_my_operations ();
+void  my_listing_function ( char* source_line, int token_accepted );
+void  init_my_operations ();
+void  open_my_files ();
+void  close_my_files ();
+int   t_hitBreak ();
 
 
 /*
@@ -134,11 +151,9 @@ int   init_my_operations ();
 *****************************************************************************
 */
 
-main (argc, argv)
-int   argc;
-char *argv[];
+void
+main ( int argc, char* argv[] )
 {
-    int     t_hitBreak();
     short   arg;
     int     i;
     int     status;
@@ -195,7 +210,7 @@ char *argv[];
 
 #ifdef AMIGA
     onbreak(&t_hitBreak);
-#endif AMIGA
+#endif // AMIGA
 
 
     /* execute SSL program */
@@ -211,15 +226,15 @@ char *argv[];
 }
 
 
-int my_listing_function (source_line, token_accepted)
-char                    *source_line;
-int                      token_accepted;
+void
+my_listing_function ( char* source_line, int token_accepted )
 {
 
     fprintf(f_lst, "====  %s", source_line);
 }
 
 
+void
 open_my_files ()
 {
 
@@ -246,6 +261,7 @@ open_my_files ()
 }
 
 
+void
 close_my_files ()
 {
     fclose (f_out);
@@ -255,6 +271,7 @@ close_my_files ()
 }
 
 
+int
 t_hitBreak()
 {
     printf("Breaking...\n");
@@ -265,6 +282,7 @@ t_hitBreak()
 
 /*********** S e m a n t i c   O p e r a t i o n s ***********/
 
+void
 init_my_operations ()
 {
     nodeInit ();   /* Init node package */
@@ -400,6 +418,7 @@ long                    ident;
 }
 
 
+void
 w_dump_table ()
 {
     NODE_PTR             class;
@@ -457,14 +476,14 @@ w_dump_table ()
     next_offset = 0;
     current_class_code = -1;
 
-    fprintf (f_out, "static short dAttributeOffset [%d][%d] = {\n", NumClasses, NumAttrSyms);
+    fprintf (f_out, "static short dAttributeOffset [%ld][%ld] = {\n", NumClasses, NumAttrSyms);
 
     w_dump_c_attr_offsets (nodeGet(SchemaRoot, qClassTree), attr_offsets, next_offset,
                            &current_class_code, obj_sizes);
     fprintf (f_out, "};\n\n");
 
 
-    fprintf (f_out, "static short dAttributeType [%d][%d] = {\n", NumClasses, NumAttrSyms);
+    fprintf (f_out, "static short dAttributeType [%ld][%ld] = {\n", NumClasses, NumAttrSyms);
 
     attr_types = (short *) malloc (sizeof(short) * NumAttrSyms);
     for (a = 0; a < NumAttrSyms; a++)
@@ -475,7 +494,7 @@ w_dump_table ()
     fprintf (f_out, "};\n\n");
 
 
-    fprintf (f_out, "static short dAttributeTags [%d][%d] = {\n", NumClasses, NumAttrSyms);
+    fprintf (f_out, "static short dAttributeTags [%ld][%ld] = {\n", NumClasses, NumAttrSyms);
 
     attr_tags = (short *) malloc (sizeof(short) * NumAttrSyms);
     for (a = 0; a < NumAttrSyms; a++)
@@ -488,7 +507,7 @@ w_dump_table ()
 
     current_class_code = -1;
 
-    fprintf (f_out, "static short dClassIsA [%d][%d] = {\n", NumClasses, NumClasses);
+    fprintf (f_out, "static short dClassIsA [%ld][%ld] = {\n", NumClasses, NumClasses);
 
     w_dump_c_class_isa (nodeGet(SchemaRoot, qClassTree), &current_class_code, obj_isa);
     fprintf (f_out, "};\n\n");
@@ -496,7 +515,7 @@ w_dump_table ()
 
     fprintf (f_out, "\n/* Public Data */\n\n");
 
-    fprintf (f_out, "short dObjectSize [%d] = {\n\t", NumClasses);
+    fprintf (f_out, "short dObjectSize [%ld] = {\n\t", NumClasses);
     for (c = 0; c < NumClasses; c++)
     {
         fprintf (f_out, "%d, ", obj_sizes[c]);
@@ -505,15 +524,15 @@ w_dump_table ()
     }
     fprintf (f_out, "\n};\n\n");
 
-    fprintf (f_out, "int   dObjects = %d;\n", NumClasses);
-    fprintf (f_out, "char *dObjectName [%d] = {\n", NumClasses);
+    fprintf (f_out, "int   dObjects = %ld;\n", NumClasses);
+    fprintf (f_out, "char *dObjectName [%ld] = {\n", NumClasses);
 
     w_dump_c_class_names (nodeGet(SchemaRoot, qClassTree));
 
     fprintf (f_out, "};\n\n");
 
-    fprintf (f_out, "int   dAttributes = %d;\n", NumAttrSyms);
-    fprintf (f_out, "char *dAttributeName [%d] = {\n", NumAttrSyms);
+    fprintf (f_out, "int   dAttributes = %ld;\n", NumAttrSyms);
+    fprintf (f_out, "char *dAttributeName [%ld] = {\n", NumAttrSyms);
 
     w_dump_c_attr_names ();
 
@@ -554,8 +573,8 @@ w_dump_table ()
 }
 
 
-w_dump_ssl_class (root)
-NODE_PTR          root;
+void
+w_dump_ssl_class ( NODE_PTR root )
 {
     NODE_PTR   NP;
 
@@ -566,6 +585,8 @@ NODE_PTR          root;
     }
 }
 
+
+void
 w_dump_ssl_attr ()
 {
     NODE_PTR   NP;
@@ -576,13 +597,10 @@ w_dump_ssl_attr ()
     }
 }
 
-w_dump_c_attr_offsets (NP, parent_offsets, parent_next_offset,
-                       class_code_ptr, obj_sizes)
-NODE_PTR               NP;
-short                 *parent_offsets;
-short                  parent_next_offset;
-int                   *class_code_ptr;
-short                 *obj_sizes;
+
+void
+w_dump_c_attr_offsets ( NODE_PTR NP, short* parent_offsets, short parent_next_offset,
+                        int* class_code_ptr, short* obj_sizes )
 {
     short    *attr_offsets;
     short     next_offset;
@@ -610,7 +628,11 @@ short                 *obj_sizes;
         {
             attr_code = nodeGetValue(nodeGet(Attr, qAttrSym), qCode);
             attr_offsets[attr_code] = next_offset;
-            next_offset += 4;
+            // SARICE 9/27/2021: 
+            // Padding for worst case, not optimized for type.
+            // This code was originally written for 32-bit.
+            // next_offset += 4;
+            next_offset += 8;
         }
 
         obj_sizes[*class_code_ptr] = next_offset;
@@ -638,9 +660,8 @@ short                 *obj_sizes;
 }
 
 
-w_dump_c_attr_types   (NP, parent_attr_types)
-NODE_PTR               NP;
-short                 *parent_attr_types;
+void
+w_dump_c_attr_types   ( NODE_PTR NP, short* parent_attr_types )
 {
     short    *attr_types;
     short     a;
@@ -688,9 +709,8 @@ short                 *parent_attr_types;
 }
 
 
-w_dump_c_attr_tags    (NP, parent_attr_tags)
-NODE_PTR               NP;
-short                 *parent_attr_tags;
+void
+w_dump_c_attr_tags( NODE_PTR NP, short* parent_attr_tags )
 {
     short    *attr_tags;
     short     a;
@@ -738,8 +758,8 @@ short                 *parent_attr_tags;
 }
 
 
-w_dump_c_class_names (root)
-NODE_PTR              root;
+void
+w_dump_c_class_names ( NODE_PTR root )
 {
     NODE_PTR    NP;
 
@@ -750,6 +770,8 @@ NODE_PTR              root;
     }
 }
 
+
+void
 w_dump_c_attr_names ()
 {
     NODE_PTR    NP;
@@ -760,10 +782,9 @@ w_dump_c_attr_names ()
     }
 }
 
-w_dump_c_class_isa (NP, class_code_ptr, parent_obj_isa)
-NODE_PTR               NP;
-int                   *class_code_ptr;
-char                  *parent_obj_isa;
+
+void
+w_dump_c_class_isa ( NODE_PTR NP, int* class_code_ptr, char* parent_obj_isa )
 {
     char     *obj_isa;
     short     o;
@@ -809,6 +830,7 @@ char                  *parent_obj_isa;
 
 /*  Callbacks to display variables in debugger  */
 
+void
 print_node (variable, udata)
 char       *variable;
 char       *udata;
@@ -818,10 +840,12 @@ char       *udata;
     nodeDumpNodeShort (node_ptr);
 }
 
+
+void
 print_long (variable, udata)
 char       *variable;
 char       *udata;
 {
-    printf ("%d\n", *((long *) variable));
+    printf ("%ld\n", *((long *) variable));
 }
 

@@ -30,7 +30,7 @@ static char sccsid[] = "@(#)schema_scan.c	1.2 6/11/93 16:15:16 /files/home/sim/s
 
 #ifdef AMIGA
 #include <dos.h>
-#endif AMIGA
+#endif // AMIGA
 
 #include "ssl_rt.h"
 
@@ -86,6 +86,7 @@ struct ssl_token_table_struct my_operator_table[] =
 struct ssl_special_codes_struct my_special_codes;
 
 
+void
 init_my_scanner ()
 {
     my_special_codes.invalid = pINVALID;

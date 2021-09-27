@@ -90,32 +90,34 @@ struct node_header_struct {
 };
 
 
+void      nodeInit();
+
 /*  Operations defined on nodes  (implemented in vnode.c)  */
 
-NODE_PTR  nodeNew        (/* node_type */);
-          nodeLink       (/* fromNP, fromAttr, toNP */);
-          nodeSetValue   (/* fromNP, fromAttr, value */);
-          nodeAppend     (/* fromNP, fromAttr, toNP */);
-NODE_PTR  nodeAppendList (/* fromNP, toNP */);
-NODE_PTR  nodeGet        (/* fromNP, fromAttr */);
-long      nodeGetValue   (/* fromNP, fromAttr */);
-NODE_PTR  nodeFirst      (/* fromNP */);
-NODE_PTR  nodeNext       (/* fromNP */);
-int       nodeType       (/* fromNP */);
-NODE_PTR  nodeFindValue  (/* fromNP, fromAttr, findAttr, findValue */);
-int       nodeCompare    (/* NP1, NP2 */);
-          nodeSaveTree   (/* fromNP */);
+NODE_PTR  nodeNew        ( short node_type );
+void      nodeLink       ( NODE_PTR fromNP, short fromAttr, NODE_PTR toNP );
+void      nodeSetValue   ( NODE_PTR fromNP, short fromAttr, long value );
+void      nodeAppend     ( NODE_PTR fromNP, short fromAttr, NODE_PTR toNP );
+NODE_PTR  nodeAppendList ( NODE_PTR fromNP, NODE_PTR toNP );
+NODE_PTR  nodeGet        ( NODE_PTR fromNP, short fromAttr );
+long      nodeGetValue   ( NODE_PTR fromNP, short fromAttr );
+NODE_PTR  nodeFirst      ( NODE_PTR fromNP );
+NODE_PTR  nodeNext       ( NODE_PTR fromNP );
+int       nodeType       ( NODE_PTR fromNP );
+NODE_PTR  nodeFindValue  ( NODE_PTR fromNP, short fromAttr, short findAttr, long findValue );
+int       nodeCompare    ( NODE_PTR NP1, NODE_PTR NP2 );
+void      nodeSaveTree   ( FILE* t_out, NODE_PTR fromNP );
 
-void     *nodeGetAttrPtr (/* fromNP, fromAttr */);
-char     *nodeTypeName   (/* node_type */);
-int       nodeIsA        (/* fromNP, node_type */);
-          nodeSaveTreeToFile (/* fromNP */);
-          nodeDumpTree   (/* fromNP */);
-          nodeDumpNodeShort (/* fromNP */);
-          nodeDumpTreeNum (/* node_num */);
+void*     nodeGetAttrPtr ( NODE_PTR fromNP, short fromAttr );
+char*     nodeTypeName   ( short node_type );
+int       nodeIsA        ( NODE_PTR fromNP, short node_type );
+void      nodeSaveTreeToFile ( FILE* t_out, NODE_PTR fromNP );
+void      nodeDumpTree   ( NODE_PTR fromNP, int indent );
+void      nodeDumpNodeShort ( NODE_PTR fromNP );
+void      nodeDumpTreeNum ( long node_num );
 
-int       nodeNum        (/* fromNP */);
-NODE_PTR  nodeNumToPtr   (/* node_num */);
+int       nodeNum        ( NODE_PTR fromNP );
+NODE_PTR  nodeNumToPtr   ( long node_num );
 
 
 /*  The following operations are defined as macros for speed.
@@ -133,5 +135,5 @@ NODE_PTR  nodeNumToPtr   (/* node_num */);
 #define nodeGetValue_M_NoErrorChecking(NP,attr) (*(long *)nodeGetAttrPtr_M((NP),(attr)))
 
 /* Note, this does NO error checking! */
-NODE_PTR nodeFindValue_NoErrorChecking (/* fromNP, fromAttr, findAttr, findValue */);
+NODE_PTR nodeFindValue_NoErrorChecking ( NODE_PTR fromNP, short fromAttr, short findAttr, long findValue );
 
