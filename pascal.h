@@ -1,4 +1,4 @@
-#define w_codeTableSize 1981
+#define SSL_CODE_TABLE_SIZE 1981
 
 #define oJumpForward 0
 #define oJumpBack 1
@@ -13,6 +13,7 @@
 #define oChoice 10
 #define oEndChoice 11
 #define oSetParameter 12
+#define oBreak 13
 #define pIdent 0
 #define pIntLit 1
 #define pStrLit 2
@@ -152,67 +153,66 @@
 #define tyRecord 8
 #define tyParams 9
 #define tySet 10
-#define oCountPush 13
-#define oCountInc 14
-#define oCountDec 15
-#define oCountIsZero 16
-#define oCountPop 17
-#define oSymPushLevel 18
-#define oSymPopLevel 19
-#define oSymPopLevelSaveType 20
-#define oSymLookup 21
-#define oSymChooseKind 22
-#define oSymAddSPop 23
-#define oSymLevelAnySyms 24
-#define oSymSPushId 25
-#define oSymSSetKind 26
-#define oSymSSetValPop 27
-#define oSymSSetTypS 28
-#define oSymSSetParamTypS 29
-#define oSymSAllocate 30
-#define oValuePushToken 31
-#define oValuePushVal 32
-#define oValuePush 33
-#define oValuePushSizeTS 34
-#define oValuePushLowTS 35
-#define oValueNegate 36
-#define oValueDifference 37
-#define oValueMultiply 38
-#define oValueIsZero 39
-#define oValueIsOne 40
-#define oValuePop 41
-#define oStringAllocLit 42
-#define oTypSPushTyp 43
-#define oTypSPush 44
-#define oTypSPopPushBase 45
-#define oTypSPopPushPtr 46
-#define oTypSMatch 47
-#define oTypSChoose 48
-#define oTypSChoosePop 49
-#define oTypSChooseKind 50
-#define oTypSChoosePtr 51
-#define oTypSSwap 52
-#define oTypSPop 53
-#define oTypNew 54
-#define oTypSetLow 55
-#define oTypSetHigh 56
-#define oTypSetSize 57
-#define oTypAssignBasePop 58
-#define oTypAssignPtr 59
+#define oCountPush 14
+#define oCountInc 15
+#define oCountDec 16
+#define oCountIsZero 17
+#define oCountPop 18
+#define oSymPushLevel 19
+#define oSymPopLevel 20
+#define oSymPopLevelSaveType 21
+#define oSymLookup 22
+#define oSymChooseKind 23
+#define oSymAddSPop 24
+#define oSymLevelAnySyms 25
+#define oSymSPushId 26
+#define oSymSSetKind 27
+#define oSymSSetValPop 28
+#define oSymSSetTypS 29
+#define oSymSSetParamTypS 30
+#define oSymSAllocate 31
+#define oValuePushToken 32
+#define oValuePushVal 33
+#define oValuePush 34
+#define oValuePushSizeTS 35
+#define oValuePushLowTS 36
+#define oValueNegate 37
+#define oValueDifference 38
+#define oValueMultiply 39
+#define oValueIsZero 40
+#define oValueIsOne 41
+#define oValuePop 42
+#define oStringAllocLit 43
+#define oTypSPushTyp 44
+#define oTypSPush 45
+#define oTypSPopPushBase 46
+#define oTypSPopPushPtr 47
+#define oTypSMatch 48
+#define oTypSChoose 49
+#define oTypSChoosePop 50
+#define oTypSChooseKind 51
+#define oTypSChoosePtr 52
+#define oTypSSwap 53
+#define oTypSPop 54
+#define oTypNew 55
+#define oTypSetLow 56
+#define oTypSetHigh 57
+#define oTypSetSize 58
+#define oTypAssignBasePop 59
+#define oTypAssignPtr 60
 #define patchLoop 0
 #define patchExit 1
 #define patchIf 2
-#define oPatchPushHere 60
-#define oPatchAnyEntries 61
-#define oPatchSwap 62
-#define oPatchDup 63
-#define oPatchPopFwd 64
-#define oPatchPopBack 65
+#define oPatchPushHere 61
+#define oPatchAnyEntries 62
+#define oPatchSwap 63
+#define oPatchDup 64
+#define oPatchPopFwd 65
+#define oPatchPopBack 66
 
-struct w_errTableType {
-  char *msg;
-  short val;
-} w_errTable[] = {
+#ifdef SSL_INCLUDE_ERR_TABLE
+
+struct ssl_error_table_struct ssl_error_table[] = {
    "eBadStatement", 0,
    "eNotConst", 1,
    "eNotType", 2,
@@ -231,4 +231,6 @@ struct w_errTableType {
    "eRecordEmpty", 15,
    "", 0
 };
-#define w_errTableSize 16
+int ssl_error_table_size = 16;
+
+#endif // SSL_INCLUDE_ERR_TABLE

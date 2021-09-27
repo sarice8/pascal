@@ -19,6 +19,25 @@
 #include <dos.h>
 #endif // AMIGA
 
+
+// ----------------------------------------------------------------------
+
+// This version of pascal.c does not yet integrate with ssl_rt.
+// But, I want to use ssl 1.2.8 which produces a header file that expects ssl_rt.
+// So provide the necessary definitions here.
+
+struct ssl_error_table_struct
+{
+    char  *msg;
+    short  val;
+};
+
+extern struct ssl_error_table_struct ssl_error_table[];
+extern int ssl_error_table_size;
+
+// ----------------------------------------------------------------------
+
+
 #define  SSL_INCLUDE_ERR_TABLE
 #include "pascal.h"
 
@@ -52,7 +71,7 @@
 
 */
 
-short w_codeTable[w_codeTableSize];     /* size defined in .h file */
+short w_codeTable[SSL_CODE_TABLE_SIZE];     /* size defined in .h file */
 
 FILE *t_src,*t_out,*t_doc,*t_lst;
 
@@ -62,6 +81,7 @@ FILE *t_src,*t_out,*t_doc,*t_lst;
 #define t_idTableSize 400
 
 char   t_lineBuffer[t_lineSize];
+char   t_lineBuffer2[t_lineSize];
 char   *t_ptr;
 char   t_strBuffer[t_strSize+1];   /* for StrLit tokens */
 short  t_lineNumber;
@@ -275,9 +295,11 @@ char *argv[];
   }
   char* p = fgets(t_lineBuffer,t_lineSize,t_src);   /* get title string */
   assert( p != NULL );
+  p = fgets(t_lineBuffer2,t_lineSize,t_src);   /* get ssl_rt string */
+  assert( p != NULL );
   int read = fscanf(t_src,"%d",&entries);
   assert( read == 1 );
-  if (entries>w_codeTableSize) {
+  if (entries>SSL_CODE_TABLE_SIZE) {
     printf("Table file too big; must recompile %s.c\n",argv[0]);
     exit(10);
   }
@@ -340,9 +362,9 @@ w_errorSignal( short err )
 {
   short i;
   i = err;
-  if (w_errTable[i].val != i)
-    for (i=0; i<w_errTableSize && w_errTable[i].val != err; i++);
-  sprintf(w_errBuffer,"Error: %s",w_errTable[i].msg);
+  if (ssl_error_table[i].val != i)
+    for (i=0; i<ssl_error_table_size && ssl_error_table[i].val != err; i++);
+  sprintf(w_errBuffer,"Error: %s",ssl_error_table[i].msg);
   t_error(w_errBuffer);
 }
 

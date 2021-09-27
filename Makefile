@@ -65,7 +65,19 @@ $(BINDIR):
 	mkdir -p $(BINDIR)
 
 
-# To do ... running ssl
+# Compile SSL code
+#
+pascal.h:  pascal.ssl
+	$(SSL_DIR)/bin-$(OSTYPE)/ssl -l -d pascal
+	- rm -f pascal.h
+	- rm -f pascal.tbl
+	- rm -f pascal.lst
+	- rm -f pascal.dbg
+	mv ram_pascal.h   pascal.h
+	mv ram_pascal.tbl pascal.tbl
+	mv ram_pascal.lst pascal.lst
+	mv ram_pascal.dbg pascal.dbg
+
 
 
 
