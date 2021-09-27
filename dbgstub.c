@@ -26,6 +26,11 @@ static char sccsid[] = "%W% %G% %U% %P%";
 */
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "debug.h"
+
 
 #define public
 #define local  static
@@ -38,34 +43,39 @@ static char sccsid[] = "%W% %G% %U% %P%";
 *****************************************************************************
 */
 
-public   ssltool_init (source_filename)
-char                  *source_filename;
+void
+ssltool_init( int argc, char** argv, char* source_filename, char* input_filename )
 {
 }
 
-ssltool_at_line (line)
-int              line;
+
+void
+ssltool_at_line ( int line )
 {
     printf ("[line %d]\n", line);
 }
 
-ssltool_at_input_position (line, col)
-int                        line;
-int                        col;
+
+void
+ssltool_at_input_position ( int line, int col )
 {
     printf ("[input line %d col %d]\n", line, col);
 }
 
-ssltool_execution_status (status_string)
-char                     *status_string;
+
+void
+ssltool_execution_status ( char* status_string )
 {
 }
 
-ssltool_restart_input_window (input_filename)
-char                         *input_filename;
+
+void
+ssltool_restart_input_window ( char* input_filename )
 {
 }
 
+
+void
 ssltool_main_loop ()
 {
     cmdline_main_loop ();
