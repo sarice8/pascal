@@ -41,7 +41,7 @@ DBG_STUBS      = ${DBG_DIR}/obj-$(OSTYPE)/dbgstub.o
 #     -TRACE_RECOVERY   -- trace steps in recovery mode
 
 #CFLAGS = -g -DDEBUG
-CLFAGS = -O3 -Werror -DDEBUG
+CFLAGS = -O3 -Werror -DDEBUG
 
 OBJDIR = ./obj-$(OSTYPE)
 BINDIR = ./bin-$(OSTYPE)
@@ -105,17 +105,17 @@ $(BINDIR):
 
 # Compile SSL code
 #
-#ssl.h:	ssl.ssl
-#	${SSL_DIR}/ssl -l -d -c ssl 
-#	- rm -f ssl.h
-#	- rm -f ssl.tbl
-#	- rm -f ssl.lst
-#	- rm -f ssl.dbg
-#	mv ram_ssl.h   ssl.h
-#	mv ram_ssl.tbl ssl.tbl
-#	mv ram_ssl.lst ssl.lst
-#	mv ram_ssl.dbg ssl.dbg
-#
+ssl.h:	ssl.ssl
+	$(SSL_DIR)/bin-$(OSTYPE)/ssl -l -d -c ssl 
+	- rm -f ssl.h
+	- rm -f ssl.tbl
+	- rm -f ssl.lst
+	- rm -f ssl.dbg
+	mv ram_ssl.h   ssl.h
+	mv ram_ssl.tbl ssl.tbl
+	mv ram_ssl.lst ssl.lst
+	mv ram_ssl.dbg ssl.dbg
+
 
 
 # Release
