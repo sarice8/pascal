@@ -84,10 +84,12 @@ static char sccsid[] = "%W% %G% %U% %P%";
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <assert.h>
 
 #ifdef AMIGA
 #include <dos.h>
-#endif AMIGA
+#endif // AMIGA
 
 
 /*  Trap fatal errors in debug version */
@@ -133,8 +135,8 @@ FILE    *ssl_src_file;                    /* application's input file       */
 char     ssl_input_filename [256];        /* application's input file       */
 int      ssl_debug;                       /* debug mode                     */
 int      ssl_case_sensitive;              /* scanner is case sensitive      */
-int    (*ssl_listing_callback)();         /* func provided to list source   */
-int    (*ssl_init_operations_callback)(); /* func provided to init operations */
+void   (*ssl_listing_callback)();         /* func provided to list source   */
+void   (*ssl_init_operations_callback)(); /* func provided to init operations */
 
 short    ssl_recovery_token;              /* synch token for error recovery */
 short    ssl_eof_token;                   /* EOF token for error recovery   */
@@ -148,11 +150,18 @@ dbg_variables   *ssl_debug_variables;     /* Operation variables and display fun
 int              ssl_break_code;          /* oBreak opcode */
 
 
+// Forward declarations
+
+int ssl_validate_version ();
+void ssl_init_handle_signals ();
+
+
 /*  ----------------------------- Application Functions ----------------------- */
 
 /*  Initialize ssl_rt module  */
 /*  Should be called once at start of application  */
 
+void
 ssl_init ()
 {
     strcpy (ssl_input_filename, "default_input");
@@ -182,11 +191,12 @@ ssl_init ()
 /*  SSL Debugger on/off  */
 /*  Can be called any time during run, to enable/disable debugging. */
 
-ssl_set_debug (debug_flag)
-int            debug_flag;
+void
+ssl_set_debug ( int debug_flag )
 {
     ssl_debug = debug_flag;
 }
+
 
 /*  Debugging info must be provided before run if debug mode enabled
  *
@@ -196,11 +206,8 @@ int            debug_flag;
  *      debug_variables - Operation variables and display functions
  */
 
-ssl_set_debug_info (debug_file, program_file, break_code, debug_variables)
-char               *debug_file;
-char               *program_file;
-int                 break_code;
-dbg_variables      *debug_variables;
+void
+ssl_set_debug_info ( char* debug_file, char* program_file, int break_code, dbg_variables* debug_variables )
 {
     strcpy (ssl_debug_file, debug_file);
     strcpy (ssl_program_file, program_file);
@@ -212,32 +219,36 @@ dbg_variables      *debug_variables;
 /*  Provide application input file, for scanner and debugger.
  *  Takes effect at next ssl_restart()
  */
-ssl_set_input_filename (input_filename)
-char                   *input_filename;
+void
+ssl_set_input_filename ( char* input_filename )
 {
     strcpy (ssl_input_filename, input_filename);
 }
 
-ssl_set_case_sensitive (case_sensitive)
-int                     case_sensitive;
+
+void
+ssl_set_case_sensitive ( int case_sensitive )
 {
     ssl_case_sensitive = case_sensitive;
 }
 
-ssl_set_listing_callback (listing_callback)
-int                      (*listing_callback)();
+
+void
+ssl_set_listing_callback ( void (*listing_callback)() )
 {
     ssl_listing_callback = listing_callback;
 }
 
-ssl_set_init_operations_callback (init_operations_callback)
-int                             (*init_operations_callback)();
+
+void
+ssl_set_init_operations_callback ( void (*init_operations_callback)() )
 {
     ssl_init_operations_callback = init_operations_callback;
 }
 
-ssl_set_recovery_token (recovery_token)
-short                   recovery_token;
+
+void
+ssl_set_recovery_token ( short recovery_token )
 {
     ssl_recovery_token = recovery_token;
 }
@@ -327,6 +338,8 @@ int ssl_restart ()
     return (0);
 }
 
+
+void
 ssl_cleanup()
 {
     if (ssl_src_file != NULL)
@@ -342,8 +355,8 @@ ssl_cleanup()
  *  Returns 0 on success.
  */
 
-int ssl_load_program (program_filename)
-char                 *program_filename;
+int
+ssl_load_program ( char* program_filename )
 {
     FILE   *program_file;
     int     entries;
@@ -356,17 +369,21 @@ char                 *program_filename;
         return (-1);
     }
 
-    fgets (ssl_title_string, 256, program_file);
-    fgets (ssl_runtime_vrs,  256, program_file);
+    char* ok = fgets (ssl_title_string, 256, program_file);
+    assert( ok );
+    ok = fgets (ssl_runtime_vrs,  256, program_file);
+    assert( ok );
 
-    fscanf (program_file,"%d",&entries);       /* size of SSL code */
+    int read = fscanf (program_file,"%d",&entries);       /* size of SSL code */
+    assert( read == 1 );
 
     /*  NEED A PROTOCOL FOR THIS  */
     /*  ssl_code_table_size = entries;  */
 
     for (addr=0; addr < entries; addr++)
     {
-        fscanf (program_file, "%d", &temp);
+        read = fscanf (program_file, "%d", &temp);
+        assert( read == 1 );
         ssl_code_table[addr] = temp;
     }
 
@@ -376,8 +393,8 @@ char                 *program_filename;
 
 /*  ------------ Internal functions to support execution ------------- */
 
-ssl_error_signal (error_code)
-short             error_code;
+void
+ssl_error_signal ( short error_code )
 {
     short i;
 
@@ -392,9 +409,8 @@ short             error_code;
 }
 
 
-ssl_assert_fun (expr, line_num)
-int             expr;
-int             line_num;
+void
+ssl_assert_fun ( int expr, int line_num )
 {
     char   buffer[100];
 
@@ -406,6 +422,7 @@ int             line_num;
 }
 
 
+void
 ssl_traceback()
 {
     short i;
@@ -418,6 +435,7 @@ ssl_traceback()
     }
     printf("\n");
 }
+
 
 /*  Verify that version of runtime model supported by this runtime module
  *  (SSL_RUNTIME_VRS) matches that assumed by the SSL compiler (ssl_runtime_vrs).
@@ -432,7 +450,8 @@ ssl_traceback()
  *
  *  Return 0 for success.
  */
-int ssl_validate_version ()
+int
+ssl_validate_version ()
 {
     int     status = 0;
     char   *ssl_rt_runtime_vrs = SSL_RUNTIME_VRS;
@@ -460,10 +479,11 @@ int ssl_validate_version ()
     return (status);
 }
 
+
 /*  ------------------- Can be called from semantic operations ----------- */
 
-ssl_fatal (msg)
-char      *msg;
+void
+ssl_fatal ( char* msg )
 {
     char tmpbuf[256];
 
@@ -473,6 +493,7 @@ char      *msg;
 }
 
 
+void
 ssl_abort ()
 {
     ssl_traceback();
@@ -485,6 +506,7 @@ ssl_abort ()
 }
 
 
+void
 ssl_print_input_position ()
 {
   char *p,spaceBuf[256];
@@ -502,8 +524,9 @@ ssl_print_input_position ()
   printf("%s^\n",spaceBuf);
 }
 
-ssl_error (msg)
-char *msg;
+
+void
+ssl_error ( char* msg )
 {
     ssl_error_count++;
 
@@ -513,14 +536,16 @@ char *msg;
     /* ssl_print_token(); */
 }
 
-ssl_warning (msg)
-char *msg;
+
+void
+ssl_warning ( char* msg )
 {
     ssl_print_input_position ();
     printf ("%s on line %d\n", msg, ssl_token.lineNumber);
 }
 
 
+void
 ssl_print_token()
 {
 #if 0
@@ -541,8 +566,8 @@ ssl_print_token()
 
 /*  ------------------- For use by debugger ------------------- */
 
-char *ssl_rule_name (pc)
-short        pc; 
+char*
+ssl_rule_name ( short pc )
 {
     short    i;
 
@@ -554,8 +579,9 @@ short        pc;
     return (ssl_rule_table[i-1].name);
 }
 
-short ssl_rule_addr (name)
-char                *name;
+
+short
+ssl_rule_addr ( char* name )
 {
     short    i;
 
@@ -568,23 +594,26 @@ char                *name;
     return ((short) -1);
 }
 
+
 /*  ------------------- For use by debugger ------------------- */
 
 /*  Catch system errors possibly caused by semantic operations  */
 
-
-ssl_handle_signal_segv (sig)
-int                     sig;
+void
+ssl_handle_signal_segv ( int sig )
 {
     ssl_fatal ("System segmentation violation");
 }
 
-ssl_handle_signal_bus (sig)
-int                    sig;
+
+void
+ssl_handle_signal_bus ( int sig )
 {
     ssl_fatal ("System bus error");
 }
 
+
+void
 ssl_init_handle_signals ()
 {
     signal (SIGSEGV, ssl_handle_signal_segv);

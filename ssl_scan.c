@@ -26,10 +26,11 @@ static char sccsid[] = "%W% %G% %U% %P%";
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #ifdef AMIGA
 #include <dos.h>
-#endif AMIGA
+#endif // AMIGA
 
 
 /*  Definitions for scanner and runtime module  */
@@ -76,8 +77,8 @@ static char   s_digit  [256];
 static short  s_punct  [256];
 static char   s_punct_multi [256];
 
-static s_lookup_id ();
-static s_hit_eof ();
+void   s_lookup_id ();
+void   s_hit_eof ();
 
 static int    s_including_file;   /* "Include" application source files */
 static FILE  *s_src_includer;
@@ -87,6 +88,7 @@ static FILE  *s_src_includer;
 
 /*  Public functions  */
 
+void
 ssl_init_scanner (keyword_table, operator_table, special_codes)
 struct ssl_token_table_struct        *keyword_table;
 struct ssl_token_table_struct        *operator_table;
@@ -159,6 +161,7 @@ struct ssl_special_codes_struct      *special_codes;
 }
 
 
+void
 ssl_include_filename (include_filename)
 char                 *include_filename;
 {
@@ -187,6 +190,7 @@ char                 *include_filename;
     NOTE, will always be called before first run, so can wait until here
     to put keywords into ident table, rather than in ssl_init_scanner. */
 
+void
 ssl_restart_scanner ()
 {
     int    i;
@@ -219,6 +223,7 @@ ssl_restart_scanner ()
 *****************************************************************************
 */
 
+void
 ssl_get_next_token ()
 {
     char        *p;
@@ -404,6 +409,7 @@ ssl_get_next_token ()
 
 /*  Token accepted.  Do listing, remeber last identifier.  */
 
+void
 ssl_accept_token ()
 {
     ssl_token.accepted = 1;
@@ -420,7 +426,8 @@ ssl_accept_token ()
 
 
 /*  Reached end of source file.  May have just been end of 'include' file.  */
-static s_hit_eof ()
+void
+s_hit_eof ()
 {
     if (!s_including_file)
     {
@@ -440,6 +447,7 @@ static s_hit_eof ()
 
 /* Used by debugger: get current input file position */
 
+void
 ssl_get_input_position (line_ptr, col_ptr)
 short                  *line_ptr;
 short                  *col_ptr;
@@ -519,7 +527,8 @@ short          code;
 *****************************************************************************
 */
 
-static s_lookup_id ()
+void
+s_lookup_id ()
 {
     short              i;
     register char     *a, *b;
@@ -571,8 +580,8 @@ static s_lookup_id ()
 
 /*  return description of token code  */
 
-char *ssl_get_code_name (code)
-int code;
+char*
+ssl_get_code_name ( short code )
 {
     static char   buffer [50];
     char         *p;
