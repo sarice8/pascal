@@ -31,7 +31,7 @@
 
 typedef char                     Boolean1;
 typedef char                     Character1;
-typedef long                     Integer4;
+typedef long                     Integer4;    // SARICE 9/2021 needs work
 typedef char                    *StringN;
 
 typedef struct SCH_NodeStruct   *Node;
@@ -143,37 +143,37 @@ void  SCH_Term ();
  *  Nodes
  */
 
-Node     NewNode  (/* int object_type */);
-int      Kind     (/* Node N */);
-Boolean1 IsA      (/* int object_type_1, int object_type_2 */);
-Boolean1 IsNull   (/* Node N */);
-void     SetAttr  (/* int attr_code, Node node, void *value */);
-void    *GetAttr  (/* int attr_code, Node node */);
-void     FreeNode (/* Node N, Boolean1 recurse */);
+Node     NewNode  ( int object_type );
+int      Kind     ( Node N );
+Boolean1 IsA      ( int object_type_1, int object_type_2 );
+Boolean1 IsNull   ( Node N );
+void     SetAttr  ( int attr_code, Node node, void* value );
+void*    GetAttr  ( int attr_code, Node node );
+void     FreeNode ( Node N, Boolean1 recurse );
 
 /*
  *  Lists
  */
 
-List     NewList  (/* int object_type */);
-Item     AddFirst (/* List L, Node N */);
-Item     AddLast  (/* List L, Node N */);
-Item     AddNext  (/* Item I, Node N */);
-Item     AddPrev  (/* Item I, Node N */);
-Node     RemoveFirst (/* List L */);
-Node     RemoveLast  (/* List L */);
-Node     RemoveItem  (/* Item I */);
-Item     FirstItem (/* List L */);
-Item     LastItem (/* List L */);
-Item     NextItem (/* Item I */);
-Item     PrevItem (/* Item I */);
-Node     Value    (/* Item I */);
-Item     FindItem (/* List L, Node N */);
-Item     NullItem (/* */);
-Boolean1 IsEmpty  (/* List L */);
-List     ListOf   (/* Item I */);
-int      ListLength (/* List L */);
-void     FreeList (/* List L, Boolean1 recurse */);
+List     NewList  ( int object_type );
+Item     AddFirst ( List L, Node N );
+Item     AddLast  ( List L, Node N );
+Item     AddNext  ( Item I, Node N );
+Item     AddPrev  ( Item I, Node N );
+Node     RemoveFirst ( List L );
+Node     RemoveLast  ( List L );
+Node     RemoveItem  ( Item I );
+Item     FirstItem ( List L );
+Item     LastItem ( List L );
+Item     NextItem ( Item I );
+Item     PrevItem ( Item I );
+Node     Value    ( Item I );
+Item     FindItem ( List L, Node N );
+Item     NullItem ();
+Boolean1 IsEmpty  ( List L );
+List     ListOf   ( Item I );
+int      ListLength ( List L );
+void     FreeList ( List L, Boolean1 recurse );
 
 #define  FOR_EACH_ITEM(I,L)  for (I=FirstItem(L); I != NULL; I = NextItem(I))
 
@@ -181,28 +181,28 @@ void     FreeList (/* List L, Boolean1 recurse */);
  *  Database I/O
  */
 
-void     SCH_SaveAscii (/* Node root, char *filename */);
-Node     SCH_LoadAscii (/* char *filename */);
+void     SCH_SaveAscii ( Node root, char* filename );
+Node     SCH_LoadAscii ( char* filename );
 
 /*
  *  Debugger
  */
 
-void     DumpNodeShort (/* Node N */);
-void     DumpNodeLong  (/* Node N */);
+void     DumpNodeShort ( Node N );
+void     DumpNodeLong  ( Node N );
 
 /*
  *  Internal use
  */
 
-void **SCH_GetAttrPtr (/* Node node, int attr_code */);
-Item   SCH_NewItem (/* List owner */);
-void   SCH_indent_printf (/* int indent, char *message, p0..p9 */);
-Node   SCH_LookupNode (/* int node_num */);
-char  *SCH_GetTypeName (/* int type */);
+void** SCH_GetAttrPtr ( Node node, int attr_code );
+Item   SCH_NewItem ( List owner );
+void   SCH_indent_printf ( int indent, char* message, ... );
+Node   SCH_LookupNode ( int node_num );
+char*  SCH_GetTypeName ( int type );
 
-void   SCH_Error (/* char *message */);
-void   SCH_Fatal (/* char *message */);
+void   SCH_Error ( char* message );
+void   SCH_Fatal ( char* message );
 void   SCH_Abandon ();
 
 

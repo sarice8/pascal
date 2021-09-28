@@ -113,4 +113,4 @@ struct ssl_error_table_struct ssl_error_table[] = {
 };
 int ssl_error_table_size = 1;
 
-#endif SSL_INCLUDE_ERR_TABLE
+#endif // SSL_INCLUDE_ERR_TABLE
