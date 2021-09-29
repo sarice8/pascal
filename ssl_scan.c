@@ -164,7 +164,9 @@ struct ssl_special_codes_struct      *special_codes;
     s_including_file = 0;
 }
 
+
 /*  Used by some compilers to pass multiple times through input text.  */
+void
 ssl_reset_input ()
 {
     fclose (ssl_src_file);
@@ -178,7 +180,7 @@ ssl_reset_input ()
     if ((ssl_src_file=fopen(ssl_input_filename, "r"))==NULL)
     {
         printf ("SSL: Can't open source file %s\n", ssl_input_filename);
-        return (-1);
+        exit (-1);
     }
 
     s_restart_scanner_input_position ();

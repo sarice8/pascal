@@ -192,7 +192,7 @@ void ssl_include_filename ( char* filename );
  *  Reset the input to the start of the source file,
  *  for multiple passes through input text
  */
-ssl_reset_input ();
+void ssl_reset_input ();
 
 /*
  *

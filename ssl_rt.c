@@ -400,11 +400,13 @@ ssl_load_program ( char* program_filename )
         ssl_rule_table[] global array.  The C table form is a global array
         and we need to be consistent. */
 
-    fscanf (program_file, "%d", &entries);
+    read = fscanf (program_file, "%d", &entries);
+    assert( read == 1 );
 
     for (ssl_rule_table_size = 0; ssl_rule_table_size < entries; ssl_rule_table_size++)
     {   
-        fscanf (program_file, "%s %d", tmp_buffer, &temp);
+        read = fscanf (program_file, "%s %d", tmp_buffer, &temp);
+        assert( read == 2 );
         ssl_rule_table[ssl_rule_table_size].addr = temp;
         ssl_rule_table[ssl_rule_table_size].name = (char *) strdup (tmp_buffer);
     }
