@@ -110,22 +110,22 @@ $(BINDIR):
 
 # Compile schema
 #
-#ssl_schema.c ssl_schema.ssl:  ssl.schema
-#	$(SCHEMA_DIR)/bin-$(OSTYPE)/schema ssl
+ssl_schema.c ssl_schema.ssl:  ssl.schema
+	$(SCHEMA_DIR)/bin-$(OSTYPE)/schema ssl
 
 
 # Compile SSL code
 #
-#ssl.h:	ssl.ssl
-#	$(SSL_DIR)/bin-$(OSTYPE)/ssl -l -d -c -r ssl 
-#	- rm -f ssl.h
-#	- rm -f ssl.tbl
-#	- rm -f ssl.lst
-#	- rm -f ssl.dbg
-#	mv ram_ssl.h   ssl.h
-#	mv ram_ssl.tbl ssl.tbl
-#	mv ram_ssl.lst ssl.lst
-#	mv ram_ssl.dbg ssl.dbg
+ssl.h:	ssl.ssl
+	$(SSL_DIR)/bin-$(OSTYPE)/ssl -l -d -c -r ssl 
+	- rm -f ssl.h
+	- rm -f ssl.tbl
+	- rm -f ssl.lst
+	- rm -f ssl.dbg
+	mv ram_ssl.h   ssl.h
+	mv ram_ssl.tbl ssl.tbl
+	mv ram_ssl.lst ssl.lst
+	mv ram_ssl.dbg ssl.dbg
 
 
 
