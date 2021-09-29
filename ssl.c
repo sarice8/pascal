@@ -50,10 +50,12 @@ static char sccsid[] = "%W% %G% %U% %P%";
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <assert.h>
 
 #ifdef AMIGA
 #include <dos.h>
-#endif AMIGA
+#endif // AMIGA
 
 /*  SSL Runtime module definitions  */
 #include "ssl_rt.h"
@@ -172,11 +174,11 @@ struct dPSType {
 
 #ifdef DEBUG
 
-int dump_tree_short();
-int dump_short_int_stack();
-int dump_short_int();
-int dump_node_short();
-int dump_var_stack();
+void dump_tree_short( void* var, void* udata );
+void dump_short_int_stack( void* var, void* udata );
+void dump_short_int( void* var, void* udata );
+void dump_node_short( void* var, void* udata );
+void dump_var_stack( void* var, void* udata );
 
 dbg_variables debug_variables[] =
 {
@@ -197,14 +199,23 @@ dbg_variables debug_variables[] =
 #endif /* DEBUG */
 
 
-/* ----------------------------------------------------------------- */
+// Forward declarations
+
+void open_my_files();
+void init_my_scanner();
+void close_my_files();
+int hit_break_key();
+void w_optimize_table();
+void w_dump_tables();
+void dump_debug_symbols();
+void list_generated_code ();
+void set_global_scope ( NODE_PTR scope_ptr );
 
 /*  Callbacks  */
-int  my_listing_function ();
-int  init_my_operations ();
+void my_listing_function( char* source_line, int token_accepted );
+void init_my_operations();
 
 
-/* ----------------------------------------------------------------- */
 
 
 /*
@@ -216,11 +227,11 @@ int  init_my_operations ();
 */
 
 
+void
 main (argc, argv)
 int   argc;
 char *argv[];
 {
-    int     hit_break_key();
     short   arg;
     char   *p;
     int     status;
@@ -326,7 +337,7 @@ char *argv[];
 
 #ifdef AMIGA
     onbreak(&hit_break_key);
-#endif AMIGA
+#endif // AMIGA
 
 
     /*  Execute SSL program  */
@@ -351,9 +362,8 @@ char *argv[];
  *  Line supplied to us containing '\n' for now.
  */
 
-int my_listing_function (source_line, token_accepted)
-char                    *source_line;
-int                      token_accepted;
+void
+my_listing_function ( char* source_line, int token_accepted )
 {
     int     line_number;
     int     addr;
@@ -413,6 +423,8 @@ int                      token_accepted;
     }
 }
 
+
+void
 open_my_files ()
 {
     if ((f_out = fopen(tbl_out_filename, "w")) == NULL)
@@ -447,6 +459,8 @@ open_my_files ()
 
 }
 
+
+void
 close_my_files ()
 {
     fclose (f_out);
@@ -460,6 +474,8 @@ close_my_files ()
         fclose (f_dbg);
 }
 
+
+int
 hit_break_key()
 {
   printf("Breaking...\n");
@@ -471,6 +487,7 @@ hit_break_key()
 /* --------------------------- Semantic Operations ----------------------- */
 
 
+void
 init_my_operations()
 {
     w_here = 0;
@@ -503,8 +520,8 @@ init_my_operations()
 /* Pre-define some operation identifiers.  Want to do this in SSL code
    eventually.  */
 
-install_system_operations (next_operation)
-long                      *next_operation;
+void
+install_system_operations ( long* next_operation )
 {
     short      id;
     int        index;
@@ -560,8 +577,8 @@ long                      *next_operation;
 /* Pre-define some type identifiers.  Want to do this in SSL code
    eventually.  */
 
-install_system_types (int_type, token_type)
-NODE_PTR             *int_type, *token_type;
+void
+install_system_types ( NODE_PTR* int_type, NODE_PTR* token_type )
 {
     short      id;
     NODE_PTR   node_ptr;
@@ -626,7 +643,7 @@ short    dTemp;                            /* multi-purpose */
                     ssl_warning ("Warning: Return value ignored");
                     break;
                 default:
-                    sprintf (ssl_error_buffer, "Warning #%d (no message)", ssl_param);
+                    sprintf (ssl_error_buffer, "Warning #%ld (no message)", ssl_param);
                     ssl_warning (ssl_error_buffer);
                     break;
             }
@@ -876,8 +893,8 @@ short    dTemp;                            /* multi-purpose */
             install_system_operations (&ssl_var_stack[ssl_param]);
             continue;
     case oInstallSystemTypes:
-            install_system_types (&(NODE_PTR)(ssl_var_stack[ssl_argv(0,2)]),
-                                  &(NODE_PTR)(ssl_var_stack[ssl_argv(1,2)]));
+            install_system_types ((NODE_PTR*)&(ssl_var_stack[ssl_argv(0,2)]),
+                                  (NODE_PTR*)&(ssl_var_stack[ssl_argv(1,2)]));
             continue;
 
 
@@ -948,6 +965,7 @@ struct ssl_token_table_struct my_operator_table[] =
 struct ssl_special_codes_struct my_special_codes;
 
 
+void
 init_my_scanner ()
 {
     my_special_codes.invalid = pInvalid;
@@ -960,6 +978,7 @@ init_my_scanner ()
 }
 
 
+void
 set_global_scope (scope_ptr)
 NODE_PTR          scope_ptr;
 {
@@ -971,7 +990,9 @@ NODE_PTR          scope_ptr;
     dGlobalScope = scope_ptr;
 }
 
-w_dump_tables ()
+
+void
+w_dump_tables()
 {
     short             i;
     short             count;
@@ -1100,7 +1121,7 @@ w_dump_tables ()
             case nError:
             case nValue:
             case nOperation:
-                fprintf(f_hdr, "#define %s %d\n",
+                fprintf(f_hdr, "#define %s %ld\n",
                                ssl_get_id_string(nodeGetValue(node_ptr, qIdent)),
                                nodeGetValue(node_ptr, qValue));
                 break;
@@ -1113,7 +1134,7 @@ w_dump_tables ()
    * (Of course, that's assuming that the user didn't generate C code for the table).
    */
             case nGlobal:
-                fprintf(f_hdr, "#define var_%s (ssl_var_stack[%d])\n",
+                fprintf(f_hdr, "#define var_%s (ssl_var_stack[%ld])\n",
                                ssl_get_id_string(nodeGetValue(node_ptr, qIdent)),
                                nodeGetValue(node_ptr, qAddr));
                 break;
@@ -1136,16 +1157,18 @@ w_dump_tables ()
     {
         if (nodeType(node_ptr) == nError)
         {
-            fprintf(f_hdr,"   \"%s\", %d,\n",ssl_get_id_string(nodeGetValue(node_ptr, qIdent)),
+            fprintf(f_hdr,"   \"%s\", %ld,\n",ssl_get_id_string(nodeGetValue(node_ptr, qIdent)),
                                              nodeGetValue(node_ptr, qValue));
             count++;
         }
     }
     fprintf(f_hdr,"   \"\", 0\n};\nint ssl_error_table_size = %d;\n",count);
-    fprintf(f_hdr,"\n#endif SSL_INCLUDE_ERR_TABLE\n");
+    fprintf(f_hdr,"\n#endif // SSL_INCLUDE_ERR_TABLE\n");
 
 }
 
+
+void
 dump_debug_symbols ()
 {
     NODE_PTR  np, p;
@@ -1160,20 +1183,20 @@ dump_debug_symbols ()
                                              nodeTypeName(nodeType(np)));
                 break;
             case nGlobal:
-                fprintf(f_dbg, "%d %s %s %d %d\n", nodeNum(np),
+                fprintf(f_dbg, "%d %s %s %d %ld\n", nodeNum(np),
                                              ssl_get_id_string(nodeGetValue(np,qIdent)),
                                              nodeTypeName(nodeType(np)),
                                              nodeNum(nodeGet(np,qType)),
                                              nodeGetValue(np, qAddr));
                 break;
             case nRule:
-                fprintf(f_dbg, "%d %s %s %d\n", nodeNum(np),
+                fprintf(f_dbg, "%d %s %s %ld\n", nodeNum(np),
                                              ssl_get_id_string(nodeGetValue(np,qIdent)),
                                              nodeTypeName(nodeType(np)),
                                              nodeGetValue(np, qValue));
                 for (p = nodeGet(nodeGet(np, qParamScope), qDecls); p != NULL; p = nodeNext(p))
                 {
-                    fprintf(f_dbg, "%d %s %s %d %d\n", nodeNum(p),
+                    fprintf(f_dbg, "%d %s %s %d %ld\n", nodeNum(p),
                                              ssl_get_id_string(nodeGetValue(p,qIdent)),
                                              nodeTypeName(nodeType(p)),
                                              nodeNum(nodeGet(p,qType)),
@@ -1181,7 +1204,7 @@ dump_debug_symbols ()
                 }
                 for (p = nodeGet(nodeGet(np, qScope), qDecls); p != NULL; p = nodeNext(p))
                 {
-                    fprintf(f_dbg, "%d %s %s %d %d\n", nodeNum(p),
+                    fprintf(f_dbg, "%d %s %s %d %ld\n", nodeNum(p),
                                              ssl_get_id_string(nodeGetValue(p,qIdent)),
                                              nodeTypeName(nodeType(p)),
                                              nodeNum(nodeGet(p,qType)),
@@ -1195,8 +1218,10 @@ dump_debug_symbols ()
     }
 }
 
+
 /*  Dump a listing of generated code to the listing file  */
 
+void
 list_generated_code ()
 {
     short  pc, target, final_target;
@@ -1300,6 +1325,7 @@ list_generated_code ()
     }
 }
 
+
 char *get_op_name (op)
 short               op;
 {
@@ -1321,6 +1347,7 @@ short               op;
 
 /* Optimize generated table */
 
+void
 w_optimize_table ()
 {
     short  pc, target, final_target;
@@ -1460,6 +1487,7 @@ w_optimize_table ()
                 improved_case_jump_count);
 }
 
+
 short find_ultimate_destination (pc)
 short                      pc;
 {
@@ -1487,9 +1515,8 @@ short                      pc;
 /*  For debugger display of program variables  */
 
 
-int dump_tree_short (variable, udata)
-char                *variable;
-char                *udata;
+void
+dump_tree_short ( void* variable, void* udata )
 {
     short       stack_size;
     NODE_PTR   *stack;
@@ -1504,9 +1531,9 @@ char                *udata;
     }
 }
 
-int dump_node_short (variable, udata)
-char                *variable;
-char                *udata;
+
+void
+dump_node_short ( void* variable, void* udata )
 {
     NODE_PTR    node_ptr;
 
@@ -1515,9 +1542,9 @@ char                *udata;
     nodeDumpNodeShort (node_ptr);
 }
 
-int dump_short_int_stack (variable, udata)
-char                     *variable;
-char                     *udata;
+
+void
+dump_short_int_stack ( void* variable, void* udata )
 {
     short     stack_size;
     short    *stack;
@@ -1532,9 +1559,9 @@ char                     *udata;
     }
 }
 
-int dump_short_int (variable, udata)
-char               *variable;
-char               *udata;
+
+void
+dump_short_int ( void* variable, void* udata )
 {
     short    *var;
 
@@ -1543,9 +1570,9 @@ char               *udata;
     printf ("\t%d\n", *var);
 }
 
-int dump_var_stack (variable, udata)
-char               *variable;
-char               *udata;
+
+void
+dump_var_stack ( void* variable, void* udata )
 {
     int    addr;
     int    fp;
@@ -1554,7 +1581,7 @@ char               *udata;
 
     for (addr = ssl_var_sp; addr > 0; addr--)
     {
-        printf ("%4d: %5d", addr, ssl_var_stack[addr]);
+        printf ("%4d: %5ld", addr, ssl_var_stack[addr]);
         if (addr == fp)
         {
             printf ("  <-- fp");
@@ -1564,6 +1591,5 @@ char               *udata;
             printf ("  <-- sp");
         printf ("\n");
     }
-
 }
 
