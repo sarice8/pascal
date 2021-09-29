@@ -1253,7 +1253,8 @@ list_generated_code ()
             while (options > 0)
             {
                 option_val = w_outTable[pc++];
-                target = pc - w_outTable[pc++];
+                target = pc - w_outTable[pc];
+                pc++;
                 fprintf (f_lst, "        %4d   %4d\n", option_val, target);
                 options--;
             }
@@ -1267,12 +1268,14 @@ list_generated_code ()
         switch (op)
         {
             case iJumpForward :
-                arg = pc + w_outTable[pc++];
+                arg = pc + w_outTable[pc];
+                pc++;
                 has_arg = 1;
                 break;
 
             case iJumpBack :
-                arg = pc - w_outTable[pc++];
+                arg = pc - w_outTable[pc];
+                pc++;
                 has_arg = 1;
                 break;
 
