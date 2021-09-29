@@ -139,7 +139,8 @@ local long     display_var_fp;
 // Forward declarations
 
 local void display_source_for_pc ( short pc );
-local display_context_vars ( short pc, long fp, int show_globals, char* var_name );
+local void display_context_vars ( short pc, long fp, int show_globals, char* var_name );
+local void display_value ( char* type_name, char* symbol_name, long value );
 
 int dbg_run ();
 void dbg_display_position();
@@ -147,8 +148,10 @@ void dbg_install_breakpoints();
 void dbg_remove_breakpoints();
 void split_args ( char* cmdbuf, int* argc, char** argv );
 void dbg_hit_breakpoint();
+void dbg_hit_input_breakpoint ();
 void dbg_execution_complete();
 int dbg_find_line ( int pc );
+void dbg_read_symbol_table ( FILE* fp );
 void dbgui_init ( char* source_filename, char* input_filename );
 void dbgui_restart ( char* input_filename );
 void dbgui_main_loop ();
@@ -178,7 +181,7 @@ void dbgui_execution_status ( char* status_string );
 */
 
 void
-dbg_init ( char* debug_line_file, char* source_filename, char* input_filename,
+dbg_init ( char* debug_data_file, char* source_filename, char* input_filename,
            short break_opcode, dbg_variables* debug_variables )
 {
     FILE      *fp;
@@ -290,8 +293,8 @@ dbg_check_step_count()
 /*  Called at the beginning of each input line.
     Returns TRUE if we have hit an input-line breakpoint. */
 
-public       dbg_check_input_breakpoint (input_line, input_col)
-short                                    input_line, input_col;
+int
+dbg_check_input_breakpoint ( short input_line, short input_col )
 {
     int  i;
 
@@ -818,8 +821,10 @@ dbg_hit_breakpoint()
     dbg_step_count = 1;
 }
 
+
 /* Similar to above, but hit breakpoint on input line */
-public    dbg_hit_input_breakpoint ()
+void
+dbg_hit_input_breakpoint ()
 {
     short    i;
     short    input_line, input_col;
@@ -988,8 +993,9 @@ dbgui_execution_status ( char* status_string )
     ssltool_execution_status (status_string);
 }
 
-dbg_read_symbol_table (fp)
-FILE *fp;
+
+void
+dbg_read_symbol_table ( FILE* fp )
 {
     int   num, class, type_num;
     char  name_buf[256];
@@ -1009,10 +1015,12 @@ FILE *fp;
 
         dbg_symbol_table[dbg_symbol_table_last].num = num;
 
-        fscanf (fp, "%s", name_buf);
+        int read = fscanf (fp, "%s", name_buf);
+        assert( read == 1 );
         dbg_symbol_table[dbg_symbol_table_last].name = strdup(name_buf);
 
-        fscanf (fp, "%s", name_buf);
+        read = fscanf (fp, "%s", name_buf);
+        assert( read == 1 );
         for (class = 1; dbg_symbol_class_names[class] != NULL; class++)
             if (strcmp(name_buf, dbg_symbol_class_names[class]) == 0)
                 break;
@@ -1025,7 +1033,8 @@ FILE *fp;
             case DBG_SYMBOL_CLASS_inparam:
             case DBG_SYMBOL_CLASS_outparam:
             case DBG_SYMBOL_CLASS_inoutparam:
-                fscanf (fp, "%d", &(dbg_symbol_table[dbg_symbol_table_last].type_num));
+                read = fscanf (fp, "%d", &(dbg_symbol_table[dbg_symbol_table_last].type_num));
+                assert( read == 1 );
                 break;
         }
 
@@ -1037,7 +1046,8 @@ FILE *fp;
             case DBG_SYMBOL_CLASS_inparam:
             case DBG_SYMBOL_CLASS_outparam:
             case DBG_SYMBOL_CLASS_inoutparam:
-                fscanf (fp, "%d", &(dbg_symbol_table[dbg_symbol_table_last].value));
+                read = fscanf (fp, "%d", &(dbg_symbol_table[dbg_symbol_table_last].value));
+                assert( read == 1 );
                 break;
         }
     }
@@ -1060,10 +1070,9 @@ FILE *fp;
     }
 }
 
-local display_value (type_name, symbol_name, value)
-char                *type_name;
-char                *symbol_name;
-long                 value;
+
+void
+display_value ( char* type_name, char* symbol_name, long value )
 {
     int  v;
 
@@ -1076,13 +1085,14 @@ long                 value;
 
         if (strcmp(dbg_vars[v].name, type_name) == 0)
         {
-            (*dbg_vars[v].display_method) (&value, dbg_vars[v].udata);
+            // SARICE TO DO: these two params should be void* rather than char*
+            (*dbg_vars[v].display_method) ((char*) &value, dbg_vars[v].udata);
             return;
         }
     }
 
     /* Default display as int */
-    printf ("\t%d\n", value);
+    printf ("\t%ld\n", value);
 }
 
 
