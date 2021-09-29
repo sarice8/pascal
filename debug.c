@@ -30,12 +30,17 @@ static char sccsid[] = "@(#)debug.c	1.5 4/21/94 13:07:52 /files/home/sim/sarice/
 */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #include "debug.h"
 
-#define public
 #define local  static
+
+
+// Debugger can dump a node
+#include "node.h"
 
 
 /* ----------------------------------------------------------------------- */
@@ -131,8 +136,28 @@ local short    display_pc;
 local short    display_sp;   /* call stack */
 local long     display_var_fp;
 
-local display_source_for_pc ();
-local display_context_vars ();
+// Forward declarations
+
+local void display_source_for_pc ( short pc );
+local display_context_vars ( short pc, long fp, int show_globals, char* var_name );
+
+int dbg_run ();
+void dbg_display_position();
+void dbg_install_breakpoints();
+void dbg_remove_breakpoints();
+void split_args ( char* cmdbuf, int* argc, char** argv );
+void dbg_hit_breakpoint();
+void dbg_execution_complete();
+int dbg_find_line ( int pc );
+void dbgui_init ( char* source_filename, char* input_filename );
+void dbgui_restart ( char* input_filename );
+void dbgui_main_loop ();
+void dbgui_create_debug_window ( char* source_filename, char* input_filename );
+void dbgui_restart_input_window ( char* input_filename );
+void dbgui_at_line ( short line );
+void dbgui_at_input_position ( int line, int col );
+void dbgui_execution_status ( char* status_string );
+
 
 /*
 *****************************************************************************
@@ -152,20 +177,16 @@ local display_context_vars ();
 *****************************************************************************
 */
 
-public   dbg_init (debug_data_file, source_filename, input_filename, break_opcode,
-                   debug_variables)
-char              *debug_data_file;
-char              *source_filename;
-char              *input_filename;
-short              break_opcode;
-dbg_variables     *debug_variables;
+void
+dbg_init ( char* debug_line_file, char* source_filename, char* input_filename,
+           short break_opcode, dbg_variables* debug_variables )
 {
     FILE      *fp;
     int        entries;
     int        line;
     int        addr;
 
-    static     session_active = 0;   /* Graphics up? */
+    static int session_active = 0;   /* Graphics up? */
 
     if (session_active)
     {
@@ -187,13 +208,15 @@ dbg_variables     *debug_variables;
         exit (10);
     }
 
-    fscanf (fp, "%d", &entries);
+    int read = fscanf (fp, "%d", &entries);
+    assert( read == 1 );
 
     dbg_line_table = (short *) malloc ((entries+1) * sizeof(short));
     dbg_line_table[0] = entries;
     for (line = 1; line <= entries; line++)
     {
-        fscanf (fp, "%d", &addr);
+        read = fscanf (fp, "%d", &addr);
+        assert( read == 1 );
         dbg_line_table[line] = addr;
     }
     dbg_read_symbol_table (fp);
@@ -219,7 +242,8 @@ dbg_variables     *debug_variables;
 /*  Called at the beginning of each instruction.
     Returns TRUE if we have reached the end of the current run step-count */
 
-public       dbg_check_step_count()
+int
+dbg_check_step_count()
 {
     short     line;
 
@@ -292,8 +316,8 @@ short                                    input_line, input_col;
 *****************************************************************************
 */
 
-public        dbg_command (command)
-char                      *command;
+int
+dbg_command ( char* command )
 {
     short     line;
     int       argc;
@@ -610,6 +634,7 @@ char                      *command;
 /*  Run up to end of program, step count, or breakpoint.
     Returns 1 = program finished  */
 
+int
 dbg_run ()
 {
     int   status;
@@ -643,8 +668,10 @@ dbg_run ()
     return (done);
 }
 
+
 /* Display current position */
-dbg_display_position ()
+void
+dbg_display_position()
 {
     short     line;
     char      buffer[50];
@@ -669,8 +696,9 @@ dbg_display_position ()
     }
 }
 
-local display_source_for_pc (pc)
-short                        pc;
+
+void
+display_source_for_pc ( short pc )
 {
     short     line;
 
@@ -679,7 +707,8 @@ short                        pc;
 }
 
 
-local    dbg_install_breakpoints()
+void
+dbg_install_breakpoints()
 {
     int i;
     int pc;
@@ -699,7 +728,9 @@ local    dbg_install_breakpoints()
     dbg_breakpoints_installed = 1;
 }
 
-local   dbg_remove_breakpoints()
+
+void
+dbg_remove_breakpoints()
 {
     int i;
 
@@ -714,10 +745,8 @@ local   dbg_remove_breakpoints()
 }
 
 
-local   split_args (cmdbuf, argc, argv)
-char               *cmdbuf;
-int                *argc;
-char              **argv;
+void
+split_args ( char* cmdbuf, int* argc, char** argv )
 {
   char *p;
 
@@ -756,7 +785,8 @@ char              **argv;
 *****************************************************************************
 */
 
-public    dbg_hit_breakpoint()
+void
+dbg_hit_breakpoint()
 {
     short    i;
 
@@ -804,14 +834,16 @@ public    dbg_hit_input_breakpoint ()
     dbg_step_count = 1;
 }
 
+
+void
 dbg_execution_complete()
 {
     printf ("Execution complete.\n");
 }
 
 
-local int    dbg_find_line (pc)
-int              pc;
+int
+dbg_find_line ( int pc )
 {
     short        line;
     int          max_line = dbg_line_table[0];
@@ -847,6 +879,7 @@ int              pc;
 }
 
 
+void
 dbg_walkTable()
 {
     dbgui_main_loop();    /* Enter main loop, with callbacks to dbg_command */
@@ -862,16 +895,16 @@ dbg_walkTable()
 
 /*  Bring up windows, init cmdline, callbacks, etc  */
 
-dbgui_init (source_filename, input_filename)
-char       *source_filename;
-char       *input_filename;
+void
+dbgui_init ( char* source_filename, char* input_filename )
 {
     dbgui_create_debug_window(source_filename, input_filename);
 }
 
+
 /*  Rerun same program with a (possibly) new input file */
-dbgui_restart (input_filename)
-char          *input_filename;
+void
+dbgui_restart ( char* input_filename )
 {
     dbgui_restart_input_window(input_filename);
 }
@@ -879,6 +912,7 @@ char          *input_filename;
 
 /*  Enter main event loop for debugger  */
 
+void
 dbgui_main_loop ()
 {
     dbg_display_position();   /* initial display of position.  Subsequent update after each run. */
@@ -888,6 +922,7 @@ dbgui_main_loop ()
 
 /*  Command-line version of main loop, rather than graphical event loop */
 
+void
 cmdline_main_loop ()
 {
     char      cmdbuf [100];
@@ -898,7 +933,8 @@ cmdline_main_loop ()
     while (!done)
     {
         printf ("ssl.%d> ",ssl_pc);
-        gets (cmdbuf);
+        char* p = fgets (cmdbuf, sizeof(cmdbuf)/sizeof(cmdbuf[0]), stdin);
+        assert( p );
 
         done = dbg_command (cmdbuf);
     }
@@ -906,9 +942,8 @@ cmdline_main_loop ()
 }
 
 
-dbgui_create_debug_window (source_filename, input_filename)
-char                      *source_filename;
-char                      *input_filename;
+void
+dbgui_create_debug_window ( char* source_filename, char* input_filename )
 {
     int   my_argc = 1;         /* Hardcode these for now */
     static char *my_argv[] = { "ssltool", NULL };
@@ -917,16 +952,18 @@ char                      *input_filename;
 
 }
 
+
 /* Restart input window with (possibly) new file */
 
-dbgui_restart_input_window (input_filename)
-char                       *input_filename;
+void
+dbgui_restart_input_window ( char* input_filename )
 {
     ssltool_restart_input_window (input_filename);
 }
 
-dbgui_at_line (line)
-short          line;
+
+void
+dbgui_at_line ( short line )
 {
 #if 0
     /*  This is how I used to do it with TxEd on the Amiga */
@@ -938,16 +975,15 @@ short          line;
 }
 
 
-dbgui_at_input_position (line, col)
-int                      line;
-int                      col;
+void
+dbgui_at_input_position ( int line, int col )
 {
     ssltool_at_input_position (line, col);
 }
 
 
-dbgui_execution_status (status_string)
-char                   *status_string;
+void
+dbgui_execution_status ( char* status_string )
 {
     ssltool_execution_status (status_string);
 }
@@ -1049,14 +1085,12 @@ long                 value;
     printf ("\t%d\n", value);
 }
 
+
 /* If a var_name given, only variable(s) with matching name
  * will be displayed.
  */
-local display_context_vars (pc, fp, show_globals, var_name)
-short                       pc;
-long                        fp;
-int                         show_globals;
-char                       *var_name;
+void
+display_context_vars ( short pc, long fp, int show_globals, char* var_name )
 {
     int    symbol;
     char  *rule;
