@@ -81,6 +81,7 @@ static char sccsid[] = "%W% %G% %U% %P%";
     Note, currently Semantic/Rule choices will follow the same algorithm as
     input choices: take default, or first choice if no default.    */
 
+void
 ssl_error_recovery ()
 {
     int done_loop = 0;

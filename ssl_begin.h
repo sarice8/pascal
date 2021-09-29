@@ -31,6 +31,11 @@ static char sccsid[] = "%W% %G% %U% %P%";
  *
  */
 
+#include <ssl_rt.h>
+#include <debug.h>
+
+void ssl_error_recovery();
+
 /*
  *  Debugging is enabled.
  */
