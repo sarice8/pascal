@@ -12,16 +12,15 @@ SSL_RT_HEADERS   = ${SSL_RT_DIR}/ssl_rt.h \
 SSL_DIR          = ${RELEASE}/ssl/1.3.2
 
 # This is the directory we would export our own build to
-OUR_RELEASE_DIR = $(RELEASE)/schema/1.3
+OUR_RELEASE_DIR = $(RELEASE)/schema/1.4
 
 # ---------------------------------------------------------
 
-# Uses Debug version 1.2.8
 DBG_DIR          = ${RELEASE}/debug/1.3.0
 DBG_OBJS         = ${DBG_DIR}/obj-$(OSTYPE)/debug.o
 DBG_STUBS        = ${DBG_DIR}/obj-$(OSTYPE)/dbgstub.o
 
-# Uses SslTool version 1.2.7
+# Uses SslTool
 # Not available yet, needs porting to a new GUI.
 #SSLTOOL_DIR      = ${RELEASE}/ssltool/1.2.7
 #SSLTOOL_OBJS     = ${SSLTOOL_DIR}/ssltool_stubs_new.o \
@@ -31,8 +30,8 @@ DBG_STUBS        = ${DBG_DIR}/obj-$(OSTYPE)/dbgstub.o
 
 # ---------------------------------------------------------
 
-CFLAGS = -g -Werror
-#CFLAGS = -O3 -Werror
+#CFLAGS = -g -Werror
+CFLAGS = -O3 -Werror
 
 OBJDIR = ./obj-$(OSTYPE)
 BINDIR = ./bin-$(OSTYPE)

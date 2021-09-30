@@ -27,6 +27,8 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <assert.h>
 
 #ifdef AMIGA
 #include <dos.h>
@@ -54,6 +56,8 @@ extern short    dAttributeType [];
 
 
 Node SCH_LookupNode (/* node_num */);
+void browse ( Node Root );
+void br_quit ( int status );
 
 
 char      filename[256];
@@ -105,8 +109,9 @@ char         *argv[];
     browse (Root);
 }
 
-browse (Root)
-Node    Root;
+
+void
+browse ( Node Root )
 {
     char      command_line[256];
     char      command[256];
@@ -125,7 +130,8 @@ Node    Root;
         while (1)
         {
             printf ("? ");
-            gets (command_line);
+            char* ok = fgets (command_line, sizeof(command_line)/sizeof(command_line[0]), stdin);
+            assert( ok );
             sscanf (command_line, "%s", command);
 
             if (strcmp(command, "help") == 0)
@@ -201,8 +207,8 @@ Node    Root;
 }
 
 
-br_quit (status)
-int      status;
+void
+br_quit ( int status )
 {
     exit (status);
 }

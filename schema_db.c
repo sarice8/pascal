@@ -26,6 +26,9 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <stdint.h>
 
 #ifdef AMIGA
 #include <dos.h>
@@ -40,9 +43,10 @@
  *  Schema table access primitives, defined in <schema>_schema.c
  */
 
-extern short    dGetAttributeOffset (/* class, attribute */);
-extern short    dGetAttributeTags   (/* class, attribute */);
-extern short    dGetAttributeType   (/* attribute */);
+short    dGetAttributeOffset ( short theClass, short attribute );
+short    dGetAttributeType   ( short attribute );
+short    dGetAttributeTags   ( short theClass, short attribute );
+int      dGetClassIsA        ( short theClass, short isaClass );
 
 extern short    dObjectSize [];
 extern int      dObjects;
@@ -57,7 +61,7 @@ extern short    dAttributeType [];
  */
 
 static long     SCH_next_node_num;
-char            SCH_errbuf [256];
+char            SCH_errbuf [1024];
 
 /*
  * For debugging
@@ -97,6 +101,7 @@ Node SCH_LookupNodeLoad (/* orig_num */);
 void    SCH_Traverse (/* root, callback, udata */);
 int     SCH_SaveNodeAscii (/* N, fp */);
 Node    SCH_LoadNodeAscii (/* fp */);
+void    SCH_LoadPatchNode ( Node N );
 
 
 /*
@@ -567,7 +572,7 @@ Node                  N;
     if (N == NULL)
         printf ("Null\n");
     else
-        printf ("%d: %s\n", N->node_num, dObjectName[N->kind]);
+        printf ("%ld: %s\n", N->node_num, dObjectName[N->kind]);
 }
 
 void  DumpNodeLong (N)
@@ -587,7 +592,7 @@ Node                N;
         return;
     }
 
-    SCH_indent_printf (indent, "%s\t\t[%d]\n", dObjectName[N->kind], N->node_num);
+    SCH_indent_printf (indent, "%s\t\t[%ld]\n", dObjectName[N->kind], N->node_num);
 
     indent += 4;
 
@@ -609,7 +614,7 @@ Node                N;
                     break;
 
                 case SCH_Type_Integer4:
-                    printf ("%d\n", *(long*)attr_ptr);
+                    printf ("%ld\n", *(long*)attr_ptr);
                     break;
 
                 case SCH_Type_StringN:
@@ -623,9 +628,9 @@ Node                N;
                     if (*(Node *)attr_ptr == NULL)
                         printf ("Null\n");
                     else if (dGetAttributeTags(N->kind, attr_code) & SCH_Tag_Alt)
-                        printf ("[Alt %d]\n", (*(Node *)attr_ptr)->node_num);
+                        printf ("[Alt %ld]\n", (*(Node *)attr_ptr)->node_num);
                     else
-                        printf ("[%d]\n", (*(Node *)attr_ptr)->node_num);
+                        printf ("[%ld]\n", (*(Node *)attr_ptr)->node_num);
                     break;
 
                 case SCH_Type_List:
@@ -639,7 +644,7 @@ Node                N;
                         printf ("List [");
                         for (I = FirstItem(L); I != NULL; I = NextItem(I))
                         {
-                            printf (" %d", Value(I)->node_num);
+                            printf (" %ld", Value(I)->node_num);
                         }
                         printf ("]\n");
                     }
@@ -701,17 +706,20 @@ List               L;
     return (I);
 }
 
-void SCH_indent_printf (indent, message, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9)
-int                     indent;
-char                   *message;
-int                     p0, p1, p2, p3, p4, p5, p6, p7, p8, p9;
+void
+SCH_indent_printf ( int indent, char* message, ... )
 {
+    va_list    arglist;
     int        i;
 
     for (i = 0; i < indent; i++)
         putchar (' ');
-    printf (message, p0, p1, p2, p3, p4, p5, p6, p7, p8, p9);
+
+    va_start( arglist, message );
+    vprintf( message, arglist );
+    va_end( arglist );
 }
+
 
 Node SCH_LookupNode (node_num)
 int                  node_num;
@@ -823,7 +831,7 @@ FILE                  *fp;
 
     /* assert N != NULL */
 
-    fprintf (fp, "%d: %s\n", N->node_num, dObjectName[N->kind]);
+    fprintf (fp, "%ld: %s\n", N->node_num, dObjectName[N->kind]);
 
     for (attr_code = 1; attr_code < dAttributes; attr_code++)
     {
@@ -844,7 +852,7 @@ FILE                  *fp;
 
                 case SCH_Type_Integer4:
                     if (*(long*)attr_ptr != 0)   /* Don't bother to print if 0, for now */
-                        fprintf (fp, "  %s: %d\n", dAttributeName[attr_code],
+                        fprintf (fp, "  %s: %ld\n", dAttributeName[attr_code],
                                                    *(long*)attr_ptr);
                     break;
 
@@ -857,7 +865,7 @@ FILE                  *fp;
                 case SCH_Type_Node:
                     N1 = *(Node *)attr_ptr;
                     if (N1 != NULL)
-                        fprintf (fp, "  %s: %d\n", dAttributeName[attr_code],
+                        fprintf (fp, "  %s: %ld\n", dAttributeName[attr_code],
                                                    N1->node_num);
                     break;
 
@@ -872,7 +880,7 @@ FILE                  *fp;
                             N1 = Value(I);
                             if (N1 != NULL)
                             {
-                                fprintf (fp, "%d ", N1->node_num);
+                                fprintf (fp, "%ld ", N1->node_num);
                                 if (wrap_count-- == 0)
                                 {
                                     wrap_count = LIST_WRAP_COUNT;
@@ -1056,7 +1064,7 @@ FILE                   *fp;
                 break;
 
             case SCH_Type_Integer4:
-                sscanf (val, "%d", (long*)attr_ptr);
+                sscanf (val, "%ld", (long*)attr_ptr);
                 break;
 
             case SCH_Type_StringN:
@@ -1110,7 +1118,7 @@ FILE                   *fp;
                     /* Based on AddLast() but not a real Node pointer */
 
                     I = SCH_NewItem (L);
-                    I->value = (Node) ((orig_num << 1) | 1);
+                    I->value = (Node) (intptr_t) ((orig_num << 1) | 1);
 
                     if (L->first == NULL)
                     {
@@ -1142,8 +1150,8 @@ FILE                   *fp;
  *  instead of node pointers.  Patch those links.
  */
 
-SCH_LoadPatchNode (N)
-Node               N;
+void
+SCH_LoadPatchNode ( Node N )
 {
     int       attr_code;
     void    **attr_ptr;
@@ -1184,7 +1192,7 @@ Node               N;
                     {
                         FOR_EACH_ITEM (I, L)
                         {
-                            orig_num = (int) I->value;
+                            orig_num = (int) (intptr_t) I->value;
                             if (orig_num & 1)
                             {
                                 orig_num = orig_num >> 1;

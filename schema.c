@@ -60,7 +60,6 @@ static char sccsid[] = "@(#)schema.c	1.4 8/23/93 20:10:04 /files/home/sim/sarice
 #include "schema.tbl"
 
 
-// Defined in schema_scan.c but no header file for that yet!
 void init_my_scanner();
 
 
@@ -95,6 +94,9 @@ Node     CurrentAttrSym;                  /* current attribute symbol */
 long     NumAttrSyms;                     /* count of attribute symbols */
 long     NumClasses;                      /* count of created/derived classes */
 
+
+// Forward Declarations
+
 short w_define_obj ();                    /* Define an object given an id   */
 short w_define_attr ();                   /* Define an attribute given id   */
 // w_define_attr_of_obj ();               /* ...given attr # and object #   */
@@ -106,6 +108,17 @@ void w_dump_c_attr_offsets ( List class_tree, short* parent_offsets, short paren
 void w_dump_c_attr_types ( List attr_syms );
 void w_dump_c_attr_tags( List class_tree, short* parent_attr_tags );
 void w_dump_c_class_isa ( List class_tree, int* class_code_ptr, char* parent_obj_isa );
+void w_dump_h_macros ();
+
+void print_node( void* variable, void* udata );
+void print_long( void* variable, void* udata );
+void nodeDumpTreeNum ( long node_number );
+
+void w_create_all_classes_list ();
+void w_create_all_classes_sub ( List class_tree, List L );
+
+void init_my_scanner ();
+
 
 
 char           C_out_filename[100];
@@ -117,8 +130,7 @@ int            option_list;
 int            option_debug;
 
 
-void print_node( char* variable, char* udata );
-void print_long( char* variable, char* udata );
+
 
 dbg_variables debug_variables[] =
 {
@@ -524,7 +536,7 @@ w_dump_table ()
     fprintf (f_out, "};\n\n");
 
 
-    fprintf (f_out, "static short dAttributeTags [%dl][%ld] = {\n", NumClasses, NumAttrSyms);
+    fprintf (f_out, "static short dAttributeTags [%ld][%ld] = {\n", NumClasses, NumAttrSyms);
 
     attr_tags = (short *) malloc (sizeof(short) * NumAttrSyms);
     for (a = 0; a < NumAttrSyms; a++)
@@ -736,7 +748,7 @@ w_dump_c_attr_types   ( List attr_syms )
 
     /* Print to file */
 
-    fprintf (f_out, "short dAttributeType [%d] = {\n", NumAttrSyms);
+    fprintf (f_out, "short dAttributeType [%ld] = {\n", NumAttrSyms);
     fprintf (f_out, "\t");
 
     for (a = 0; a < NumAttrSyms; a++)
@@ -803,7 +815,7 @@ w_dump_c_attr_tags    ( List class_tree, short* parent_attr_tags )
 
 
 void
-w_dump_c_class_isa ( List class_tree, int* class_code_ptr, char parent_obj_isa )
+w_dump_c_class_isa ( List class_tree, int* class_code_ptr, char* parent_obj_isa )
 {
     char     *obj_isa;
     short     o;
@@ -847,6 +859,8 @@ w_dump_c_class_isa ( List class_tree, int* class_code_ptr, char parent_obj_isa )
     free (obj_isa);
 }
 
+
+void
 w_dump_h_macros ()
 {
     Item        I;
@@ -856,6 +870,7 @@ w_dump_h_macros ()
 
     fprintf (f_h_out, "/* Generated automatically by schema */\n");
     fprintf (f_h_out, "\n");
+    fprintf (f_h_out, "#include <stdint.h>\n");
     fprintf (f_h_out, "#include \"schema_db.h\"\n");
     fprintf (f_h_out, "\n");
 
@@ -885,22 +900,53 @@ w_dump_h_macros ()
 
     /* Define query and set macros */
 
+    // SARICE TO DO 9/29/2021 -
+    // The original code was assuming every value could be passed around and stored as a void*.
+    // That can't compile anymore.   At a minimum, add typecasts here for integer types.
+    // Better would be to have different GetAttr/SetAttr methods per aType.
+
     FOR_EACH_ITEM (I, qAttrSyms(SchemaRoot))
     {
         N = Value(I);
-        fprintf (f_h_out, "#define %s(N)\t\t(%s)\tGetAttr(T_%s, N)\n",
-                 ssl_get_id_string(qIdent(N)),
-                 SCH_GetTypeName(qType(N)),
-                 ssl_get_id_string(qIdent(N)));
+        // SARICE temp fix 9/29/2021 - typecasts for non-pointer types, as noted above
+        //         Will need to include <stdint.h>
+        switch (qType(N)) {
+          case type_Boolean1:
+          case type_Character1:
+          case type_Integer4:
+            fprintf (f_h_out, "#define %s(N)\t\t(%s)\t(intptr_t) GetAttr(T_%s, N)\n",
+                     ssl_get_id_string(qIdent(N)),
+                     SCH_GetTypeName(qType(N)),
+                     ssl_get_id_string(qIdent(N)));
+            break;
+          default:
+            fprintf (f_h_out, "#define %s(N)\t\t(%s)\tGetAttr(T_%s, N)\n",
+                     ssl_get_id_string(qIdent(N)),
+                     SCH_GetTypeName(qType(N)),
+                     ssl_get_id_string(qIdent(N)));
+            break;
+        }
     }
 
     fprintf (f_h_out, "\n");
     FOR_EACH_ITEM (I, qAttrSyms(SchemaRoot))
     {
         N = Value(I);
-        fprintf (f_h_out, "#define Set%s(N,V)\t\tSetAttr(T_%s, N, (void*)(V))\n",
-                 ssl_get_id_string(qIdent(N)),
-                 ssl_get_id_string(qIdent(N)));
+        // SARICE temp fix 9/29/2021 - typecasts for non-pointer types, as noted above
+        switch (qType(N)) {
+          case type_Boolean1:
+          case type_Character1:
+          case type_Integer4:
+            fprintf (f_h_out, "#define Set%s(N,V)\t\tSetAttr(T_%s, N, (void*)(intptr_t)(V))\n",
+                     ssl_get_id_string(qIdent(N)),
+                     ssl_get_id_string(qIdent(N)));
+            break;
+          default:
+            fprintf (f_h_out, "#define Set%s(N,V)\t\tSetAttr(T_%s, N, V)\n",
+                     ssl_get_id_string(qIdent(N)),
+                     ssl_get_id_string(qIdent(N)));
+            break;
+        }
     }
 
     fprintf (f_h_out, "\n");
@@ -919,9 +965,7 @@ w_dump_h_macros ()
 /*  Callbacks to display variables in debugger  */
 
 void
-print_node (variable, udata)
-char       *variable;
-char       *udata;
+print_node ( void* variable, void* udata )
 {
     Node      N = *((Node *) variable);
 
@@ -930,16 +974,15 @@ char       *udata;
 
 
 void
-print_long (variable, udata)
-char       *variable;
-char       *udata;
+print_long ( void* variable, void* udata )
 {
     printf ("%ld\n", *((long *) variable));
 }
 
+
 /***** FIX THIS.  debug/1.2.8/debug.o calls it. *****/
-nodeDumpTreeNum (node_number)
-long             node_number;
+void
+nodeDumpTreeNum ( long node_number )
 {
     Node  N;
     N = SCH_LookupNode (node_number);
@@ -1000,6 +1043,7 @@ struct ssl_token_table_struct my_operator_table[] =
 struct ssl_special_codes_struct my_special_codes;
 
 
+void
 init_my_scanner ()
 {
     my_special_codes.invalid = pINVALID;

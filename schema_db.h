@@ -197,7 +197,7 @@ void     DumpNodeLong  ( Node N );
 
 void** SCH_GetAttrPtr ( Node node, int attr_code );
 Item   SCH_NewItem ( List owner );
-void   SCH_indent_printf ( int indent, char* message, ... );
+void   SCH_indent_printf ( int indent, char* message, ... ) __attribute__ ((format (printf, 2, 3 )));
 Node   SCH_LookupNode ( int node_num );
 char*  SCH_GetTypeName ( int type );
 
