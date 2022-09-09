@@ -79,6 +79,20 @@ static char   s_id_cont [256];
 static char   s_digit  [256];
 static short  s_punct  [256];
 static char   s_punct_multi [256];
+static char   s_potential_comment_start[256];
+
+/* Comment brackets */
+
+typedef struct ssl_comment_bracket_struct {
+  char start[16];
+  char end[16];   // "" for comment to end-of-line
+} ssl_comment_bracket;
+
+#define SSL_COMMENT_BRACKETS_SIZE 5
+ssl_comment_bracket ssl_comment_brackets[SSL_COMMENT_BRACKETS_SIZE];
+int ssl_num_comment_brackets = 0;
+int ssl_using_default_comment_brackets = 0;
+
 
 void   s_lookup_id ();
 void   s_hit_eof ();
@@ -161,7 +175,38 @@ struct ssl_special_codes_struct      *special_codes;
         }
     }
 
+    // By default, scanner accepts comments starting from '%' to end of line.
+    // Applications can override this by calling ssl_scanner_init_comment() themselves.
+    ssl_scanner_init_comment( "%", "" );
+    ssl_using_default_comment_brackets = 1;
+
     s_including_file = 0;
+}
+
+
+void
+ssl_scanner_init_comment( const char* start_str, const char* end_str )
+{
+  if ( !start_str || !end_str ) {
+    ssl_fatal( "ssl_scan.c: unexpected null passed to ssl_scanner_init_comment\n" );
+  }
+
+  if ( ssl_using_default_comment_brackets ) {
+    // erase default configuration
+    memset( s_potential_comment_start, '\0', 256 );
+    ssl_num_comment_brackets = 0;
+    ssl_using_default_comment_brackets = 0;
+  }
+
+  if ( ssl_num_comment_brackets == SSL_COMMENT_BRACKETS_SIZE ) {
+    ssl_fatal( "ssl_scan.c: too many comment brackets defined\n" );
+  }
+
+  strcpy( ssl_comment_brackets[ ssl_num_comment_brackets ].start, start_str );
+  strcpy( ssl_comment_brackets[ ssl_num_comment_brackets ].end, end_str );
+  ++ssl_num_comment_brackets;
+
+  s_potential_comment_start[ start_str[0] ] = 1;
 }
 
 
@@ -296,18 +341,60 @@ ssl_get_next_token ()
             ssl_line_listed = 0;
         }
 
-        else if (s_src_ptr[0]=='%')           /* comment */
+        else if ( s_potential_comment_start[ s_src_ptr[0] ] )
         {
-            if (ssl_listing_callback && !ssl_line_listed)
-                (*ssl_listing_callback) (ssl_line_buffer, 0);
-            if (!fgets(ssl_line_buffer, ssl_line_size, ssl_src_file))
-            {
-                s_hit_eof();
-                return;
+            // might be start of a comment
+            int bracket;
+            for ( bracket = 0; bracket < ssl_num_comment_brackets; ++bracket ) {
+              if ( strncmp( s_src_ptr, ssl_comment_brackets[ bracket ].start,
+                            strlen( ssl_comment_brackets[ bracket ].start ) ) == 0 ) {
+                break;
+              }
             }
-            s_src_ptr = ssl_line_buffer;
-            ssl_line_number++;
-            ssl_line_listed = 0;
+
+            if ( bracket == ssl_num_comment_brackets ) {
+              // Not a comment.  Done looking through whitespace/comments.
+              break;
+            }
+
+            // If no closing bracket defined, this is a comment to end-of-line
+            if ( ssl_comment_brackets[ bracket ].end[0] == '\0' ) {
+
+              // Comment to end-of-line
+
+              if (ssl_listing_callback && !ssl_line_listed)
+                  (*ssl_listing_callback) (ssl_line_buffer, 0);
+              if (!fgets(ssl_line_buffer, ssl_line_size, ssl_src_file))
+              {
+                  s_hit_eof();
+                  return;
+              }
+              s_src_ptr = ssl_line_buffer;
+              ssl_line_number++;
+              ssl_line_listed = 0;
+
+            } else {
+
+              // Comment until the close bracket, potentially across multiple lines.
+
+              s_src_ptr += strlen( ssl_comment_brackets[ bracket ].start );
+              while ( strncmp( s_src_ptr, ssl_comment_brackets[ bracket ].end,
+                               strlen( ssl_comment_brackets[ bracket ].end ) ) != 0 ) {
+                if ( !*s_src_ptr++ ) {
+                  if (ssl_listing_callback && !ssl_line_listed)
+                      (*ssl_listing_callback) (ssl_line_buffer, 0);
+                  if (!fgets(ssl_line_buffer, ssl_line_size, ssl_src_file)) {
+                      s_hit_eof();
+                      return;
+                  }
+                  s_src_ptr = ssl_line_buffer;
+                  ssl_line_number++;
+                  ssl_line_listed = 0;
+                }
+
+              }
+              s_src_ptr += strlen( ssl_comment_brackets[ bracket ].end );
+            }
         }
 
         else

@@ -183,6 +183,17 @@ void ssl_init_scanner ( struct ssl_token_table_struct *keyword_table,
                         struct ssl_special_codes_struct *special_codes );
 
 /*
+ *  Set the bracketing text for a comment.
+ *  This may be called multiple times to allow for multiple comment styles.
+ *  If end_str is "", the comment goes to the end of the line.
+ *  This should be called after ssl_init_scanner.
+ *
+ *  By default, we assume a call to ssl_scanner_init_comment( "%", "" )
+ *  but this will be replaced if the application makes any call to this method.
+ */
+void ssl_scanner_init_comment( const char* start_str, const char* end_str );
+
+/*
  *  Include another source file
  */
 void ssl_include_filename ( char* filename );
