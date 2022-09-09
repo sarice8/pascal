@@ -380,6 +380,10 @@ init_my_scanner()
   my_special_codes.strlit  = pStrLit;
 
   ssl_init_scanner( my_keyword_table, my_operator_table, &my_special_codes );
+
+  ssl_scanner_init_comment( "(*", "*)" );  // Original pascal comments
+  ssl_scanner_init_comment( "{", "}" );    // Introduced by Turbo Pascal
+  ssl_scanner_init_comment( "//", "" );    // to end of line. Delphi pascal.
 }
 
 

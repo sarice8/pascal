@@ -21,8 +21,8 @@ SCHEMA_DIR       = $(RELEASE)/schema/1.3
 
 
 
-#CFLAGS = -g -Werror
-CFLAGS = -O3 -Werror
+CFLAGS = -g -Werror
+#CFLAGS = -O3 -Werror
 
 OBJDIR = ./obj-$(OSTYPE)
 BINDIR = ./bin-$(OSTYPE)

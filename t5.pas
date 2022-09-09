@@ -2,6 +2,10 @@
 
         01Jan90                   }
 
+  // Another comment
+  (* And yet
+     another comment, old-style *)
+
 program test (input, output);
 
 type atype = array [1..9] of array[1..2,1..2] of integer;
