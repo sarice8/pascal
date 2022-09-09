@@ -373,6 +373,13 @@ struct ssl_special_codes_struct my_special_codes;
 void
 init_my_scanner()
 {
+  // Pascal is case-insensitive!  Variables and keywords match regardless of case.
+  ssl_set_case_sensitive( 0 );
+
+  // TO DO: Pascal identifiers must start with A-Z or underscore.
+  //        They continue with A-Z, 0-9, underscore.
+  //        They do -not- allow $  which the current hardcoded scanner accepts.
+
   my_special_codes.invalid = pInvalid;
   my_special_codes.eof     = pEof;
   my_special_codes.ident   = pIdent;
