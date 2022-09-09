@@ -196,6 +196,13 @@ error:
    eNotInALoop
    eRecordEmpty;
 
+include 'pascal_schema.ssl'
+
+type Node:     % A pointer to a node in the schema database (symbol database)
+    Null = 0
+    ;
+
+
 type boolean:
    false    = 0
    true     = 1;

@@ -1,0 +1,14 @@
+
+% An empty schema, for now.
+
+Schema Pascal Root nScope Is
+
+% -----------------------------------------------------------------------
+% Scope
+% -----------------------------------------------------------------------
+
+Object ::= nScope
+nScope =>
+        qParentScope:   Node            (nScope)                [Alt,Opt]
+
+
