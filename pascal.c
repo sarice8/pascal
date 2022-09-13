@@ -189,10 +189,18 @@ struct dSDtype {            /* symbol table display */
 } dSD[dSDsize];
 short dSDptr;
 
+// symbol stack
 #define dSSsize 40
-struct dStype dSS[dSSsize];               /* symbol stack */
+struct dStype dSS[dSSsize];
 short dSSptr;
 
+// scope stack
+#define dScopeStackSize 40
+NODE_PTR        dScopeStack[dScopeStackSize];
+int             dScopeStackPtr;
+
+
+// OLD:
 #define dTTsize 50
 struct dTTtype {          /* type table */
   short kind;             /* for user types: array, record, set, etc */
@@ -204,8 +212,16 @@ struct dTTtype {          /* type table */
 short dTTptr;
 short dLastScalar;        /* typ# of last basic type (user typ#'s follow) */
 
+// OLD:
 #define dTSsize 40
 short dTS[dTSsize], dTSptr;        /* type stack ... index into TT */
+
+// New type table, owns nType nodes.
+// Need to make dynamic size.
+#define dTypeTableSize 50
+NODE_PTR dTypeTable[dTypeTableSize];
+int dTypeTablePtr;
+
 
 #define dCSsize 30
 short dCS[dCSsize], dCSptr;        /* count stack */
@@ -236,6 +252,14 @@ struct dPStype {
    {dPatchL, 0, dPatchLsize,
     dPatchE, 0, dPatchEsize,
     dPatchI, 0, dPatchIsize};
+
+
+// A dynamic vector of NODE_PTR's
+typedef struct NodeVecStruct {
+  int size;
+  int capacity;
+  NODE_PTR*  elements;
+} NodeVec, *NODE_VEC_PTR;
 
 
 void
@@ -418,6 +442,7 @@ init_my_operations()
   /* built-in types */
   /* note, entry 0 of TT is not used */
 
+#if 0
   dST[++dSTptr].id = ssl_add_id("integer",pIdent);
   dST[dSTptr].kind = kType;
   dST[dSTptr].typ  = tyInteger;
@@ -442,12 +467,14 @@ init_my_operations()
   dST[dSTptr].kind = kType;
   dST[dSTptr].typ  = tyFile;
   dTT[tyFile].size = 1;
+#endif
 
   dTTptr = tyFile;
   dLastScalar = tyFile;
 
   /* built-in constants */
 
+#if 0
   dST[++dSTptr].id = ssl_add_id("true",pIdent);
   dST[dSTptr].kind = kConst;
   dST[dSTptr].typ  = tyBoolean;
@@ -457,12 +484,16 @@ init_my_operations()
   dST[dSTptr].kind = kConst;
   dST[dSTptr].typ  = tyBoolean;
   dST[dSTptr].val  = 0;
+#endif
 
 }
 
 
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
+
+NODE_PTR dNode;  // temporary for several mechanisms
+
 
 #include "ssl_begin.h"
 
@@ -485,6 +516,218 @@ init_my_operations()
                                  continue;
             }
 
+
+    /* Mechanism node_mech */
+
+    case oNodeNew:      /* (node_type) -- create node */
+            ssl_result = (long) nodeNew (ssl_param);
+            continue;
+    case oNodeSet:
+            nodeLink ((NODE_PTR)ssl_argv(0,3), ssl_argv(1,3), (NODE_PTR)ssl_argv(2,3));
+            continue;
+    case oNodeSetInt:
+    case oNodeSetBoolean:
+    case oNodeSetKind:
+            nodeSetValue ((NODE_PTR)ssl_argv(0,3), ssl_argv(1,3), ssl_argv(2,3));
+            continue;
+    case oNodeGet:
+            ssl_result = (long) nodeGet ((NODE_PTR)ssl_argv(0,2), ssl_argv(1,2));
+            continue;
+    case oNodeGetInt:
+    case oNodeGetBoolean:
+            ssl_result = (long) nodeGetValue ((NODE_PTR)ssl_argv(0,2), ssl_argv(1,2));
+            continue;
+    case oNodeNull:
+            ssl_result = ((NODE_PTR)ssl_param == NULL);
+            continue;
+    case oNodeNext:
+            ssl_var_stack[ssl_param] = (long) nodeNext((NODE_PTR)ssl_var_stack[ssl_param]);
+            continue;
+    case oNodeType:
+            // SARICE TEST: allow for Null, returning type nINVALID.
+            //   Maybe nodeType should allow this.
+            if ((NODE_PTR)ssl_param == NULL) {
+              ssl_result = nINVALID;
+            } else {
+              ssl_result = nodeType((NODE_PTR)ssl_param);
+            }
+            continue;
+    case oNodeEqual:
+            ssl_result = (ssl_argv(0,2) == ssl_argv(1,2));
+            continue;
+
+
+    /* Mechanism node_vec_mech */
+
+    case oNodeVecNew: {
+            NODE_VEC_PTR nv = (NODE_VEC_PTR) malloc( sizeof( NodeVec ) );
+            nv->size = 0;
+            nv->capacity = 4;
+            nv->elements = (NODE_PTR*) malloc( nv->capacity * sizeof( NODE_PTR ) );
+            memset( nv->elements, nv->capacity * sizeof( NODE_PTR ), 0 );
+            ssl_result = (long) nv;
+            continue;
+            }
+    case oNodeVecDelete: {
+            NODE_VEC_PTR nv = (NODE_VEC_PTR) ssl_param;
+            free( nv->elements );
+            free( nv );
+            continue;
+            }
+    case oNodeVecAppend: {
+            NODE_VEC_PTR nv = (NODE_VEC_PTR) ssl_argv(0,2);
+            NODE_PTR n = (NODE_PTR) ssl_argv(1,2);
+            if ( nv->size == nv->capacity ) {
+              int new_capacity = nv->capacity * 2;
+              nv->elements = realloc( nv->elements, new_capacity * sizeof( NODE_PTR ) );
+              memset( &(nv->elements[nv->capacity]),
+                      (new_capacity - nv->capacity) * sizeof( NODE_PTR ),
+                      0 );
+              nv->capacity = new_capacity;
+            }
+            nv->elements[nv->size++] = n;
+            continue;
+            }
+    case oNodeVecSize: {
+            NODE_VEC_PTR nv = (NODE_VEC_PTR) ssl_param;
+            ssl_result = nv->size;
+            continue;
+            }
+    case oNodeVecElement: {
+            NODE_VEC_PTR nv = (NODE_VEC_PTR) ssl_argv(0,2);
+            ssl_result = (long) nv->elements[ ssl_argv(1,2) ];
+            continue;
+            }
+
+
+    /* Mechanism math */
+
+    case inc :
+            ssl_var_stack[ssl_param]++;
+            continue;
+    case dec :
+            ssl_var_stack[ssl_param]--;
+            continue;
+    case negate :
+            ssl_result = -ssl_param;
+            continue;
+    case subtract :
+            ssl_result = (ssl_argv(0,2) - ssl_argv(1,2));
+            continue;
+    case multiply :
+            ssl_result = (ssl_argv(0,2) * ssl_argv(1,2));
+            continue;
+    case equal :
+            ssl_result = (ssl_argv(0,2) == ssl_argv(1,2));
+            continue;
+    case equal_zero :
+            ssl_result = (ssl_param == 0);
+            continue;
+    case equal_node_type :
+            ssl_result = (ssl_argv(0,2) == ssl_argv(1,2));
+            continue;
+
+
+    /* Mechanism more_builtins */
+
+    case TOKEN_VALUE :
+            ssl_result = ssl_token.val;
+            continue;
+    case LAST_ID :
+            ssl_result = ssl_last_id;
+            continue;
+
+
+    /* Mechanism scope_mech */
+
+    case oScopeBegin:
+            dNode = nodeNew (nScope);
+            if (dScopeStackPtr > 0)
+                nodeLink (dNode, qParentScope, dScopeStack[dScopeStackPtr]);
+            if (++dScopeStackPtr == dScopeStackSize) ssl_fatal ("Scope Stack overflow");
+            dScopeStack[dScopeStackPtr] = dNode;
+            continue;
+    case oScopeEnd:
+            ssl_assert (dScopeStackPtr >= 1);
+            dScopeStackPtr--;
+            continue;
+    case oScopeCurrent:
+            ssl_assert (dScopeStackPtr >= 1);
+            ssl_result = (long) dScopeStack[dScopeStackPtr];
+            continue;
+    case oScopeDeclare:
+            ssl_assert (dScopeStackPtr >= 1);
+            nodeAppend (dScopeStack[dScopeStackPtr], qDecls, (NODE_PTR)ssl_param);
+            continue;
+    case oScopeDeclareAlloc: {
+            ssl_assert (dScopeStackPtr >= 1);
+            NODE_PTR scope = dScopeStack[dScopeStackPtr];
+            NODE_PTR node = (NODE_PTR)ssl_param;
+            NODE_PTR theType = nodeGet( node, qType );
+            ssl_assert( theType != NULL );
+            long offset = nodeGetValue( scope, qNextOffset );
+            nodeSetValue( node, qValue, offset );
+            nodeSetValue( scope, qNextOffset, offset + nodeGetValue( theType, qSize ) );
+            nodeAppend (scope, qDecls, node);
+            continue;
+            }
+    case oScopeFind:
+            for (int dScopeStackLookup = dScopeStackPtr; dScopeStackLookup > 0; dScopeStackLookup--)
+            {  
+                dNode = nodeFindValue_NoErrorChecking (dScopeStack[dScopeStackLookup], qDecls, qIdent, ssl_last_id);
+                if (dNode != NULL)
+                    break;
+            }
+            ssl_result = (long) dNode;
+            continue;
+    case oScopeFindRequire:
+            for (int dScopeStackLookup = dScopeStackPtr; dScopeStackLookup > 0; dScopeStackLookup--)
+            {  
+                dNode = nodeFindValue_NoErrorChecking (dScopeStack[dScopeStackLookup], qDecls, qIdent, ssl_last_id);
+                if (dNode != NULL)
+                    break;
+            }  
+            ssl_result = (long) dNode;
+            if (dNode == NULL)
+            {
+                ssl_error ("Undefined symbol");
+                ssl_pc--;
+                ssl_error_recovery ();
+            }
+            continue;
+
+
+    /* Mechanism type_mech */
+
+    case oTypeAdd:
+            if (++dTypeTablePtr==dTypeTableSize) ssl_fatal("Type Table overflow");
+            dTypeTable[dTypeTablePtr] = (NODE_PTR) ssl_param;
+            continue;
+
+
+    /* Mechanism id_mech */
+
+    case oIdAdd_File:
+            ssl_result = ssl_add_id( "file", pIdent );
+            continue;
+    case oIdAdd_Integer:
+            ssl_result = ssl_add_id( "integer", pIdent );
+            continue;
+    case oIdAdd_Boolean:
+            ssl_result = ssl_add_id( "boolean", pIdent );
+            continue;
+    case oIdAdd_Char:
+            ssl_result = ssl_add_id( "char", pIdent );
+            continue;
+    case oIdAdd_String:
+            ssl_result = ssl_add_id( "string", pIdent );
+            continue;
+    case oIdAdd_True:
+            ssl_result = ssl_add_id( "true", pIdent );
+            continue;
+    case oIdAdd_False:
+            ssl_result = ssl_add_id( "false", pIdent );
+            continue;
 
 
      /* Mechanism count */
@@ -544,6 +787,9 @@ init_my_operations()
             continue;
      case oValueIsOne :
             ssl_result = (dVS[dVSptr] == 1);
+            continue;
+     case oValueTop:
+            ssl_result = dVS[dVSptr];
             continue;
      case oValuePop :
             dVSptr--;

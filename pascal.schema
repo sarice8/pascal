@@ -1,5 +1,10 @@
 
-% An empty schema, for now.
+%
+% This schema holds a symbol table for a Pascal program.
+% Inspired by what I did in the SSL 1.3.2 processor.
+%
+% Steve Rice -- Sept 10, 2022
+%
 
 Schema Pascal Root nScope Is
 
@@ -10,5 +15,111 @@ Schema Pascal Root nScope Is
 Object ::= nScope
 nScope =>
         qParentScope:   Node            (nScope)                [Alt,Opt]
+        qDecls:         List            (nDeclaration)          [Pri,Opt]
+        qNextOffset:    Integer4              % address for next variable
+
+Object ::= nDeclaration
+
+
+% TO DO: not sure why I had both nDeclaration and nIdent
+nDeclaration ::= nIdent
+nIdent =>
+        % to do: ditch all the fields, and rely on schema objects instead.
+        qIdent:         Integer4
+        qKind:          Integer4   % to do: ditch this. rely on object type.
+        qType:          Node            (nType)                 [Alt,Opt]  % for var, func, typeDecl (how about const?)
+        qParamType:     Node            (nType)                 [Alt,Opt]  % for proc/funcs. I represented params as a type
+        qValue:         Integer4   % for const: value  (was short)
+                                   % for nGlobalVar: global address
+                                   % for nLocalVar: local address (relative to frame ptr)
+                                   % for nParam: local address (relative to frame ptr)
+        
+
+nIdent ::= nProgram
+
+% proc has qType == Null
+nIdent ::= nProc
+nProc =>
+        qParams:        Node            (nScope)                [Pri,Opt]
+        qChildScope:    Node            (nScope)                [Pri,Opt]
+
+
+% func has qType == return type
+%  (qType is currently held in qIdent)
+nProc ::= nFunc
+
+
+
+nIdent ::= nConst
+
+nIdent ::= nTypeDecl
+
+nIdent ::= nVar
+
+nVar ::= nGlobalVar
+
+nVar ::= nLocalVar
+
+nVar ::= nRecordField
+
+nVar ::= nParam
+nParam =>
+        qInOut:         Boolean1      % has VAR keyword
+
+
+Object ::= nType
+
+
+% nType objects are all owned by a type table, so child types are [Alt] here.
+%
+nType =>
+        qSize:          Integer4
+        qPointerType:   Node            (nType)                 [Alt,Opt]
+             % possibly silly optimization: a type that's a pointer to this type
+
+nType ::= nFileType
+
+nType ::= nIntegerType
+
+nType ::= nBooleanType
+
+nType ::= nCharType
+
+nType ::= nStringType
+
+nType ::= nPointerType
+nPointerType =>
+        qBaseType:      Node            (nType)                 [Alt]
+
+nType ::= nArrayType
+nArrayType =>
+        % The index type is always just for one dimension.
+        % A multi-dimension array is recorded as array of array,
+        % and may be referenced as such in the user's program.
+        qIndexType:     Node            (nSubrangeType)         [Alt]
+        qBaseType:      Node            (nType)                 [Alt]
+
+nType ::= nSubrangeType
+nSubrangeType =>
+        qLow:           Integer4
+        qHigh:          Integer4
+        qBaseType:      Node            (nType)                 [Alt]
+
+nType ::= nRecordType
+nRecordType =>
+        % the record field declarations, each with a relative offset
+        qScope:         Node            (nScope)                [Pri]
+
+
+% TO DO: Looks like I didn't support this in SSL yet
+nType ::= nEnumType
+nEnumType =>
+        % the enum value declarations, each as a const with its int value 
+        qScope:         Node            (nScope)                [Pri]
+
+% a collection of enum values, like a bit vector
+nType ::= nSetType
+nSetType =>
+        qBaseType:      Node            (nType)                 [Alt]
 
 

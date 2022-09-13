@@ -5,10 +5,51 @@ type node_type:
 	nINVALID
 	Object
 	nScope
+	nDeclaration
+	nIdent
+	nProgram
+	nProc
+	nFunc
+	nConst
+	nTypeDecl
+	nVar
+	nGlobalVar
+	nLocalVar
+	nRecordField
+	nParam
+	nType
+	nFileType
+	nIntegerType
+	nBooleanType
+	nCharType
+	nStringType
+	nPointerType
+	nArrayType
+	nSubrangeType
+	nRecordType
+	nEnumType
+	nSetType
 	;
 
 type node_attribute:
 	qINVALID
 	qParentScope
+	qDecls
+	qNextOffset
+	qIdent
+	qKind
+	qType
+	qParamType
+	qValue
+	qParams
+	qChildScope
+	qInOut
+	qSize
+	qPointerType
+	qBaseType
+	qIndexType
+	qLow
+	qHigh
+	qScope
 	;
 

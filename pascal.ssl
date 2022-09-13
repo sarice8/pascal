@@ -1,4 +1,5 @@
 title: 'Pascal Compiler 1.1.5 -- Jan 01 ''90';
+   
 %
 %  Pascal.ssl
 %
@@ -202,6 +203,9 @@ type Node:     % A pointer to a node in the schema database (symbol database)
     Null = 0
     ;
 
+type NodeVec:  % A pointer to a vector of Node.  See mechanism node_vec_mech
+    NullVec = 0
+    ;
 
 type boolean:
    false    = 0
@@ -234,6 +238,81 @@ type typ:
    tyRecord
    tyParams          % like record; a collection of proc/func params
    tySet;
+
+
+% Some general schema node operations.
+% node_type and node_attribute are defined in generated file pascal_schema.ssl included above.
+%
+mechanism node_mech:
+    oNodeNew (node_type) >> Node         % create new node
+    oNodeSet (Node, node_attribute, Node)   % set Node attribute of node
+    oNodeSetInt (Node, node_attribute, int) % set int attribute of node
+    oNodeSetBoolean (Node, node_attribute, boolean)
+    oNodeSetKind (Node, node_attribute, kind) % set attribute of node  *** MIGHT NOT NEED
+    oNodeGet (Node, node_attribute) >> Node    % get Node attribute of node
+    oNodeGetInt (Node, node_attribute) >> int  % get int attribute of node
+    oNodeGetBoolean (Node, node_attribute) >> boolean  % get int attribute of node
+    oNodeNull (Node) >> boolean          % is node null?
+    oNodeNext (inout Node)               % advance Node to next in list
+    oNodeType (Node) >> node_type        % return node type of node
+    oNodeEqual (Node, Node) >> boolean   % compare two nodes for equality
+                                         % (i.e. same node, not just same contents)
+    ;
+
+
+% Manipulate a temporary vector of Node
+%
+mechanism node_vec_mech:
+    oNodeVecNew >> NodeVec
+    oNodeVecDelete( NodeVec nv )
+    oNodeVecAppend( NodeVec nv, Node n )
+    oNodeVecSize( NodeVec nv ) >> int                % how many elements
+    oNodeVecElement( NodeVec nv, int idx ) >> Node   % element at index idx (0..size-1)
+    ;
+
+
+mechanism math:
+    inc (inout int)
+    dec (inout int)
+    negate (int) >> int
+    subtract( int x, int y ) >> int     % x - y
+    multiply( int x, int y ) >> int     % x * y
+    equal( int x, int y ) >> boolean
+    equal_zero (int) >> boolean
+    equal_node_type (node_type, node_type) >> boolean     % Want equal_<type> for every type
+    ;
+
+mechanism more_builtins:      % These should be built-in SSL operations
+    TOKEN_VALUE >> int        % value of just accepted token, e.g. IntLit token
+    LAST_ID >> int            % id number of last accepted identifier
+    ;
+
+mechanism scope_mech:
+    oScopeBegin                          % create a new scope. Subsequent declarations will go here.
+    oScopeEnd                            % end current scope. Subsequent declarations will go to parent scope.
+    oScopeCurrent >> Node                % returns current scope
+    oScopeDeclare( Node )                % add declaration to current scope.
+    oScopeDeclareAlloc( Node )           % add declaration to current scope, and allocate space according to its type
+    oScopeFind >> Node                   % find declaration of last accepted identifier.  Returns Null if not found.
+    oScopeFindRequire >> Node            % find declaration of last accepted identifier.  Error if not found.
+    ;
+
+
+mechanism type_mech:
+    oTypeAdd( Node node )     % add the given nType to the type table
+    ;
+
+mechanism id_mech:
+    % adds a predefined id to the scanner's id table, and returns the id code
+    oIdAdd_File >> int
+    oIdAdd_Integer >> int
+    oIdAdd_Boolean >> int
+    oIdAdd_Char >> int
+    oIdAdd_String >> int
+    oIdAdd_True >> int
+    oIdAdd_False >> int
+    ;
+
 
 mechanism count :
    oCountPush(number)          % start a new counter, with initial value
@@ -283,6 +362,7 @@ mechanism value :              % value stack, to calc. const expr's
    oValueMultiply              % pop 2, push (top * 2nd)
    oValueIsZero >> boolean     % is top value zero?
    oValueIsOne >> boolean      % is top value one?
+   oValueTop >> int            % get top value on value stack
    oValuePop;
 
 mechanism string :
@@ -327,43 +407,71 @@ mechanism patch:               % note, creates absolute-address jumps
 
 rules
 
+% ----------------------------- Global Variables ----------------------------
+
+Node    globalScope            % global nScope
+
+% built-in nTypes
+Node    FileType
+Node    IntegerType
+Node    BooleanType
+Node    CharType
+Node    StringType
+
+% -------------------------- Forward Declarations -------------------------
+
+Block( node_type varNodeType );
+VarDecl( node_type varNodeType );
+newType( node_type nt, int size ) >> Node;
+newIdent( node_type nt, kind k, int id ) >> Node;
+TypeRef( out Node theType );
+
+
 % ----------------------------- Declarations ----------------------------
 
 Program:
+   Node t
+
+   oScopeBegin
+   globalScope = oScopeCurrent
+
+   @installBuiltIns
+
    pProgram
    pIdent
-   oSymSPushId oSymSSetKind(kProgram) oSymAddSPop
+
+   t = @newIdent( nProgram, kProgram, LAST_ID )
+   oScopeDeclare( t )
+
    [
       | '(' :
          pIdent      % input, output files
-         oSymSPushId
-         oSymSSetKind(kVar)
-         oTypSPush(tyFile)
-         oSymSSetTypS
-         oSymSAllocate
-         oSymAddSPop
-         oTypSPop
+
+         t = @newIdent( nVar, kVar, LAST_ID )
+         oNodeSet( t, qType, FileType )
+         oScopeDeclareAlloc( t )
+
          ','
          pIdent
-         oSymSPushId
-         oSymSSetKind(kVar)
-         oTypSPush(tyFile)
-         oSymSSetTypS
-         oSymSAllocate
-         oSymAddSPop
-         oTypSPop
+
+         t = @newIdent( nVar, kVar, LAST_ID )
+         oNodeSet( t, qType, FileType )
+         oScopeDeclareAlloc( t )
+
          ')'
       | * :
    ]
    ';'
-   @Block    % not including punctuation after body's 'end'
-   '.';
+   @Block( nGlobalVar )    % not including punctuation after body's 'end'
+   '.'
+   oScopeEnd
+   ;
 
-Block:
+Block( node_type varNodeType ):
    {[
       | pConst :     @ConstDecl
       | pType :      @TypeDecl
-      | pVar :       @VarDecl
+      | pVar :       @VarDecl( varNodeType )
       | pProcedure : @ProcDecl
       | pFunction :  @FuncDecl
       | * :          @Statement
@@ -372,82 +480,99 @@ Block:
    ]};
 
 ProcDecl:
+   Node decl
+
    pIdent
-   oSymSPushId oSymSSetKind(kProc)    % don't save in table yet
-   oSymPushLevel
-   @FormalArgDecl            % params go in their own lex level
-   [ oSymLevelAnySyms
-      | true :
-         oTypNew(tyParams)   % create a type to hold list of params
-         oSymPopLevelSaveType
-      | * :
-         oTypSPush(tyNone)   % no parameters
-         oSymPopLevel
-   ]
-   oSymSSetParamTypS
-   oTypSPop
-   oSymAddSPop               % add proc name to table
+   decl = @newIdent( nProc, kProc, LAST_ID )
+
+   oScopeBegin
+   @FormalArgDecl
+   oNodeSet( decl, qParams, oScopeCurrent )
+   oScopeEnd
+   oScopeDeclare( decl )
    ';'
-   oSymPushLevel
-   @Block
-   oSymPopLevel
+
+   oScopeBegin
+   @Block( nLocalVar )
+   oNodeSet( decl, qChildScope, oScopeCurrent )
+   oScopeEnd
    ';';
 
 FuncDecl:
+   Node decl
+   Node theType
+
    pIdent
-   oSymSPushId oSymSSetKind(kFunc)
-   oSymPushLevel
+   decl = @newIdent( nFunc, kFunc, LAST_ID )
+
+   oScopeBegin
    @FormalArgDecl
-   [ oSymLevelAnySyms
-      | true :
-         oTypNew(tyParams)   % create a type to hold list of params
-         oSymPopLevelSaveType
-      | * :
-         oTypSPush(tyNone)   % no parameters
-         oSymPopLevel
-   ]
-   oSymSSetParamTypS
-   oTypSPop
+   oNodeSet( decl, qParams, oScopeCurrent )
+   oScopeEnd
+   oScopeDeclare( decl )
    ':'
-   @TypeRef
-   oSymSSetTypS              % type of function
-   oTypSPop
-   oSymAddSPop
+
+   @TypeRef( theType )
+   oNodeSet( decl, qType, theType )
    ';'
-   oSymPushLevel
-   @Block
-   oSymPopLevel
+
+   oScopeBegin
+   @Block( nLocalVar )
+   oNodeSet( decl, qChildScope, oScopeCurrent )
+   oScopeEnd
    ';';
 
+
+% TO DO:
+%   This code is declaring params in the wrong order.
+%   Also ignoring var keyword.
+%   Also not using schema yet.
+%   Also should use a var instead of count stack.
+%
 FormalArgDecl:
    [
       | '(' :
          {
+            NodeVec decls
+            decls = oNodeVecNew
+            Node decl
+            boolean isInOut
+            isInOut = false
+
             [
-               | pVar :         % currently ignored ***
+               | pVar : isInOut = true
                | * :
             ]
-            oCountPush(zero)    % count vars of one type
+
             {  pIdent
-               oSymSPushId oSymSSetKind(kVar)
-               oCountInc
+
+               decl = @newIdent( nParam, kVar, LAST_ID )
+               oNodeSetBoolean( decl, qInOut, isInOut )
+               oNodeVecAppend( decls, decl )
+
                [
                   | ':' : >
                   | ',' :
                ]
             }
-            @TypeRef
-            {[ oCountIsZero
+
+            Node theType
+            @TypeRef( theType )
+
+            int i
+            i = 0
+            {[ equal( i, oNodeVecSize( decls ) )
                | false :
-                  oSymSSetTypS
-                  oSymSAllocate
-                  oSymAddSPop
-                  oCountDec
+                  decl = oNodeVecElement( decls, i )
+                  oNodeSet( decl, qType, theType )
+                  oScopeDeclareAlloc( decl )
+                  inc( i )
                | * :
                   >
             ]}
-            oCountPop
-            oTypSPop
+
+            oNodeVecDelete( decls )
+
             [
                | ')' : >
                | ';' :
@@ -459,10 +584,21 @@ FormalArgDecl:
 ConstDecl:
    {[
       | pIdent :
-         oSymSPushId oSymSSetKind(kConst)
+         Node decl
+         decl = @newIdent( nConst, kConst, LAST_ID )
          '='
+
          @ConstExpr
-         oSymSSetValPop oSymAddSPop
+         % TO DO: currently ConstExpr leaves int result on oValue stack
+         int val
+         val = oValueTop
+         oValuePop
+         oNodeSetInt( decl, qValue, val )
+
+         % TO DO: different types.  Currently assumes int!
+         oNodeSet( decl, qType, IntegerType )
+
+         oScopeDeclare( decl )
          ';'
       | * :
          >
@@ -471,22 +607,27 @@ ConstDecl:
 TypeDecl:
    {[
       | pIdent :
-         oSymSPushId oSymSSetKind(kType)
+         Node decl
+         decl = @newIdent( nTypeDecl, kType, LAST_ID )
          '='
-         @TypeRef
-         oSymSSetTypS oTypSPop oSymAddSPop
+         Node theType
+         @TypeRef( theType )
+         oNodeSet( decl, qType, theType )
+         oScopeDeclare( decl )
          ';'
       | * :
          >
    ]};
 
-VarDecl:
+VarDecl( node_type varNodeType ):
    {[
       | pIdent :
-         oCountPush(zero)
+         NodeVec decls
+         decls = oNodeVecNew
+         Node decl
          {
-            oSymSPushId oSymSSetKind(kVar)
-            oCountInc
+            decl = @newIdent( varNodeType, kVar, LAST_ID )
+            oNodeVecAppend( decls, decl )
             [
                | ',' :
                   pIdent
@@ -495,67 +636,128 @@ VarDecl:
             ]
          }
          ':'
-         @TypeRef
-         {[ oCountIsZero
-            | false :
-               oSymSSetTypS
-               oSymSAllocate
-               oSymAddSPop
-               oCountDec
+         Node theType
+         @TypeRef( theType )
+
+         int i
+         i = 0
+         {[ equal( i, oNodeVecSize( decls ) )
+           | false :
+             decl = oNodeVecElement( decls, i )
+             oNodeSet( decl, qType, theType )
+             oScopeDeclareAlloc( decl )
+             inc( i )
             | * :
-               >
+              >
          ]}
-         oCountPop
-         oTypSPop
+
+         oNodeVecDelete( decls )
          ';'
       | * :
          >
    ]};
 
-TypeRef:      % possibly create new type entry; put type# on type stack
+
+% Parse a type reference, returning the nType.
+% This will add types to the type table, as needed.
+%
+% Style question - at the moment I think callers look clearer if we use
+% an out param here, rather than a return value.
+%
+TypeRef( out Node theType ):
    [
       | pIdent :           % previously named type (including intrinsics)
-         oSymLookup
-         [ oSymChooseKind
-            | kType :
-               oTypSPushTyp
-            | * :
-               #eNotType oTypSPush(tyInteger)
+         Node decl
+         decl = oScopeFindRequire
+         [ oNodeType( decl )
+           | nTypeDecl :
+               theType = oNodeGet( decl, qType )
+           | * :
+               #eNotType
+               theType = IntegerType
          ]
+   
       | pArray :
          '['
-         oCountPush(zero)     % count dimensions (to fix their TT entries)
+
+         % A multi-dimensional array is represented as a chain
+         %    array [subrange1] of array [subrange2] of elementType
+
+         % First, we build a vector of nArray's, each with one subrange as its index type,
+         % but without setting the "of" type or size.
+
+         NodeVec dimensions
+         dimensions = oNodeVecNew
+
          {
-            oTypNew(tyArray)  % start new TT entry; push typ# on TS
-            oCountInc
+            % to do: probably should use general subrange parsing, incl minimal size value
+            Node subrange
+            subrange = oNodeNew( nSubrangeType )
+
+            % TO DO: currently ConstExpr leaves int result on oValue stack
             @ConstExpr
-            oTypSetLow
+            oNodeSetInt( subrange, qLow, oValueTop )
+            oValuePop
             '..'
             @ConstExpr
-            oTypSetHigh
-            oValueDifference
+            oNodeSetInt( subrange, qHigh, oValueTop )
+            oValuePop
+            oNodeSetInt( subrange, qSize, 4 )   % maybe don't need
+
+            oTypeAdd( subrange )
+
+            Node a
+            a = oNodeNew( nArrayType )
+            oNodeSet( a, qIndexType, subrange )
+
+            oNodeVecAppend( dimensions, a )
+            % I'll hold off on adding 'a' to the type table since not fully formed yet
+
             [
                | ']' : >
                | ',' :
             ]
          }
          pOf
-         @TypeRef
-         oValuePushSizeTS        % push size of OF type
+         Node baseType
+         @TypeRef( baseType )
+
+         % Work backwards through the dimensions,
+         % hooking up the 'of' type and calculating the size.
+         % At each iteration, baseType is the 'of' type.
+
+         int dim
+         dim = oNodeVecSize( dimensions )
          {
-            oTypAssignBasePop    % assign OF type to last dim, pop OF type
-            oValueMultiply       % size of last dimension
-            oTypSetSize
-            oCountDec            % repeat for all dimensions back to 1st
-            [ oCountIsZero
-               | false :
-               | * :     >
-            ]
+             dec(dim)
+
+             Node a
+             a = oNodeVecElement( dimensions, dim )
+             oNodeSet( a, qBaseType, baseType )
+             Node subrange
+             subrange = oNodeGet( a, qIndexType )
+             int width
+             width = subtract( oNodeGetInt( subrange, qHigh ), oNodeGetInt( subrange, qLow ) )
+             inc( width )
+             oNodeSetInt( a, qSize, multiply( width, oNodeGetInt( baseType, qSize ) ) )
+
+             oTypeAdd( a )
+             baseType = a
+
+             [ equal_zero(dim)
+                 | true:  >
+                 | *:
+             ]
          }
-         oValuePop
-         oCountPop
+
+         % result type
+         theType = oNodeVecElement( dimensions, 0 )
+
+         oNodeVecDelete( dimensions )
+
       | '^' :
-         @TypeRef
+         Node theType
+         @TypeRef( theType )
          [ oTypSChoosePtr        % has a ptr to this type been declared?
             | tyNone :           % no
                oTypNew(tyPointer)
@@ -566,19 +768,23 @@ TypeRef:      % possibly create new type entry; put type# on type stack
             | * :                % yes
                oTypSPopPushPtr
          ]
+
       | pRecord :
          oTypNew(tyRecord)
          oSymPushLevel
-         @VarDecl
+         @VarDecl( nRecordField )
          [ oSymLevelAnySyms
             | false :   #eRecordEmpty
             | * :
          ]
          oSymPopLevelSaveType
          pEnd
+
       % *** following type constructors are not implemented *** 
       | pSet :
-         pOf @TypeRef
+         pOf
+         Node theType
+         @TypeRef( theType )
       | * :       % this works for cases except where expr starts with an id
          @ConstExpr '..' @ConstExpr
    ];
@@ -1191,6 +1397,78 @@ RequireBool:
       | tyBoolean :
       | * :          #eNotBoolean
    ];
+
+
+% Create and return a new nType of the given node_type, adding it to the type table.
+%
+newType( node_type nt, int size ) >> Node:
+  Node node
+  node = oNodeNew( nt )
+  oNodeSetInt( node, qSize, size )
+  oTypeAdd( node )
+  >> node
+  ;
+
+
+% Create and return a new nIdent of the given node_type, with the given ident id.
+% Does not add it to any scope.
+%
+newIdent( node_type nt, kind k, int id ) >> Node:
+  Node t
+  t = oNodeNew( nt )
+  oNodeSetKind( t, qKind, k )   % deprecated attribute
+  oNodeSetInt( t, qIdent, id )
+  >> t
+  ;
+
+
+installBuiltIns:
+
+   % install built-in types
+   FileType = @newType( nFileType, 4 )
+   IntegerType = @newType( nIntegerType, 4 )
+   BooleanType = @newType( nBooleanType, 1 )
+   CharType = @newType( nCharType, 1 )
+   StringType = @newType( nStringType, 256 )    % string with default length 256
+
+   % Declare those type identifiers.
+   % SSL doesn't support strings, so need help from operations e.g. oIdAdd_File
+
+   Node t
+
+   t = @newIdent( nTypeDecl, kType, oIdAdd_File )
+   oNodeSet( t, qType, FileType )
+   oScopeDeclare( t )
+
+   t = @newIdent( nTypeDecl, kType, oIdAdd_Integer )
+   oNodeSet( t, qType, IntegerType )
+   oScopeDeclare( t )
+
+   t = @newIdent( nTypeDecl, kType, oIdAdd_Boolean )
+   oNodeSet( t, qType, BooleanType )
+   oScopeDeclare( t )
+
+   t = @newIdent( nTypeDecl, kType, oIdAdd_Char )
+   oNodeSet( t, qType, CharType )
+   oScopeDeclare( t )
+
+   t = @newIdent( nTypeDecl, kType, oIdAdd_String )
+   oNodeSet( t, qType, StringType )
+   oScopeDeclare( t )
+
+   % Built-in constants
+
+   t = @newIdent( nConst, kConst, oIdAdd_True )
+   oNodeSet( t, qType, BooleanType )
+   oNodeSetInt( t, qValue, 1 )
+   oScopeDeclare( t )
+
+   t = @newIdent( nConst, kConst, oIdAdd_False )
+   oNodeSet( t, qType, BooleanType )
+   oNodeSetInt( t, qValue, 0 )
+   oScopeDeclare( t )
+
+   ;
 
 end
 
