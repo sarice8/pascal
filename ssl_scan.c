@@ -100,6 +100,7 @@ void   s_restart_scanner_input_position ();
 
 static int    s_including_file;   /* "Include" application source files */
 static FILE  *s_src_includer;
+static int    s_src_includer_line_number;
 
 /* ---- End of private variables ----- */
 
@@ -240,6 +241,7 @@ char                 *include_filename;
         ssl_fatal ("Nested includes are not yet supported");
     s_including_file = 1;
     s_src_includer = ssl_src_file;
+    s_src_includer_line_number = ssl_line_number;
     ssl_src_file = fopen (include_filename, "r");
     if (ssl_src_file == NULL)
     {
@@ -249,6 +251,7 @@ char                 *include_filename;
     ssl_line_buffer[0] = '\0';
     s_src_ptr = ssl_line_buffer;
     ssl_line_listed = 1;
+    ssl_line_number = 0;
 }
 
 
@@ -564,6 +567,7 @@ s_hit_eof ()
         ssl_src_file = s_src_includer;
         ssl_line_buffer[0] = '\0';
         s_src_ptr = ssl_line_buffer;
+        ssl_line_number = s_src_includer_line_number;
         ssl_line_listed = 1;
         ssl_get_next_token();
     }
