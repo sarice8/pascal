@@ -175,7 +175,6 @@ output:
 %  Other:
 
    tSpace            % emit a hole, to be patched later
-   tConstant         % emit value on top of value stack (don't pop)
    tSymVal           % emit value of symbol looked-up with oSymLookup
    ;
 
@@ -210,10 +209,6 @@ type NodeVec:  % A pointer to a vector of Node.  See mechanism node_vec_mech
 type boolean:
    false    = 0
    true     = 1;
-
-type number:
-   zero     = 0
-   one      = 1;
 
 type kind:           % kind of identifier
    kUndefined        % not yet added to symbol table
@@ -271,6 +266,12 @@ mechanism node_vec_mech:
     ;
 
 
+mechanism emit_mech:
+    oEmitInt( int )              % emit int into the generated code
+    Here >> int                  % current address in the generated code
+    oPatch( int addr, int val )  % patch an int into address in the generated code
+    ;
+
 mechanism math:
     inc (inout int)
     dec (inout int)
@@ -302,6 +303,14 @@ mechanism type_mech:
     oTypeAdd( Node node )     % add the given nType to the type table
     ;
 
+mechanism type_stack_mech:
+    oTypeSPush( Node node )
+    oTypeSPop
+    oTypeSTop >> Node
+    oTypeSNodeType >> node_type          % node_type of the node on top of type stack, skipping subranges
+    ;
+
+
 mechanism id_mech:
     % adds a predefined id to the scanner's id table, and returns the id code
     oIdAdd_File >> int
@@ -315,7 +324,7 @@ mechanism id_mech:
 
 
 mechanism count :
-   oCountPush(number)          % start a new counter, with initial value
+   oCountPush(int)          % start a new counter, with initial value
    oCountInc
    oCountDec
    oCountIsZero >> boolean
@@ -354,7 +363,7 @@ mechanism sym :
 mechanism value :              % value stack, to calc. const expr's
    oValuePushToken             % push value of (int lit) token just read
    oValuePushVal               % push val of symbol looked-up
-   oValuePush(number)          % push an explicit int lit
+   oValuePush(int)             % push an explicit int lit
    oValuePushSizeTS            % push size of type on type stack
    oValuePushLowTS             % push low subscript of type on type stack
    oValueNegate                % negate top value
@@ -384,8 +393,6 @@ mechanism typS :               % type stack
 
    oTypNew(typ)                % new TT entry, with type class (e.g. array)
                                %   push typ# on TS, for use by following:
-   oTypSetLow                  % low field = VS (don't pop VS)
-   oTypSetHigh                 % high field = VS (don't pop VS)
    oTypSetSize                 % size field = VS (don't pop VS)
    oTypAssignBasePop           % base of 2nd on TS := top of TS, pop TS
    oTypAssignPtr               % ptrType of 2nd on TS := top of TS, no pop
@@ -424,7 +431,9 @@ Block( node_type varNodeType );
 VarDecl( node_type varNodeType );
 newType( node_type nt, int size ) >> Node;
 newIdent( node_type nt, kind k, int id ) >> Node;
+EmitValue( Node decl );
 TypeRef( out Node theType );
+PointerTypeTo( Node theType ) >> Node;
 
 
 % ----------------------------- Declarations ----------------------------
@@ -664,17 +673,17 @@ VarDecl( node_type varNodeType ):
 % Style question - at the moment I think callers look clearer if we use
 % an out param here, rather than a return value.
 %
-TypeRef( out Node theType ):
+TypeRef( out Node resultType ):
    [
       | pIdent :           % previously named type (including intrinsics)
          Node decl
          decl = oScopeFindRequire
          [ oNodeType( decl )
            | nTypeDecl :
-               theType = oNodeGet( decl, qType )
+               resultType = oNodeGet( decl, qType )
            | * :
                #eNotType
-               theType = IntegerType
+               resultType = IntegerType
          ]
    
       | pArray :
@@ -691,8 +700,13 @@ TypeRef( out Node theType ):
 
          {
             % to do: probably should use general subrange parsing, incl minimal size value
+            %   In fact, supposed to parse ordinal_type here.  all ordinal types have a static low, high.
+            %   Not necessary to be a subrange.
+
             Node subrange
             subrange = oNodeNew( nSubrangeType )
+            % TO DO: currently assuming subrange of integer
+            oNodeSet( subrange, qBaseType, IntegerType )
 
             % TO DO: currently ConstExpr leaves int result on oValue stack
             @ConstExpr
@@ -750,37 +764,38 @@ TypeRef( out Node theType ):
              ]
          }
 
-         % result type
-         theType = oNodeVecElement( dimensions, 0 )
-
+         resultType = oNodeVecElement( dimensions, 0 )
          oNodeVecDelete( dimensions )
 
       | '^' :
          Node theType
          @TypeRef( theType )
-         [ oTypSChoosePtr        % has a ptr to this type been declared?
-            | tyNone :           % no
-               oTypNew(tyPointer)
-               oValuePush(one) oTypSetSize oValuePop
-               oTypAssignPtr
-               oTypSSwap
-               oTypAssignBasePop
-            | * :                % yes
-               oTypSPopPushPtr
-         ]
+         resultType = @PointerTypeTo( theType )
 
       | pRecord :
-         oTypNew(tyRecord)
-         oSymPushLevel
+         resultType = oNodeNew( nRecordType )
+         oScopeBegin
+
          @VarDecl( nRecordField )
-         [ oSymLevelAnySyms
-            | false :   #eRecordEmpty
+
+         int size
+         size = oNodeGetInt( oScopeCurrent, qNextOffset )
+         % to do: padding
+         [ equal_zero( size )
+            | true : #eRecordEmpty
             | * :
          ]
-         oSymPopLevelSaveType
+
          pEnd
 
-      % *** following type constructors are not implemented *** 
+         oNodeSet( resultType, qScope, oScopeCurrent )
+         oNodeSetInt( resultType, qSize, size )
+         oScopeEnd
+         oTypeAdd( resultType )
+
+
+      % *** TO DO: following type constructors are not implemented *** 
+      % *** TO DO: also missing declaration of enum type
       | pSet :
          pOf
          Node theType
@@ -799,15 +814,16 @@ TypeRef( out Node theType ):
 ConstExpr:
    [
       | pIntLit :
-         oValuePushToken
+         oValuePush( TOKEN_VALUE )
       | pIdent :
-         oSymLookup
-         [ oSymChooseKind
-            | kConst :
-               oValuePushVal
+         Node decl
+         decl = oScopeFindRequire
+         [ oNodeType( decl )
+            | nConst :
+               oValuePush( oNodeGetInt( decl, qValue ) )
             | * :
                #eNotConst
-               oValuePush(zero)
+               oValuePush( 0 )
          ]
       | pMinus :
          @ConstExpr
@@ -825,59 +841,71 @@ Expr:
       | '=' :
          @BoolExpr
          @MatchTypes
-         [ oTypSChoosePop
-            | tyInteger, tyBoolean :   .tEqualInt
-            | tyPointer :              .tEqualPtr
-            | tyChar, tyString :       #eNotImplemented
-            | * :                      #eNotAllowed
+         [ oTypeSNodeType
+            | nIntegerType, nBooleanType :  .tEqualInt
+            | nPointerType :                .tEqualPtr
+            | nCharType, nStringType :      #eNotImplemented
+            | * :                           #eNotAllowed
          ]
-         oTypSPush(tyBoolean)
+         oTypeSPop
+         oTypeSPush( BooleanType )
+
       | '<>' :
          @BoolExpr
          @MatchTypes
-         [ oTypSChoosePop
-            | tyInteger, tyBoolean :   .tNotEqualInt
-            | tyPointer :              .tNotEqualPtr
-            | tyChar, tyString :       #eNotImplemented
-            | * :                      #eNotAllowed
+         [ oTypeSNodeType
+            | nIntegerType, nBooleanType :  .tNotEqualInt
+            | nPointerType :                .tNotEqualPtr
+            | nCharType, nStringType :      #eNotImplemented
+            | * :                           #eNotAllowed
          ]
-         oTypSPush(tyBoolean)
+         oTypeSPop
+         oTypeSPush( BooleanType )
+
       | '<' :
          @BoolExpr
          @MatchTypes
-         [ oTypSChoosePop
-            | tyInteger, tyBoolean :   .tLessInt
-            | tyChar, tyString :       #eNotImplemented
-            | * :                      #eNotAllowed
+         [ oTypeSNodeType
+            | nIntegerType, nBooleanType :  .tLessInt
+            | nCharType, nStringType :      #eNotImplemented
+            | * :                           #eNotAllowed
          ]
-         oTypSPush(tyBoolean)
+         oTypeSPop
+         oTypeSPush( BooleanType )
+
       | '>' :
          @BoolExpr
          @MatchTypes
-         [ oTypSChoosePop
-            | tyInteger, tyBoolean :   .tGreaterInt
-            | tyChar, tyString :       #eNotImplemented
-            | * :                      #eNotAllowed
+         [ oTypeSNodeType
+            | nIntegerType, nBooleanType :  .tGreaterInt
+            | nCharType, nStringType :      #eNotImplemented
+            | * :                           #eNotAllowed
          ]
-         oTypSPush(tyBoolean)
+         oTypeSPop
+         oTypeSPush( BooleanType )
+
       | '<=' :
          @BoolExpr
          @MatchTypes
-         [ oTypSChoosePop
-            | tyInteger, tyBoolean :   .tLessEqualInt
-            | tyChar, tyString :       #eNotImplemented
-            | * :                      #eNotAllowed
+         [ oTypeSNodeType
+            | nIntegerType, nBooleanType :  .tLessEqualInt
+            | nCharType, nStringType :      #eNotImplemented
+            | * :                           #eNotAllowed
          ]
-         oTypSPush(tyBoolean)
+         oTypeSPop
+         oTypeSPush( BooleanType )
+
       | '>=' :
          @BoolExpr
          @MatchTypes
-         [ oTypSChoosePop
-            | tyInteger, tyBoolean :   .tGreaterEqualInt
-            | tyChar, tyString :       #eNotImplemented
-            | * :                      #eNotAllowed
+         [ oTypeSNodeType
+            | nIntegerType, nBooleanType :  .tGreaterEqualInt
+            | nCharType, nStringType :      #eNotImplemented
+            | * :                           #eNotAllowed
          ]
-         oTypSPush(tyBoolean)
+         oTypeSPop
+         oTypeSPush( BooleanType )
+
       | * :
          >
    ]};
@@ -966,26 +994,35 @@ Factor:
 Primary:
    [
       | pIntLit :
-         .tPushIntLit
-         oValuePushToken .tConstant oValuePop
-         oTypSPush(tyInteger)
+         .tPushIntLit   oEmitInt( TOKEN_VALUE )
+         oTypeSPush( IntegerType )
+
       | '(' :
          @Expr
          ')'
+
       | pStrLit :
          oStringAllocLit     % store, put addr on value stack
-         .tPushAddr .tConstant oValuePop
-         oTypSPush(tyString)
+         .tPushAddr  oEmitInt( oValueTop )  oValuePop
+         % TO DO: do we need to create a type with the literal's length?
+         oTypeSPush( StringType )
+
       | pIdent :
-         oSymLookup
-         [ oSymChooseKind
-            | kFunc :
-               oValuePushVal
-               oTypSPushTyp
+         Node decl
+         Node theType
+         decl = oScopeFindRequire
+
+         [ oNodeType( decl )
+            | nFunc :
                [
                   | '(' :
-                     {  @Expr    % match type
-                        oTypSPop % *** don't for now ***
+                     {  @Expr
+
+                        % TO DO: match type against param
+                        % TO DO: push the expression onto the call stack e.g. iPush...
+                        %  Meanwhile for now we are broken, leaving the value on the runtime value stack
+                        oTypeSPop
+
                         [
                           | ')' : >
                           | ',' :
@@ -993,89 +1030,91 @@ Primary:
                      }
                   | * :
                ]
-               .tCall
-               .tConstant oValuePop
-            | kConst :
-               oTypSPush(tyInteger)
-               [ oTypSChoose
-                  | tyInteger, tyBoolean :
-                     .tPushIntLit .tSymVal
+               .tCall  @EmitValue( decl )
+               oTypeSPush( oNodeGet( decl, qType ) )
+
+            | nConst :
+               theType = oNodeGet( decl, qType )
+               oTypeSPush( theType )
+               [ oTypeSNodeType
+                  | nIntegerType, nBooleanType :
+                     .tPushIntLit @EmitValue( decl )
                   | * :
                      #eNotImplemented
                ]
-            | kVar :
-               oTypSPushTyp
-               [ oTypSChoose
-                  | tyInteger :
-                     .tPushIntVar .tSymVal
-                  | tyBoolean :
-                     .tPushBoolVar .tSymVal
-                  | tyChar, tyString, tyFile :
+
+            | nGlobalVar :
+               theType = oNodeGet( decl, qType )
+               oTypeSPush( theType )
+               [ oTypeSNodeType
+                  | nIntegerType :
+                     .tPushIntVar @EmitValue( decl )
+                  | nBooleanType :
+                     .tPushBoolVar @EmitValue( decl )
+                  | nCharType, nStringType, nFileType :
                      #eNotImplemented
-                  | * :                   % user type
-                     [ oTypSChooseKind
-                        | tyPointer :
-                           .tPushPtrVar .tSymVal
-                           [
-                              | '^' :             % dereferenced
-                                 oTypSPopPushBase
-                                 @LValue
-                                 @FetchVar
-                              | * :               % just ptr value alone
-                           ]
-                        | * :                     % compound type
-                           .tPushAddr .tSymVal    % addr of start of var
-                           @LValue                % get final addr
-                           @FetchVar              % get final value
+                  | nPointerType :
+                     .tPushPtrVar @EmitValue( decl )
+                     [
+                        | '^' :             % dereferenced
+                           oTypeSPop
+                           oTypeSPush( oNodeGet( theType, qBaseType ) )
+                           @LValue
+                           @FetchVar
+                        | * :               % just ptr value alone
                      ]
+                  | * :                     % compound type
+                     .tPushAddr @EmitValue( decl )    % addr of start of var
+                     @LValue                % get final addr
+                     @FetchVar              % get final value
                ]
+
             | * :
                #eNotValue
-               oTypSPush(tyInteger)
+               oTypeSPush( IntegerType )
          ]
+
       | '^' :        % ^var
          pIdent
-         oSymLookup
-         [ oSymChooseKind
-            | kVar :
-               oTypSPushTyp
-               .tPushAddr .tSymVal
+
+         Node decl
+         Node theType
+         decl = oScopeFindRequire
+         theType = oNodeGet( decl, qType )
+
+         [ oNodeType( decl )
+            | nGlobalVar :
+               .tPushAddr @EmitValue( decl )
                @LValue     % ptr value to expr stack
-               % now, adjust TS to indicate ptr type
-               [ oTypSChoosePtr
-                  | tyNone :             % not yet a ptr type declared
-                     oTypNew(tyPointer)  % so declare one now
-                     oValuePush(one) oTypSetSize oValuePop
-                     oTypAssignPtr
-                     oTypSSwap
-                     oTypAssignBasePop
-                  | * :
-                     oTypSPopPushPtr
-               ]
+
+               Node ptrType
+               ptrType = @PointerTypeTo( theType )
+               oTypeSPush( ptrType )
+
+            | nLocalVar, nParam : #eNotImplemented
+               oTypeSPush( IntegerType )
             | * :
                #eNotVar
-               oTypSPush(tyInteger)
+               oTypeSPush( IntegerType )
          ]
+
       | * :
          #eNotValue
-         oTypSPush(tyInteger)
+         oTypeSPush( IntegerType )
    ];
+
 
 % Addr of start of var is on expr stack; type is on type stack.
 % Replace expr stack with value of var.
 % (In the case of compound vars, this remains as the addr of the var).
 
 FetchVar:
-   [ oTypSChoose
-      | tyInteger :   .tFetchInt
-      | tyBoolean :   .tFetchBool
-      | tyChar, tyString, tyFile :
-                      #eNotImplemented
-      | * :                 % user type
-         [ oTypSChooseKind
-            | tyPointer :    .tFetchPtr
-            | * :            % compound type; leave as addr
-         ]
+   [ oTypeSNodeType
+      | nIntegerType :   .tFetchInt
+      | nBooleanType :   .tFetchBool
+      | nCharType, nStringType, nFileType : #eNotImplemented
+      | nPointerType :   .tFetchPtr
+      | * :              % compound type; leave as addr
    ];
 
 
@@ -1107,12 +1146,12 @@ ArraySubscripts:
       @RequireIntPop
       [ oValueIsZero    % adjust for low subscript
          | true :       oValuePop
-         | * :          .tPushIntLit .tConstant .tSubtractInt oValuePop
+         | * :          .tPushIntLit oEmitInt( oValueTop ) .tSubtractInt oValuePop
       ]
       oValuePushSizeTS
       [ oValueIsOne     % adjust for size of subtype
          | true :       oValuePop
-         | * :          .tPushIntLit .tConstant .tMultiplyInt oValuePop
+         | * :          .tPushIntLit oEmitInt( oValueTop ) .tMultiplyInt oValuePop
       ]
       .tAddInt          % update start address
       [
@@ -1124,14 +1163,19 @@ ArraySubscripts:
 % ptr deref on left side, i.e. BEFORE addr of ptr var is on stack,
 %                              AFTER addr of thing pointed to is on stack
 PointerDeref:
-   [ oTypSChooseKind
-      | tyPointer :
+   [ oTypeSNodeType
+      | nPointerType :
       | * :       #eNotPointer
    ]
    .tFetchPtr           % now addr on stack is addr of what we're pointing to
-   oTypSPopPushBase;    % replace TS with type of thing we're pointing to
 
-   
+   Node theType
+   theType = oTypeSTop
+   oTypeSPop
+   oTypeSPush( oNodeGet( theType, qBaseType ) )
+   ;
+
+
 % ------------------------------ Statements -----------------------------
 
 Statement:
@@ -1151,11 +1195,12 @@ Statement:
       | * :            % null statement : don't accept any tokens
    ];
 
+
 AssignOrCallStmt:         % *** Call doesn't work yet ***
-   oSymLookup
-   [ oSymChooseKind       % can parse without semantic info
-      | kProc :           %    but this is easier
-         oValuePushVal    % addr of proc
+   Node decl
+   decl = oScopeFindRequire
+   [ oNodeType( decl )    % can parse without semantic info
+      | nProc :           %    but this is easier
          [
             | '(' :
                {  @Expr oTypSPop  % ignore type for now
@@ -1166,33 +1211,29 @@ AssignOrCallStmt:         % *** Call doesn't work yet ***
                }
             | * :
          ]
-         .tCall
-         .tConstant oValuePop
-      | kVar :
-         .tPushAddr .tSymVal
-         oTypSPushTyp
+         .tCall  @EmitValue( decl )
+
+      | nGlobalVar :
+         .tPushAddr @EmitValue( decl )
+         oTypeSPush( oNodeGet( decl, qType ) )
          @LValue        % handle subscripts, if any
          ':=' 
          @Expr
-         @MatchTypes    % left = right?
-         [ oTypSChoose
-            | tyInteger :
-               .tAssignInt
-            | tyBoolean :
-               .tAssignBool
-            | tyChar, tyString, tyFile :
-               #eNotImplemented
-            | * :       % compound var assigns; addrs of src, dest on stack
-               [ oTypSChooseKind
-                  | tyPointer :
-                     .tAssignPtr
-                  | * :
-                     oValuePushSizeTS     % size of var
-                     .tCopy .tConstant    % multi-word copy
-                     oValuePop
-               ]
+         @MatchTypes
+         [ oTypeSNodeType
+            | nIntegerType :            .tAssignInt
+            | nBooleanType :            .tAssignBool
+            | nCharType, nStringType, nFileType :   #eNotImplemented
+
+            % compound var assigns; addrs of src, dest on stack
+            | nPointerType :            .tAssignPtr
+            | * :
+                int size
+                size = oNodeGetInt( oTypeSTop, qSize )
+                .tCopy  oEmitInt( size )    % multi-word copy
          ]
-         oTypSPop
+         oTypeSPop
+
       | * :
          #eBadStatement
    ];
@@ -1227,7 +1268,7 @@ ForStmt:
       | * :        #eNotIntVar
    ]
    oValuePushVal                   % address of index var (keep on VS)
-   .tPushAddr .tConstant
+   .tPushAddr oEmitInt( oValueTop )
    ':='
    @Expr
    @RequireIntPop
@@ -1237,25 +1278,25 @@ ForStmt:
    oPatchSwap(patchLoop)
    [
       | pTo :
-         .tIncIntVar .tConstant
+         .tIncIntVar oEmitInt( oValueTop )
          oPatchPopFwd(patchLoop)
-         .tPushIntVar .tConstant
+         .tPushIntVar oEmitInt( oValueTop )
          @Expr
          @RequireIntPop
          .tGreaterInt
          .tJumpTrue oPatchPushHere(patchLoop) .tSpace
          oPatchSwap(patchLoop)
       | pDownto :
-         .tDecIntVar .tConstant
+         .tDecIntVar oEmitInt( oValueTop )
          oPatchPopFwd(patchLoop)
-         .tPushIntVar .tConstant
+         .tPushIntVar oEmitInt( oValueTop )
          @Expr
          @RequireIntPop
          .tLessInt
          .tJumpTrue oPatchPushHere(patchLoop) .tSpace
          oPatchSwap(patchLoop)
    ]
-   oCountPush(zero)          % count 'exit' patches
+   oCountPush(0)          % count 'exit' patches
    pDo
    @Statement
    .tJump oPatchPopBack(patchLoop)
@@ -1265,7 +1306,7 @@ ForStmt:
 
 RepeatStmt:
    oPatchPushHere(patchLoop) % start of loop
-   oCountPush(zero)          % count the 'exit' patches
+   oCountPush(0)          % count the 'exit' patches
    @Statement
    {[
       | ';' :
@@ -1281,7 +1322,7 @@ RepeatStmt:
 
 WhileStmt:
    oPatchPushHere(patchLoop)    % start of loop
-   oCountPush(zero)
+   oCountPush(0)
    @Expr
    @RequireBoolPop
    pDo
@@ -1367,34 +1408,47 @@ PatchExitsPop:
    ]}
    oCountPop;
 
+
+% Require that the top two types on the type stack are matching (ignoring subranges).
+% Pop one of them, leaving only one.
+%
 MatchTypes:
-   [ oTypSMatch
+   node_type nt
+   nt = oTypeSNodeType
+   oTypeSPop
+   [ equal_node_type( nt, oTypeSNodeType )
       | false :
          #eTypeMismatch
       | * :
    ];
 
+
+% Require that the top type on the type stack is integer (ignoring subranges).
+% Pop it.
+%
 RequireIntPop:
-   [ oTypSChoosePop
-      | tyInteger :
+   [ oTypeSNodeType
+      | nIntegerType :
       | * :          #eNotInteger
-   ];
+   ]
+   oTypeSPop;
 
 RequireInt:
-   [ oTypSChoose
-      | tyInteger :
+   [ oTypeSNodeType
+      | nIntegerType :
       | * :          #eNotInteger
    ];
 
 RequireBoolPop:
-   [ oTypSChoosePop
-      | tyBoolean :
+   [ oTypeSNodeType
+      | nBooleanType :
       | * :          #eNotBoolean
-   ];
+   ]
+   oTypeSPop;
 
 RequireBool:
-   [ oTypSChoose
-      | tyBoolean :
+   [ oTypeSNodeType
+      | nBooleanType :
       | * :          #eNotBoolean
    ];
 
@@ -1420,6 +1474,33 @@ newIdent( node_type nt, kind k, int id ) >> Node:
   oNodeSetInt( t, qIdent, id )
   >> t
   ;
+
+
+% Return an nType representing a pointer to the given type.
+% (Creates a new type if necessary.)
+%
+PointerTypeTo( Node theType ) >> Node:
+   Node ptrType
+   ptrType = oNodeGet( theType, qPointerType )
+   [ oNodeNull( ptrType )
+      | true :
+         ptrType = oNodeNew( nPointerType )
+         oNodeSet( ptrType, qBaseType, theType )
+         oNodeSetInt( ptrType, qSize, 8 )
+         oTypeAdd( ptrType )
+         oNodeSet( theType, qPointerType, ptrType )
+      | * :
+   ]
+   >> ptrType;
+
+
+% Emit the value in a declaration.
+% For a constant integer, this is the constant value.
+% For a global variable, this is the global address.
+% For a local variable, this is the local address relative to the call stack frame.
+%
+EmitValue( Node decl ):
+    oEmitInt( oNodeGetInt( decl, qValue ));
 
 
 installBuiltIns:

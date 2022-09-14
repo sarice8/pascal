@@ -152,6 +152,10 @@ walkTable()
               if (++sp>=stackMax) fatal("stack overflow");
               stack[sp] = data[code[pc++]];
               continue;
+       case tPushPtrVar :
+              if (++sp>=stackMax) fatal("stack overflow");
+              stack[sp] = data[code[pc++]];
+              continue;
        case tPushAddr :
               if (++sp>=stackMax) fatal("stack overflow");
               stack[sp] = code[pc++];
@@ -328,6 +332,7 @@ dumpTable()
      switch (code[pc++]) {
        case tPushIntVar :    op1("tPushIntVar");
        case tPushBoolVar :   op1("tPushBoolVar"); 
+       case tPushPtrVar :    op1("tPushPtrVar");
        case tPushAddr :      op1("tPushAddr");
        case tFetchInt :      op0("tFetchInt");
        case tFetchBool :     op0("tFetchBool");

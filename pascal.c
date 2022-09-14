@@ -222,6 +222,10 @@ short dTS[dTSsize], dTSptr;        /* type stack ... index into TT */
 NODE_PTR dTypeTable[dTypeTableSize];
 int dTypeTablePtr;
 
+// Type stack
+#define dTypeStackSize 50
+NODE_PTR dTypeStack[dTypeStackSize];
+int dTypeStackPtr;
 
 #define dCSsize 30
 short dCS[dCSsize], dCSptr;        /* count stack */
@@ -506,8 +510,6 @@ NODE_PTR dNode;  // temporary for several mechanisms
 
             dTemp = ssl_code_table[ssl_pc++];
             switch (dTemp) {
-              case tConstant :   w_outTable[w_here++] = dVS[dVSptr];
-                                 continue;
               case tSpace :      w_outTable[w_here++] = 0;
                                  continue;
               case tSymVal :     w_outTable[w_here++] = dST[dSym].val;
@@ -598,6 +600,19 @@ NODE_PTR dNode;  // temporary for several mechanisms
             ssl_result = (long) nv->elements[ ssl_argv(1,2) ];
             continue;
             }
+
+
+    /* Mechanism emit_mech */
+
+    case oEmitInt :
+            w_outTable[w_here++] = ssl_param;
+            continue;
+    case Here :
+            ssl_result = w_here;
+            continue;
+    case oPatch :
+            w_outTable[ssl_argv(0,2)] = ssl_argv(1,2);
+            continue;
 
 
     /* Mechanism math */
@@ -703,6 +718,34 @@ NODE_PTR dNode;  // temporary for several mechanisms
             if (++dTypeTablePtr==dTypeTableSize) ssl_fatal("Type Table overflow");
             dTypeTable[dTypeTablePtr] = (NODE_PTR) ssl_param;
             continue;
+
+
+    /* Mechanism type_stack_mech */
+
+    case oTypeSPush:
+            if (++dTypeStackPtr==dTypeStackSize) ssl_fatal("Type Stack overflow");
+            dTypeStack[dTypeStackPtr] = (NODE_PTR) ssl_param;
+            continue;
+    case oTypeSPop:
+            ssl_assert( dTypeStackPtr > 0 );
+            --dTypeStackPtr;
+            continue;
+    case oTypeSTop:
+            ssl_assert( dTypeStackPtr > 0 );
+            ssl_result = (long) dTypeStack[dTypeStackPtr];
+            continue;
+    case oTypeSNodeType: {
+            ssl_assert( dTypeStackPtr > 0 );
+            NODE_PTR t = dTypeStack[dTypeStackPtr];
+            // Skip past subranges, to the underlying base type.
+            // If a caller wants the raw type including subranges, they can examine
+            // the top node themselves using oTypeSTop.
+            while ( nodeType(t) == nSubrangeType ) {
+              t = nodeGet( t, qBaseType );
+            }
+            ssl_result = nodeType( t );
+            continue;
+            }
 
 
     /* Mechanism id_mech */
@@ -859,12 +902,6 @@ NODE_PTR dNode;  // temporary for several mechanisms
             dTT[dTTptr].kind = ssl_param;
             dTT[dTTptr].ptrType = tyNone; /* no ptr to this type defined */
             dTS[dTSptr] = dTTptr;
-            continue;
-     case oTypSetLow :
-            dTT[dTS[dTSptr]].low = dVS[dVSptr];
-            continue;
-     case oTypSetHigh :
-            dTT[dTS[dTSptr]].high = dVS[dVSptr];
             continue;
      case oTypSetSize :
             dTT[dTS[dTSptr]].size = dVS[dVSptr];
