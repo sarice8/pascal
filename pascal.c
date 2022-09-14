@@ -840,21 +840,39 @@ NODE_PTR dNode;  // temporary for several mechanisms
 
      /* Mechanism string */
 
-     case oStringAllocLit :
+     case oStringAllocLit : {
+            // Current approach is: space for the string literal is reserved in the global scope.
+            // And separately, the literal is recorded in a string table, which will be written
+            // to the output file after all the code.
+            // The written string table says where each literal should be installed in the data space.
+            //
+            // A more conventional approach would have the output file contain separate records for
+            // initialized static data, and blank (0-initialized) static data.
+            // To do that, though, I'd also need to patch all the data references in the code,
+            // since I don't know on the first pass how big each section will be.
+            // And with multiple output object files, relocation tables would need to be resolved by
+            // a linker.   Leaving all that aside for now.
+
+            NODE_PTR globalScope = dScopeStack[dScopeStackPtr];
+
             dWords = (ssl_token.namelen + 2) / 2;  /* #words for string */
             if (dSLptr + dWords + 2 >= dSLsize) ssl_fatal("SL overflow");
-            /* push string addr (global data ptr) on value table */
+
+            int offset = nodeGetValue( globalScope, qNextOffset );
+            nodeSetValue( globalScope, qNextOffset, offset + dWords );
+
+            /* push string addr (global data ptr) on value stack */
             if (++dVSptr==dVSsize) ssl_fatal("VS overflow");
-            dVS[dVSptr] = dSD[0].allocOffset;
+            dVS[dVSptr] = offset;
+
             /* save in strlit table: <addr> <words> <data> */
-            dSL[dSLptr++] = dSD[0].allocOffset;
+            dSL[dSLptr++] = offset;
             dSL[dSLptr++] = dWords;
             dPtr = (short *) ssl_strlit_buffer;
             for (dTemp = 0; dTemp < dWords; dTemp++)
               dSL[dSLptr++] = *dPtr++;
-            /* advance global data ptr */
-            dSD[0].allocOffset += dWords;
             continue;
+            }
 
      /* Mechanism typ */
 

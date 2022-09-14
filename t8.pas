@@ -25,6 +25,7 @@ const c1 = 10;
 
 BEGIN
 
+(*
   for i := 5 to 10 do
   begin
     j := i;
@@ -42,25 +43,41 @@ BEGIN
   l := a1[ 1 ][ 2, 2 ];
 
   writeln ( 'pointer=', k, ' value=', k^ );
+*)
 
+  writeln ( 'SAR: ', a1[1][2,1] );
+  writeln ( 'SAR: ', a1[1][2][1] );
+  //i = a1[1][2,1];
+
+
+  writeln ( 'SAR 1: ', a1[1][2,1] );
   writeln ('Here we go!');
 
   for i := 1 to 9 do
     begin
+     (*
       if I = 3 then
         cycle;
+      *)
       for j := 1 to 2 do
         a1[i][J,J] := i;
     end;
 
+  writeln ( 'SAR 2: ', a1[1][2,1] );
+
   FOR I := 9 DOWNTO 1 DO
     begin
+    writeln( a1[i][2,1] );
+//(*
     writeln('-> ',a1[i][1,1],a1[i][1,2],a1[I,1][1],a1[i,1][2],a1[i,1,1],a1[i,1,2]);
     writeln('-> ',a1[i][2,1],a1[i][2,2],a1[I,2][1],a1[i,2][2],a1[i,2,1],a1[i,2,2]);
+//*)
+    writeln( a1[i][2,1] );
     end;
 
 
   write ('That''s ','all ');
   WRITELN ('folks!');
+
 
 END.

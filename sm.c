@@ -26,14 +26,15 @@
 
 FILE *src,*dmp;
 
-#define codeMax 1000
+#define codeMax 10000
 short code[codeMax],pc;      /* Program memory */
 short codeWords;             /* Actual #words used */
 
-#define stackMax 200
+#define stackMax 2000
 short stack[stackMax],sp;    /* Call stack */
 
-#define dataMax 400
+// good grief, can't hardcode these
+#define dataMax 40000
 short data[dataMax];         /* Data memory */
 
 short temp, *ptr1, *ptr2;
