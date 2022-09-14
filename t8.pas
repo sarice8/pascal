@@ -25,14 +25,24 @@ const c1 = 10;
 
 BEGIN
 
+  for i := 5 to 10 do
+  begin
+    j := i;
+    writeln( 'j is ', j );
+    //exit;
+    //cycle;
+    //exit;
+    //exit;
+  end;
+
   i := c1 + 2;
   j := i * 2 + 5;
   k := ^i;
   l := k^ + 100;
+  l := a1[ 1 ][ 2, 2 ];
 
-//  writeln ( i );
+  writeln ( 'pointer=', k, ' value=', k^ );
 
-(*
   writeln ('Here we go!');
 
   for i := 1 to 9 do
@@ -52,6 +62,5 @@ BEGIN
 
   write ('That''s ','all ');
   WRITELN ('folks!');
-*)
 
 END.

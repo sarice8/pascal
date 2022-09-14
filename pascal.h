@@ -1,4 +1,4 @@
-#define SSL_CODE_TABLE_SIZE 3800
+#define SSL_CODE_TABLE_SIZE 3900
 
 #define oJumpForward 0
 #define oJumpBack 1
@@ -128,19 +128,20 @@
 #define eBadStatement 0
 #define eNotConst 1
 #define eNotType 2
-#define eNotVar 3
-#define eNotIntVar 4
-#define eNotValue 5
-#define eNotInteger 6
-#define eNotBoolean 7
-#define eNotPointer 8
-#define eNotArray 9
-#define eTooManySubscripts 10
-#define eTypeMismatch 11
-#define eNotImplemented 12
-#define eNotAllowed 13
-#define eNotInALoop 14
-#define eRecordEmpty 15
+#define eNotOrdinalType 3
+#define eNotVar 4
+#define eNotIntVar 5
+#define eNotValue 6
+#define eNotInteger 7
+#define eNotBoolean 8
+#define eNotPointer 9
+#define eNotArray 10
+#define eTooManySubscripts 11
+#define eTypeMismatch 12
+#define eNotImplemented 13
+#define eNotAllowed 14
+#define eNotInALoop 15
+#define eRecordEmpty 16
 #define nINVALID 0
 #define Object 1
 #define nScope 2
@@ -320,21 +321,22 @@ struct ssl_error_table_struct ssl_error_table[] = {
    "eBadStatement", 0,
    "eNotConst", 1,
    "eNotType", 2,
-   "eNotVar", 3,
-   "eNotIntVar", 4,
-   "eNotValue", 5,
-   "eNotInteger", 6,
-   "eNotBoolean", 7,
-   "eNotPointer", 8,
-   "eNotArray", 9,
-   "eTooManySubscripts", 10,
-   "eTypeMismatch", 11,
-   "eNotImplemented", 12,
-   "eNotAllowed", 13,
-   "eNotInALoop", 14,
-   "eRecordEmpty", 15,
+   "eNotOrdinalType", 3,
+   "eNotVar", 4,
+   "eNotIntVar", 5,
+   "eNotValue", 6,
+   "eNotInteger", 7,
+   "eNotBoolean", 8,
+   "eNotPointer", 9,
+   "eNotArray", 10,
+   "eTooManySubscripts", 11,
+   "eTypeMismatch", 12,
+   "eNotImplemented", 13,
+   "eNotAllowed", 14,
+   "eNotInALoop", 15,
+   "eRecordEmpty", 16,
    "", 0
 };
-int ssl_error_table_size = 16;
+int ssl_error_table_size = 17;
 
 #endif // SSL_INCLUDE_ERR_TABLE

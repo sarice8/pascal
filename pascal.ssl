@@ -182,6 +182,7 @@ error:
    eBadStatement
    eNotConst
    eNotType
+   eNotOrdinalType
    eNotVar
    eNotIntVar
    eNotValue
@@ -194,7 +195,8 @@ error:
    eNotImplemented
    eNotAllowed
    eNotInALoop
-   eRecordEmpty;
+   eRecordEmpty
+   ;
 
 include 'pascal_schema.ssl'
 
@@ -434,6 +436,7 @@ newIdent( node_type nt, kind k, int id ) >> Node;
 EmitValue( Node decl );
 TypeRef( out Node theType );
 PointerTypeTo( Node theType ) >> Node;
+OrdinalLow( Node theType ) >> int;
 
 
 % ----------------------------- Declarations ----------------------------
@@ -1131,29 +1134,46 @@ LValue:
    ]};
 
 ArraySubscripts:
-   [ oTypSChooseKind
-      | tyArray :
+   [ oTypeSNodeType
+      | nArrayType :
       | * :       #eNotArray
    ]
    {
-      [ oTypSChooseKind
-         | tyArray :
+      [ oTypeSNodeType
+         | nArrayType :
          | * :    #eTooManySubscripts
       ]
-      oValuePushLowTS   % low subscript of this dimension
-      oTypSPopPushBase  % replace TS with next dimension, or OF type
+
+      % low subscript of this dimension
+      int low
+      low = @OrdinalLow( oNodeGet( oTypeSTop, qIndexType ) )
+
+      % replace type stack with next dimension, or OF type
+      Node baseType
+      baseType = oNodeGet( oTypeSTop, qBaseType )
+      oTypeSPop
+      oTypeSPush( baseType )
+
       @Expr
       @RequireIntPop
-      [ oValueIsZero    % adjust for low subscript
-         | true :       oValuePop
-         | * :          .tPushIntLit oEmitInt( oValueTop ) .tSubtractInt oValuePop
+      % adjust for low subscript
+      [ equal_zero( low )
+         | false :
+            .tPushIntLit oEmitInt( low ) .tSubtractInt
+         | * :
       ]
-      oValuePushSizeTS
-      [ oValueIsOne     % adjust for size of subtype
-         | true :       oValuePop
-         | * :          .tPushIntLit oEmitInt( oValueTop ) .tMultiplyInt oValuePop
+
+      % multiply by element size
+      int size
+      size = oNodeGetInt( baseType, qSize )
+      [ equal( size, 1 )
+         | false :
+            .tPushIntLit oEmitInt( size ) .tMultiplyInt
+         | * :
       ]
-      .tAddInt          % update start address
+
+      % update start address
+      .tAddInt
       [
          | ']' :  >
          | ',' :
@@ -1260,36 +1280,42 @@ IfStmt:
 
 ForStmt:
    pIdent
-   oSymLookup
-   [ oSymChooseKind
-      | kVar :
-         oTypSPushTyp
-         @RequireIntPop
-      | * :        #eNotIntVar
+
+   Node decl
+   decl = oScopeFindRequire
+   [ oNodeType( decl )
+      | nGlobalVar :
+      | nLocalVar :    #eNotImplemented
+      | nParam :       #eNotImplemented
+      | * :            #eNotIntVar
    ]
-   oValuePushVal                   % address of index var (keep on VS)
-   .tPushAddr oEmitInt( oValueTop )
+   oTypeSPush( oNodeGet( decl, qType ) )
+   @RequireIntPop
+   .tPushAddr  @EmitValue( decl )
+
    ':='
+
    @Expr
    @RequireIntPop
    .tAssignInt
+
    .tJump oPatchPushHere(patchLoop) .tSpace
    oPatchPushHere(patchLoop)
    oPatchSwap(patchLoop)
    [
       | pTo :
-         .tIncIntVar oEmitInt( oValueTop )
+         .tIncIntVar @EmitValue( decl )
          oPatchPopFwd(patchLoop)
-         .tPushIntVar oEmitInt( oValueTop )
+         .tPushIntVar @EmitValue( decl )
          @Expr
          @RequireIntPop
          .tGreaterInt
          .tJumpTrue oPatchPushHere(patchLoop) .tSpace
          oPatchSwap(patchLoop)
       | pDownto :
-         .tDecIntVar oEmitInt( oValueTop )
+         .tDecIntVar @EmitValue( decl )
          oPatchPopFwd(patchLoop)
-         .tPushIntVar oEmitInt( oValueTop )
+         .tPushIntVar @EmitValue( decl )
          @Expr
          @RequireIntPop
          .tLessInt
@@ -1300,7 +1326,6 @@ ForStmt:
    pDo
    @Statement
    .tJump oPatchPopBack(patchLoop)
-   oValuePop
    oPatchPopFwd(patchLoop)
    @PatchExitsPop;
 
@@ -1373,18 +1398,15 @@ WriteStmt:
       | '(' :
          {
             @Expr
-            [ oTypSChoose
-               | tyInteger :                .tPutInt
-               | tyBoolean :                .tPutBool
-               | tyString :                 .tPutStr
-               | tyChar, tyFile :           #eNotImplemented
-               | * :                        % compound types
-                  [ oTypSChooseKind
-                     | tyPointer :          .tPutPtr
-                     | * :                  #eNotAllowed
-                  ]
+            [ oTypeSNodeType
+               | nIntegerType :             .tPutInt
+               | nBooleanType :             .tPutBool
+               | nStringType :              .tPutStr
+               | nCharType, nFileType :     #eNotImplemented
+               | nPointerType :             .tPutPtr
+               | * :                        #eNotAllowed
             ]
-            oTypSPop
+            oTypeSPop
             [
                | ')' : >
                | ',' :
@@ -1404,6 +1426,7 @@ ReadStmt:
 PatchExitsPop:
    {[ oCountIsZero
       | false : oPatchPopFwd(patchExit)
+                oCountDec
       | * :     >
    ]}
    oCountPop;
@@ -1492,6 +1515,20 @@ PointerTypeTo( Node theType ) >> Node:
       | * :
    ]
    >> ptrType;
+
+
+% Return the low value of an ordinal type
+%
+OrdinalLow( Node theType ) >> int:
+   [ oNodeType( theType )
+      | nIntegerType :  >> -2147483648
+      | nBooleanType :  >> 0
+      | nCharType :     >> 0
+      | nSubrangeType : >> oNodeGetInt( theType, qLow )
+      | * :             #eNotOrdinalType
+                        >> 0
+   ];
+
 
 
 % Emit the value in a declaration.
