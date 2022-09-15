@@ -175,7 +175,6 @@ output:
 %  Other:
 
    tSpace            % emit a hole, to be patched later
-   tSymVal           % emit value of symbol looked-up with oSymLookup
    ;
 
 error:
@@ -332,73 +331,16 @@ mechanism count :
    oCountIsZero >> boolean
    oCountPop;
 
-mechanism sym :                
-
-   % symbol table
-
-   oSymPushLevel               % new lexical level
-   oSymPopLevel                % return to old lexical level
-   oSymPopLevelSaveType        % attach id's in lex level to the syms field
-                               %   of the type on top of the type stack
-   oSymLookup                  % lookup last id accepted (for use by
-                               %   other semantic operations...)
-   oSymChooseKind >> kind      % kind of symbol looked-up
-   oSymAddSPop                 % add id on symbol stack to symbol table
-                               %   (pop symbol stack)
-   oSymLevelAnySyms >> boolean % any symbols in top lexical level?
-
-   % symbol stack
-   % (used to construct entries for the symbol table,
-   %       and to handle references to symbols)
-
-   oSymSPushId                 % push id# of last id accepted
-   oSymSSetKind(kind)          % set kind of top symbol (kVar, kType, etc)
-                               %   ... error if it was already set
-   oSymSSetValPop              % set val of sym on SS from val on VS (pop VS)
-   oSymSSetTypS                % set type of top symbol, from type on
-                               %   type stack (don't pop type stack)
-   oSymSSetParamTypS           % set param type of top symbol from type on TS
-   oSymSAllocate               % allocate data space for var, using size of
-                               %   type on type stack
-   ;
 
 mechanism value :              % value stack, to calc. const expr's
-   oValuePushToken             % push value of (int lit) token just read
-   oValuePushVal               % push val of symbol looked-up
    oValuePush(int)             % push an explicit int lit
-   oValuePushSizeTS            % push size of type on type stack
-   oValuePushLowTS             % push low subscript of type on type stack
    oValueNegate                % negate top value
-   oValueDifference            % pop 2, push (top - 2nd + 1)
-   oValueMultiply              % pop 2, push (top * 2nd)
-   oValueIsZero >> boolean     % is top value zero?
-   oValueIsOne >> boolean      % is top value one?
    oValueTop >> int            % get top value on value stack
    oValuePop;
 
 mechanism string :
    oStringAllocLit;            % alloc data space for strlit, push address
                                %   on value stack
-
-mechanism typS :               % type stack
-   oTypSPushTyp                % push type# of sym looked-up (not root type)
-   oTypSPush(typ)              % push explicit type# (intrinsic)
-   oTypSPopPushBase            % replace top TS with type# of its base type
-   oTypSPopPushPtr             % replace top TS with its ptrType field
-   oTypSMatch >> boolean       % do top 2 types match? (pop both, push 1)
-   oTypSChoose >> typ          % return type on TS (not root type)
-   oTypSChoosePop >> typ       % return type on TS (not root type), pop it
-   oTypSChooseKind >> typ      % return kind (array,etc) of top type; no pop
-   oTypSChoosePtr >> typ       % return 'ptrType' field of type; no pop
-   oTypSSwap                   % swap top two TS entries
-   oTypSPop
-
-   oTypNew(typ)                % new TT entry, with type class (e.g. array)
-                               %   push typ# on TS, for use by following:
-   oTypSetSize                 % size field = VS (don't pop VS)
-   oTypAssignBasePop           % base of 2nd on TS := top of TS, pop TS
-   oTypAssignPtr               % ptrType of 2nd on TS := top of TS, no pop
-;
 
 type patchStack:
    patchLoop                   % addr of start of loop (repeat, while, for)
@@ -1223,7 +1165,7 @@ AssignOrCallStmt:         % *** Call doesn't work yet ***
       | nProc :           %    but this is easier
          [
             | '(' :
-               {  @Expr oTypSPop  % ignore type for now
+               {  @Expr oTypeSPop  % ignore type for now
                   [
                     | ')' : >
                     | ',' :

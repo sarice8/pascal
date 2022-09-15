@@ -1,460 +1,325 @@
-   0	tPushAddr	 316
+   0	tPushAddr	 304
    2	tPutStr
-   3	tPushAddr	   8
-   5	tPushIntLit	   1
-   7	tPushIntLit	   1
-   9	tSubtractInt
-  10	tPushIntLit	  16
-  12	tMultiplyInt
-  13	tAddInt
-  14	tPushIntLit	   2
-  16	tPushIntLit	   1
-  18	tSubtractInt
-  19	tPushIntLit	   8
-  21	tMultiplyInt
-  22	tAddInt
-  23	tPushIntLit	   1
-  25	tPushIntLit	   1
-  27	tSubtractInt
-  28	tPushIntLit	   4
-  30	tMultiplyInt
-  31	tAddInt
-  32	tFetchInt
-  33	tPutInt
-  34	tPutCR
-  35	tPushAddr	 319
-  37	tPutStr
-  38	tPushAddr	   8
-  40	tPushIntLit	   1
-  42	tPushIntLit	   1
-  44	tSubtractInt
-  45	tPushIntLit	  16
-  47	tMultiplyInt
-  48	tAddInt
-  49	tPushIntLit	   2
-  51	tPushIntLit	   1
-  53	tSubtractInt
-  54	tPushIntLit	   8
-  56	tMultiplyInt
-  57	tAddInt
+   3	tPutCR
+   4	tPushAddr	 296
+   6	tPushIntLit	   1
+   8	tAssignInt
+   9	tJump   	  13
+  11	tIncIntVar	 296
+  13	tPushIntVar	 296
+  15	tPushIntLit	   9
+  17	tGreaterInt
+  18	tJumpTrue	  81
+  20	tPushIntVar	 296
+  22	tPushIntLit	   3
+  24	tEqualInt
+  25	tJumpFalse	  29
+  27	tJump   	  11
+  29	tPushAddr	 300
+  31	tPushIntLit	   1
+  33	tAssignInt
+  34	tJump   	  38
+  36	tIncIntVar	 300
+  38	tPushIntVar	 300
+  40	tPushIntLit	   2
+  42	tGreaterInt
+  43	tJumpTrue	  79
+  45	tPushAddr	   8
+  47	tPushIntVar	 296
+  49	tPushIntLit	   1
+  51	tSubtractInt
+  52	tPushIntLit	  16
+  54	tMultiplyInt
+  55	tAddInt
+  56	tPushIntVar	 300
   58	tPushIntLit	   1
-  60	tPushIntLit	   1
-  62	tSubtractInt
-  63	tPushIntLit	   4
-  65	tMultiplyInt
-  66	tAddInt
-  67	tFetchInt
-  68	tPutInt
-  69	tPutCR
-  70	tPushAddr	 322
-  72	tPutStr
-  73	tPushAddr	   8
-  75	tPushIntLit	   1
-  77	tPushIntLit	   1
-  79	tSubtractInt
-  80	tPushIntLit	  16
-  82	tMultiplyInt
-  83	tAddInt
-  84	tPushIntLit	   2
-  86	tPushIntLit	   1
-  88	tSubtractInt
-  89	tPushIntLit	   8
-  91	tMultiplyInt
-  92	tAddInt
-  93	tPushIntLit	   1
-  95	tPushIntLit	   1
-  97	tSubtractInt
-  98	tPushIntLit	   4
- 100	tMultiplyInt
- 101	tAddInt
- 102	tFetchInt
- 103	tPutInt
- 104	tPutCR
- 105	tPushAddr	 326
- 107	tPutStr
- 108	tPutCR
- 109	tPushAddr	 296
+  60	tSubtractInt
+  61	tPushIntLit	   8
+  63	tMultiplyInt
+  64	tAddInt
+  65	tPushIntVar	 300
+  67	tPushIntLit	   1
+  69	tSubtractInt
+  70	tPushIntLit	   4
+  72	tMultiplyInt
+  73	tAddInt
+  74	tPushIntVar	 296
+  76	tAssignInt
+  77	tJump   	  36
+  79	tJump   	  11
+  81	tPushAddr	 296
+  83	tPushIntLit	   9
+  85	tAssignInt
+  86	tJump   	  90
+  88	tDecIntVar	 296
+  90	tPushIntVar	 296
+  92	tPushIntLit	   1
+  94	tLessInt
+  95	tJumpTrue	 479
+  97	tPushAddr	 310
+  99	tPutStr
+ 100	tPushAddr	   8
+ 102	tPushIntVar	 296
+ 104	tPushIntLit	   1
+ 106	tSubtractInt
+ 107	tPushIntLit	  16
+ 109	tMultiplyInt
+ 110	tAddInt
  111	tPushIntLit	   1
- 113	tAssignInt
- 114	tJump   	 118
- 116	tIncIntVar	 296
- 118	tPushIntVar	 296
- 120	tPushIntLit	   9
- 122	tGreaterInt
- 123	tJumpTrue	 177
- 125	tPushAddr	 300
- 127	tPushIntLit	   1
- 129	tAssignInt
- 130	tJump   	 134
- 132	tIncIntVar	 300
- 134	tPushIntVar	 300
- 136	tPushIntLit	   2
- 138	tGreaterInt
- 139	tJumpTrue	 175
- 141	tPushAddr	   8
- 143	tPushIntVar	 296
- 145	tPushIntLit	   1
- 147	tSubtractInt
- 148	tPushIntLit	  16
- 150	tMultiplyInt
- 151	tAddInt
- 152	tPushIntVar	 300
- 154	tPushIntLit	   1
- 156	tSubtractInt
- 157	tPushIntLit	   8
- 159	tMultiplyInt
- 160	tAddInt
- 161	tPushIntVar	 300
- 163	tPushIntLit	   1
- 165	tSubtractInt
- 166	tPushIntLit	   4
- 168	tMultiplyInt
- 169	tAddInt
- 170	tPushIntVar	 296
- 172	tAssignInt
- 173	tJump   	 132
- 175	tJump   	 116
- 177	tPushAddr	 332
- 179	tPutStr
- 180	tPushAddr	   8
+ 113	tPushIntLit	   1
+ 115	tSubtractInt
+ 116	tPushIntLit	   8
+ 118	tMultiplyInt
+ 119	tAddInt
+ 120	tPushIntLit	   1
+ 122	tPushIntLit	   1
+ 124	tSubtractInt
+ 125	tPushIntLit	   4
+ 127	tMultiplyInt
+ 128	tAddInt
+ 129	tFetchInt
+ 130	tPutInt
+ 131	tPushAddr	   8
+ 133	tPushIntVar	 296
+ 135	tPushIntLit	   1
+ 137	tSubtractInt
+ 138	tPushIntLit	  16
+ 140	tMultiplyInt
+ 141	tAddInt
+ 142	tPushIntLit	   1
+ 144	tPushIntLit	   1
+ 146	tSubtractInt
+ 147	tPushIntLit	   8
+ 149	tMultiplyInt
+ 150	tAddInt
+ 151	tPushIntLit	   2
+ 153	tPushIntLit	   1
+ 155	tSubtractInt
+ 156	tPushIntLit	   4
+ 158	tMultiplyInt
+ 159	tAddInt
+ 160	tFetchInt
+ 161	tPutInt
+ 162	tPushAddr	   8
+ 164	tPushIntVar	 296
+ 166	tPushIntLit	   1
+ 168	tSubtractInt
+ 169	tPushIntLit	  16
+ 171	tMultiplyInt
+ 172	tAddInt
+ 173	tPushIntLit	   1
+ 175	tPushIntLit	   1
+ 177	tSubtractInt
+ 178	tPushIntLit	   8
+ 180	tMultiplyInt
+ 181	tAddInt
  182	tPushIntLit	   1
  184	tPushIntLit	   1
  186	tSubtractInt
- 187	tPushIntLit	  16
+ 187	tPushIntLit	   4
  189	tMultiplyInt
  190	tAddInt
- 191	tPushIntLit	   2
- 193	tPushIntLit	   1
- 195	tSubtractInt
- 196	tPushIntLit	   8
- 198	tMultiplyInt
- 199	tAddInt
- 200	tPushIntLit	   1
- 202	tPushIntLit	   1
- 204	tSubtractInt
- 205	tPushIntLit	   4
- 207	tMultiplyInt
- 208	tAddInt
- 209	tFetchInt
- 210	tPutInt
- 211	tPutCR
- 212	tPushAddr	 296
- 214	tPushIntLit	   9
- 216	tAssignInt
- 217	tJump   	 221
- 219	tDecIntVar	 296
- 221	tPushIntVar	 296
- 223	tPushIntLit	   1
- 225	tLessInt
- 226	tJumpTrue	 674
- 228	tPushAddr	   8
- 230	tPushIntVar	 296
- 232	tPushIntLit	   1
- 234	tSubtractInt
- 235	tPushIntLit	  16
- 237	tMultiplyInt
- 238	tAddInt
- 239	tPushIntLit	   2
- 241	tPushIntLit	   1
- 243	tSubtractInt
- 244	tPushIntLit	   8
- 246	tMultiplyInt
- 247	tAddInt
- 248	tPushIntLit	   1
- 250	tPushIntLit	   1
- 252	tSubtractInt
- 253	tPushIntLit	   4
- 255	tMultiplyInt
- 256	tAddInt
- 257	tFetchInt
- 258	tPutInt
- 259	tPutCR
- 260	tPushAddr	 336
- 262	tPutStr
- 263	tPushAddr	   8
- 265	tPushIntVar	 296
- 267	tPushIntLit	   1
- 269	tSubtractInt
- 270	tPushIntLit	  16
- 272	tMultiplyInt
- 273	tAddInt
- 274	tPushIntLit	   1
- 276	tPushIntLit	   1
- 278	tSubtractInt
- 279	tPushIntLit	   8
- 281	tMultiplyInt
- 282	tAddInt
- 283	tPushIntLit	   1
- 285	tPushIntLit	   1
- 287	tSubtractInt
- 288	tPushIntLit	   4
- 290	tMultiplyInt
- 291	tAddInt
- 292	tFetchInt
- 293	tPutInt
- 294	tPushAddr	   8
- 296	tPushIntVar	 296
- 298	tPushIntLit	   1
- 300	tSubtractInt
- 301	tPushIntLit	  16
- 303	tMultiplyInt
- 304	tAddInt
- 305	tPushIntLit	   1
- 307	tPushIntLit	   1
- 309	tSubtractInt
- 310	tPushIntLit	   8
- 312	tMultiplyInt
- 313	tAddInt
- 314	tPushIntLit	   2
- 316	tPushIntLit	   1
- 318	tSubtractInt
- 319	tPushIntLit	   4
- 321	tMultiplyInt
- 322	tAddInt
- 323	tFetchInt
- 324	tPutInt
- 325	tPushAddr	   8
- 327	tPushIntVar	 296
- 329	tPushIntLit	   1
- 331	tSubtractInt
- 332	tPushIntLit	  16
- 334	tMultiplyInt
- 335	tAddInt
- 336	tPushIntLit	   1
- 338	tPushIntLit	   1
- 340	tSubtractInt
- 341	tPushIntLit	   8
- 343	tMultiplyInt
- 344	tAddInt
- 345	tPushIntLit	   1
- 347	tPushIntLit	   1
- 349	tSubtractInt
- 350	tPushIntLit	   4
- 352	tMultiplyInt
- 353	tAddInt
- 354	tFetchInt
- 355	tPutInt
- 356	tPushAddr	   8
- 358	tPushIntVar	 296
- 360	tPushIntLit	   1
- 362	tSubtractInt
- 363	tPushIntLit	  16
- 365	tMultiplyInt
- 366	tAddInt
- 367	tPushIntLit	   1
- 369	tPushIntLit	   1
- 371	tSubtractInt
- 372	tPushIntLit	   8
- 374	tMultiplyInt
- 375	tAddInt
- 376	tPushIntLit	   2
- 378	tPushIntLit	   1
- 380	tSubtractInt
- 381	tPushIntLit	   4
- 383	tMultiplyInt
- 384	tAddInt
- 385	tFetchInt
- 386	tPutInt
- 387	tPushAddr	   8
- 389	tPushIntVar	 296
- 391	tPushIntLit	   1
- 393	tSubtractInt
- 394	tPushIntLit	  16
- 396	tMultiplyInt
- 397	tAddInt
- 398	tPushIntLit	   1
- 400	tPushIntLit	   1
- 402	tSubtractInt
- 403	tPushIntLit	   8
- 405	tMultiplyInt
- 406	tAddInt
- 407	tPushIntLit	   1
- 409	tPushIntLit	   1
- 411	tSubtractInt
- 412	tPushIntLit	   4
- 414	tMultiplyInt
- 415	tAddInt
- 416	tFetchInt
- 417	tPutInt
- 418	tPushAddr	   8
- 420	tPushIntVar	 296
- 422	tPushIntLit	   1
- 424	tSubtractInt
- 425	tPushIntLit	  16
- 427	tMultiplyInt
- 428	tAddInt
- 429	tPushIntLit	   1
- 431	tPushIntLit	   1
- 433	tSubtractInt
- 434	tPushIntLit	   8
- 436	tMultiplyInt
- 437	tAddInt
- 438	tPushIntLit	   2
- 440	tPushIntLit	   1
- 442	tSubtractInt
- 443	tPushIntLit	   4
- 445	tMultiplyInt
- 446	tAddInt
- 447	tFetchInt
- 448	tPutInt
- 449	tPutCR
- 450	tPushAddr	 338
- 452	tPutStr
- 453	tPushAddr	   8
- 455	tPushIntVar	 296
- 457	tPushIntLit	   1
- 459	tSubtractInt
- 460	tPushIntLit	  16
- 462	tMultiplyInt
- 463	tAddInt
- 464	tPushIntLit	   2
- 466	tPushIntLit	   1
- 468	tSubtractInt
- 469	tPushIntLit	   8
- 471	tMultiplyInt
- 472	tAddInt
- 473	tPushIntLit	   1
- 475	tPushIntLit	   1
- 477	tSubtractInt
- 478	tPushIntLit	   4
- 480	tMultiplyInt
- 481	tAddInt
- 482	tFetchInt
- 483	tPutInt
- 484	tPushAddr	   8
- 486	tPushIntVar	 296
- 488	tPushIntLit	   1
- 490	tSubtractInt
- 491	tPushIntLit	  16
- 493	tMultiplyInt
- 494	tAddInt
- 495	tPushIntLit	   2
- 497	tPushIntLit	   1
- 499	tSubtractInt
- 500	tPushIntLit	   8
- 502	tMultiplyInt
- 503	tAddInt
- 504	tPushIntLit	   2
- 506	tPushIntLit	   1
- 508	tSubtractInt
- 509	tPushIntLit	   4
- 511	tMultiplyInt
- 512	tAddInt
- 513	tFetchInt
- 514	tPutInt
- 515	tPushAddr	   8
- 517	tPushIntVar	 296
- 519	tPushIntLit	   1
- 521	tSubtractInt
- 522	tPushIntLit	  16
- 524	tMultiplyInt
- 525	tAddInt
- 526	tPushIntLit	   2
- 528	tPushIntLit	   1
- 530	tSubtractInt
- 531	tPushIntLit	   8
- 533	tMultiplyInt
- 534	tAddInt
- 535	tPushIntLit	   1
- 537	tPushIntLit	   1
- 539	tSubtractInt
- 540	tPushIntLit	   4
- 542	tMultiplyInt
- 543	tAddInt
- 544	tFetchInt
- 545	tPutInt
- 546	tPushAddr	   8
- 548	tPushIntVar	 296
- 550	tPushIntLit	   1
- 552	tSubtractInt
- 553	tPushIntLit	  16
- 555	tMultiplyInt
- 556	tAddInt
- 557	tPushIntLit	   2
- 559	tPushIntLit	   1
- 561	tSubtractInt
- 562	tPushIntLit	   8
- 564	tMultiplyInt
- 565	tAddInt
- 566	tPushIntLit	   2
- 568	tPushIntLit	   1
- 570	tSubtractInt
- 571	tPushIntLit	   4
- 573	tMultiplyInt
- 574	tAddInt
- 575	tFetchInt
- 576	tPutInt
- 577	tPushAddr	   8
- 579	tPushIntVar	 296
- 581	tPushIntLit	   1
- 583	tSubtractInt
- 584	tPushIntLit	  16
- 586	tMultiplyInt
- 587	tAddInt
- 588	tPushIntLit	   2
- 590	tPushIntLit	   1
- 592	tSubtractInt
- 593	tPushIntLit	   8
- 595	tMultiplyInt
- 596	tAddInt
- 597	tPushIntLit	   1
- 599	tPushIntLit	   1
- 601	tSubtractInt
- 602	tPushIntLit	   4
- 604	tMultiplyInt
- 605	tAddInt
- 606	tFetchInt
- 607	tPutInt
- 608	tPushAddr	   8
- 610	tPushIntVar	 296
- 612	tPushIntLit	   1
- 614	tSubtractInt
- 615	tPushIntLit	  16
- 617	tMultiplyInt
- 618	tAddInt
- 619	tPushIntLit	   2
- 621	tPushIntLit	   1
- 623	tSubtractInt
- 624	tPushIntLit	   8
- 626	tMultiplyInt
- 627	tAddInt
- 628	tPushIntLit	   2
- 630	tPushIntLit	   1
- 632	tSubtractInt
- 633	tPushIntLit	   4
- 635	tMultiplyInt
- 636	tAddInt
- 637	tFetchInt
- 638	tPutInt
- 639	tPutCR
- 640	tPushAddr	   8
- 642	tPushIntVar	 296
- 644	tPushIntLit	   1
- 646	tSubtractInt
- 647	tPushIntLit	  16
- 649	tMultiplyInt
- 650	tAddInt
- 651	tPushIntLit	   2
- 653	tPushIntLit	   1
- 655	tSubtractInt
- 656	tPushIntLit	   8
- 658	tMultiplyInt
- 659	tAddInt
- 660	tPushIntLit	   1
- 662	tPushIntLit	   1
- 664	tSubtractInt
- 665	tPushIntLit	   4
- 667	tMultiplyInt
- 668	tAddInt
- 669	tFetchInt
- 670	tPutInt
- 671	tPutCR
- 672	tJump   	 219
- 674	tPushAddr	 340
- 676	tPutStr
- 677	tPushAddr	 344
- 679	tPutStr
- 680	tPushAddr	 347
- 682	tPutStr
- 683	tPutCR
- 684	tReturn
+ 191	tFetchInt
+ 192	tPutInt
+ 193	tPushAddr	   8
+ 195	tPushIntVar	 296
+ 197	tPushIntLit	   1
+ 199	tSubtractInt
+ 200	tPushIntLit	  16
+ 202	tMultiplyInt
+ 203	tAddInt
+ 204	tPushIntLit	   1
+ 206	tPushIntLit	   1
+ 208	tSubtractInt
+ 209	tPushIntLit	   8
+ 211	tMultiplyInt
+ 212	tAddInt
+ 213	tPushIntLit	   2
+ 215	tPushIntLit	   1
+ 217	tSubtractInt
+ 218	tPushIntLit	   4
+ 220	tMultiplyInt
+ 221	tAddInt
+ 222	tFetchInt
+ 223	tPutInt
+ 224	tPushAddr	   8
+ 226	tPushIntVar	 296
+ 228	tPushIntLit	   1
+ 230	tSubtractInt
+ 231	tPushIntLit	  16
+ 233	tMultiplyInt
+ 234	tAddInt
+ 235	tPushIntLit	   1
+ 237	tPushIntLit	   1
+ 239	tSubtractInt
+ 240	tPushIntLit	   8
+ 242	tMultiplyInt
+ 243	tAddInt
+ 244	tPushIntLit	   1
+ 246	tPushIntLit	   1
+ 248	tSubtractInt
+ 249	tPushIntLit	   4
+ 251	tMultiplyInt
+ 252	tAddInt
+ 253	tFetchInt
+ 254	tPutInt
+ 255	tPushAddr	   8
+ 257	tPushIntVar	 296
+ 259	tPushIntLit	   1
+ 261	tSubtractInt
+ 262	tPushIntLit	  16
+ 264	tMultiplyInt
+ 265	tAddInt
+ 266	tPushIntLit	   1
+ 268	tPushIntLit	   1
+ 270	tSubtractInt
+ 271	tPushIntLit	   8
+ 273	tMultiplyInt
+ 274	tAddInt
+ 275	tPushIntLit	   2
+ 277	tPushIntLit	   1
+ 279	tSubtractInt
+ 280	tPushIntLit	   4
+ 282	tMultiplyInt
+ 283	tAddInt
+ 284	tFetchInt
+ 285	tPutInt
+ 286	tPutCR
+ 287	tPushAddr	 312
+ 289	tPutStr
+ 290	tPushAddr	   8
+ 292	tPushIntVar	 296
+ 294	tPushIntLit	   1
+ 296	tSubtractInt
+ 297	tPushIntLit	  16
+ 299	tMultiplyInt
+ 300	tAddInt
+ 301	tPushIntLit	   2
+ 303	tPushIntLit	   1
+ 305	tSubtractInt
+ 306	tPushIntLit	   8
+ 308	tMultiplyInt
+ 309	tAddInt
+ 310	tPushIntLit	   1
+ 312	tPushIntLit	   1
+ 314	tSubtractInt
+ 315	tPushIntLit	   4
+ 317	tMultiplyInt
+ 318	tAddInt
+ 319	tFetchInt
+ 320	tPutInt
+ 321	tPushAddr	   8
+ 323	tPushIntVar	 296
+ 325	tPushIntLit	   1
+ 327	tSubtractInt
+ 328	tPushIntLit	  16
+ 330	tMultiplyInt
+ 331	tAddInt
+ 332	tPushIntLit	   2
+ 334	tPushIntLit	   1
+ 336	tSubtractInt
+ 337	tPushIntLit	   8
+ 339	tMultiplyInt
+ 340	tAddInt
+ 341	tPushIntLit	   2
+ 343	tPushIntLit	   1
+ 345	tSubtractInt
+ 346	tPushIntLit	   4
+ 348	tMultiplyInt
+ 349	tAddInt
+ 350	tFetchInt
+ 351	tPutInt
+ 352	tPushAddr	   8
+ 354	tPushIntVar	 296
+ 356	tPushIntLit	   1
+ 358	tSubtractInt
+ 359	tPushIntLit	  16
+ 361	tMultiplyInt
+ 362	tAddInt
+ 363	tPushIntLit	   2
+ 365	tPushIntLit	   1
+ 367	tSubtractInt
+ 368	tPushIntLit	   8
+ 370	tMultiplyInt
+ 371	tAddInt
+ 372	tPushIntLit	   1
+ 374	tPushIntLit	   1
+ 376	tSubtractInt
+ 377	tPushIntLit	   4
+ 379	tMultiplyInt
+ 380	tAddInt
+ 381	tFetchInt
+ 382	tPutInt
+ 383	tPushAddr	   8
+ 385	tPushIntVar	 296
+ 387	tPushIntLit	   1
+ 389	tSubtractInt
+ 390	tPushIntLit	  16
+ 392	tMultiplyInt
+ 393	tAddInt
+ 394	tPushIntLit	   2
+ 396	tPushIntLit	   1
+ 398	tSubtractInt
+ 399	tPushIntLit	   8
+ 401	tMultiplyInt
+ 402	tAddInt
+ 403	tPushIntLit	   2
+ 405	tPushIntLit	   1
+ 407	tSubtractInt
+ 408	tPushIntLit	   4
+ 410	tMultiplyInt
+ 411	tAddInt
+ 412	tFetchInt
+ 413	tPutInt
+ 414	tPushAddr	   8
+ 416	tPushIntVar	 296
+ 418	tPushIntLit	   1
+ 420	tSubtractInt
+ 421	tPushIntLit	  16
+ 423	tMultiplyInt
+ 424	tAddInt
+ 425	tPushIntLit	   2
+ 427	tPushIntLit	   1
+ 429	tSubtractInt
+ 430	tPushIntLit	   8
+ 432	tMultiplyInt
+ 433	tAddInt
+ 434	tPushIntLit	   1
+ 436	tPushIntLit	   1
+ 438	tSubtractInt
+ 439	tPushIntLit	   4
+ 441	tMultiplyInt
+ 442	tAddInt
+ 443	tFetchInt
+ 444	tPutInt
+ 445	tPushAddr	   8
+ 447	tPushIntVar	 296
+ 449	tPushIntLit	   1
+ 451	tSubtractInt
+ 452	tPushIntLit	  16
+ 454	tMultiplyInt
+ 455	tAddInt
+ 456	tPushIntLit	   2
+ 458	tPushIntLit	   1
+ 460	tSubtractInt
+ 461	tPushIntLit	   8
+ 463	tMultiplyInt
+ 464	tAddInt
+ 465	tPushIntLit	   2
+ 467	tPushIntLit	   1
+ 469	tSubtractInt
+ 470	tPushIntLit	   4
+ 472	tMultiplyInt
+ 473	tAddInt
+ 474	tFetchInt
+ 475	tPutInt
+ 476	tPutCR
+ 477	tJump   	  88
+ 479	tPushAddr	 314
+ 481	tPutStr
+ 482	tPushAddr	 318
+ 484	tPutStr
+ 485	tPushAddr	 321
+ 487	tPutStr
+ 488	tPutCR
+ 489	tReturn

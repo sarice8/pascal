@@ -175,7 +175,6 @@
       %  Other:
       
    2:    tSpace            % emit a hole, to be patched later
-   2:    tSymVal           % emit value of symbol looked-up with oSymLookup
    2:    ;
       
    2: error:
@@ -387,73 +386,16 @@
    2:    oCountIsZero >> boolean
    2:    oCountPop;
       
-   2: mechanism sym :                
-      
-         % symbol table
-      
-   2:    oSymPushLevel               % new lexical level
-   2:    oSymPopLevel                % return to old lexical level
-   2:    oSymPopLevelSaveType        % attach id's in lex level to the syms field
-                                     %   of the type on top of the type stack
-   2:    oSymLookup                  % lookup last id accepted (for use by
-                                     %   other semantic operations...)
-   2:    oSymChooseKind >> kind      % kind of symbol looked-up
-   2:    oSymAddSPop                 % add id on symbol stack to symbol table
-                                     %   (pop symbol stack)
-   2:    oSymLevelAnySyms >> boolean % any symbols in top lexical level?
-      
-         % symbol stack
-         % (used to construct entries for the symbol table,
-         %       and to handle references to symbols)
-      
-   2:    oSymSPushId                 % push id# of last id accepted
-   2:    oSymSSetKind(kind)          % set kind of top symbol (kVar, kType, etc)
-                                     %   ... error if it was already set
-   2:    oSymSSetValPop              % set val of sym on SS from val on VS (pop VS)
-   2:    oSymSSetTypS                % set type of top symbol, from type on
-                                     %   type stack (don't pop type stack)
-   2:    oSymSSetParamTypS           % set param type of top symbol from type on TS
-   2:    oSymSAllocate               % allocate data space for var, using size of
-                                     %   type on type stack
-   2:    ;
       
    2: mechanism value :              % value stack, to calc. const expr's
-   2:    oValuePushToken             % push value of (int lit) token just read
-   2:    oValuePushVal               % push val of symbol looked-up
    2:    oValuePush(int)             % push an explicit int lit
-   2:    oValuePushSizeTS            % push size of type on type stack
-   2:    oValuePushLowTS             % push low subscript of type on type stack
    2:    oValueNegate                % negate top value
-   2:    oValueDifference            % pop 2, push (top - 2nd + 1)
-   2:    oValueMultiply              % pop 2, push (top * 2nd)
-   2:    oValueIsZero >> boolean     % is top value zero?
-   2:    oValueIsOne >> boolean      % is top value one?
    2:    oValueTop >> int            % get top value on value stack
    2:    oValuePop;
       
    2: mechanism string :
    2:    oStringAllocLit;            % alloc data space for strlit, push address
                                      %   on value stack
-      
-   2: mechanism typS :               % type stack
-   2:    oTypSPushTyp                % push type# of sym looked-up (not root type)
-   2:    oTypSPush(typ)              % push explicit type# (intrinsic)
-   2:    oTypSPopPushBase            % replace top TS with type# of its base type
-   2:    oTypSPopPushPtr             % replace top TS with its ptrType field
-   2:    oTypSMatch >> boolean       % do top 2 types match? (pop both, push 1)
-   2:    oTypSChoose >> typ          % return type on TS (not root type)
-   2:    oTypSChoosePop >> typ       % return type on TS (not root type), pop it
-   2:    oTypSChooseKind >> typ      % return kind (array,etc) of top type; no pop
-   2:    oTypSChoosePtr >> typ       % return 'ptrType' field of type; no pop
-   2:    oTypSSwap                   % swap top two TS entries
-   2:    oTypSPop
-      
-   2:    oTypNew(typ)                % new TT entry, with type class (e.g. array)
-                                     %   push typ# on TS, for use by following:
-   2:    oTypSetSize                 % size field = VS (don't pop VS)
-   2:    oTypAssignBasePop           % base of 2nd on TS := top of TS, pop TS
-   2:    oTypAssignPtr               % ptrType of 2nd on TS := top of TS, no pop
-   2: ;
       
    2: type patchStack:
    2:    patchLoop                   % addr of start of loop (repeat, while, for)
@@ -1278,7 +1220,7 @@
 2451:       | nProc :           %    but this is easier
 2452:          [
 2452:             | '(' :
-2454:                {  @Expr oTypSPop  % ignore type for now
+2454:                {  @Expr oTypeSPop  % ignore type for now
 2457:                   [
 2457:                     | ')' : >
 2461:                     | ',' :
@@ -3168,7 +3110,7 @@ Generated code:
 2450: oChoice 2574
 2452: oInputChoice 2475
 2454: oCall 1328
-2456: oTypSPop
+2456: oTypeSPop
 2457: oInputChoice 2465
 2459: oJumpForward 2473
 2461: oJumpForward 2471
