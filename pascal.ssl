@@ -15,17 +15,6 @@ title: 'Pascal Compiler 1.1.5 -- Jan 01 ''90';
 %    23Oct89   Fixed for statement, so CYCLE goes to next step.
 %    01Jan90   Added string literals
 %
-%  *** WORKING ON : Records ***
-%    - fields allocated now, but need to calculate size of whole record
-%    - need to make ST a linked list structure for oSymPopLevelSaveType
-%      (note, this will mess up SD, and oSymLevelAnySyms)
-%    - references to records: currently pushes addr on stack. ok.
-%      Field selection '.' should push the fields on the SD, look up
-%      the next ident only in that level, add the offset if not 0,
-%      replace the current type with the field type, and continue
-%      (note, we're in fetch mode here, working with addresses on run stack
-%      just as with arrays).
-%
 %  *** WORKING ON : Procedures ***
 %    - formal args declared but not saved (see Records)
 %    - allocate args so the #'s match the stack (esp. re VAR flag)
@@ -189,6 +178,8 @@ error:
    eNotBoolean
    eNotPointer
    eNotArray
+   eNotRecord
+   eNotRecordField
    eTooManySubscripts
    eTypeMismatch
    eNotImplemented
@@ -291,7 +282,8 @@ mechanism more_builtins:      % These should be built-in SSL operations
 
 mechanism scope_mech:
     oScopeBegin                          % create a new scope. Subsequent declarations will go here.
-    oScopeEnd                            % end current scope. Subsequent declarations will go to parent scope.
+    oScopeEnter( Node scope )            % enter an existing scope.
+    oScopeEnd                            % end current scope. Subsequent declarations will go to previous scope.
     oScopeCurrent >> Node                % returns current scope
     oScopeDeclare( Node )                % add declaration to current scope.
     oScopeDeclareAlloc( Node )           % add declaration to current scope, and allocate space according to its type
@@ -1070,7 +1062,7 @@ FetchVar:
 LValue:
    {[
       | '[' :       @ArraySubscripts
-      | '.' :       #eNotImplemented
+      | '.' :       @RecordFieldRef
       | '^' :       @PointerDeref
       | * :         >
    ]};
@@ -1121,6 +1113,37 @@ ArraySubscripts:
          | ',' :
       ]
    };
+
+
+RecordFieldRef:
+   [ oTypeSNodeType
+      | nRecordType :
+      | * :    #eNotRecord
+   ]
+   oScopeEnter( oNodeGet( oTypeSTop, qScope ) )
+   pIdent
+   Node field
+   field = oScopeFindRequire
+   % oScopeFind searches all open scopes, so make sure we found nRecordField
+   % which could only be seen in the local scope we entered above.
+   [ oNodeType( field )
+      | nRecordField :
+      | * :   #eNotRecordField
+   ]
+   oScopeEnd
+   int offset
+   offset = oNodeGetInt( field, qValue )
+   [ equal_zero( offset )
+      | false :
+         .tPushIntLit oEmitInt( offset ) .tAddInt
+      | * :
+   ]
+
+   % replace the type on the type stack, with the field type
+   oTypeSPop
+   oTypeSPush( oNodeGet( field, qType ) )
+   ;
+
 
 % ptr deref on left side, i.e. BEFORE addr of ptr var is on stack,
 %                              AFTER addr of thing pointed to is on stack

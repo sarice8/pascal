@@ -15,15 +15,48 @@ type rtype = record
     f3, f4: integer;
   end;
 
+type rrtype = record
+    f1: integer;
+    f2: rtype;
+    f3: rtype;
+  end;
 
 var  a1,a2: atype;
      i,j:   integer;
      k: ^integer;
      l: integer;
 
+     r1: rtype;
+     r2: rtype;
+
+     rr1: rrtype;
+
 const c1 = 10;
 
 BEGIN
+
+  writeln( 'Record test:' );
+
+  r1.f1 := 1;
+  r1.f2 := 2;
+  r1.f3 := 3;
+  r1.f4 := 4;
+
+  // did I implement compound var assignment yet?  Yep
+  r2 := r1;
+
+  writeln( 'r1=', r1.f1, r1.f2, r1.f3, r1.f4 );
+  writeln( 'r2=', r2.f1, r2.f2, r2.f3, r2.f4 );
+
+  rr1.f2 := r1;
+  rr1.f3.f1 := 10;
+  rr1.f3.f2 := 20;
+  rr1.f3.f3 := 30;
+  rr1.f3.f4 := 40;
+
+  writeln( 'rr1.f2=', rr1.f2.f1, rr1.f2.f2, rr1.f2.f3, rr1.f2.f4 );
+  writeln( 'rr1.f3=', rr1.f3.f1, rr1.f3.f2, rr1.f3.f3, rr1.f3.f4 );
+
 
 (*
   for i := 5 to 10 do

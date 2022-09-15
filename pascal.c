@@ -477,6 +477,10 @@ NODE_PTR dNode;  // temporary for several mechanisms
             if (++dScopeStackPtr == dScopeStackSize) ssl_fatal ("Scope Stack overflow");
             dScopeStack[dScopeStackPtr] = dNode;
             continue;
+    case oScopeEnter:
+            if (++dScopeStackPtr == dScopeStackSize) ssl_fatal ("Scope Stack overflow");
+            dScopeStack[dScopeStackPtr] = (NODE_PTR) ssl_param;
+            continue;
     case oScopeEnd:
             ssl_assert (dScopeStackPtr >= 1);
             dScopeStackPtr--;

@@ -1,4 +1,4 @@
-#define SSL_CODE_TABLE_SIZE 3900
+#define SSL_CODE_TABLE_SIZE 4000
 
 #define oJumpForward 0
 #define oJumpBack 1
@@ -135,12 +135,14 @@
 #define eNotBoolean 8
 #define eNotPointer 9
 #define eNotArray 10
-#define eTooManySubscripts 11
-#define eTypeMismatch 12
-#define eNotImplemented 13
-#define eNotAllowed 14
-#define eNotInALoop 15
-#define eRecordEmpty 16
+#define eNotRecord 11
+#define eNotRecordField 12
+#define eTooManySubscripts 13
+#define eTypeMismatch 14
+#define eNotImplemented 15
+#define eNotAllowed 16
+#define eNotInALoop 17
+#define eRecordEmpty 18
 #define nINVALID 0
 #define Object 1
 #define nScope 2
@@ -240,43 +242,44 @@
 #define TOKEN_VALUE 53
 #define LAST_ID 54
 #define oScopeBegin 55
-#define oScopeEnd 56
-#define oScopeCurrent 57
-#define oScopeDeclare 58
-#define oScopeDeclareAlloc 59
-#define oScopeFind 60
-#define oScopeFindRequire 61
-#define oTypeAdd 62
-#define oTypeSPush 63
-#define oTypeSPop 64
-#define oTypeSTop 65
-#define oTypeSNodeType 66
-#define oIdAdd_File 67
-#define oIdAdd_Integer 68
-#define oIdAdd_Boolean 69
-#define oIdAdd_Char 70
-#define oIdAdd_String 71
-#define oIdAdd_True 72
-#define oIdAdd_False 73
-#define oCountPush 74
-#define oCountInc 75
-#define oCountDec 76
-#define oCountIsZero 77
-#define oCountPop 78
-#define oValuePush 79
-#define oValueNegate 80
-#define oValueTop 81
-#define oValuePop 82
-#define oStringAllocLit 83
+#define oScopeEnter 56
+#define oScopeEnd 57
+#define oScopeCurrent 58
+#define oScopeDeclare 59
+#define oScopeDeclareAlloc 60
+#define oScopeFind 61
+#define oScopeFindRequire 62
+#define oTypeAdd 63
+#define oTypeSPush 64
+#define oTypeSPop 65
+#define oTypeSTop 66
+#define oTypeSNodeType 67
+#define oIdAdd_File 68
+#define oIdAdd_Integer 69
+#define oIdAdd_Boolean 70
+#define oIdAdd_Char 71
+#define oIdAdd_String 72
+#define oIdAdd_True 73
+#define oIdAdd_False 74
+#define oCountPush 75
+#define oCountInc 76
+#define oCountDec 77
+#define oCountIsZero 78
+#define oCountPop 79
+#define oValuePush 80
+#define oValueNegate 81
+#define oValueTop 82
+#define oValuePop 83
+#define oStringAllocLit 84
 #define patchLoop 0
 #define patchExit 1
 #define patchIf 2
-#define oPatchPushHere 84
-#define oPatchAnyEntries 85
-#define oPatchSwap 86
-#define oPatchDup 87
-#define oPatchPopFwd 88
-#define oPatchPopBack 89
+#define oPatchPushHere 85
+#define oPatchAnyEntries 86
+#define oPatchSwap 87
+#define oPatchDup 88
+#define oPatchPopFwd 89
+#define oPatchPopBack 90
 
 #ifdef SSL_INCLUDE_ERR_TABLE
 
@@ -292,14 +295,16 @@ struct ssl_error_table_struct ssl_error_table[] = {
    "eNotBoolean", 8,
    "eNotPointer", 9,
    "eNotArray", 10,
-   "eTooManySubscripts", 11,
-   "eTypeMismatch", 12,
-   "eNotImplemented", 13,
-   "eNotAllowed", 14,
-   "eNotInALoop", 15,
-   "eRecordEmpty", 16,
+   "eNotRecord", 11,
+   "eNotRecordField", 12,
+   "eTooManySubscripts", 13,
+   "eTypeMismatch", 14,
+   "eNotImplemented", 15,
+   "eNotAllowed", 16,
+   "eNotInALoop", 17,
+   "eRecordEmpty", 18,
    "", 0
 };
-int ssl_error_table_size = 17;
+int ssl_error_table_size = 19;
 
 #endif // SSL_INCLUDE_ERR_TABLE
