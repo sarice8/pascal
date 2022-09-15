@@ -145,44 +145,44 @@ walkTable()
 
      switch (code[pc++]) {
 
-       case tPushIntVar :
+       case tPushGlobalI :
               if (++sp>=stackMax) fatal("stack overflow");
               stack[sp] = data[code[pc++]];
               continue;
-       case tPushBoolVar :
+       case tPushGlobalB :
               if (++sp>=stackMax) fatal("stack overflow");
               stack[sp] = data[code[pc++]];
               continue;
-       case tPushPtrVar :
+       case tPushGlobalP :
               if (++sp>=stackMax) fatal("stack overflow");
               stack[sp] = data[code[pc++]];
               continue;
-       case tPushAddr :
+       case tPushConstI :
               if (++sp>=stackMax) fatal("stack overflow");
               stack[sp] = code[pc++];
               continue;
-       case tFetchInt :
-              stack[sp] = data[stack[sp]];
-              continue;
-       case tFetchBool :
-              stack[sp] = data[stack[sp]];
-              continue;
-       case tFetchPtr :
-              stack[sp] = data[stack[sp]];
-              continue;
-       case tPushIntLit :
+       case tPushConstP :
               if (++sp>=stackMax) fatal("stack overflow");
               stack[sp] = code[pc++];
               continue;
-       case tAssignInt :
+       case tFetchI :
+              stack[sp] = data[stack[sp]];
+              continue;
+       case tFetchB :
+              stack[sp] = data[stack[sp]];
+              continue;
+       case tFetchP :
+              stack[sp] = data[stack[sp]];
+              continue;
+       case tAssignI :
               data[stack[sp-1]] = stack[sp];
               sp -= 2;
               continue;
-       case tAssignBool :
+       case tAssignB :
               data[stack[sp-1]] = stack[sp];
               sp -= 2;
               continue;
-       case tAssignPtr :
+       case tAssignP :
               data[stack[sp-1]] = stack[sp];
               sp -= 2;
               continue;
@@ -194,29 +194,29 @@ walkTable()
               sp -= 2;
               pc++;
               continue;
-       case tIncIntVar :
+       case tIncGlobalI :
               data[code[pc++]]++;
               continue;
-       case tDecIntVar :
+       case tDecGlobalI :
               data[code[pc++]]--;
               continue;
-       case tMultiplyInt :
+       case tMultI :
               stack[sp-1] *= stack[sp];
               sp--;
               continue;
-       case tDivideInt :
+       case tDivI :
               stack[sp-1] /= stack[sp];
               sp--;
               continue;
-       case tAddInt :
+       case tAddI :
               stack[sp-1] += stack[sp];
               sp--;
               continue;
-       case tSubtractInt :
+       case tSubI :
               stack[sp-1] -= stack[sp];
               sp--;
               continue;
-       case tNegateInt :
+       case tNegI :
               stack[sp] *= -1;
               continue;
        case tNot :
@@ -230,35 +230,35 @@ walkTable()
               stack[sp-1] = stack[sp-1] || stack[sp];
               sp--;
               continue;
-       case tEqualInt :
+       case tEqualI :
               stack[sp-1] = stack[sp-1] == stack[sp];
               sp--;
               continue;
-       case tNotEqualInt :
+       case tNotEqualI :
               stack[sp-1] = stack[sp-1] != stack[sp];
               sp--;
               continue;
-       case tGreaterInt :
+       case tGreaterI :
               stack[sp-1] = stack[sp-1] > stack[sp];
               sp--;
               continue;
-       case tLessInt :
+       case tLessI :
               stack[sp-1] = stack[sp-1] < stack[sp];
               sp--;
               continue;
-       case tGreaterEqualInt :
+       case tGreaterEqualI :
               stack[sp-1] = stack[sp-1] >= stack[sp];
               sp--;
               continue;
-       case tLessEqualInt :
+       case tLessEqualI :
               stack[sp-1] = stack[sp-1] <= stack[sp];
               sp--;
               continue;
-       case tEqualPtr :
+       case tEqualP :
               stack[sp-1] = stack[sp-1] == stack[sp];
               sp--;
               continue;
-       case tNotEqualPtr :
+       case tNotEqualP :
               stack[sp-1] = stack[sp-1] != stack[sp];
               sp--;
               continue;
@@ -290,21 +290,21 @@ walkTable()
               }
               pc++;
               continue;
-       case tPutInt :
+       case tWriteI :
               printf("%d",stack[sp--]);
               continue;
-       case tPutBool :
+       case tWriteBool :
               printf(stack[sp--] ? "TRUE" : "FALSE");
               continue;
-       case tPutStr :
+       case tWriteStr :
               // SARICE 9/26/2021 - string literals are stored in the intermediate file
               //   as pairs of characters in a short, so have an endian problem.
               printf("%s",(char*)&data[stack[sp--]]);
               continue;
-       case tPutPtr :
+       case tWriteP :
               printf(" <%d>",stack[sp--]);
               continue;
-       case tPutCR :
+       case tWriteCR :
               printf("\n");
               continue;
 
@@ -331,46 +331,46 @@ dumpTable()
    while (pc < codeWords) {
      fprintf(dmp,"%4d\t",pc);
      switch (code[pc++]) {
-       case tPushIntVar :    op1("tPushIntVar");
-       case tPushBoolVar :   op1("tPushBoolVar"); 
-       case tPushPtrVar :    op1("tPushPtrVar");
-       case tPushAddr :      op1("tPushAddr");
-       case tFetchInt :      op0("tFetchInt");
-       case tFetchBool :     op0("tFetchBool");
-       case tFetchPtr :      op0("tFetchPtr");
-       case tPushIntLit :    op1("tPushIntLit");
-       case tAssignInt :     op0("tAssignInt");
-       case tAssignBool :    op0("tAssignBool");
-       case tAssignPtr :     op0("tAssignPtr");
+       case tPushGlobalI :   op1("tPushGlobalI");
+       case tPushGlobalB :   op1("tPushGlobalB"); 
+       case tPushGlobalP :   op1("tPushGlobalP");
+       case tPushConstI :    op1("tPushConstI");
+       case tPushConstP :    op1("tPushConstP");
+       case tFetchI :        op0("tFetchI");
+       case tFetchB :        op0("tFetchB");
+       case tFetchP :        op0("tFetchP");
+       case tAssignI :       op0("tAssignI");
+       case tAssignB :       op0("tAssignB");
+       case tAssignP :       op0("tAssignP");
        case tCopy :          op1("tCopy   ");
-       case tIncIntVar :     op1("tIncIntVar");
-       case tDecIntVar :     op1("tDecIntVar");
-       case tMultiplyInt :   op0("tMultiplyInt");
-       case tDivideInt :     op0("tDivideInt");
-       case tAddInt :        op0("tAddInt");
-       case tSubtractInt :   op0("tSubtractInt");
-       case tNegateInt :     op0("tNegateInt");
+       case tIncGlobalI :    op1("tIncGlobalI");
+       case tDecGlobalI :    op1("tDecGlobalI");
+       case tMultI :         op0("tMultI");
+       case tDivI :          op0("tDivI");
+       case tAddI :          op0("tAddI");
+       case tSubI :          op0("tSubI");
+       case tNegI :          op0("tNegI");
        case tNot :           op0("tNot");
        case tAnd :           op0("tAnd");
        case tOr :            op0("tOr");
-       case tEqualInt :      op0("tEqualInt");
-       case tNotEqualInt :   op0("tNotEqualInt");
-       case tGreaterInt :    op0("tGreaterInt");
-       case tLessInt :       op0("tLessInt");
-       case tGreaterEqualInt : op0("tGreaterEqualInt");
-       case tLessEqualInt :  op0("tLessEqualInt");
-       case tEqualPtr :      op0("tEqualPtr");
-       case tNotEqualPtr :   op0("tNotEqualPtr");
+       case tEqualI :        op0("tEqualI");
+       case tNotEqualI :     op0("tNotEqualI");
+       case tGreaterI   :    op0("tGreaterI");
+       case tLessI :         op0("tLessI");
+       case tGreaterEqualI : op0("tGreaterEqualI");
+       case tLessEqualI :    op0("tLessEqualI");
+       case tEqualP :        op0("tEqualP");
+       case tNotEqualP :     op0("tNotEqualP");
        case tCall :          op1("tCall   ");
        case tReturn :        op0("tReturn");
        case tJump :          op1("tJump   ");
        case tJumpTrue :      op1("tJumpTrue");
        case tJumpFalse :     op1("tJumpFalse");
-       case tPutInt :        op0("tPutInt");
-       case tPutBool :       op0("tPutBool");
-       case tPutStr :        op0("tPutStr");
-       case tPutPtr :        op0("tPutPtr");
-       case tPutCR :         op0("tPutCR");
+       case tWriteI :        op0("tWriteI");
+       case tWriteBool :     op0("tWriteBool");
+       case tWriteStr :      op0("tWriteStr");
+       case tWriteP :        op0("tWriteP");
+       case tWriteCR :       op0("tWriteCR");
        default :             op0("???");
      }
    }

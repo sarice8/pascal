@@ -15,22 +15,6 @@ title: 'Pascal Compiler 1.1.5 -- Jan 01 ''90';
 %    23Oct89   Fixed for statement, so CYCLE goes to next step.
 %    01Jan90   Added string literals
 %
-%  *** WORKING ON : Procedures ***
-%    - formal args declared but not saved (see Records)
-%    - allocate args so the #'s match the stack (esp. re VAR flag)
-%    - pay attention to VAR flag
-%    - formal params are visible to body of proc, but requires special
-%      code to access non-global vars.
-%      i.e. in expressions, if var is found at SD level > 0, must take it
-%      off stack. (possibly with indirection).
-%      NOTE, VAR parameters are like pointer vars, with automatic deref ('^')
-%      Maybe this helps with the implementation.
-%    - Big choice: what is runtime environment of stack machine?
-%        Call stack with params, returns
-%        Expr stack used within a statement
-%        These can be the same if Expr stack always empty before/after an
-%        indivisible expression. (??)
-%
 %  NOTES
 %    1) During a loop, the top counter counts the number of 'exit'
 %       statements to be patched.
@@ -120,46 +104,46 @@ output:
 
 %  Instructions for a stack machine (all vars are 32-bit integers)
 
-   tPushIntVar       % push value of int var; addr follows
-   tPushBoolVar
-   tPushPtrVar
-   tPushAddr         % addr (of a var) follows
-   tFetchInt         % replace addr (on tos) of int var with contents
-   tFetchBool        %    "      "      "     " bool  "   "    "
-   tFetchPtr         %    "      "      "     " ptr   "   "    "   
-   tPushIntLit       % int lit follows (NOTE, used for BOOLEAN too)
-   tAssignInt        % assign value on tos to addr under it (pop both)
-   tAssignBool       %   "      "    "   "  "   "    "    "   "   "
-   tAssignPtr        % assign val WHOSE ADDR is on tos to addr under it (pop)
+   tPushGlobalI      % <ptr> - push int value read from ptr
+   tPushGlobalB      % <ptr> - push byte value read from ptr
+   tPushGlobalP      % <ptr> - push ptr value read from ptr
+   tPushConstI       % <int> - push int value on stack (NOTE, used for BOOLEAN too)
+   tPushConstP       % <ptr> - push constant ptr value
+   tFetchI           % pop ptr from stack, and push int value it points to
+   tFetchB           %    "      "      "     "     byte  "   "    "
+   tFetchP           %    "      "      "     "     ptr   "   "    "   
+   tAssignI          % assign int value on top of stack to addr under it (pop both)
+   tAssignB          %   "    byte   "    "   "  "   "    "    "   "   "
+   tAssignP          %   "    ptr    "    "   "  "   "    "    "   "   "
    tCopy             % #words follows.  tos=src, 2nd=dest (pop 2)
-   tIncIntVar        % increment int var (addr follows)
-   tDecIntVar        % decrement int var (addr follows)
-   tMultiplyInt      % multiply top two integers (replacing with result)
-   tDivideInt
-   tAddInt
-   tSubtractInt
-   tNegateInt        % top entry *= -1
+   tIncGlobalI       % <ptr> - increment int value pointed to by ptr
+   tDecGlobalI       % <ptr> - decrement int value pointed to by ptr
+   tMultI            % multiply top two integers (replacing with result)
+   tDivI
+   tAddI  
+   tSubI
+   tNegI             % top entry *= -1
    tNot              % negate top boolean
    tAnd              % boolean AND of top 2 (pop 2, push 1)
    tOr               % boolean OR or top 2 (pop 2, push 1)
-   tEqualInt         % top two entries equal? (pop 2, push 1) (true=1)
-   tNotEqualInt      %    NOTE, these all work for booleans too
-   tGreaterInt       % 2nd entry greater than top entry? (pop 2, push answer)
-   tLessInt
-   tGreaterEqualInt
-   tLessEqualInt
-   tEqualPtr         % are the ptr vars whose addresses are top 2 equal?
-   tNotEqualPtr
+   tEqualI           % top two entries equal? (pop 2, push 1) (true=1)
+   tNotEqualI        %    NOTE, these all work for booleans too
+   tGreaterI         % 2nd entry greater than top entry? (pop 2, push answer)
+   tLessI  
+   tGreaterEqualI
+   tLessEqualI
+   tEqualP           % two two pointer values equal? (pop 2, push 1) (true=1)
+   tNotEqualP
    tCall             % addr follows
    tReturn
    tJump             % addr follows
    tJumpTrue         % addr follows  (pops top of stack, jumps if true)
    tJumpFalse        % addr follows  (pops top of stack, jumps if false)
-   tPutInt           % for writeln : write integer on tos, pop
-   tPutBool          %  "     "    : write TRUE/FALSE, pop
-   tPutStr           %  "     "    : write string whose addr is on tos, pop
-   tPutPtr           %  "     "    : write ptr var whose addr is on tos, pop
-   tPutCR            %  "     "    : write cr
+   tWriteI           % for writeln : write integer on tos, pop
+   tWriteBool        %  "     "    : write TRUE/FALSE, pop
+   tWriteStr         %  "     "    : write string whose addr is on tos, pop
+   tWriteP           %  "     "    : write ptr var whose addr is on tos, pop
+   tWriteCR          %  "     "    : write cr
 
 %  Other:
 
@@ -779,8 +763,8 @@ Expr:
          @BoolExpr
          @MatchTypes
          [ oTypeSNodeType
-            | nIntegerType, nBooleanType :  .tEqualInt
-            | nPointerType :                .tEqualPtr
+            | nIntegerType, nBooleanType :  .tEqualI
+            | nPointerType :                .tEqualP
             | nCharType, nStringType :      #eNotImplemented
             | * :                           #eNotAllowed
          ]
@@ -791,8 +775,8 @@ Expr:
          @BoolExpr
          @MatchTypes
          [ oTypeSNodeType
-            | nIntegerType, nBooleanType :  .tNotEqualInt
-            | nPointerType :                .tNotEqualPtr
+            | nIntegerType, nBooleanType :  .tNotEqualI
+            | nPointerType :                .tNotEqualP
             | nCharType, nStringType :      #eNotImplemented
             | * :                           #eNotAllowed
          ]
@@ -803,7 +787,7 @@ Expr:
          @BoolExpr
          @MatchTypes
          [ oTypeSNodeType
-            | nIntegerType, nBooleanType :  .tLessInt
+            | nIntegerType, nBooleanType :  .tLessI
             | nCharType, nStringType :      #eNotImplemented
             | * :                           #eNotAllowed
          ]
@@ -814,7 +798,7 @@ Expr:
          @BoolExpr
          @MatchTypes
          [ oTypeSNodeType
-            | nIntegerType, nBooleanType :  .tGreaterInt
+            | nIntegerType, nBooleanType :  .tGreaterI
             | nCharType, nStringType :      #eNotImplemented
             | * :                           #eNotAllowed
          ]
@@ -825,7 +809,7 @@ Expr:
          @BoolExpr
          @MatchTypes
          [ oTypeSNodeType
-            | nIntegerType, nBooleanType :  .tLessEqualInt
+            | nIntegerType, nBooleanType :  .tLessEqualI
             | nCharType, nStringType :      #eNotImplemented
             | * :                           #eNotAllowed
          ]
@@ -836,7 +820,7 @@ Expr:
          @BoolExpr
          @MatchTypes
          [ oTypeSNodeType
-            | nIntegerType, nBooleanType :  .tGreaterEqualInt
+            | nIntegerType, nBooleanType :  .tGreaterEqualI
             | nCharType, nStringType :      #eNotImplemented
             | * :                           #eNotAllowed
          ]
@@ -888,12 +872,12 @@ ArithExpr:
          @RequireIntPop
          @Term
          @RequireInt
-         .tAddInt
+         .tAddI
       | pMinus :
          @RequireIntPop
          @Term
          @RequireInt
-         .tSubtractInt
+         .tSubI
       | * :
          >
    ]};
@@ -905,12 +889,12 @@ Term:
          @RequireIntPop
          @Factor
          @RequireInt
-         .tMultiplyInt
+         .tMultI
       | pDivide :
          @RequireIntPop
          @Factor
          @RequireInt
-         .tDivideInt
+         .tDivI
       | * :
          >
    ]};
@@ -923,7 +907,7 @@ Factor:
       | pMinus :
          @Primary
          @RequireInt
-         .tNegateInt
+         .tNegI
       | * :
          @Primary
    ];
@@ -931,7 +915,7 @@ Factor:
 Primary:
    [
       | pIntLit :
-         .tPushIntLit   oEmitInt( TOKEN_VALUE )
+         .tPushConstI  oEmitInt( TOKEN_VALUE )
          oTypeSPush( IntegerType )
 
       | '(' :
@@ -940,7 +924,7 @@ Primary:
 
       | pStrLit :
          oStringAllocLit     % store, put addr on value stack
-         .tPushAddr  oEmitInt( oValueTop )  oValuePop
+         .tPushConstP oEmitInt( oValueTop )  oValuePop
          % TO DO: do we need to create a type with the literal's length?
          oTypeSPush( StringType )
 
@@ -975,7 +959,7 @@ Primary:
                oTypeSPush( theType )
                [ oTypeSNodeType
                   | nIntegerType, nBooleanType :
-                     .tPushIntLit @EmitValue( decl )
+                     .tPushConstI @EmitValue( decl )
                   | * :
                      #eNotImplemented
                ]
@@ -985,13 +969,13 @@ Primary:
                oTypeSPush( theType )
                [ oTypeSNodeType
                   | nIntegerType :
-                     .tPushIntVar @EmitValue( decl )
+                     .tPushGlobalI @EmitValue( decl )
                   | nBooleanType :
-                     .tPushBoolVar @EmitValue( decl )
+                     .tPushGlobalB @EmitValue( decl )
                   | nCharType, nStringType, nFileType :
                      #eNotImplemented
                   | nPointerType :
-                     .tPushPtrVar @EmitValue( decl )
+                     .tPushGlobalP @EmitValue( decl )
                      [
                         | '^' :             % dereferenced
                            oTypeSPop
@@ -1001,7 +985,7 @@ Primary:
                         | * :               % just ptr value alone
                      ]
                   | * :                     % compound type
-                     .tPushAddr @EmitValue( decl )    % addr of start of var
+                     .tPushConstP @EmitValue( decl )    % addr of start of var
                      @LValue                % get final addr
                      @FetchVar              % get final value
                ]
@@ -1021,7 +1005,7 @@ Primary:
 
          [ oNodeType( decl )
             | nGlobalVar :
-               .tPushAddr @EmitValue( decl )
+               .tPushConstP @EmitValue( decl )
                @LValue     % ptr value to expr stack
 
                Node ptrType
@@ -1047,10 +1031,10 @@ Primary:
 
 FetchVar:
    [ oTypeSNodeType
-      | nIntegerType :   .tFetchInt
-      | nBooleanType :   .tFetchBool
+      | nIntegerType :   .tFetchI
+      | nBooleanType :   .tFetchB
       | nCharType, nStringType, nFileType : #eNotImplemented
-      | nPointerType :   .tFetchPtr
+      | nPointerType :   .tFetchP
       | * :              % compound type; leave as addr
    ];
 
@@ -1093,7 +1077,7 @@ ArraySubscripts:
       % adjust for low subscript
       [ equal_zero( low )
          | false :
-            .tPushIntLit oEmitInt( low ) .tSubtractInt
+            .tPushConstI oEmitInt( low ) .tSubI
          | * :
       ]
 
@@ -1102,12 +1086,12 @@ ArraySubscripts:
       size = oNodeGetInt( baseType, qSize )
       [ equal( size, 1 )
          | false :
-            .tPushIntLit oEmitInt( size ) .tMultiplyInt
+            .tPushConstI oEmitInt( size ) .tMultI
          | * :
       ]
 
       % update start address
-      .tAddInt
+      .tAddI
       [
          | ']' :  >
          | ',' :
@@ -1135,7 +1119,7 @@ RecordFieldRef:
    offset = oNodeGetInt( field, qValue )
    [ equal_zero( offset )
       | false :
-         .tPushIntLit oEmitInt( offset ) .tAddInt
+         .tPushConstI oEmitInt( offset ) .tAddI
       | * :
    ]
 
@@ -1152,7 +1136,7 @@ PointerDeref:
       | nPointerType :
       | * :       #eNotPointer
    ]
-   .tFetchPtr           % now addr on stack is addr of what we're pointing to
+   .tFetchP           % now addr on stack is addr of what we're pointing to
 
    Node theType
    theType = oTypeSTop
@@ -1199,19 +1183,19 @@ AssignOrCallStmt:         % *** Call doesn't work yet ***
          .tCall  @EmitValue( decl )
 
       | nGlobalVar :
-         .tPushAddr @EmitValue( decl )
+         .tPushConstP @EmitValue( decl )
          oTypeSPush( oNodeGet( decl, qType ) )
          @LValue        % handle subscripts, if any
          ':=' 
          @Expr
          @MatchTypes
          [ oTypeSNodeType
-            | nIntegerType :            .tAssignInt
-            | nBooleanType :            .tAssignBool
+            | nIntegerType :            .tAssignI
+            | nBooleanType :            .tAssignB
             | nCharType, nStringType, nFileType :   #eNotImplemented
 
             % compound var assigns; addrs of src, dest on stack
-            | nPointerType :            .tAssignPtr
+            | nPointerType :            .tAssignP
             | * :
                 int size
                 size = oNodeGetInt( oTypeSTop, qSize )
@@ -1256,34 +1240,34 @@ ForStmt:
    ]
    oTypeSPush( oNodeGet( decl, qType ) )
    @RequireIntPop
-   .tPushAddr  @EmitValue( decl )
+   .tPushConstP  @EmitValue( decl )
 
    ':='
 
    @Expr
    @RequireIntPop
-   .tAssignInt
+   .tAssignI
 
    .tJump oPatchPushHere(patchLoop) .tSpace
    oPatchPushHere(patchLoop)
    oPatchSwap(patchLoop)
    [
       | pTo :
-         .tIncIntVar @EmitValue( decl )
+         .tIncGlobalI @EmitValue( decl )
          oPatchPopFwd(patchLoop)
-         .tPushIntVar @EmitValue( decl )
+         .tPushGlobalI @EmitValue( decl )
          @Expr
          @RequireIntPop
-         .tGreaterInt
+         .tGreaterI
          .tJumpTrue oPatchPushHere(patchLoop) .tSpace
          oPatchSwap(patchLoop)
       | pDownto :
-         .tDecIntVar @EmitValue( decl )
+         .tDecGlobalI @EmitValue( decl )
          oPatchPopFwd(patchLoop)
-         .tPushIntVar @EmitValue( decl )
+         .tPushGlobalI @EmitValue( decl )
          @Expr
          @RequireIntPop
-         .tLessInt
+         .tLessI
          .tJumpTrue oPatchPushHere(patchLoop) .tSpace
          oPatchSwap(patchLoop)
    ]
@@ -1356,7 +1340,7 @@ BeginStmt:
 
 WritelnStmt:
    @WriteStmt
-   .tPutCR;
+   .tWriteCR;
 
 WriteStmt:
    [
@@ -1364,11 +1348,11 @@ WriteStmt:
          {
             @Expr
             [ oTypeSNodeType
-               | nIntegerType :             .tPutInt
-               | nBooleanType :             .tPutBool
-               | nStringType :              .tPutStr
+               | nIntegerType :             .tWriteI
+               | nBooleanType :             .tWriteBool
+               | nStringType :              .tWriteStr
                | nCharType, nFileType :     #eNotImplemented
-               | nPointerType :             .tPutPtr
+               | nPointerType :             .tWriteP
                | * :                        #eNotAllowed
             ]
             oTypeSPop

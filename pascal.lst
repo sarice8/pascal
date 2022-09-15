@@ -15,30 +15,6 @@
       %    23Oct89   Fixed for statement, so CYCLE goes to next step.
       %    01Jan90   Added string literals
       %
-      %  *** WORKING ON : Records ***
-      %    - references to records: currently pushes addr on stack. ok.
-      %      Field selection '.' should lookup the ident from the record type's fields scope,
-      %      add the offset if not 0,
-      %      replace the current type with the field type, and continue
-      %      (note, we're in fetch mode here, working with addresses on run stack
-      %      just as with arrays).
-      %
-      %  *** WORKING ON : Procedures ***
-      %    - formal args declared but not saved (see Records)
-      %    - allocate args so the #'s match the stack (esp. re VAR flag)
-      %    - pay attention to VAR flag
-      %    - formal params are visible to body of proc, but requires special
-      %      code to access non-global vars.
-      %      i.e. in expressions, if var is found at SD level > 0, must take it
-      %      off stack. (possibly with indirection).
-      %      NOTE, VAR parameters are like pointer vars, with automatic deref ('^')
-      %      Maybe this helps with the implementation.
-      %    - Big choice: what is runtime environment of stack machine?
-      %        Call stack with params, returns
-      %        Expr stack used within a statement
-      %        These can be the same if Expr stack always empty before/after an
-      %        indivisible expression. (??)
-      %
       %  NOTES
       %    1) During a loop, the top counter counts the number of 'exit'
       %       statements to be patched.
@@ -128,46 +104,46 @@
       
       %  Instructions for a stack machine (all vars are 32-bit integers)
       
-   2:    tPushIntVar       % push value of int var; addr follows
-   2:    tPushBoolVar
-   2:    tPushPtrVar
-   2:    tPushAddr         % addr (of a var) follows
-   2:    tFetchInt         % replace addr (on tos) of int var with contents
-   2:    tFetchBool        %    "      "      "     " bool  "   "    "
-   2:    tFetchPtr         %    "      "      "     " ptr   "   "    "   
-   2:    tPushIntLit       % int lit follows (NOTE, used for BOOLEAN too)
-   2:    tAssignInt        % assign value on tos to addr under it (pop both)
-   2:    tAssignBool       %   "      "    "   "  "   "    "    "   "   "
-   2:    tAssignPtr        % assign val WHOSE ADDR is on tos to addr under it (pop)
+   2:    tPushGlobalI      % <ptr> - push int value read from ptr
+   2:    tPushGlobalB      % <ptr> - push byte value read from ptr
+   2:    tPushGlobalP      % <ptr> - push ptr value read from ptr
+   2:    tPushConstI       % <int> - push int value on stack (NOTE, used for BOOLEAN too)
+   2:    tPushConstP       % <ptr> - push constant ptr value
+   2:    tFetchI           % pop ptr from stack, and push int value it points to
+   2:    tFetchB           %    "      "      "     "     byte  "   "    "
+   2:    tFetchP           %    "      "      "     "     ptr   "   "    "   
+   2:    tAssignI          % assign int value on top of stack to addr under it (pop both)
+   2:    tAssignB          %   "    byte   "    "   "  "   "    "    "   "   "
+   2:    tAssignP          %   "    ptr    "    "   "  "   "    "    "   "   "
    2:    tCopy             % #words follows.  tos=src, 2nd=dest (pop 2)
-   2:    tIncIntVar        % increment int var (addr follows)
-   2:    tDecIntVar        % decrement int var (addr follows)
-   2:    tMultiplyInt      % multiply top two integers (replacing with result)
-   2:    tDivideInt
-   2:    tAddInt
-   2:    tSubtractInt
-   2:    tNegateInt        % top entry *= -1
+   2:    tIncGlobalI       % <ptr> - increment int value pointed to by ptr
+   2:    tDecGlobalI       % <ptr> - decrement int value pointed to by ptr
+   2:    tMultI            % multiply top two integers (replacing with result)
+   2:    tDivI
+   2:    tAddI  
+   2:    tSubI
+   2:    tNegI             % top entry *= -1
    2:    tNot              % negate top boolean
    2:    tAnd              % boolean AND of top 2 (pop 2, push 1)
    2:    tOr               % boolean OR or top 2 (pop 2, push 1)
-   2:    tEqualInt         % top two entries equal? (pop 2, push 1) (true=1)
-   2:    tNotEqualInt      %    NOTE, these all work for booleans too
-   2:    tGreaterInt       % 2nd entry greater than top entry? (pop 2, push answer)
-   2:    tLessInt
-   2:    tGreaterEqualInt
-   2:    tLessEqualInt
-   2:    tEqualPtr         % are the ptr vars whose addresses are top 2 equal?
-   2:    tNotEqualPtr
+   2:    tEqualI           % top two entries equal? (pop 2, push 1) (true=1)
+   2:    tNotEqualI        %    NOTE, these all work for booleans too
+   2:    tGreaterI         % 2nd entry greater than top entry? (pop 2, push answer)
+   2:    tLessI  
+   2:    tGreaterEqualI
+   2:    tLessEqualI
+   2:    tEqualP           % two two pointer values equal? (pop 2, push 1) (true=1)
+   2:    tNotEqualP
    2:    tCall             % addr follows
    2:    tReturn
    2:    tJump             % addr follows
    2:    tJumpTrue         % addr follows  (pops top of stack, jumps if true)
    2:    tJumpFalse        % addr follows  (pops top of stack, jumps if false)
-   2:    tPutInt           % for writeln : write integer on tos, pop
-   2:    tPutBool          %  "     "    : write TRUE/FALSE, pop
-   2:    tPutStr           %  "     "    : write string whose addr is on tos, pop
-   2:    tPutPtr           %  "     "    : write ptr var whose addr is on tos, pop
-   2:    tPutCR            %  "     "    : write cr
+   2:    tWriteI           % for writeln : write integer on tos, pop
+   2:    tWriteBool        %  "     "    : write TRUE/FALSE, pop
+   2:    tWriteStr         %  "     "    : write string whose addr is on tos, pop
+   2:    tWriteP           %  "     "    : write ptr var whose addr is on tos, pop
+   2:    tWriteCR          %  "     "    : write cr
       
       %  Other:
       
@@ -842,8 +818,8 @@
 1334:          @BoolExpr
 1336:          @MatchTypes
 1338:          [ oTypeSNodeType
-1340:             | nIntegerType, nBooleanType :  .tEqualInt
-1343:             | nPointerType :                .tEqualPtr
+1340:             | nIntegerType, nBooleanType :  .tEqualI
+1343:             | nPointerType :                .tEqualP
 1347:             | nCharType, nStringType :      #eNotImplemented
 1351:             | * :                           #eNotAllowed
 1366:          ]
@@ -854,8 +830,8 @@
 1375:          @BoolExpr
 1377:          @MatchTypes
 1379:          [ oTypeSNodeType
-1381:             | nIntegerType, nBooleanType :  .tNotEqualInt
-1384:             | nPointerType :                .tNotEqualPtr
+1381:             | nIntegerType, nBooleanType :  .tNotEqualI
+1384:             | nPointerType :                .tNotEqualP
 1388:             | nCharType, nStringType :      #eNotImplemented
 1392:             | * :                           #eNotAllowed
 1407:          ]
@@ -866,7 +842,7 @@
 1416:          @BoolExpr
 1418:          @MatchTypes
 1420:          [ oTypeSNodeType
-1422:             | nIntegerType, nBooleanType :  .tLessInt
+1422:             | nIntegerType, nBooleanType :  .tLessI
 1425:             | nCharType, nStringType :      #eNotImplemented
 1429:             | * :                           #eNotAllowed
 1442:          ]
@@ -877,7 +853,7 @@
 1451:          @BoolExpr
 1453:          @MatchTypes
 1455:          [ oTypeSNodeType
-1457:             | nIntegerType, nBooleanType :  .tGreaterInt
+1457:             | nIntegerType, nBooleanType :  .tGreaterI
 1460:             | nCharType, nStringType :      #eNotImplemented
 1464:             | * :                           #eNotAllowed
 1477:          ]
@@ -888,7 +864,7 @@
 1486:          @BoolExpr
 1488:          @MatchTypes
 1490:          [ oTypeSNodeType
-1492:             | nIntegerType, nBooleanType :  .tLessEqualInt
+1492:             | nIntegerType, nBooleanType :  .tLessEqualI
 1495:             | nCharType, nStringType :      #eNotImplemented
 1499:             | * :                           #eNotAllowed
 1512:          ]
@@ -899,7 +875,7 @@
 1521:          @BoolExpr
 1523:          @MatchTypes
 1525:          [ oTypeSNodeType
-1527:             | nIntegerType, nBooleanType :  .tGreaterEqualInt
+1527:             | nIntegerType, nBooleanType :  .tGreaterEqualI
 1530:             | nCharType, nStringType :      #eNotImplemented
 1534:             | * :                           #eNotAllowed
 1547:          ]
@@ -951,12 +927,12 @@
 1646:          @RequireIntPop
 1648:          @Term
 1650:          @RequireInt
-1652:          .tAddInt
+1652:          .tAddI
 1654:       | pMinus :
 1656:          @RequireIntPop
 1658:          @Term
 1660:          @RequireInt
-1662:          .tSubtractInt
+1662:          .tSubI
 1664:       | * :
 1671:          >
 1673:    ]};
@@ -968,12 +944,12 @@
 1682:          @RequireIntPop
 1684:          @Factor
 1686:          @RequireInt
-1688:          .tMultiplyInt
+1688:          .tMultI
 1690:       | pDivide :
 1692:          @RequireIntPop
 1694:          @Factor
 1696:          @RequireInt
-1698:          .tDivideInt
+1698:          .tDivI
 1700:       | * :
 1707:          >
 1709:    ]};
@@ -986,7 +962,7 @@
 1720:       | pMinus :
 1722:          @Primary
 1724:          @RequireInt
-1726:          .tNegateInt
+1726:          .tNegI
 1728:       | * :
 1735:          @Primary
 1737:    ];
@@ -994,7 +970,7 @@
 1738: Primary:
 1740:    [
 1740:       | pIntLit :
-1742:          .tPushIntLit   oEmitInt( TOKEN_VALUE )
+1742:          .tPushConstI  oEmitInt( TOKEN_VALUE )
 1749:          oTypeSPush( IntegerType )
       
 1755:       | '(' :
@@ -1003,7 +979,7 @@
       
 1761:       | pStrLit :
 1763:          oStringAllocLit     % store, put addr on value stack
-1764:          .tPushAddr  oEmitInt( oValueTop )  oValuePop
+1764:          .tPushConstP oEmitInt( oValueTop )  oValuePop
                % TO DO: do we need to create a type with the literal's length?
 1772:          oTypeSPush( StringType )
       
@@ -1038,7 +1014,7 @@
 1856:                oTypeSPush( theType )
 1862:                [ oTypeSNodeType
 1864:                   | nIntegerType, nBooleanType :
-1865:                      .tPushIntLit @EmitValue( decl )
+1865:                      .tPushConstI @EmitValue( decl )
 1874:                   | * :
 1881:                      #eNotImplemented
 1883:                ]
@@ -1048,13 +1024,13 @@
 1898:                oTypeSPush( theType )
 1904:                [ oTypeSNodeType
 1906:                   | nIntegerType :
-1907:                      .tPushIntVar @EmitValue( decl )
+1907:                      .tPushGlobalI @EmitValue( decl )
 1916:                   | nBooleanType :
-1918:                      .tPushBoolVar @EmitValue( decl )
+1918:                      .tPushGlobalB @EmitValue( decl )
 1927:                   | nCharType, nStringType, nFileType :
 1929:                      #eNotImplemented
 1931:                   | nPointerType :
-1933:                      .tPushPtrVar @EmitValue( decl )
+1933:                      .tPushGlobalP @EmitValue( decl )
 1942:                      [
 1942:                         | '^' :             % dereferenced
 1944:                            oTypeSPop
@@ -1064,7 +1040,7 @@
 1962:                         | * :               % just ptr value alone
 1967:                      ]
 1967:                   | * :                     % compound type
-1982:                      .tPushAddr @EmitValue( decl )    % addr of start of var
+1982:                      .tPushConstP @EmitValue( decl )    % addr of start of var
 1991:                      @LValue                % get final addr
 1993:                      @FetchVar              % get final value
 1995:                ]
@@ -1084,7 +1060,7 @@
       
 2034:          [ oNodeType( decl )
 2041:             | nGlobalVar :
-2042:                .tPushAddr @EmitValue( decl )
+2042:                .tPushConstP @EmitValue( decl )
 2051:                @LValue     % ptr value to expr stack
       
 2053:                Node ptrType
@@ -1110,10 +1086,10 @@
       
 2119: FetchVar:
 2121:    [ oTypeSNodeType
-2123:       | nIntegerType :   .tFetchInt
-2126:       | nBooleanType :   .tFetchBool
+2123:       | nIntegerType :   .tFetchI
+2126:       | nBooleanType :   .tFetchB
 2130:       | nCharType, nStringType, nFileType : #eNotImplemented
-2134:       | nPointerType :   .tFetchPtr
+2134:       | nPointerType :   .tFetchP
 2138:       | * :              % compound type; leave as addr
 2153:    ];
       
@@ -1156,7 +1132,7 @@
             % adjust for low subscript
 2244:       [ equal_zero( low )
 2251:          | false :
-2252:             .tPushIntLit oEmitInt( low ) .tSubtractInt
+2252:             .tPushConstI oEmitInt( low ) .tSubI
 2262:          | * :
 2267:       ]
       
@@ -1165,12 +1141,12 @@
 2267:       size = oNodeGetInt( baseType, qSize )
 2280:       [ equal( size, 1 )
 2290:          | false :
-2291:             .tPushIntLit oEmitInt( size ) .tMultiplyInt
+2291:             .tPushConstI oEmitInt( size ) .tMultI
 2301:          | * :
 2306:       ]
       
             % update start address
-2306:       .tAddInt
+2306:       .tAddI
 2308:       [
 2308:          | ']' :  >
 2312:          | ',' :
@@ -1198,7 +1174,7 @@
 2372:    offset = oNodeGetInt( field, qValue )
 2385:    [ equal_zero( offset )
 2392:       | false :
-2393:          .tPushIntLit oEmitInt( offset ) .tAddInt
+2393:          .tPushConstI oEmitInt( offset ) .tAddI
 2403:       | * :
 2408:    ]
       
@@ -1215,7 +1191,7 @@
 2427:       | nPointerType :
 2428:       | * :       #eNotPointer
 2435:    ]
-2435:    .tFetchPtr           % now addr on stack is addr of what we're pointing to
+2435:    .tFetchP           % now addr on stack is addr of what we're pointing to
       
 2437:    Node theType
 2437:    theType = oTypeSTop
@@ -1262,19 +1238,19 @@
 2576:          .tCall  @EmitValue( decl )
       
 2585:       | nGlobalVar :
-2587:          .tPushAddr @EmitValue( decl )
+2587:          .tPushConstP @EmitValue( decl )
 2596:          oTypeSPush( oNodeGet( decl, qType ) )
 2609:          @LValue        % handle subscripts, if any
 2611:          ':=' 
 2613:          @Expr
 2615:          @MatchTypes
 2617:          [ oTypeSNodeType
-2619:             | nIntegerType :            .tAssignInt
-2622:             | nBooleanType :            .tAssignBool
+2619:             | nIntegerType :            .tAssignI
+2622:             | nBooleanType :            .tAssignB
 2626:             | nCharType, nStringType, nFileType :   #eNotImplemented
       
                   % compound var assigns; addrs of src, dest on stack
-2630:             | nPointerType :            .tAssignPtr
+2630:             | nPointerType :            .tAssignP
 2634:             | * :
 2649:                 int size
 2649:                 size = oNodeGetInt( oTypeSTop, qSize )
@@ -1319,34 +1295,34 @@
 2774:    ]
 2774:    oTypeSPush( oNodeGet( decl, qType ) )
 2787:    @RequireIntPop
-2789:    .tPushAddr  @EmitValue( decl )
+2789:    .tPushConstP  @EmitValue( decl )
       
 2798:    ':='
       
 2800:    @Expr
 2802:    @RequireIntPop
-2804:    .tAssignInt
+2804:    .tAssignI
       
 2806:    .tJump oPatchPushHere(patchLoop) .tSpace
 2816:    oPatchPushHere(patchLoop)
 2822:    oPatchSwap(patchLoop)
 2828:    [
 2828:       | pTo :
-2830:          .tIncIntVar @EmitValue( decl )
+2830:          .tIncGlobalI @EmitValue( decl )
 2839:          oPatchPopFwd(patchLoop)
-2845:          .tPushIntVar @EmitValue( decl )
+2845:          .tPushGlobalI @EmitValue( decl )
 2854:          @Expr
 2856:          @RequireIntPop
-2858:          .tGreaterInt
+2858:          .tGreaterI
 2860:          .tJumpTrue oPatchPushHere(patchLoop) .tSpace
 2870:          oPatchSwap(patchLoop)
 2876:       | pDownto :
-2878:          .tDecIntVar @EmitValue( decl )
+2878:          .tDecGlobalI @EmitValue( decl )
 2887:          oPatchPopFwd(patchLoop)
-2893:          .tPushIntVar @EmitValue( decl )
+2893:          .tPushGlobalI @EmitValue( decl )
 2902:          @Expr
 2904:          @RequireIntPop
-2906:          .tLessInt
+2906:          .tLessI
 2908:          .tJumpTrue oPatchPushHere(patchLoop) .tSpace
 2918:          oPatchSwap(patchLoop)
 2924:    ]
@@ -1419,7 +1395,7 @@
       
 3147: WritelnStmt:
 3149:    @WriteStmt
-3151:    .tPutCR;
+3151:    .tWriteCR;
       
 3154: WriteStmt:
 3156:    [
@@ -1427,11 +1403,11 @@
 3158:          {
 3158:             @Expr
 3160:             [ oTypeSNodeType
-3162:                | nIntegerType :             .tPutInt
-3165:                | nBooleanType :             .tPutBool
-3169:                | nStringType :              .tPutStr
+3162:                | nIntegerType :             .tWriteI
+3165:                | nBooleanType :             .tWriteBool
+3169:                | nStringType :              .tWriteStr
 3173:                | nCharType, nFileType :     #eNotImplemented
-3177:                | nPointerType :             .tPutPtr
+3177:                | nPointerType :             .tWriteP
 3181:                | * :                        #eNotAllowed
 3198:             ]
 3198:             oTypeSPop
@@ -2710,7 +2686,7 @@ Generated code:
 1737: oReturn
 1738: oLocalSpace 5
 1740: oInputChoice 2099
-1742: oEmit 7
+1742: oEmit 3
 1744: TOKEN_VALUE
 1745: oPushResult
 1746: oEmitInt
@@ -2724,7 +2700,7 @@ Generated code:
 1759: oInput 14
 1761: oJumpForward 2118
 1763: oStringAllocLit
-1764: oEmit 3
+1764: oEmit 4
 1766: oValueTop
 1767: oPushResult
 1768: oEmitInt
@@ -2789,7 +2765,7 @@ Generated code:
 1860: oPop 1
 1862: oTypeSNodeType
 1863: oChoice 1876
-1865: oEmit 7
+1865: oEmit 3
 1867: oGetLocal 1
 1869: oPushResult
 1870: oCall 3540
@@ -2858,7 +2834,7 @@ Generated code:
           19   1929
           18   1918
           17   1907
-1982: oEmit 3
+1982: oEmit 4
 1984: oGetLocal 1
 1986: oPushResult
 1987: oCall 3540
@@ -2895,7 +2871,7 @@ Generated code:
 2037: oNodeType
 2038: oPop 1
 2040: oChoice 2082
-2042: oEmit 3
+2042: oEmit 4
 2044: oGetLocal 1
 2046: oPushResult
 2047: oCall 3540
@@ -2944,13 +2920,13 @@ Generated code:
 2119: oLocalSpace 0
 2121: oTypeSNodeType
 2122: oChoice 2140
-2124: oEmit 4
+2124: oEmit 5
 2126: oJumpForward 2153
-2128: oEmit 5
+2128: oEmit 6
 2130: oJumpForward 2153
 2132: oError 15
 2134: oJumpForward 2153
-2136: oEmit 6
+2136: oEmit 7
 2138: oJumpForward 2153
 2140: Choice Lookup Table
           21   2136
@@ -3021,7 +2997,7 @@ Generated code:
 2247: equal_zero
 2248: oPop 1
 2250: oChoice 2264
-2252: oEmit 7
+2252: oEmit 3
 2254: oGetLocal 1
 2256: oPushResult
 2257: oEmitInt
@@ -3046,7 +3022,7 @@ Generated code:
 2286: equal
 2287: oPop 2
 2289: oChoice 2303
-2291: oEmit 7
+2291: oEmit 3
 2293: oGetLocal 3
 2295: oPushResult
 2296: oEmitInt
@@ -3111,7 +3087,7 @@ Generated code:
 2388: equal_zero
 2389: oPop 1
 2391: oChoice 2405
-2393: oEmit 7
+2393: oEmit 3
 2395: oGetLocal 2
 2397: oPushResult
 2398: oEmitInt
@@ -3138,7 +3114,7 @@ Generated code:
 2430: Choice Lookup Table
           21   2428
 2433: oError 9
-2435: oEmit 6
+2435: oEmit 7
 2437: oGetAddrLocal 1
 2439: oPushResult
 2440: oTypeSTop
@@ -3225,7 +3201,7 @@ Generated code:
 2581: oCall 3540
 2583: oPop 1
 2585: oJumpForward 2679
-2587: oEmit 3
+2587: oEmit 4
 2589: oGetLocal 1
 2591: oPushResult
 2592: oCall 3540
@@ -3347,7 +3323,7 @@ Generated code:
 2784: oTypeSPush
 2785: oPop 1
 2787: oCall 3276
-2789: oEmit 3
+2789: oEmit 4
 2791: oGetLocal 1
 2793: oPushResult
 2794: oCall 3540
