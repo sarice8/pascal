@@ -14,6 +14,7 @@ title: 'Pascal Compiler 1.1.5 -- Jan 01 ''90';
 %    27Sep89   Added for statement.
 %    23Oct89   Fixed for statement, so CYCLE goes to next step.
 %    01Jan90   Added string literals
+%    09Sep22   I have returned.  Migrate symbol table to schema, to ease development.
 %
 %  NOTES
 %    1) During a loop, the top counter counts the number of 'exit'
@@ -33,6 +34,33 @@ title: 'Pascal Compiler 1.1.5 -- Jan 01 ''90';
 %       expression ^x, the type in that field in the entry for the type of x
 %       will be used (unless it's 0, in which case a new TT entry will be
 %       created).
+%
+%
+%  MISSING
+%
+%    - proceudre and function forward declarations.
+%      I think it uses the keyword 'forward' in place of the body.
+%      Only one forward declaration is allowed.  I will overwrite the nMethod info
+%      with the final addr and param names when the true body is seen.
+%      If a call is made to a foward declared method, add the forward decl node & Here to patch table.
+% 
+%    - procedure and function declarations may be nested within other procs/funcs!
+%      They are allowed to see locals within those parent scopes.
+%      Pass a hidden parameter to nested methods, to follow up to parent scopes as needed.
+%      Need a level counter at each scope, and uplevels count on reference to local/param.
+%      
+%    - Confirm that var decls can't be nested inside statements as they can in C.
+%      (i.e. is my "Block" concept correct?)
+%      
+%    - Non-ISO extensions.  Look at "Units" e.g. from Turbo Pascal wikipedia page.
+%
+%  PASCAL DOCS
+%      Here's some handy language material:
+%      https://www.freepascal.org/docs-html/ref/ref.html
+%      https://www.freepascal.org/docs-html/prog/prog.html
+%      https://en.wikipedia.org/wiki/Turbo_Pascal
+%      https://en.wikipedia.org/wiki/Pascal_(programming_language)#Standards
+%
 
 input:
    pIdent
@@ -107,8 +135,19 @@ output:
    tPushGlobalI      % <ptr> - push int value read from ptr
    tPushGlobalB      % <ptr> - push byte value read from ptr
    tPushGlobalP      % <ptr> - push ptr value read from ptr
+   tPushLocalI       % <offset> - push int value read from local var
+   tPushLocalB       % <offset> - push byte value read from local var
+   tPushLocalP       % <offset> - push ptr value read from local var
+   tPushParamI       % <offset> - push int value read from local var
+   tPushParamB       % <offset> - push byte value read from local var
+   tPushParamP       % <offset> - push ptr value read from local var
+
    tPushConstI       % <int> - push int value on stack (NOTE, used for BOOLEAN too)
    tPushConstP       % <ptr> - push constant ptr value
+   tPushAddrGlobal   % <offset> - push ptr to global var (same as tPushConstP)
+   tPushAddrLocal    % <offset> - push ptr to local var
+   tPushAddrParam    % <offset> - push ptr to formal param (used by method to see its param)
+   tPushAddrActual   % <offset> - push ptr to actual param, in actuals space (used by caller)
    tFetchI           % pop ptr from stack, and push int value it points to
    tFetchB           %    "      "      "     "     byte  "   "    "
    tFetchP           %    "      "      "     "     ptr   "   "    "   
@@ -134,8 +173,11 @@ output:
    tLessEqualI
    tEqualP           % two two pointer values equal? (pop 2, push 1) (true=1)
    tNotEqualP
+   tAllocActuals     % <#bytes> - make space on call stack for actual params (adjusting call stack sp)
+   tFreeActuals      % <#bytes> - discard space on call stack allocated by tAllocActuals
    tCall             % addr follows
    tReturn
+   tEnter            % <#bytes> - start a stack frame on the call stack, reserving #bytes of local variable space
    tJump             % addr follows
    tJumpTrue         % addr follows  (pops top of stack, jumps if true)
    tJumpFalse        % addr follows  (pops top of stack, jumps if false)
@@ -166,6 +208,7 @@ error:
    eNotRecordField
    eTooManySubscripts
    eTypeMismatch
+   eMissingParameter
    eNotImplemented
    eNotAllowed
    eNotInALoop
@@ -347,7 +390,7 @@ Node    StringType
 
 % -------------------------- Forward Declarations -------------------------
 
-Block( node_type varNodeType );
+Block( node_type varNodeType, out int addr );
 VarDecl( node_type varNodeType );
 newType( node_type nt, int size ) >> Node;
 newIdent( node_type nt, kind k, int id ) >> Node;
@@ -355,6 +398,9 @@ EmitValue( Node decl );
 TypeRef( out Node theType );
 PointerTypeTo( Node theType ) >> Node;
 OrdinalLow( Node theType ) >> int;
+AssignStmt( Node decl );
+VarExpr( Node decl );
+VarLValue( Node decl );
 
 
 % ----------------------------- Declarations ----------------------------
@@ -366,6 +412,12 @@ Program:
    globalScope = oScopeCurrent
 
    @installBuiltIns
+
+   % Start by jumping to the main program statement
+   int patchJumpMain
+   .tJump 
+   patchJumpMain = Here
+   .tSpace
 
    pProgram
    pIdent
@@ -392,22 +444,49 @@ Program:
       | * :
    ]
    ';'
-   @Block( nGlobalVar )    % not including punctuation after body's 'end'
+
+   int addr
+   @Block( nGlobalVar, addr )    % not including punctuation after body's 'end'
+   oPatch( patchJumpMain, addr )
+
    '.'
    oScopeEnd
    ;
 
-Block( node_type varNodeType ):
+
+% Returns the addr of the block's statements.
+% This might differ from the Here on entry to this rule,
+% due to method declarations in the block.
+%
+Block( node_type varNodeType, out int addr ):
    {[
       | pConst :     @ConstDecl
       | pType :      @TypeDecl
       | pVar :       @VarDecl( varNodeType )
       | pProcedure : @ProcDecl
       | pFunction :  @FuncDecl
-      | * :          @Statement
-                     .tReturn
-                     >
-   ]};
+      | * :          >
+   ]}
+   addr = Here
+
+   % proc/func body begins with tEnter
+   int patchLS
+   [ equal_node_type( varNodeType, nLocalVar )
+      | true :       .tEnter  patchLS = Here  .tSpace
+      | * :
+   ]
+
+   @Statement
+   .tReturn
+
+   [ equal_node_type( varNodeType, nLocalVar )
+      | true :
+         int localSpace
+         localSpace = oNodeGetInt( oScopeCurrent, qNextOffset )
+         oPatch( patchLS, localSpace )
+      | * :
+   ];
+
 
 ProcDecl:
    Node decl
@@ -416,16 +495,30 @@ ProcDecl:
    decl = @newIdent( nProc, kProc, LAST_ID )
 
    oScopeBegin
+   Node paramScope
+   paramScope = oScopeCurrent
+
    @FormalArgDecl
-   oNodeSet( decl, qParams, oScopeCurrent )
+   oNodeSet( decl, qParams, paramScope )
    oScopeEnd
+
    oScopeDeclare( decl )
    ';'
 
+   % Enter the params scope again, so params are visible in body.
+   % TO DO: Perhaps I could mark the scope read-only at this point.
+   oScopeEnter( paramScope )
+
+   % Start scope for declarations within the proc
    oScopeBegin
-   @Block( nLocalVar )
+   int addr
+   @Block( nLocalVar, addr )
    oNodeSet( decl, qChildScope, oScopeCurrent )
+   oNodeSetInt( decl, qValue, addr )
+   oNodeSetBoolean( decl, qAddrDefined, true )
    oScopeEnd
+
+   oScopeEnd  % paramScope
    ';';
 
 FuncDecl:
@@ -436,9 +529,13 @@ FuncDecl:
    decl = @newIdent( nFunc, kFunc, LAST_ID )
 
    oScopeBegin
+   Node paramScope
+   paramScope = oScopeCurrent
+
    @FormalArgDecl
-   oNodeSet( decl, qParams, oScopeCurrent )
+   oNodeSet( decl, qParams, paramScope )
    oScopeEnd
+
    oScopeDeclare( decl )
    ':'
 
@@ -446,10 +543,19 @@ FuncDecl:
    oNodeSet( decl, qType, theType )
    ';'
 
+   % Enter the params scope again, so params are visible in body.
+   % TO DO: Perhaps I could mark the scope read-only at this point.
+   oScopeEnter( paramScope )
+
    oScopeBegin
-   @Block( nLocalVar )
+   int addr
+   @Block( nLocalVar, addr )
    oNodeSet( decl, qChildScope, oScopeCurrent )
+   oNodeSetInt( decl, qValue, addr )
+   oNodeSetBoolean( decl, qAddrDefined, true )
    oScopeEnd
+
+   oScopeEnd  % paramScope
    ';';
 
 
@@ -935,24 +1041,8 @@ Primary:
 
          [ oNodeType( decl )
             | nFunc :
-               [
-                  | '(' :
-                     {  @Expr
 
-                        % TO DO: match type against param
-                        % TO DO: push the expression onto the call stack e.g. iPush...
-                        %  Meanwhile for now we are broken, leaving the value on the runtime value stack
-                        oTypeSPop
-
-                        [
-                          | ')' : >
-                          | ',' :
-                        ]
-                     }
-                  | * :
-               ]
-               .tCall  @EmitValue( decl )
-               oTypeSPush( oNodeGet( decl, qType ) )
+               @Call( decl )
 
             | nConst :
                theType = oNodeGet( decl, qType )
@@ -964,31 +1054,8 @@ Primary:
                      #eNotImplemented
                ]
 
-            | nGlobalVar :
-               theType = oNodeGet( decl, qType )
-               oTypeSPush( theType )
-               [ oTypeSNodeType
-                  | nIntegerType :
-                     .tPushGlobalI @EmitValue( decl )
-                  | nBooleanType :
-                     .tPushGlobalB @EmitValue( decl )
-                  | nCharType, nStringType, nFileType :
-                     #eNotImplemented
-                  | nPointerType :
-                     .tPushGlobalP @EmitValue( decl )
-                     [
-                        | '^' :             % dereferenced
-                           oTypeSPop
-                           oTypeSPush( oNodeGet( theType, qBaseType ) )
-                           @LValue
-                           @FetchVar
-                        | * :               % just ptr value alone
-                     ]
-                  | * :                     % compound type
-                     .tPushConstP @EmitValue( decl )    % addr of start of var
-                     @LValue                % get final addr
-                     @FetchVar              % get final value
-               ]
+            | nGlobalVar, nLocalVar, nParam :
+               @VarExpr( decl )
 
             | * :
                #eNotValue
@@ -1001,27 +1068,77 @@ Primary:
          Node decl
          Node theType
          decl = oScopeFindRequire
-         theType = oNodeGet( decl, qType )
 
-         [ oNodeType( decl )
-            | nGlobalVar :
-               .tPushConstP @EmitValue( decl )
-               @LValue     % ptr value to expr stack
+         @VarLValue( decl )
 
-               Node ptrType
-               ptrType = @PointerTypeTo( theType )
-               oTypeSPush( ptrType )
-
-            | nLocalVar, nParam : #eNotImplemented
-               oTypeSPush( IntegerType )
-            | * :
-               #eNotVar
-               oTypeSPush( IntegerType )
-         ]
+         % The above leaves the pointed-to type on type stack.
+         % But our expression type is actually ptr-to-<type>.
+         theType = oTypeSTop
+         oTypeSPop
+         Node ptrType
+         ptrType = @PointerTypeTo( theType )
+         oTypeSPush( ptrType )
 
       | * :
          #eNotValue
          oTypeSPush( IntegerType )
+   ];
+
+
+% Parse a variable expression, given the declaration of the
+% just-accepted identifier.
+% Leaves the value on the expression stack, and type on the type stack.
+%
+VarExpr( Node decl ):
+   Node theType
+   theType = oNodeGet( decl, qType )
+   oTypeSPush( theType )
+   [ oTypeSNodeType
+      | nIntegerType :
+         [ oNodeType( decl )
+            | nGlobalVar :   .tPushGlobalI @EmitValue( decl )
+            | nLocalVar :    .tPushLocalI @EmitValue( decl )
+            | nParam :       .tPushParamI @EmitValue( decl )
+                     % TO DO:   VAR params may need adjustment? (also cases below...)
+         ]
+
+      | nBooleanType :
+         [ oNodeType( decl )
+            | nGlobalVar :   .tPushGlobalB @EmitValue( decl )
+            | nLocalVar :    .tPushLocalB @EmitValue( decl )
+            | nParam :       .tPushParamB @EmitValue( decl )
+         ]
+
+      | nCharType, nStringType, nFileType :
+         #eNotImplemented
+
+      | nPointerType :
+         [ oNodeType( decl )
+            | nGlobalVar :   .tPushGlobalP @EmitValue( decl )
+            | nLocalVar :    .tPushLocalP @EmitValue( decl )
+            | nParam :       .tPushParamP @EmitValue( decl )
+         ]
+         [
+            | '^' :             % dereferenced
+               oTypeSPop
+               oTypeSPush( oNodeGet( theType, qBaseType ) )
+               @LValue
+               @FetchVar
+            | * :               % just ptr value alone
+         ]
+
+      | * :
+         % compound type
+         % first, push addr of start of var
+         [ oNodeType( decl )
+            | nGlobalVar :   .tPushAddrGlobal @EmitValue( decl )
+            | nLocalVar :    .tPushAddrLocal @EmitValue( decl )
+            | nParam :       .tPushAddrParam @EmitValue( decl )
+         ]
+         % modify addr for subscripts, field references, etc
+         @LValue
+         % get final value
+         @FetchVar
    ];
 
 
@@ -1145,6 +1262,109 @@ PointerDeref:
    ;
 
 
+% The expr stack contains a value whose type is on top of the type stack.
+% Generate code to coerce the value to the type under it in the type stack
+% (pop the type stack, leaving only the desired type).
+% This is used for assignment.
+%
+CoerceType:
+   % TO DO: not implemented yet.  For now I require exact type match.
+   @MatchTypes
+   ;
+
+
+% Parse a call, given an nProc or nFunc for the just-accepted identifier.
+% If a func, this will also generate the code to push the return value on the expr stack,
+% and push the return type on the type stack.
+%
+Call( Node method ):
+
+   Node paramScope
+   paramScope = oNodeGet( method, qParams )
+   int actualsSize
+   actualsSize = oNodeGetInt( paramScope, qNextOffset )
+   .tAllocActuals  oEmitInt( actualsSize )
+
+   Node param
+   param = oNodeGet( paramScope, qDecls )
+   [
+      | '(' :
+      
+         {
+            [ oNodeNull( param )
+               | true : >
+               | * :
+            ]
+
+            Node actualType
+            actualType = oNodeGet( param, qType )
+            int offset
+            offset = oNodeGetInt( param, qValue )
+
+            % Assign actual value to spot in actuals space
+            .tPushAddrActual oEmitInt( offset )
+            oTypeSPush( oNodeGet( param, qType ) )
+
+            [ oNodeGetBoolean( param, qInOut )
+               | true :
+                          % I need something like @LvalueExpr
+                          % that parses expr, generating code to push addr, and push type on type stack.
+                          % Close to what I have but need to refactor.
+                          #eNotImplemented
+                          % TO DO: match types more exactly. not sufficient to be assign compatible
+                          %        since the method will be assigning to the actual using the param type.
+                          %        Maybe something like type contents must match, incl subrange bounds.
+                          .tAssignP
+
+               | false :  @Expr
+                          @CoerceType
+                          
+                          % Assign to offset in actuals space
+
+                          [ oTypeSNodeType
+                             | nIntegerType :            .tAssignI
+                             | nBooleanType :            .tAssignB
+                             | nCharType, nStringType, nFileType :   #eNotImplemented
+                             | nPointerType :            .tAssignP
+                             | * :
+                                 % compound types: copy value into actuals space
+                                 int size
+                                 size = oNodeGetInt( oTypeSTop, qSize )
+                                 .tCopy  oEmitInt( size )    % multi-word copy
+                          ]
+            ]
+
+            oNodeNext( param )
+            [ oNodeNull( param )
+               | true :  >
+               | false :
+            ]
+
+            ','
+         }
+
+         ')'
+
+      | * :
+         [ oNodeNull( param )
+            | false :    #eMissingParameter
+            | * :
+         ]
+   ]
+
+   .tCall   @EmitValue( method )
+
+   [ oNodeType( method )
+      | nFunc :
+         % TO DO: push return value from actuals space
+         oTypeSPush( oNodeGet( method, qType ) )
+      | * :
+   ]
+   
+   .tFreeActuals  oEmitInt( actualsSize )
+   ;
+
+
 % ------------------------------ Statements -----------------------------
 
 Statement:
@@ -1165,47 +1385,59 @@ Statement:
    ];
 
 
-AssignOrCallStmt:         % *** Call doesn't work yet ***
+AssignOrCallStmt:
    Node decl
    decl = oScopeFindRequire
-   [ oNodeType( decl )    % can parse without semantic info
-      | nProc :           %    but this is easier
-         [
-            | '(' :
-               {  @Expr oTypeSPop  % ignore type for now
-                  [
-                    | ')' : >
-                    | ',' :
-                  ]
-               }
-            | * :
-         ]
-         .tCall  @EmitValue( decl )
-
-      | nGlobalVar :
-         .tPushConstP @EmitValue( decl )
-         oTypeSPush( oNodeGet( decl, qType ) )
-         @LValue        % handle subscripts, if any
-         ':=' 
-         @Expr
-         @MatchTypes
-         [ oTypeSNodeType
-            | nIntegerType :            .tAssignI
-            | nBooleanType :            .tAssignB
-            | nCharType, nStringType, nFileType :   #eNotImplemented
-
-            % compound var assigns; addrs of src, dest on stack
-            | nPointerType :            .tAssignP
-            | * :
-                int size
-                size = oNodeGetInt( oTypeSTop, qSize )
-                .tCopy  oEmitInt( size )    % multi-word copy
-         ]
-         oTypeSPop
-
-      | * :
-         #eBadStatement
+   [ oNodeType( decl )
+      | nProc :                           @Call( decl )
+      | nGlobalVar, nLocalVar, nParam :   @AssignStmt( decl )
+      | * :                               #eBadStatement
    ];
+
+
+% Given decl, the just-accepted first identifier on the left hand side.
+%
+AssignStmt( Node decl ):
+
+   @VarLValue( decl )
+
+   ':=' 
+   @Expr
+   @MatchTypes
+   [ oTypeSNodeType
+      | nIntegerType :            .tAssignI
+      | nBooleanType :            .tAssignB
+      | nCharType, nStringType, nFileType :   #eNotImplemented
+
+      % compound var assigns; addrs of src, dest on stack
+      | nPointerType :            .tAssignP
+      | * :
+          int size
+          size = oNodeGetInt( oTypeSTop, qSize )
+          .tCopy  oEmitInt( size )    % multi-word copy
+   ]
+   oTypeSPop
+   ;
+
+
+
+% Parse an lvalue expression (e.g. left side of an assign statement)
+% that stars with the just-accepted identifier indicated by the given decl.
+% Leaves the lvalue address on the expression stack, and the type on the type stack.
+%
+VarLValue( Node decl ):
+   [ oNodeType( decl )
+      | nGlobalVar :   .tPushAddrGlobal @EmitValue( decl )
+      | nLocalVar :    .tPushAddrLocal @EmitValue( decl )
+      | nParam :       .tPushAddrParam @EmitValue( decl )
+          % TO DO:   VAR params may need adjustment?
+      | * :            #eNotVar
+   ]
+
+   oTypeSPush( oNodeGet( decl, qType ) )
+   @LValue        % handle subscripts, if any
+   ;
+
 
 IfStmt:
    @Expr

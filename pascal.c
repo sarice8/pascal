@@ -642,7 +642,7 @@ NODE_PTR dNode;  // temporary for several mechanisms
             // And with multiple output object files, relocation tables would need to be resolved by
             // a linker.   Leaving all that aside for now.
 
-            NODE_PTR globalScope = dScopeStack[dScopeStackPtr];
+            NODE_PTR globalScope = dScopeStack[1];
 
             dWords = (ssl_token.namelen + 2) / 2;  /* #words for string */
             if (dSLptr + dWords + 2 >= dSLsize) ssl_fatal("SL overflow");

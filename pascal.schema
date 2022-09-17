@@ -37,17 +37,26 @@ nIdent =>
 
 nIdent ::= nProgram
 
-% proc has qType == Null
-nIdent ::= nProc
-nProc =>
+
+% nMethod is a proc or func declaration.
+% qValue is the method address, unless we've only seen a forward declaration
+% in which case qAddrDefined is false.
+%
+% If there's a forward declaration and the body is subsequently seen,
+% we'll update the existing nMethod to contain the final information:
+% storing the address in qValue, and updating the qParams (since the names
+% might differ), and setting qAddrDefined to true.
+%
+nIdent ::= nMethod
+nMethod =>
         qParams:        Node            (nScope)                [Pri,Opt]
         qChildScope:    Node            (nScope)                [Pri,Opt]
+        qAddrDefined:   Boolean1
 
+nMethod ::= nProc
 
-% func has qType == return type
-%  (qType is currently held in qIdent)
-nProc ::= nFunc
-
+% func return type is qType in nIdent.
+nMethod ::= nFunc
 
 
 nIdent ::= nConst

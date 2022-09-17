@@ -33,7 +33,34 @@ var  a1,a2: atype;
 
 const c1 = 10;
 
+var glob: integer;
+
+
+// procedure proc1( p1, p2 : integer, p3 : integer );
+procedure proc1( p1, p2, p3 : integer );
+    var total : integer;
+  begin
+    glob := p1;
+    glob := p2;
+    glob := p3;
+
+    writeln( 'Hello from proc1' );
+    writeln( '  glob = ', glob );
+
+    total := p1 + p2 + p3;
+    writeln( '  p1 = ', p1 );
+    writeln( '  p2 = ', p2 );
+    writeln( '  p3 = ', p3 );
+    writeln( '  total = ', total );
+  end;
+
+
 BEGIN
+
+  writeln( 'Proc test:' );
+  proc1( 100, 200, 300 );
+  proc1( 400, 500, 600 );
+
 
   writeln( 'Record test:' );
 

@@ -30,12 +30,36 @@ FILE *src,*dmp;
 short code[codeMax],pc;      /* Program memory */
 short codeWords;             /* Actual #words used */
 
+// expression stack - used for expression evaluation.
+//  In a JIT, this might be implemented with a mix of registers and temp vars instead.
 #define stackMax 2000
-short stack[stackMax],sp;    /* Call stack */
+short stack[stackMax],sp;
+
+
+// Hardcoded offset from fp to start of params.
+// This is needed to record old fp and method return address.
+// TO DO: maybe the offset shouldl be built into code instead.
+#define FRAME_PARAMS_OFFSET  2   // 2 since still using words in stack, not bytes.
+
+
 
 // good grief, can't hardcode these
-#define dataMax 40000
+#define dataMax 30000
 short data[dataMax];         /* Data memory */
+
+
+// call stack - used for function params, local vars, temp vars
+// (and TO DO: return addresses)
+//
+// The call stack resides within the data[] array (at the end, growing down).
+// This is because in my runtime model, an 'address' is always an index into data.
+// e.g. so tAssignI can work equally on global var and local var.
+// 
+#define callStackSize 2000
+#define callStackLowerBound (dataMax - callStackSize)
+short call_sp;
+short call_fp;
+
 
 short temp, *ptr1, *ptr2;
 char trace, underflow, dump;
@@ -125,6 +149,7 @@ char *argv[];
 
   pc = 0;                        /* Initialize walker */
   sp = 0;
+  call_sp = dataMax-1;
 
   walkTable();
 
@@ -157,6 +182,32 @@ walkTable()
               if (++sp>=stackMax) fatal("stack overflow");
               stack[sp] = data[code[pc++]];
               continue;
+       case tPushLocalI :
+              if (++sp>=stackMax) fatal("stack overflow");
+              // TO DO: offset not quite correct.
+              //  Prob need to store neg offset in decl/code, to be consistent with field size
+              stack[sp] = data[call_fp - code[pc++]];
+              continue;
+       case tPushLocalB :
+              if (++sp>=stackMax) fatal("stack overflow");
+              stack[sp] = data[call_fp - code[pc++]];
+              continue;
+       case tPushLocalP :
+              if (++sp>=stackMax) fatal("stack overflow");
+              stack[sp] = data[call_fp - code[pc++]];
+              continue;
+       case tPushParamI :
+              if (++sp>=stackMax) fatal("stack overflow");
+              stack[sp] = data[call_fp + code[pc++] + FRAME_PARAMS_OFFSET];
+              continue;
+       case tPushParamB :
+              if (++sp>=stackMax) fatal("stack overflow");
+              stack[sp] = data[call_fp + code[pc++] + FRAME_PARAMS_OFFSET];
+              continue;
+       case tPushParamP :
+              if (++sp>=stackMax) fatal("stack overflow");
+              stack[sp] = data[call_fp + code[pc++] + FRAME_PARAMS_OFFSET];
+              continue;
        case tPushConstI :
               if (++sp>=stackMax) fatal("stack overflow");
               stack[sp] = code[pc++];
@@ -164,6 +215,22 @@ walkTable()
        case tPushConstP :
               if (++sp>=stackMax) fatal("stack overflow");
               stack[sp] = code[pc++];
+              continue;
+       case tPushAddrGlobal :
+              if (++sp>=stackMax) fatal("stack overflow");
+              stack[sp] = code[pc++];
+              continue;
+       case tPushAddrLocal :
+              if (++sp>=stackMax) fatal("stack overflow");
+              stack[sp] = call_fp - code[pc++];
+              continue;
+       case tPushAddrParam :
+              if (++sp>=stackMax) fatal("stack overflow");
+              stack[sp] = call_fp + code[pc++] + FRAME_PARAMS_OFFSET;  // to do: for now, we do this offset
+              continue;
+       case tPushAddrActual :
+              if (++sp>=stackMax) fatal("stack overflow");
+              stack[sp] = call_sp + code[pc++];
               continue;
        case tFetchI :
               stack[sp] = data[stack[sp]];
@@ -262,17 +329,40 @@ walkTable()
               stack[sp-1] = stack[sp-1] != stack[sp];
               sp--;
               continue;
+       case tAllocActuals :
+              call_sp -= code[pc++];
+              if (call_sp < callStackLowerBound) fatal("call stack overflow");
+              continue;
+       case tFreeActuals :
+              call_sp += code[pc++];
+              continue;
        case tCall :
               if (++sp==stackMax) fatal("call stack overflow");
               stack[sp] = pc+1;
               pc = code[pc];
               continue;
        case tReturn :
-              if (sp) {
+              if (call_fp) {
                 pc = stack[sp--];
+                // unwind tEnter
+                call_sp = call_fp;
+                call_fp = data[call_fp];
+                ++call_sp;
+                ++call_sp;  // TO DO: remove when iCall pushes return address on call stack
                 continue;
               } else
                 return;            /* done program table */
+       case tEnter :       
+              // Start a stack frame, on entry to a proc/func.
+              //  TO DO: ideally tCall/tReturn would record return addr on call stack, for clarity
+              call_sp--;  // TO DO: remove when iCall pushes return address on call stack
+              call_sp--;
+              data[call_sp] = call_fp;
+              call_fp = call_sp;
+              if (call_sp < callStackLowerBound) fatal("call stack overflow");
+              call_sp -= code[pc++];
+              if (call_sp < callStackLowerBound) fatal("call stack overflow");
+              continue;
        case tJump :
               pc = code[pc];
               continue;
@@ -334,8 +424,18 @@ dumpTable()
        case tPushGlobalI :   op1("tPushGlobalI");
        case tPushGlobalB :   op1("tPushGlobalB"); 
        case tPushGlobalP :   op1("tPushGlobalP");
+       case tPushLocalI :    op1("tPushLocalI");
+       case tPushLocalB :    op1("tPushLocalB"); 
+       case tPushLocalP :    op1("tPushLocalP");
+       case tPushParamI :    op1("tPushParamI");
+       case tPushParamB :    op1("tPushParamB"); 
+       case tPushParamP :    op1("tPushParamP");
        case tPushConstI :    op1("tPushConstI");
        case tPushConstP :    op1("tPushConstP");
+       case tPushAddrGlobal : op1("tPushAddrGlobal");
+       case tPushAddrLocal :  op1("tPushAddrLocal");
+       case tPushAddrParam :  op1("tPushAddrParam");
+       case tPushAddrActual : op1("tPushAddrActual");
        case tFetchI :        op0("tFetchI");
        case tFetchB :        op0("tFetchB");
        case tFetchP :        op0("tFetchP");
@@ -361,8 +461,11 @@ dumpTable()
        case tLessEqualI :    op0("tLessEqualI");
        case tEqualP :        op0("tEqualP");
        case tNotEqualP :     op0("tNotEqualP");
+       case tAllocActuals :  op1("tAllocActuals");
+       case tFreeActuals :   op1("tFreeActuals");
        case tCall :          op1("tCall   ");
        case tReturn :        op0("tReturn");
+       case tEnter :         op1("tEnter");
        case tJump :          op1("tJump   ");
        case tJumpTrue :      op1("tJumpTrue");
        case tJumpFalse :     op1("tJumpFalse");
