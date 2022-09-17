@@ -34,9 +34,9 @@ type node_type:
 
 type node_attribute:
 	qINVALID
-	qParentScope
 	qDecls
-	qNextOffset
+	qSize
+	qAllocDown
 	qIdent
 	qKind
 	qType
@@ -46,7 +46,6 @@ type node_attribute:
 	qChildScope
 	qAddrDefined
 	qInOut
-	qSize
 	qPointerType
 	qBaseType
 	qIndexType

@@ -472,8 +472,6 @@ NODE_PTR dNode;  // temporary for several mechanisms
 
     case oScopeBegin:
             dNode = nodeNew (nScope);
-            if (dScopeStackPtr > 0)
-                nodeLink (dNode, qParentScope, dScopeStack[dScopeStackPtr]);
             if (++dScopeStackPtr == dScopeStackSize) ssl_fatal ("Scope Stack overflow");
             dScopeStack[dScopeStackPtr] = dNode;
             continue;
@@ -497,12 +495,18 @@ NODE_PTR dNode;  // temporary for several mechanisms
             ssl_assert (dScopeStackPtr >= 1);
             NODE_PTR scope = dScopeStack[dScopeStackPtr];
             NODE_PTR node = (NODE_PTR)ssl_param;
+            nodeAppend (scope, qDecls, node);
             NODE_PTR theType = nodeGet( node, qType );
             ssl_assert( theType != NULL );
-            long offset = nodeGetValue( scope, qNextOffset );
-            nodeSetValue( node, qValue, offset );
-            nodeSetValue( scope, qNextOffset, offset + nodeGetValue( theType, qSize ) );
-            nodeAppend (scope, qDecls, node);
+            int size = nodeGetValue( theType, qSize );
+            long offset = nodeGetValue( scope, qSize );
+            if ( nodeGetValue( scope, qAllocDown ) ) {
+              nodeSetValue( node, qValue, -offset - size );
+              nodeSetValue( scope, qSize, offset + size );
+            } else {
+              nodeSetValue( node, qValue, offset );
+              nodeSetValue( scope, qSize, offset + size );
+            }
             continue;
             }
     case oScopeFind:
@@ -647,8 +651,8 @@ NODE_PTR dNode;  // temporary for several mechanisms
             dWords = (ssl_token.namelen + 2) / 2;  /* #words for string */
             if (dSLptr + dWords + 2 >= dSLsize) ssl_fatal("SL overflow");
 
-            int offset = nodeGetValue( globalScope, qNextOffset );
-            nodeSetValue( globalScope, qNextOffset, offset + dWords );
+            int offset = nodeGetValue( globalScope, qSize );
+            nodeSetValue( globalScope, qSize, offset + dWords );
 
             /* push string addr (global data ptr) on value stack */
             if (++dVSptr==dVSsize) ssl_fatal("VS overflow");

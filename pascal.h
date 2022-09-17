@@ -1,4 +1,4 @@
-#define SSL_CODE_TABLE_SIZE 4600
+#define SSL_CODE_TABLE_SIZE 4700
 
 #define oJumpForward 0
 #define oJumpBack 1
@@ -186,9 +186,9 @@
 #define nEnumType 26
 #define nSetType 27
 #define qINVALID 0
-#define qParentScope 1
-#define qDecls 2
-#define qNextOffset 3
+#define qDecls 1
+#define qSize 2
+#define qAllocDown 3
 #define qIdent 4
 #define qKind 5
 #define qType 6
@@ -198,13 +198,12 @@
 #define qChildScope 10
 #define qAddrDefined 11
 #define qInOut 12
-#define qSize 13
-#define qPointerType 14
-#define qBaseType 15
-#define qIndexType 16
-#define qLow 17
-#define qHigh 18
-#define qScope 19
+#define qPointerType 13
+#define qBaseType 14
+#define qIndexType 15
+#define qLow 16
+#define qHigh 17
+#define qScope 18
 #define Null 0
 #define NullVec 0
 #define false 0

@@ -38,19 +38,21 @@ title: 'Pascal Compiler 1.1.5 -- Jan 01 ''90';
 %
 %  MISSING
 %
-%    - proceudre and function forward declarations.
-%      I think it uses the keyword 'forward' in place of the body.
-%      Only one forward declaration is allowed.  I will overwrite the nMethod info
-%      with the final addr and param names when the true body is seen.
+%    - Functions.  make room in the actual params space for the result value.
+%      Function body will assign value there.  Caller will pick it up and
+%      push onto expr stack.
+%
+%    - VAR parameters need work, on caller side and reference side (lhs and rhs).
+%
+%    - Forward declaration of proceudres and functions.
+%      Only one forward declaration should be allowed.
+%      I will overwrite the nMethod info with the final addr and param names when the true body is seen.
 %      If a call is made to a foward declared method, add the forward decl node & Here to patch table.
 % 
 %    - procedure and function declarations may be nested within other procs/funcs!
 %      They are allowed to see locals within those parent scopes.
 %      Pass a hidden parameter to nested methods, to follow up to parent scopes as needed.
 %      Need a level counter at each scope, and uplevels count on reference to local/param.
-%      
-%    - Confirm that var decls can't be nested inside statements as they can in C.
-%      (i.e. is my "Block" concept correct?)
 %      
 %    - Non-ISO extensions.  Look at "Units" e.g. from Turbo Pascal wikipedia page.
 %
@@ -482,7 +484,7 @@ Block( node_type varNodeType, out int addr ):
    [ equal_node_type( varNodeType, nLocalVar )
       | true :
          int localSpace
-         localSpace = oNodeGetInt( oScopeCurrent, qNextOffset )
+         localSpace = oNodeGetInt( oScopeCurrent, qSize )
          oPatch( patchLS, localSpace )
       | * :
    ];
@@ -511,6 +513,8 @@ ProcDecl:
 
    % Start scope for declarations within the proc
    oScopeBegin
+   oNodeSetBoolean( oScopeCurrent, qAllocDown, true )
+
    int addr
    @Block( nLocalVar, addr )
    oNodeSet( decl, qChildScope, oScopeCurrent )
@@ -548,6 +552,8 @@ FuncDecl:
    oScopeEnter( paramScope )
 
    oScopeBegin
+   oNodeSetBoolean( oScopeCurrent, qAllocDown, true )
+
    int addr
    @Block( nLocalVar, addr )
    oNodeSet( decl, qChildScope, oScopeCurrent )
@@ -806,7 +812,7 @@ TypeRef( out Node resultType ):
          @VarDecl( nRecordField )
 
          int size
-         size = oNodeGetInt( oScopeCurrent, qNextOffset )
+         size = oNodeGetInt( oScopeCurrent, qSize )
          % to do: padding
          [ equal_zero( size )
             | true : #eRecordEmpty
@@ -1282,7 +1288,7 @@ Call( Node method ):
    Node paramScope
    paramScope = oNodeGet( method, qParams )
    int actualsSize
-   actualsSize = oNodeGetInt( paramScope, qNextOffset )
+   actualsSize = oNodeGetInt( paramScope, qSize )
    .tAllocActuals  oEmitInt( actualsSize )
 
    Node param

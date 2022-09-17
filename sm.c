@@ -183,18 +183,17 @@ walkTable()
               stack[sp] = data[code[pc++]];
               continue;
        case tPushLocalI :
+              // code provides negative offset from call_fp
               if (++sp>=stackMax) fatal("stack overflow");
-              // TO DO: offset not quite correct.
-              //  Prob need to store neg offset in decl/code, to be consistent with field size
-              stack[sp] = data[call_fp - code[pc++]];
+              stack[sp] = data[call_fp + code[pc++]];
               continue;
        case tPushLocalB :
               if (++sp>=stackMax) fatal("stack overflow");
-              stack[sp] = data[call_fp - code[pc++]];
+              stack[sp] = data[call_fp + code[pc++]];
               continue;
        case tPushLocalP :
               if (++sp>=stackMax) fatal("stack overflow");
-              stack[sp] = data[call_fp - code[pc++]];
+              stack[sp] = data[call_fp + code[pc++]];
               continue;
        case tPushParamI :
               if (++sp>=stackMax) fatal("stack overflow");
@@ -222,7 +221,7 @@ walkTable()
               continue;
        case tPushAddrLocal :
               if (++sp>=stackMax) fatal("stack overflow");
-              stack[sp] = call_fp - code[pc++];
+              stack[sp] = call_fp + code[pc++];
               continue;
        case tPushAddrParam :
               if (++sp>=stackMax) fatal("stack overflow");

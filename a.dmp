@@ -17,7 +17,7 @@
   26	tPushGlobalI	 384
   28	tWriteI
   29	tWriteCR
-  30	tPushAddrLocal	   0
+  30	tPushAddrLocal	  -4
   32	tPushParamI	   0
   34	tPushParamI	   4
   36	tAddI
@@ -41,7 +41,7 @@
   61	tWriteCR
   62	tPushConstP	 414
   64	tWriteStr
-  65	tPushLocalI	   0
+  65	tPushLocalI	  -4
   67	tWriteI
   68	tWriteCR
   69	tReturn

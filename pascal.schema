@@ -14,9 +14,9 @@ Schema Pascal Root nScope Is
 
 Object ::= nScope
 nScope =>
-        qParentScope:   Node            (nScope)                [Alt,Opt]
         qDecls:         List            (nDeclaration)          [Pri,Opt]
-        qNextOffset:    Integer4              % address for next variable
+        qSize:          Integer4        % space required by declared variables
+        qAllocDown:     Boolean1        % allocate from -1 downto -size
 
 Object ::= nDeclaration
 
