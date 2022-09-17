@@ -38,9 +38,11 @@ title: 'Pascal Compiler 1.1.5 -- Jan 01 ''90';
 %
 %  MISSING
 %
-%    - Functions.  make room in the actual params space for the result value.
-%      Function body will assign value there.  Caller will pick it up and
-%      push onto expr stack.
+%    - Functions. 
+%      Caller allocates a temporary variable for the result.
+%      The params contain an extra hidden VAR parameter, i.e. passing in the temporary by reference.
+%      After the call, the caller pushes a reference to the temporary on the expression stack.
+%      (This would push a scalar value, or the addr of the temporary if a compound type.)
 %
 %    - VAR parameters need work, on caller side and reference side (lhs and rhs).
 %
@@ -54,7 +56,11 @@ title: 'Pascal Compiler 1.1.5 -- Jan 01 ''90';
 %      Pass a hidden parameter to nested methods, to follow up to parent scopes as needed.
 %      Need a level counter at each scope, and uplevels count on reference to local/param.
 %      
-%    - Non-ISO extensions.  Look at "Units" e.g. from Turbo Pascal wikipedia page.
+%    - Consider non-ISO extensions.  e.g. see "Units" e.g. from Turbo Pascal wikipedia page.
+%      Dynamic arrays.  Objects.  But, perhaps stick to my old goal, standard Pascal.
+%
+%    - x86 code generation.
+%
 %
 %  PASCAL DOCS
 %      Here's some handy language material:
@@ -314,8 +320,9 @@ mechanism scope_mech:
     oScopeEnter( Node scope )            % enter an existing scope.
     oScopeEnd                            % end current scope. Subsequent declarations will go to previous scope.
     oScopeCurrent >> Node                % returns current scope
-    oScopeDeclare( Node )                % add declaration to current scope.
-    oScopeDeclareAlloc( Node )           % add declaration to current scope, and allocate space according to its type
+    oScopeDeclare( Node decl )           % add declaration to current scope.
+    oScopeDeclareAlloc( Node decl )      % add declaration to current scope, and allocate space according to its type
+    oScopeAllocType( Node theType ) >> int   % allocate space for type in current scope, and return its address
     oScopeFind >> Node                   % find declaration of last accepted identifier.  Returns Null if not found.
     oScopeFindRequire >> Node            % find declaration of last accepted identifier.  Error if not found.
     ;
@@ -402,7 +409,7 @@ PointerTypeTo( Node theType ) >> Node;
 OrdinalLow( Node theType ) >> int;
 AssignStmt( Node decl );
 VarExpr( Node decl );
-VarLValue( Node decl );
+LValueVar( Node decl );
 
 
 % ----------------------------- Declarations ----------------------------
@@ -565,12 +572,6 @@ FuncDecl:
    ';';
 
 
-% TO DO:
-%   This code is declaring params in the wrong order.
-%   Also ignoring var keyword.
-%   Also not using schema yet.
-%   Also should use a var instead of count stack.
-%
 FormalArgDecl:
    [
       | '(' :
@@ -601,13 +602,22 @@ FormalArgDecl:
             Node theType
             @TypeRef( theType )
 
+            % VAR param is declared with its given type, but allocated as a pointer.
+            Node allocType
+            [ isInOut
+               | true :   allocType = @PointerTypeTo( theType )
+               | * :      allocType = theType
+            ]
+
             int i
             i = 0
             {[ equal( i, oNodeVecSize( decls ) )
                | false :
                   decl = oNodeVecElement( decls, i )
+
                   oNodeSet( decl, qType, theType )
-                  oScopeDeclareAlloc( decl )
+                  oScopeDeclare( decl )
+                  oNodeSetInt( decl, qValue, oScopeAllocType( allocType ) )
                   inc( i )
                | * :
                   >
@@ -1075,10 +1085,10 @@ Primary:
          Node theType
          decl = oScopeFindRequire
 
-         @VarLValue( decl )
+         @LValueVar( decl )
 
          % The above leaves the pointed-to type on type stack.
-         % But our expression type is actually ptr-to-<type>.
+         % Replace with ptr-to-<type>.
          theType = oTypeSTop
          oTypeSPop
          Node ptrType
@@ -1104,15 +1114,26 @@ VarExpr( Node decl ):
          [ oNodeType( decl )
             | nGlobalVar :   .tPushGlobalI @EmitValue( decl )
             | nLocalVar :    .tPushLocalI @EmitValue( decl )
-            | nParam :       .tPushParamI @EmitValue( decl )
-                     % TO DO:   VAR params may need adjustment? (also cases below...)
+            | nParam :
+               [ oNodeGetBoolean( decl, qInOut )
+                  | true :    % VAR param points to the var.  Auto dereference.
+                              .tPushParamP @EmitValue( decl )
+                              .tFetchI
+                  | * :       .tPushParamI @EmitValue( decl )
+               ]
          ]
 
       | nBooleanType :
          [ oNodeType( decl )
             | nGlobalVar :   .tPushGlobalB @EmitValue( decl )
             | nLocalVar :    .tPushLocalB @EmitValue( decl )
-            | nParam :       .tPushParamB @EmitValue( decl )
+            | nParam :
+               [ oNodeGetBoolean( decl, qInOut )
+                  | true :    % VAR param points to the var.  Auto derefernce.
+                              .tPushParamP @EmitValue( decl )
+                              .tFetchB
+                  | * :       .tPushParamB @EmitValue( decl )
+               ]
          ]
 
       | nCharType, nStringType, nFileType :
@@ -1122,13 +1143,19 @@ VarExpr( Node decl ):
          [ oNodeType( decl )
             | nGlobalVar :   .tPushGlobalP @EmitValue( decl )
             | nLocalVar :    .tPushLocalP @EmitValue( decl )
-            | nParam :       .tPushParamP @EmitValue( decl )
+            | nParam :
+               [ oNodeGetBoolean( decl, qInOut )
+                  | true :    % VAR param points to the var.  Auto derefernce.
+                              .tPushParamP @EmitValue( decl )
+                              .tFetchP
+                  | * :       .tPushParamP @EmitValue( decl )
+               ]
          ]
          [
             | '^' :             % dereferenced
                oTypeSPop
                oTypeSPush( oNodeGet( theType, qBaseType ) )
-               @LValue
+               @LValueIndexes
                @FetchVar
             | * :               % just ptr value alone
          ]
@@ -1139,10 +1166,15 @@ VarExpr( Node decl ):
          [ oNodeType( decl )
             | nGlobalVar :   .tPushAddrGlobal @EmitValue( decl )
             | nLocalVar :    .tPushAddrLocal @EmitValue( decl )
-            | nParam :       .tPushAddrParam @EmitValue( decl )
+            | nParam :
+               [ oNodeGetBoolean( decl, qInOut )
+                  | true :    % VAR param points to the var.  Auto derefernce.
+                              .tPushParamP @EmitValue( decl )
+                  | * :       .tPushAddrParam @EmitValue( decl )
+               ]
          ]
          % modify addr for subscripts, field references, etc
-         @LValue
+         @LValueIndexes
          % get final value
          @FetchVar
    ];
@@ -1163,10 +1195,10 @@ FetchVar:
 
 
 % Addr of start of var is already on run stack, and type is on type stack.
-% Read subscripts, etc, to get final addr on run stack, and final type
+% Read subscripts, record fields, etc, to get final addr on run stack, and final type
 % on type stack.
 
-LValue:
+LValueIndexes:
    {[
       | '[' :       @ArraySubscripts
       | '.' :       @RecordFieldRef
@@ -1302,8 +1334,6 @@ Call( Node method ):
                | * :
             ]
 
-            Node actualType
-            actualType = oNodeGet( param, qType )
             int offset
             offset = oNodeGetInt( param, qValue )
 
@@ -1312,14 +1342,19 @@ Call( Node method ):
             oTypeSPush( oNodeGet( param, qType ) )
 
             [ oNodeGetBoolean( param, qInOut )
-               | true :
-                          % I need something like @LvalueExpr
-                          % that parses expr, generating code to push addr, and push type on type stack.
-                          % Close to what I have but need to refactor.
-                          #eNotImplemented
-                          % TO DO: match types more exactly. not sufficient to be assign compatible
-                          %        since the method will be assigning to the actual using the param type.
-                          %        Maybe something like type contents must match, incl subrange bounds.
+               | true :   % A VAR param.
+                          % The actual is a pointer to the value.
+                          % The type on the type stack (pushed above) is for the pointed-to value.
+
+                          @LValueExpr
+                          % Addr of the referenced variable is on the expr stack,
+                          % type of the variable is on the type stack.
+
+                          % Match types more exactly. It's not sufficient to be assign compatible
+                          % since the method will be assigning to the actual using the param type.
+                          % Maybe something like type contents must match, incl subrange bounds.
+                          @MatchTypes
+
                           .tAssignP
 
                | false :  @Expr
@@ -1339,6 +1374,7 @@ Call( Node method ):
                                  .tCopy  oEmitInt( size )    % multi-word copy
                           ]
             ]
+            oTypeSPop
 
             oNodeNext( param )
             [ oNodeNull( param )
@@ -1405,7 +1441,7 @@ AssignOrCallStmt:
 %
 AssignStmt( Node decl ):
 
-   @VarLValue( decl )
+   @LValueVar( decl )
 
    ':=' 
    @Expr
@@ -1426,22 +1462,45 @@ AssignStmt( Node decl ):
    ;
 
 
+% Parse an lvalue expression, from scratch.
+% This is an expression that may appear on the left side of an assignment.
+% Leaves the address of the value on the expr stack,
+% and the type of the value at that address on the type stack.
+%
+LValueExpr:
+   % At the moment, all lvalue expressions start with a variable name.
+   % I think there can also be typecasts, not supported yet.  Check standard syntax.
+   pIdent
+   Node decl
+   decl = oScopeFindRequire
+   [ oNodeType( decl )
+      | nGlobalVar, nLocalVar, nParam :
+      | * :  #eNotVar
+   ]
+   @LValueVar( decl )
+   ;
+
 
 % Parse an lvalue expression (e.g. left side of an assign statement)
 % that stars with the just-accepted identifier indicated by the given decl.
-% Leaves the lvalue address on the expression stack, and the type on the type stack.
+% Leaves the lvalue address on the expression stack,
+% and the type of the value at that address on the type stack.
 %
-VarLValue( Node decl ):
+LValueVar( Node decl ):
    [ oNodeType( decl )
       | nGlobalVar :   .tPushAddrGlobal @EmitValue( decl )
       | nLocalVar :    .tPushAddrLocal @EmitValue( decl )
-      | nParam :       .tPushAddrParam @EmitValue( decl )
-          % TO DO:   VAR params may need adjustment?
+      | nParam :
+         [ oNodeGetBoolean( decl, qInOut )
+            | true :   % VAR param points to variable.  No dereference.
+                       .tPushParamP @EmitValue( decl )
+            | * :      .tPushAddrParam @EmitValue( decl )
+         ]
       | * :            #eNotVar
    ]
 
    oTypeSPush( oNodeGet( decl, qType ) )
-   @LValue        % handle subscripts, if any
+   @LValueIndexes        % handle subscripts, if any
    ;
 
 

@@ -509,6 +509,22 @@ NODE_PTR dNode;  // temporary for several mechanisms
             }
             continue;
             }
+    case oScopeAllocType: {
+            ssl_assert (dScopeStackPtr >= 1);
+            NODE_PTR scope = dScopeStack[dScopeStackPtr];
+            NODE_PTR theType = (NODE_PTR)ssl_param;
+            ssl_assert( theType != NULL );
+            int size = nodeGetValue( theType, qSize );
+            long offset = nodeGetValue( scope, qSize );
+            if ( nodeGetValue( scope, qAllocDown ) ) {
+              ssl_result = -offset - size;
+              nodeSetValue( scope, qSize, offset + size );
+            } else {
+              ssl_result = offset;
+              nodeSetValue( scope, qSize, offset + size );
+            }
+            continue;
+            }
     case oScopeFind:
             for (int dScopeStackLookup = dScopeStackPtr; dScopeStackLookup > 0; dScopeStackLookup--)
             {  

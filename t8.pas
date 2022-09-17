@@ -36,7 +36,7 @@ const c1 = 10;
 var glob: integer;
 
 
-// procedure proc1( p1, p2 : integer, p3 : integer );
+// procedure proc1( p1, p2 : integer; p3 : integer );
 procedure proc1( p1, p2, p3 : integer );
     var total : integer;
   begin
@@ -55,12 +55,44 @@ procedure proc1( p1, p2, p3 : integer );
   end;
 
 
+// VAR parameters
+procedure proc2( p1 : integer;
+                 VAR p2, p3 : integer;
+                 p4 : integer;
+                 VAR p5 : rtype );
+  var r1 : rtype;
+  begin
+
+    writeln( 'Hello from proc2' );
+    p1 := p1 + 1000;
+    p2 := p2 + 2000;
+    p3 := p3 + 3000;
+    p4 := p4 + 4000;
+    writeln( '  p1 = ', p1 );
+    writeln( '  p2 = ', p2 );
+    writeln( '  p3 = ', p3 );
+    writeln( '  p4 = ', p4 );
+
+    r1.f1 := p1;
+    r1.f2 := p2;
+    r1.f3 := p3;
+    p5 := r1;
+  end;
+
+
+// main
 BEGIN
 
   writeln( 'Proc test:' );
   proc1( 100, 200, 300 );
   proc1( 400, 500, 600 );
 
+  i := 5;
+  j := 10;
+  proc2( 1, i, j, 4, r1 );
+  proc2( 1, i, j, 4, r1 );
+  writeln( 'After proc2, i = ', i, ' j = ', j );
+  writeln( '   r1.f1 = ', r1.f1, ' r1.f2 = ', r1.f2, ' r1.f3 = ', r1.f3 );
 
   writeln( 'Record test:' );
 
