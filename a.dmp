@@ -13,7 +13,7 @@
   20	tPushConstP	 388
   22	tWriteStr
   23	tWriteCR
-  24	tPushConstP	 397
+  24	tPushConstP	 405
   26	tWriteStr
   27	tPushGlobalI	 384
   29	tWriteI
@@ -25,29 +25,29 @@
   38	tPushParamI	   8
   40	tAddI
   41	tAssignI
-  42	tPushConstP	 402
+  42	tPushConstP	 415
   44	tWriteStr
   45	tPushParamI	   0
   47	tWriteI
   48	tWriteCR
-  49	tPushConstP	 406
+  49	tPushConstP	 423
   51	tWriteStr
   52	tPushParamI	   4
   54	tWriteI
   55	tWriteCR
-  56	tPushConstP	 410
+  56	tPushConstP	 431
   58	tWriteStr
   59	tPushParamI	   8
   61	tWriteI
   62	tWriteCR
-  63	tPushConstP	 414
+  63	tPushConstP	 439
   65	tWriteStr
   66	tPushLocalI	  -4
   68	tWriteI
   69	tWriteCR
   70	tReturn
   71	tEnter	  16
-  73	tPushConstP	 420
+  73	tPushConstP	 450
   75	tWriteStr
   76	tWriteCR
   77	tPushAddrParam	   0
@@ -72,24 +72,24 @@
  107	tPushConstI	4000
  109	tAddI
  110	tAssignI
- 111	tPushConstP	 429
+ 111	tPushConstP	 467
  113	tWriteStr
  114	tPushParamI	   0
  116	tWriteI
  117	tWriteCR
- 118	tPushConstP	 433
+ 118	tPushConstP	 475
  120	tWriteStr
  121	tPushParamP	   4
  123	tFetchI
  124	tWriteI
  125	tWriteCR
- 126	tPushConstP	 437
+ 126	tPushConstP	 483
  128	tWriteStr
  129	tPushParamP	  12
  131	tFetchI
  132	tWriteI
  133	tWriteCR
- 134	tPushConstP	 441
+ 134	tPushConstP	 491
  136	tWriteStr
  137	tPushParamI	  20
  139	tWriteI
@@ -143,7 +143,7 @@
  213	tAssignI
  214	tReturn
  215	tEnter	   4
- 217	tPushConstP	 445
+ 217	tPushConstP	 499
  219	tWriteStr
  220	tWriteCR
  221	tPushAddrGlobal	 296
@@ -162,12 +162,12 @@
  244	tFetchI
  245	tFreeActuals	  16
  247	tAssignI
- 248	tPushConstP	 451
+ 248	tPushConstP	 510
  250	tWriteStr
  251	tPushGlobalI	 296
  253	tWriteI
  254	tWriteCR
- 255	tPushConstP	 458
+ 255	tPushConstP	 524
  257	tWriteStr
  258	tWriteCR
  259	tAllocActuals	  12
@@ -236,28 +236,28 @@
  368	tAssignP
  369	tCall   	  71
  371	tFreeActuals	  32
- 373	tPushConstP	 464
+ 373	tPushConstP	 535
  375	tWriteStr
  376	tPushGlobalI	 296
  378	tWriteI
- 379	tPushConstP	 473
+ 379	tPushConstP	 553
  381	tWriteStr
  382	tPushGlobalI	 300
  384	tWriteI
  385	tWriteCR
- 386	tPushConstP	 476
+ 386	tPushConstP	 559
  388	tWriteStr
  389	tPushAddrGlobal	 316
  391	tFetchI
  392	tWriteI
- 393	tPushConstP	 482
+ 393	tPushConstP	 571
  395	tWriteStr
  396	tPushAddrGlobal	 316
  398	tPushConstI	   4
  400	tAddI
  401	tFetchI
  402	tWriteI
- 403	tPushConstP	 487
+ 403	tPushConstP	 581
  405	tWriteStr
  406	tPushAddrGlobal	 316
  408	tPushConstI	   8
@@ -265,7 +265,7 @@
  411	tFetchI
  412	tWriteI
  413	tWriteCR
- 414	tPushConstP	 492
+ 414	tPushConstP	 591
  416	tWriteStr
  417	tWriteCR
  418	tPushAddrGlobal	 316
@@ -289,7 +289,7 @@
  447	tPushAddrGlobal	 332
  449	tPushAddrGlobal	 316
  451	tCopy   	  16
- 453	tPushConstP	 499
+ 453	tPushConstP	 604
  455	tWriteStr
  456	tPushAddrGlobal	 316
  458	tFetchI
@@ -310,7 +310,7 @@
  479	tFetchI
  480	tWriteI
  481	tWriteCR
- 482	tPushConstP	 501
+ 482	tPushConstP	 608
  484	tWriteStr
  485	tPushAddrGlobal	 332
  487	tFetchI
@@ -362,7 +362,7 @@
  557	tAddI
  558	tPushConstI	  40
  560	tAssignI
- 561	tPushConstP	 503
+ 561	tPushConstP	 612
  563	tWriteStr
  564	tPushAddrGlobal	 348
  566	tPushConstI	   4
@@ -391,7 +391,7 @@
  599	tFetchI
  600	tWriteI
  601	tWriteCR
- 602	tPushConstP	 507
+ 602	tPushConstP	 620
  604	tWriteStr
  605	tPushAddrGlobal	 348
  607	tPushConstI	  20
@@ -420,7 +420,7 @@
  640	tFetchI
  641	tWriteI
  642	tWriteCR
- 643	tPushConstP	 511
+ 643	tPushConstP	 628
  645	tWriteStr
  646	tPushAddrGlobal	   8
  648	tPushConstI	   1
@@ -444,7 +444,7 @@
  675	tFetchI
  676	tWriteI
  677	tWriteCR
- 678	tPushConstP	 514
+ 678	tPushConstP	 634
  680	tWriteStr
  681	tPushAddrGlobal	   8
  683	tPushConstI	   1
@@ -468,7 +468,7 @@
  710	tFetchI
  711	tWriteI
  712	tWriteCR
- 713	tPushConstP	 517
+ 713	tPushConstP	 640
  715	tWriteStr
  716	tPushAddrGlobal	   8
  718	tPushConstI	   1
@@ -492,7 +492,7 @@
  745	tFetchI
  746	tWriteI
  747	tWriteCR
- 748	tPushConstP	 521
+ 748	tPushConstP	 648
  750	tWriteStr
  751	tWriteCR
  752	tPushConstP	 296
@@ -536,7 +536,7 @@
  815	tAssignI
  816	tJump   	 775
  818	tJump   	 759
- 820	tPushConstP	 527
+ 820	tPushConstP	 660
  822	tWriteStr
  823	tPushAddrGlobal	   8
  825	tPushConstI	   1
@@ -591,7 +591,7 @@
  900	tFetchI
  901	tWriteI
  902	tWriteCR
- 903	tPushConstP	 531
+ 903	tPushConstP	 668
  905	tWriteStr
  906	tPushAddrGlobal	   8
  908	tPushGlobalI	 296
@@ -720,7 +720,7 @@
 1090	tFetchI
 1091	tWriteI
 1092	tWriteCR
-1093	tPushConstP	 533
+1093	tPushConstP	 672
 1095	tWriteStr
 1096	tPushAddrGlobal	   8
 1098	tPushGlobalI	 296
@@ -872,11 +872,11 @@
 1313	tWriteI
 1314	tWriteCR
 1315	tJump   	 862
-1317	tPushConstP	 535
+1317	tPushConstP	 676
 1319	tWriteStr
-1320	tPushConstP	 539
+1320	tPushConstP	 684
 1322	tWriteStr
-1323	tPushConstP	 542
+1323	tPushConstP	 689
 1325	tWriteStr
 1326	tWriteCR
 1327	tReturn

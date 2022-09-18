@@ -6,4 +6,4 @@
 ./bin-${OSTYPE}/sm -d a.out
 
 # Now execute
-./bin-${OSTYPE}/sm a.out
+./bin-${OSTYPE}/sm a.out | tee a.log

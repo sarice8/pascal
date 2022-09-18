@@ -27,8 +27,8 @@
 FILE *src,*dmp;
 
 #define codeMax 10000
-short code[codeMax],pc;      /* Program memory */
-short codeWords;             /* Actual #words used */
+int code[codeMax],pc;      /* Program memory */
+int codeWords;             /* Actual #words used */
 
 // expression stack - used for expression evaluation.
 //  In a JIT, this might be implemented with a mix of registers and temp vars instead.
@@ -78,9 +78,8 @@ main(argc,argv)
 int argc;
 char *argv[];
 {
-  int temp;                /* I can't seem to read a 'short' */
+  int temp;
   short arg;
-  short address,count;
 
   trace = 0;
 
@@ -119,17 +118,18 @@ char *argv[];
   } 
 
   /* Also get any string literals, and store in data segemnt */
-  /* File format: <addr> <#words> <data words>               */
+  /* File format: <addr> <#ints> <data ints>               */
 
-  while (fscanf(src,"%d",&temp) != EOF) {
-    address = temp;
-    read = fscanf(src,"%d",&temp);
-    assert( read == 1 );
-    count = temp;
+  int address;
+  int count;
+  while (fscanf(src, "%d", &address) != EOF) {
+    read = fscanf(src, "%d", &count);
+    int* intPtr = (int*) &(data[address]);
     while (count--) {
-      read = fscanf(src,"%d",&temp);
+      int word;
+      read = fscanf(src, "%d", &word);
       assert( read == 1 );
-      data[address++] = temp;
+      *intPtr++ = word;
     }
   }
 

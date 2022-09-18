@@ -80,14 +80,10 @@ void t_dumpTables();
 
 
 #define w_outTableSize 5000
-short w_outTable[w_outTableSize];  /* Emit into this table */
-short w_here;                      /* Output position */
+int   w_outTable[w_outTableSize];  /* Emit into this table */
+int   w_here;                      /* Output position */
 
 /*************** Variables for semantic mechanisms ***************/
-
-short dTemp;                       /* multi-purpose */
-short *dPtr;                       /* multi-purpose */
-short dWords;                      /* multi-purpose */
 
 
 // scope stack
@@ -108,13 +104,13 @@ NODE_PTR dTypeStack[dTypeStackSize];
 int dTypeStackPtr;
 
 #define dCSsize 30
-short dCS[dCSsize], dCSptr;        /* count stack */
+int dCS[dCSsize], dCSptr;        /* count stack */
 
 #define dVSsize 30
-short dVS[dVSsize], dVSptr;        /* value stack */
+int dVS[dVSsize], dVSptr;        /* value stack */
 
 #define dSLsize 400
-short dSL[dSLsize], dSLptr;        /* string literal table */
+int dSL[dSLsize], dSLptr;        /* string literal table */
 
 /* code patch stacks */
 
@@ -122,16 +118,16 @@ short dSL[dSLsize], dSLptr;        /* string literal table */
 #define dPatchEsize 200
 #define dPatchIsize 40
 
-short dPatchL[dPatchLsize];    /* loop starts */
-short dPatchE[dPatchEsize];    /* loop exits */
-short dPatchI[dPatchIsize];    /* 'if' jumps */
+int dPatchL[dPatchLsize];    /* loop starts */
+int dPatchE[dPatchEsize];    /* loop exits */
+int dPatchI[dPatchIsize];    /* 'if' jumps */
 
 /* array pointing to patch stacks */
 
 struct dPStype {
-  short *stack;
-  short ptr;
-  short size;
+  int* stack;
+  int  ptr;
+  int  size;
 } dPS[3] = 
    {dPatchL, 0, dPatchLsize,
     dPatchE, 0, dPatchEsize,
@@ -151,8 +147,8 @@ main(argc,argv)
 int argc;
 char *argv[];
 {
-  int entries,temp;                /* I can't seem to read a 'short' */
-  short arg;
+  int entries,temp;
+  int arg;
 
   /* Prepare Files */
 
@@ -320,17 +316,19 @@ NODE_PTR dNode;  // temporary for several mechanisms
 
     // built-in Emit operation is handled by application
 
-    case oEmit :
+    case oEmit : {
             if (w_here >= w_outTableSize) {
               ssl_fatal( "output table overflow" );
             }
 
-            dTemp = ssl_code_table[ssl_pc++];
-            switch (dTemp) {
+            int outToken = ssl_code_table[ssl_pc++];
+            switch (outToken) {
               case tSpace :      w_outTable[w_here++] = 0;
-                                 continue;
-              default :          w_outTable[w_here++] = dTemp;
-                                 continue;
+                                 break;
+              default :          w_outTable[w_here++] = outToken;
+                                 break;
+            }
+            continue;
             }
 
 
@@ -664,22 +662,27 @@ NODE_PTR dNode;  // temporary for several mechanisms
 
             NODE_PTR globalScope = dScopeStack[1];
 
-            dWords = (ssl_token.namelen + 2) / 2;  /* #words for string */
-            if (dSLptr + dWords + 2 >= dSLsize) ssl_fatal("SL overflow");
+            int size = ssl_token.namelen + 1;  // +1 for '\0'
+            // TO DO: for now, strlit table packs the data into ints, which is confusing.
+            int numInts = (size + 3) / 4;
+            if (dSLptr + numInts + 2 >= dSLsize) ssl_fatal("SL overflow");
 
             int offset = nodeGetValue( globalScope, qSize );
-            nodeSetValue( globalScope, qSize, offset + dWords );
+            nodeSetValue( globalScope, qSize, offset + size );
 
             /* push string addr (global data ptr) on value stack */
             if (++dVSptr==dVSsize) ssl_fatal("VS overflow");
             dVS[dVSptr] = offset;
 
             /* save in strlit table: <addr> <words> <data> */
+
             dSL[dSLptr++] = offset;
-            dSL[dSLptr++] = dWords;
-            dPtr = (short *) ssl_strlit_buffer;
-            for (dTemp = 0; dTemp < dWords; dTemp++)
-              dSL[dSLptr++] = *dPtr++;
+            dSL[dSLptr++] = numInts;
+            int* intPtr = (int*) ssl_strlit_buffer;
+            for (int i = 0; i < numInts; ++i) {
+              dSL[dSLptr++] = *intPtr++;
+            }
+
             continue;
             }
 
@@ -694,20 +697,23 @@ NODE_PTR dNode;  // temporary for several mechanisms
      case oPatchAnyEntries :
             ssl_result = dPS[ssl_param].ptr>0;
             continue;
-     case oPatchSwap :
-            dPtr = &dPS[ssl_param].stack[dPS[ssl_param].ptr-1];
-            dTemp = dPtr[0];
-            dPtr[0] = dPtr[1];
-            dPtr[1] = dTemp;
+     case oPatchSwap : {
+            int* ptr = &dPS[ssl_param].stack[dPS[ssl_param].ptr-1];
+            int temp = ptr[0];
+            ptr[0] = ptr[1];
+            ptr[1] = temp;
             continue;
-     case oPatchDup :
-            dPtr = &dPS[ssl_param].stack[dPS[ssl_param].ptr++];
-            dPtr[1] = dPtr[0];
+            }
+     case oPatchDup : {
+            int* intPtr = &dPS[ssl_param].stack[dPS[ssl_param].ptr++];
+            intPtr[1] = intPtr[0];
             continue;
-     case oPatchPopFwd :
-            dTemp = dPS[ssl_param].stack[dPS[ssl_param].ptr--];
-            w_outTable[dTemp] = w_here;
+            }
+     case oPatchPopFwd : {
+            int loc = dPS[ssl_param].stack[dPS[ssl_param].ptr--];
+            w_outTable[loc] = w_here;
             continue;
+            }
      case oPatchPopBack :
             w_outTable[w_here] = dPS[ssl_param].stack[dPS[ssl_param].ptr--];
             w_here++;
@@ -784,14 +790,14 @@ t_dumpTables()
   fprintf(t_out,"%d\n",w_here);
   col = 0;
   for (i=0; i<w_here; i++) {
-    fprintf(t_out,"%6d",w_outTable[i]);
+    fprintf(t_out,"%6d ",w_outTable[i]);
     if ((++col % 10) == 0)
       fprintf(t_out,"\n");
   }
 
   /* string literals table */
   for (i=0; i<dSLptr; i++) {
-    fprintf(t_out,"%6d",dSL[i]);
+    fprintf(t_out,"%6d ",dSL[i]);
     if ((++col % 10) == 0)
       fprintf(t_out,"\n");
   }
