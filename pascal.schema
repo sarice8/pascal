@@ -36,6 +36,10 @@ nIdent =>
         
 
 nIdent ::= nProgram
+nProgram =>
+        % scope for use by the main routine, for temporaries
+        qMainRoutineScope:   Node       (nScope)                [Pri]
+
 
 
 % nMethod is a proc or func declaration.

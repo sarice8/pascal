@@ -401,6 +401,8 @@ Node    StringType
 % -------------------------- Forward Declarations -------------------------
 
 Block( node_type varNodeType, out int addr );
+BlockDecls( node_type varNodeType );
+BlockStmt( out int addr );
 VarDecl( node_type varNodeType );
 newType( node_type nt, int size ) >> Node;
 newIdent( node_type nt, kind k, int id ) >> Node;
@@ -416,6 +418,7 @@ LValueVar( Node decl );
 % ----------------------------- Declarations ----------------------------
 
 Program:
+   Node progDecl
    Node t
 
    oScopeBegin
@@ -423,17 +426,16 @@ Program:
 
    @installBuiltIns
 
-   % Start by jumping to the main program statement
-   int patchJumpMain
-   .tJump 
-   patchJumpMain = Here
-   .tSpace
+   % Start by calling the main program routine
+   int patchCallMain
+   .tCall  patchCallMain = Here  .tSpace
+   .tReturn
 
    pProgram
    pIdent
 
-   t = @newIdent( nProgram, kProgram, LAST_ID )
-   oScopeDeclare( t )
+   progDecl = @newIdent( nProgram, kProgram, LAST_ID )
+   oScopeDeclare( progDecl )
 
    [
       | '(' :
@@ -455,12 +457,25 @@ Program:
    ]
    ';'
 
+   @BlockDecls( nGlobalVar )
+
+   % a new scope just for temporaries in the main routine
+   oScopeBegin
+   oNodeSetBoolean( oScopeCurrent, qAllocDown, true )
+   oNodeSet( progDecl, qMainRoutineScope, oScopeCurrent )
+
+   % The block statement includes a stack frame, and enter/return,
+   % even for the main routine.
+   % That will be necessary for temporaries allocated in the main routine.
    int addr
-   @Block( nGlobalVar, addr )    % not including punctuation after body's 'end'
-   oPatch( patchJumpMain, addr )
+   @BlockStmt( addr )
+
+   oScopeEnd   % main routine scope
+
+   oPatch( patchCallMain, addr )
 
    '.'
-   oScopeEnd
+   oScopeEnd   % global scope
    ;
 
 
@@ -469,6 +484,12 @@ Program:
 % due to method declarations in the block.
 %
 Block( node_type varNodeType, out int addr ):
+   @BlockDecls( varNodeType )
+   @BlockStmt( addr )
+   ;
+
+
+BlockDecls( node_type varNodeType ):
    {[
       | pConst :     @ConstDecl
       | pType :      @TypeDecl
@@ -476,26 +497,27 @@ Block( node_type varNodeType, out int addr ):
       | pProcedure : @ProcDecl
       | pFunction :  @FuncDecl
       | * :          >
-   ]}
+   ]};
+
+
+BlockStmt( out int addr ):
    addr = Here
 
-   % proc/func body begins with tEnter
+   % Proc, func, and main routine all start with tEnter
+   % to create a stack frame.  This will be used for temporaries
+   % (and local vars in the case of proc, func).
+
    int patchLS
-   [ equal_node_type( varNodeType, nLocalVar )
-      | true :       .tEnter  patchLS = Here  .tSpace
-      | * :
-   ]
+   .tEnter  patchLS = Here  .tSpace
 
    @Statement
    .tReturn
 
-   [ equal_node_type( varNodeType, nLocalVar )
-      | true :
-         int localSpace
-         localSpace = oNodeGetInt( oScopeCurrent, qSize )
-         oPatch( patchLS, localSpace )
-      | * :
-   ];
+   int localSpace
+   localSpace = oNodeGetInt( oScopeCurrent, qSize )
+   oPatch( patchLS, localSpace )
+   ;
+
 
 
 ProcDecl:
@@ -1334,7 +1356,6 @@ Call( Node method ):
    boolean isFunc
    Node resultType
    int tempOffset
-   boolean tempIsGlobal
 
    isFunc = equal_node_type( oNodeType( method ), nFunc )
 
@@ -1342,15 +1363,8 @@ Call( Node method ):
       | true :
          resultType = oNodeGet( method, qType )
          tempOffset = oScopeAllocType( resultType )
-         tempIsGlobal = oNodeEqual( oScopeCurrent, globalScope )
-
          % TO DO: we could manage temp allocation, so temp space can be reused
          %        by different code branches.
-         % Note, the current scope can be global scope, if function is called from
-         % the main code.  We need to know if the temp is global or local
-         % to reference the allocated offset.  TO DO: could be cleaner.  Maybe I should
-         % create a local stack frame for the main method too.
-
       | * :
    ]
    
@@ -1436,12 +1450,8 @@ Call( Node method ):
    [ isFunc
       | true :
          % Pass result temp as an additional VAR parameter.
-         % Allow for the result temp to be in global scope or local scope.
          .tPushAddrActual oEmitInt( oNodeGetInt( method, qResultOffset ) )
-         [ tempIsGlobal
-            | true :   .tPushAddrGlobal  oEmitInt( tempOffset )
-            | * :      .tPushAddrLocal   oEmitInt( tempOffset )
-         ]
+         .tPushAddrLocal  oEmitInt( tempOffset )
          .tAssignP
       | * :
    ]
@@ -1452,10 +1462,7 @@ Call( Node method ):
       | true :
          % push return value from temp
          oTypeSPush( resultType )
-         [ tempIsGlobal
-            | true :   .tPushAddrGlobal  oEmitInt( tempOffset )
-            | * :      .tPushAddrLocal   oEmitInt( tempOffset )
-         ]
+         .tPushAddrLocal  oEmitInt( tempOffset )
          @FetchVar
       | * :
    ]

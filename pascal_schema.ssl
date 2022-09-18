@@ -42,6 +42,7 @@ type node_attribute:
 	qType
 	qParamType
 	qValue
+	qMainRoutineScope
 	qParams
 	qChildScope
 	qAddrDefined
