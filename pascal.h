@@ -1,4 +1,4 @@
-#define SSL_CODE_TABLE_SIZE 4800
+#define SSL_CODE_TABLE_SIZE 5100
 
 #define oJumpForward 0
 #define oJumpBack 1
@@ -157,6 +157,7 @@
 #define eNotAllowed 17
 #define eNotInALoop 18
 #define eRecordEmpty 19
+#define eNotCurrentFunction 20
 #define nINVALID 0
 #define Object 1
 #define nScope 2
@@ -197,13 +198,14 @@
 #define qParams 9
 #define qChildScope 10
 #define qAddrDefined 11
-#define qInOut 12
-#define qPointerType 13
-#define qBaseType 14
-#define qIndexType 15
-#define qLow 16
-#define qHigh 17
-#define qScope 18
+#define qResultOffset 12
+#define qInOut 13
+#define qPointerType 14
+#define qBaseType 15
+#define qIndexType 16
+#define qLow 17
+#define qHigh 18
+#define qScope 19
 #define Null 0
 #define NullVec 0
 #define false 0
@@ -320,8 +322,9 @@ struct ssl_error_table_struct ssl_error_table[] = {
    "eNotAllowed", 17,
    "eNotInALoop", 18,
    "eRecordEmpty", 19,
+   "eNotCurrentFunction", 20,
    "", 0
 };
-int ssl_error_table_size = 20;
+int ssl_error_table_size = 21;
 
 #endif // SSL_INCLUDE_ERR_TABLE

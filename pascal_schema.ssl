@@ -45,6 +45,7 @@ type node_attribute:
 	qParams
 	qChildScope
 	qAddrDefined
+	qResultOffset
 	qInOut
 	qPointerType
 	qBaseType

@@ -221,6 +221,7 @@ error:
    eNotAllowed
    eNotInALoop
    eRecordEmpty
+   eNotCurrentFunction
    ;
 
 include 'pascal_schema.ssl'
@@ -521,10 +522,10 @@ ProcDecl:
    % Start scope for declarations within the proc
    oScopeBegin
    oNodeSetBoolean( oScopeCurrent, qAllocDown, true )
+   oNodeSet( decl, qChildScope, oScopeCurrent )
 
    int addr
    @Block( nLocalVar, addr )
-   oNodeSet( decl, qChildScope, oScopeCurrent )
    oNodeSetInt( decl, qValue, addr )
    oNodeSetBoolean( decl, qAddrDefined, true )
    oScopeEnd
@@ -545,14 +546,24 @@ FuncDecl:
 
    @FormalArgDecl
    oNodeSet( decl, qParams, paramScope )
-   oScopeEnd
 
-   oScopeDeclare( decl )
    ':'
 
    @TypeRef( theType )
    oNodeSet( decl, qType, theType )
+
+   % The function's param space gets an additional pointer,
+   % which will point to a temporary in the caller's scope.
+   % This pointer is essentially a VAR param, but I won't create an nParam for it.
+
+   Node ptrType
+   ptrType = @PointerTypeTo( theType )
+   oNodeSetInt( decl, qResultOffset, oScopeAllocType( ptrType ) )
+
    ';'
+
+   oScopeEnd
+   oScopeDeclare( decl )
 
    % Enter the params scope again, so params are visible in body.
    % TO DO: Perhaps I could mark the scope read-only at this point.
@@ -560,10 +571,10 @@ FuncDecl:
 
    oScopeBegin
    oNodeSetBoolean( oScopeCurrent, qAllocDown, true )
+   oNodeSet( decl, qChildScope, oScopeCurrent )
 
    int addr
    @Block( nLocalVar, addr )
-   oNodeSet( decl, qChildScope, oScopeCurrent )
    oNodeSetInt( decl, qValue, addr )
    oNodeSetBoolean( decl, qAddrDefined, true )
    oScopeEnd
@@ -1317,6 +1328,33 @@ CoerceType:
 %
 Call( Node method ):
 
+   % If this is a function, we will allocate a temporary
+   % in the current scope, to hold the result value.
+   % And pass a pointer to that temporary as an extra parameter.
+   boolean isFunc
+   Node resultType
+   int tempOffset
+   boolean tempIsGlobal
+
+   isFunc = equal_node_type( oNodeType( method ), nFunc )
+
+   [ isFunc
+      | true :
+         resultType = oNodeGet( method, qType )
+         tempOffset = oScopeAllocType( resultType )
+         tempIsGlobal = oNodeEqual( oScopeCurrent, globalScope )
+
+         % TO DO: we could manage temp allocation, so temp space can be reused
+         %        by different code branches.
+         % Note, the current scope can be global scope, if function is called from
+         % the main code.  We need to know if the temp is global or local
+         % to reference the allocated offset.  TO DO: could be cleaner.  Maybe I should
+         % create a local stack frame for the main method too.
+
+      | * :
+   ]
+   
+
    Node paramScope
    paramScope = oNodeGet( method, qParams )
    int actualsSize
@@ -1388,18 +1426,37 @@ Call( Node method ):
          ')'
 
       | * :
-         [ oNodeNull( param )
-            | false :    #eMissingParameter
-            | * :
+   ]
+
+   [ oNodeNull( param )
+      | false :    #eMissingParameter
+      | * :
+   ]
+
+   [ isFunc
+      | true :
+         % Pass result temp as an additional VAR parameter.
+         % Allow for the result temp to be in global scope or local scope.
+         .tPushAddrActual oEmitInt( oNodeGetInt( method, qResultOffset ) )
+         [ tempIsGlobal
+            | true :   .tPushAddrGlobal  oEmitInt( tempOffset )
+            | * :      .tPushAddrLocal   oEmitInt( tempOffset )
          ]
+         .tAssignP
+      | * :
    ]
 
    .tCall   @EmitValue( method )
 
-   [ oNodeType( method )
-      | nFunc :
-         % TO DO: push return value from actuals space
-         oTypeSPush( oNodeGet( method, qType ) )
+   [ isFunc
+      | true :
+         % push return value from temp
+         oTypeSPush( resultType )
+         [ tempIsGlobal
+            | true :   .tPushAddrGlobal  oEmitInt( tempOffset )
+            | * :      .tPushAddrLocal   oEmitInt( tempOffset )
+         ]
+         @FetchVar
       | * :
    ]
    
@@ -1433,6 +1490,7 @@ AssignOrCallStmt:
    [ oNodeType( decl )
       | nProc :                           @Call( decl )
       | nGlobalVar, nLocalVar, nParam :   @AssignStmt( decl )
+      | nFunc :                           @AssignResultStmt( decl )
       | * :                               #eBadStatement
    ];
 
@@ -1460,6 +1518,40 @@ AssignStmt( Node decl ):
    ]
    oTypeSPop
    ;
+
+
+% Given nFunc for the just-accepted identifier on the left hand side.
+% Parse an assignment that represents assignment of the function result.
+%
+AssignResultStmt( Node funcDecl ):
+   % Only allowed to assign the result of the immediately enclosing function, I think.
+   [ oNodeEqual( oNodeGet( funcDecl, qChildScope ), oScopeCurrent )
+      | false :   #eNotCurrentFunction
+      | * :
+   ]
+
+   % Result value is stored in the caller's space, via a hidden VAR parameter.
+   .tPushParamP  oEmitInt( oNodeGetInt( funcDecl, qResultOffset ) )
+   oTypeSPush( oNodeGet( funcDecl, qType ) )
+
+   ':='
+   @Expr
+   @MatchTypes
+   [ oTypeSNodeType
+      | nIntegerType :            .tAssignI
+      | nBooleanType :            .tAssignB
+      | nCharType, nStringType, nFileType :   #eNotImplemented
+
+      % compound var assigns; addrs of src, dest on stack
+      | nPointerType :            .tAssignP
+      | * :
+          int size
+          size = oNodeGetInt( oTypeSTop, qSize )
+          .tCopy  oEmitInt( size )    % multi-word copy
+   ]
+   oTypeSPop
+   ;
+
 
 
 % Parse an lvalue expression, from scratch.

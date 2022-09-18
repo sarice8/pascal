@@ -79,9 +79,24 @@ procedure proc2( p1 : integer;
     p5 := r1;
   end;
 
+function func1( p1 : integer;
+                p2 : integer ) : integer;
+  var r1 : rtype;
+  begin
+    r1.f1 := p1;
+    r1.f2 := p2;
+    r1.f3 := p1;
+
+    func1 := r1.f1 + r1.f2 + r1.f3;
+  end;
+
 
 // main
 BEGIN
+
+  writeln( 'Func test:' );
+  i := func1( 10, 20 );
+  writeln( '  result i = ', i );
 
   writeln( 'Proc test:' );
   proc1( 100, 200, 300 );

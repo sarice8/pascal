@@ -57,6 +57,9 @@ nMethod ::= nProc
 
 % func return type is qType in nIdent.
 nMethod ::= nFunc
+nFunc =>
+        qResultOffset:  Integer4    % offset of VAR param for result
+
 
 
 nIdent ::= nConst
