@@ -151,7 +151,6 @@ output:
    tPushParamP       % <offset> - push ptr value read from local var
 
    tPushConstI       % <int> - push int value on stack (NOTE, used for BOOLEAN too)
-   tPushConstP       % <ptr> - push constant ptr value
    tPushAddrGlobal   % <offset> - push ptr to global var (same as tPushConstP)
    tPushAddrLocal    % <offset> - push ptr to local var
    tPushAddrParam    % <offset> - push ptr to formal param (used by method to see its param)
@@ -1078,8 +1077,8 @@ Primary:
          ')'
 
       | pStrLit :
-         oStringAllocLit     % store, put addr on value stack
-         .tPushConstP oEmitInt( oValueTop )  oValuePop
+         oStringAllocLit     % store in global data, push offset on value stack
+         .tPushAddrGlobal oEmitInt( oValueTop )  oValuePop
          % TO DO: do we need to create a type with the literal's length?
          oTypeSPush( StringType )
 
@@ -1626,6 +1625,8 @@ IfStmt:
 ForStmt:
    pIdent
 
+   % TO DO: this needs to use something like lvalue var instead.
+   %        and similarly allow reference to any var kind below.
    Node decl
    decl = oScopeFindRequire
    [ oNodeType( decl )
@@ -1636,7 +1637,7 @@ ForStmt:
    ]
    oTypeSPush( oNodeGet( decl, qType ) )
    @RequireIntPop
-   .tPushConstP  @EmitValue( decl )
+   .tPushAddrGlobal  @EmitValue( decl )
 
    ':='
 

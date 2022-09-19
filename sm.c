@@ -26,26 +26,29 @@
 
 FILE *src,*dmp;
 
+#define PTR_SIZE (sizeof(void*))
+
 #define codeMax 10000
 int code[codeMax],pc;      /* Program memory */
 int codeWords;             /* Actual #words used */
 
 // expression stack - used for expression evaluation.
 //  In a JIT, this might be implemented with a mix of registers and temp vars instead.
+//  Each element is large enough to hold a pointer value.
 #define stackMax 2000
-short stack[stackMax],sp;
+long stack[stackMax],sp;
 
 
 // Hardcoded offset from fp to start of params.
 // This is needed to record old fp and method return address.
 // TO DO: maybe the offset shouldl be built into code instead.
-#define FRAME_PARAMS_OFFSET  2   // 2 since still using words in stack, not bytes.
+#define FRAME_PARAMS_OFFSET  (2*PTR_SIZE)
 
 
 
 // good grief, can't hardcode these
-#define dataMax 30000
-short data[dataMax];         /* Data memory */
+#define dataMax 100000
+char data[dataMax];         /* Data memory */
 
 
 // call stack - used for function params, local vars, temp vars
@@ -56,12 +59,12 @@ short data[dataMax];         /* Data memory */
 // e.g. so tAssignI can work equally on global var and local var.
 // 
 #define callStackSize 2000
-#define callStackLowerBound (dataMax - callStackSize)
-short call_sp;
-short call_fp;
+#define callStackLowerBound (&data[dataMax - callStackSize])
+char* call_sp;
+char* call_fp;
 
 
-short temp, *ptr1, *ptr2;
+short temp;
 char trace, underflow, dump;
 
 
@@ -78,14 +81,11 @@ main(argc,argv)
 int argc;
 char *argv[];
 {
-  int temp;
-  short arg;
-
   trace = 0;
 
   /* Prepare Files */
 
-  arg = 1;
+  int arg = 1;
   if (arg>=argc) {
     printf("Usage:  stackmachine -trace -underflow -dump <file>\n");
     exit(-1);
@@ -103,16 +103,17 @@ char *argv[];
     printf("Can't open program file %s\n",argv[arg]);
     exit(-1);
   }
-  int read = fscanf(src,"%d",&temp);
+  int read = fscanf(src, "%d", &codeWords);
   assert( read == 1 );
-  codeWords = temp;
   if (codeWords >= codeMax) {
     printf("Program code too big for buffer\n");
     exit(-1);
   }
   printf("Stack Machine ");
+
+  int temp;
   for (pc=0; pc<codeWords; pc++) {
-    read = fscanf(src,"%d",&temp);
+    read = fscanf(src, "%d", &temp);
     assert( read == 1 );
     code[pc] = temp;
   } 
@@ -149,7 +150,7 @@ char *argv[];
 
   pc = 0;                        /* Initialize walker */
   sp = 0;
-  call_sp = dataMax-1;
+  call_sp = &data[dataMax] - PTR_SIZE;
 
   walkTable();
 
@@ -172,100 +173,102 @@ walkTable()
 
        case tPushGlobalI :
               if (++sp>=stackMax) fatal("stack overflow");
-              stack[sp] = data[code[pc++]];
+              stack[sp] = *(int*) (data + code[pc++]);
               continue;
        case tPushGlobalB :
               if (++sp>=stackMax) fatal("stack overflow");
-              stack[sp] = data[code[pc++]];
+              stack[sp] = *(char*) (data + code[pc++]);
               continue;
        case tPushGlobalP :
               if (++sp>=stackMax) fatal("stack overflow");
-              stack[sp] = data[code[pc++]];
+              stack[sp] = (long) *(void**) (data + code[pc++]);
               continue;
        case tPushLocalI :
               // code provides negative offset from call_fp
               if (++sp>=stackMax) fatal("stack overflow");
-              stack[sp] = data[call_fp + code[pc++]];
+              stack[sp] = *(int*) (call_fp + code[pc++]);
               continue;
        case tPushLocalB :
               if (++sp>=stackMax) fatal("stack overflow");
-              stack[sp] = data[call_fp + code[pc++]];
+              stack[sp] = *(char*) (call_fp + code[pc++]);
               continue;
        case tPushLocalP :
               if (++sp>=stackMax) fatal("stack overflow");
-              stack[sp] = data[call_fp + code[pc++]];
+              stack[sp] = (long) *(void**) (call_fp + code[pc++]);
               continue;
        case tPushParamI :
               if (++sp>=stackMax) fatal("stack overflow");
-              stack[sp] = data[call_fp + code[pc++] + FRAME_PARAMS_OFFSET];
+              stack[sp] = *(int*) (call_fp + code[pc++] + FRAME_PARAMS_OFFSET);
               continue;
        case tPushParamB :
               if (++sp>=stackMax) fatal("stack overflow");
-              stack[sp] = data[call_fp + code[pc++] + FRAME_PARAMS_OFFSET];
+              stack[sp] = *(char*) (call_fp + code[pc++] + FRAME_PARAMS_OFFSET);
               continue;
        case tPushParamP :
               if (++sp>=stackMax) fatal("stack overflow");
-              stack[sp] = data[call_fp + code[pc++] + FRAME_PARAMS_OFFSET];
+              stack[sp] = (long) *(void**) (call_fp + code[pc++] + FRAME_PARAMS_OFFSET);
               continue;
        case tPushConstI :
               if (++sp>=stackMax) fatal("stack overflow");
               stack[sp] = code[pc++];
               continue;
-       case tPushConstP :
-              if (++sp>=stackMax) fatal("stack overflow");
-              stack[sp] = code[pc++];
-              continue;
        case tPushAddrGlobal :
               if (++sp>=stackMax) fatal("stack overflow");
-              stack[sp] = code[pc++];
+              stack[sp] = (long) (data + code[pc++]);
               continue;
        case tPushAddrLocal :
               if (++sp>=stackMax) fatal("stack overflow");
-              stack[sp] = call_fp + code[pc++];
+              stack[sp] = (long) (call_fp + code[pc++]);
               continue;
        case tPushAddrParam :
               if (++sp>=stackMax) fatal("stack overflow");
-              stack[sp] = call_fp + code[pc++] + FRAME_PARAMS_OFFSET;  // to do: for now, we do this offset
+              stack[sp] = (long) (call_fp + code[pc++] + FRAME_PARAMS_OFFSET);
               continue;
        case tPushAddrActual :
               if (++sp>=stackMax) fatal("stack overflow");
-              stack[sp] = call_sp + code[pc++];
+              stack[sp] = (long) (call_sp + code[pc++]);
               continue;
        case tFetchI :
-              stack[sp] = data[stack[sp]];
+              stack[sp] = *(int*) stack[sp];
               continue;
        case tFetchB :
-              stack[sp] = data[stack[sp]];
+              stack[sp] = *(char*) stack[sp];
               continue;
        case tFetchP :
-              stack[sp] = data[stack[sp]];
+              stack[sp] = (long) *(void**) stack[sp];
               continue;
        case tAssignI :
-              data[stack[sp-1]] = stack[sp];
+              *((int*) stack[sp-1]) = stack[sp];
               sp -= 2;
               continue;
        case tAssignB :
-              data[stack[sp-1]] = stack[sp];
+              *((char*) stack[sp-1]) = stack[sp];
               sp -= 2;
               continue;
        case tAssignP :
-              data[stack[sp-1]] = stack[sp];
+              *((void**) stack[sp-1]) = (void*) stack[sp];
               sp -= 2;
               continue;
-       case tCopy :
-              ptr1 = &data[stack[sp-1]];
-              ptr2 = &data[stack[sp]];
-              for (temp=0; temp<code[pc]; temp++)
+       case tCopy : {
+              char* ptr1 = (char*) stack[sp-1];
+              char* ptr2 = (char*) stack[sp];
+              for (int i = 0; i < code[pc]; ++i) {
                 *ptr1++ = *ptr2++;
+              }
               sp -= 2;
               pc++;
               continue;
-       case tIncGlobalI :
-              data[code[pc++]]++;
+              }
+       case tIncGlobalI : {
+              int* ptr = (int*) (data + code[pc++]);
+              (*ptr)++;
               continue;
-       case tDecGlobalI :
-              data[code[pc++]]--;
+              }
+       case tDecGlobalI : {
+              int* ptr = (int*) (data + code[pc++]);
+              (*ptr)--;
               continue;
+              }
        case tMultI :
               stack[sp-1] *= stack[sp];
               sp--;
@@ -345,18 +348,18 @@ walkTable()
                 pc = stack[sp--];
                 // unwind tEnter
                 call_sp = call_fp;
-                call_fp = data[call_fp];
-                ++call_sp;
-                ++call_sp;  // TO DO: remove when iCall pushes return address on call stack
+                call_fp = *(char**)(call_fp);
+                call_sp += PTR_SIZE;
+                call_sp += PTR_SIZE;;  // TO DO: remove when iCall pushes return address on call stack
                 continue;
               } else
                 return;            /* done program table */
        case tEnter :       
               // Start a stack frame, on entry to a proc/func.
               //  TO DO: ideally tCall/tReturn would record return addr on call stack, for clarity
-              call_sp--;  // TO DO: remove when iCall pushes return address on call stack
-              call_sp--;
-              data[call_sp] = call_fp;
+              call_sp -= PTR_SIZE;  // TO DO: remove when iCall pushes return address on call stack
+              call_sp -= PTR_SIZE;
+              *(char**)call_sp = call_fp;
               call_fp = call_sp;
               if (call_sp < callStackLowerBound) fatal("call stack overflow");
               call_sp -= code[pc++];
@@ -380,18 +383,16 @@ walkTable()
               pc++;
               continue;
        case tWriteI :
-              printf("%d",stack[sp--]);
+              printf("%d", (int) stack[sp--]);
               continue;
        case tWriteBool :
               printf(stack[sp--] ? "TRUE" : "FALSE");
               continue;
        case tWriteStr :
-              // SARICE 9/26/2021 - string literals are stored in the intermediate file
-              //   as pairs of characters in a short, so have an endian problem.
-              printf("%s",(char*)&data[stack[sp--]]);
+              printf("%s", (char*) stack[sp--]);
               continue;
        case tWriteP :
-              printf(" <%d>",stack[sp--]);
+              printf(" <%p>", (void*) stack[sp--]);
               continue;
        case tWriteCR :
               printf("\n");
@@ -430,7 +431,6 @@ dumpTable()
        case tPushParamB :    op1("tPushParamB"); 
        case tPushParamP :    op1("tPushParamP");
        case tPushConstI :    op1("tPushConstI");
-       case tPushConstP :    op1("tPushConstP");
        case tPushAddrGlobal : op1("tPushAddrGlobal");
        case tPushAddrLocal :  op1("tPushAddrLocal");
        case tPushAddrParam :  op1("tPushAddrParam");
