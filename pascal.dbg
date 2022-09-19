@@ -1,4 +1,4 @@
-1938
+1962
 -1
 -1
 -1
@@ -400,6 +400,8 @@
 -1
 -1
 -1
+2
+2
 2
 2
 2
@@ -1605,64 +1607,76 @@
 -1
 3740
 3742
-3744
-3746
-3748
-3750
-3756
+3749
+3751
 3758
-3760
-3760
-3762
+3759
+3761
+-1
 3764
-3770
-3772
-3778
-3784
-3786
-3791
-3791
+3766
+3773
+3775
+3782
+3783
+3785
 -1
+-1
+3788
+3790
+3792
+3794
+3796
 3798
-3800
--1
--1
--1
-3802
-3802
-3807
-3814
-3815
-3819
-3823
+3804
+3806
+3808
+3808
+3810
+3812
+3818
+3820
+3826
+3832
 3834
-3834
-3847
-3849
+3839
+3839
 -1
-3858
 -1
-3860
+3846
+3848
+-1
+3850
+3850
+-1
+-1
+-1
+3855
 3862
+-1
 3864
 -1
 3866
-3876
+3868
+3870
+-1
+3872
 3882
 3888
-3888
-3890
-3899
-3905
-3914
-3916
-3918
-3920
-3930
-3936
-3938
-3947
-3953
+3894
+3894
+3896
+3903
+3909
+3917
+3919
+3921
+3923
+3933
+3939
+3941
+3948
+3954
 3962
 3964
 3966
@@ -1675,6 +1689,7 @@
 4002
 4010
 4016
+-1
 -1
 4019
 4021
@@ -1692,6 +1707,7 @@
 4055
 4057
 -1
+-1
 4068
 4070
 4076
@@ -1708,6 +1724,7 @@
 4114
 4120
 -1
+-1
 4123
 4125
 4132
@@ -1717,6 +1734,7 @@
 4147
 4152
 4154
+-1
 -1
 4155
 4157
@@ -1729,6 +1747,7 @@
 4181
 4183
 -1
+-1
 4184
 4186
 4188
@@ -1736,9 +1755,11 @@
 4192
 4196
 -1
+-1
 4207
 4209
 4211
+-1
 -1
 4214
 4216
@@ -1764,8 +1785,11 @@
 -1
 -1
 4281
+-1
 4284
+-1
 4284
+-1
 4287
 -1
 -1
@@ -1960,143 +1984,147 @@
 478 varNodeType nInParam 162 1
 479 BlockStmt nRule 247
 481 addr nOutParam 28 1
-616 patchLS nLocal 28 1
-617 localSpace nLocal 28 2
+622 patchLS nLocal 28 1
+623 localSpace nLocal 28 2
 482 VarDecl nRule 929
 484 varNodeType nInParam 162 1
-648 decls nLocal 215 1
-649 decl nLocal 213 2
-651 theType nLocal 213 3
-652 i nLocal 28 4
+654 decls nLocal 215 1
+655 decl nLocal 213 2
+657 theType nLocal 213 3
+658 i nLocal 28 4
 485 newType nRule 4390
 487 nt nInParam 162 2
 488 size nInParam 28 1
-739 node nLocal 213 1
+747 node nLocal 213 1
 490 newIdent nRule 4424
 492 nt nInParam 162 3
 493 k nInParam 220 2
 495 id nInParam 28 1
-741 t nLocal 213 1
+749 t nLocal 213 1
 496 EmitValue nRule 4600
 498 decl nInParam 213 1
 499 TypeRef nRule 1070
 501 resultType nOutParam 213 1
-654 decl nLocal 213 1
-655 dimensions nLocal 215 2
-657 subrange nLocal 213 3
-658 a nLocal 213 4
-659 baseType nLocal 213 5
-660 dim nLocal 28 6
-661 a nLocal 213 7
-662 subrange nLocal 213 8
-663 width nLocal 28 9
-664 theType nLocal 213 10
-665 size nLocal 28 11
-666 theType nLocal 213 12
+660 decl nLocal 213 1
+661 dimensions nLocal 215 2
+663 subrange nLocal 213 3
+664 a nLocal 213 4
+665 baseType nLocal 213 5
+666 dim nLocal 28 6
+667 a nLocal 213 7
+668 subrange nLocal 213 8
+669 width nLocal 28 9
+670 theType nLocal 213 10
+671 size nLocal 28 11
+672 theType nLocal 213 12
 502 PointerTypeTo nRule 4464
 504 theType nInParam 213 1
-743 ptrType nLocal 213 1
+751 ptrType nLocal 213 1
 505 OrdinalLow nRule 4548
 507 theType nInParam 213 1
 508 AssignStmt nRule 3428
 510 decl nInParam 213 1
-713 size nLocal 28 1
+719 size nLocal 28 1
 511 VarExpr nRule 2210
 513 decl nInParam 213 1
-684 theType nLocal 213 1
+690 theType nLocal 213 1
 514 LValueVar nRule 3647
 516 decl nInParam 213 1
-517 Program nRule 2
-608 progDecl nLocal 213 1
-609 t nLocal 213 2
-611 patchCallMain nLocal 28 3
-612 addr nLocal 28 4
-519 ProcDecl nRule 289
-620 decl nLocal 213 1
-621 paramScope nLocal 213 2
-623 addr nLocal 28 3
-521 FuncDecl nRule 406
-625 decl nLocal 213 1
-626 theType nLocal 213 2
-628 paramScope nLocal 213 3
-629 ptrType nLocal 213 4
-630 addr nLocal 28 5
-523 FormalArgDecl nRule 571
-632 decls nLocal 215 1
-633 decl nLocal 213 2
-635 isInOut nLocal 217 3
-636 theType nLocal 213 4
-637 allocType nLocal 213 5
-638 i nLocal 28 6
-525 ConstDecl nRule 798
-640 decl nLocal 213 1
-641 val nLocal 28 2
-527 TypeDecl nRule 870
-644 decl nLocal 213 1
-645 theType nLocal 213 2
-529 ConstExpr nRule 1539
-668 decl nLocal 213 1
-531 Expr nRule 1605
-533 BoolExpr nRule 1851
-535 BoolTerm nRule 1875
-537 BoolFactor nRule 1899
-539 ArithExpr nRule 1917
-541 Term nRule 1953
-543 Factor nRule 1989
-545 Primary nRule 2015
-677 decl nLocal 213 1
-678 theType nLocal 213 2
-680 decl nLocal 213 3
-681 theType nLocal 213 4
-682 ptrType nLocal 213 5
-547 FetchVar nRule 2589
-549 LValueIndexes nRule 2624
-551 ArraySubscripts nRule 2652
-688 low nLocal 28 1
-689 baseType nLocal 213 2
-691 size nLocal 28 3
-553 RecordFieldRef nRule 2795
-693 field nLocal 213 1
-694 offset nLocal 28 2
-555 PointerDeref nRule 2893
-697 theType nLocal 213 1
-557 CoerceType nRule 2927
-559 Call nRule 2932
-561 method nInParam 213 1
-700 isFunc nLocal 217 1
-701 resultType nLocal 213 2
-703 tempOffset nLocal 28 3
-704 paramScope nLocal 213 4
-705 actualsSize nLocal 28 5
-706 param nLocal 213 6
-707 offset nLocal 28 7
-708 size nLocal 28 8
-562 Statement nRule 3294
-564 AssignOrCallStmt nRule 3372
-711 decl nLocal 213 1
-566 AssignResultStmt nRule 3497
-568 funcDecl nInParam 213 1
-715 size nLocal 28 1
-569 LValueExpr nRule 3611
+517 IncVar nRule 3740
+519 decl nInParam 213 1
+520 DecVar nRule 3764
+522 decl nInParam 213 1
+523 Program nRule 2
+614 progDecl nLocal 213 1
+615 t nLocal 213 2
+617 patchCallMain nLocal 28 3
+618 addr nLocal 28 4
+525 ProcDecl nRule 289
+626 decl nLocal 213 1
+627 paramScope nLocal 213 2
+629 addr nLocal 28 3
+527 FuncDecl nRule 406
+631 decl nLocal 213 1
+632 theType nLocal 213 2
+634 paramScope nLocal 213 3
+635 ptrType nLocal 213 4
+636 addr nLocal 28 5
+529 FormalArgDecl nRule 571
+638 decls nLocal 215 1
+639 decl nLocal 213 2
+641 isInOut nLocal 217 3
+642 theType nLocal 213 4
+643 allocType nLocal 213 5
+644 i nLocal 28 6
+531 ConstDecl nRule 798
+646 decl nLocal 213 1
+647 val nLocal 28 2
+533 TypeDecl nRule 870
+650 decl nLocal 213 1
+651 theType nLocal 213 2
+535 ConstExpr nRule 1539
+674 decl nLocal 213 1
+537 Expr nRule 1605
+539 BoolExpr nRule 1851
+541 BoolTerm nRule 1875
+543 BoolFactor nRule 1899
+545 ArithExpr nRule 1917
+547 Term nRule 1953
+549 Factor nRule 1989
+551 Primary nRule 2015
+683 decl nLocal 213 1
+684 theType nLocal 213 2
+686 decl nLocal 213 3
+687 theType nLocal 213 4
+688 ptrType nLocal 213 5
+553 FetchVar nRule 2589
+555 LValueIndexes nRule 2624
+557 ArraySubscripts nRule 2652
+694 low nLocal 28 1
+695 baseType nLocal 213 2
+697 size nLocal 28 3
+559 RecordFieldRef nRule 2795
+699 field nLocal 213 1
+700 offset nLocal 28 2
+561 PointerDeref nRule 2893
+703 theType nLocal 213 1
+563 CoerceType nRule 2927
+565 Call nRule 2932
+567 method nInParam 213 1
+706 isFunc nLocal 217 1
+707 resultType nLocal 213 2
+709 tempOffset nLocal 28 3
+710 paramScope nLocal 213 4
+711 actualsSize nLocal 28 5
+712 param nLocal 213 6
+713 offset nLocal 28 7
+714 size nLocal 28 8
+568 Statement nRule 3294
+570 AssignOrCallStmt nRule 3372
 717 decl nLocal 213 1
-571 IfStmt nRule 3740
-573 ForStmt nRule 3798
-721 decl nLocal 213 1
-575 RepeatStmt nRule 4019
-577 WhileStmt nRule 4068
-579 CycleStmt nRule 4123
-581 ExitStmt nRule 4155
-583 BeginStmt nRule 4184
-585 WritelnStmt nRule 4207
-587 WriteStmt nRule 4214
-589 ReadlnStmt nRule 4281
-591 ReadStmt nRule 4284
-593 PatchExitsPop nRule 4287
-595 MatchTypes nRule 4310
-733 nt nLocal 162 1
-597 RequireIntPop nRule 4336
-599 RequireInt nRule 4350
-601 RequireBoolPop nRule 4363
-603 RequireBool nRule 4377
-605 installBuiltIns nRule 4616
-747 t nLocal 213 1
+572 AssignResultStmt nRule 3497
+574 funcDecl nInParam 213 1
+721 size nLocal 28 1
+575 LValueExpr nRule 3611
+723 decl nLocal 213 1
+577 IfStmt nRule 3788
+579 ForStmt nRule 3846
+729 decl nLocal 213 1
+581 RepeatStmt nRule 4019
+583 WhileStmt nRule 4068
+585 CycleStmt nRule 4123
+587 ExitStmt nRule 4155
+589 BeginStmt nRule 4184
+591 WritelnStmt nRule 4207
+593 WriteStmt nRule 4214
+595 ReadlnStmt nRule 4281
+597 ReadStmt nRule 4284
+599 PatchExitsPop nRule 4287
+601 MatchTypes nRule 4310
+741 nt nLocal 162 1
+603 RequireIntPop nRule 4336
+605 RequireInt nRule 4350
+607 RequireBoolPop nRule 4363
+609 RequireBool nRule 4377
+611 installBuiltIns nRule 4616
+755 t nLocal 213 1

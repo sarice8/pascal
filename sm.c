@@ -259,16 +259,12 @@ walkTable()
               pc++;
               continue;
               }
-       case tIncGlobalI : {
-              int* ptr = (int*) (data + code[pc++]);
-              (*ptr)++;
+       case tIncI :
+              stack[sp]++;
               continue;
-              }
-       case tDecGlobalI : {
-              int* ptr = (int*) (data + code[pc++]);
-              (*ptr)--;
+       case tDecI :
+              stack[sp]--;
               continue;
-              }
        case tMultI :
               stack[sp-1] *= stack[sp];
               sp--;
@@ -442,8 +438,8 @@ dumpTable()
        case tAssignB :       op0("tAssignB");
        case tAssignP :       op0("tAssignP");
        case tCopy :          op1("tCopy   ");
-       case tIncGlobalI :    op1("tIncGlobalI");
-       case tDecGlobalI :    op1("tDecGlobalI");
+       case tIncI :          op0("tIncI");
+       case tDecI :          op0("tDecI");
        case tMultI :         op0("tMultI");
        case tDivI :          op0("tDivI");
        case tAddI :          op0("tAddI");

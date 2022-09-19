@@ -162,8 +162,8 @@ output:
    tAssignB          %   "    byte   "    "   "  "   "    "    "   "   "
    tAssignP          %   "    ptr    "    "   "  "   "    "    "   "   "
    tCopy             % #words follows.  tos=src, 2nd=dest (pop 2)
-   tIncGlobalI       % <ptr> - increment int value pointed to by ptr
-   tDecGlobalI       % <ptr> - decrement int value pointed to by ptr
+   tIncI             % increment int value on top of expr stack
+   tDecI             % decrement int value on top of expr stack
    tMultI            % multiply top two integers (replacing with result)
    tDivI
    tAddI  
@@ -412,6 +412,8 @@ OrdinalLow( Node theType ) >> int;
 AssignStmt( Node decl );
 VarExpr( Node decl );
 LValueVar( Node decl );
+IncVar( Node decl );
+DecVar( Node decl );
 
 
 % ----------------------------- Declarations ----------------------------
@@ -1580,7 +1582,7 @@ LValueExpr:
 
 
 % Parse an lvalue expression (e.g. left side of an assign statement)
-% that stars with the just-accepted identifier indicated by the given decl.
+% that starts with the just-accepted identifier indicated by the given decl.
 % Leaves the lvalue address on the expression stack,
 % and the type of the value at that address on the type stack.
 %
@@ -1600,6 +1602,23 @@ LValueVar( Node decl ):
    oTypeSPush( oNodeGet( decl, qType ) )
    @LValueIndexes        % handle subscripts, if any
    ;
+
+
+IncVar( Node decl ):
+   @LValueVar( decl )
+   @RequireIntPop
+   @VarExpr( decl )
+   oTypeSPop
+   .tIncI
+   .tAssignI;
+
+DecVar( Node decl ):
+   @LValueVar( decl )
+   @RequireIntPop
+   @VarExpr( decl )
+   oTypeSPop
+   .tDecI
+   .tAssignI;
 
 
 IfStmt:
@@ -1622,22 +1641,17 @@ IfStmt:
    ]
    oPatchPopFwd(patchIf);
 
+
 ForStmt:
    pIdent
 
-   % TO DO: this needs to use something like lvalue var instead.
-   %        and similarly allow reference to any var kind below.
    Node decl
    decl = oScopeFindRequire
-   [ oNodeType( decl )
-      | nGlobalVar :
-      | nLocalVar :    #eNotImplemented
-      | nParam :       #eNotImplemented
-      | * :            #eNotIntVar
-   ]
-   oTypeSPush( oNodeGet( decl, qType ) )
+   % TO DO: disallow use of a compound variable field.
+   %        Could do that by disallowing use of LValueIndexes,
+   %        or by double-checking the decl's qType here.
+   @LValueVar( decl )
    @RequireIntPop
-   .tPushAddrGlobal  @EmitValue( decl )
 
    ':='
 
@@ -1650,18 +1664,18 @@ ForStmt:
    oPatchSwap(patchLoop)
    [
       | pTo :
-         .tIncGlobalI @EmitValue( decl )
+         @IncVar( decl )
          oPatchPopFwd(patchLoop)
-         .tPushGlobalI @EmitValue( decl )
+         @VarExpr( decl )  oTypeSPop
          @Expr
          @RequireIntPop
          .tGreaterI
          .tJumpTrue oPatchPushHere(patchLoop) .tSpace
          oPatchSwap(patchLoop)
       | pDownto :
-         .tDecGlobalI @EmitValue( decl )
+         @DecVar( decl )
          oPatchPopFwd(patchLoop)
-         .tPushGlobalI @EmitValue( decl )
+         @VarExpr( decl )  oTypeSPop
          @Expr
          @RequireIntPop
          .tLessI
@@ -1674,6 +1688,7 @@ ForStmt:
    .tJump oPatchPopBack(patchLoop)
    oPatchPopFwd(patchLoop)
    @PatchExitsPop;
+
 
 RepeatStmt:
    oPatchPushHere(patchLoop) % start of loop
@@ -1691,6 +1706,7 @@ RepeatStmt:
          >
    ]};
 
+
 WhileStmt:
    oPatchPushHere(patchLoop)    % start of loop
    oCountPush(0)
@@ -1707,6 +1723,7 @@ WhileStmt:
    oPatchPopFwd(patchLoop)
    @PatchExitsPop;
 
+
 CycleStmt:                     % NOTE, for repeat..until, skips test (??)
    [ oPatchAnyEntries(patchLoop)
       | true :
@@ -1716,6 +1733,7 @@ CycleStmt:                     % NOTE, for repeat..until, skips test (??)
       | * :
          #eNotInALoop
    ];
+
 
 ExitStmt:
    [ oPatchAnyEntries(patchLoop)
@@ -1728,6 +1746,7 @@ ExitStmt:
          #eNotInALoop
    ];
 
+
 BeginStmt:
    @Statement
    {[
@@ -1735,9 +1754,11 @@ BeginStmt:
       | pEnd :  >
    ]};
 
+
 WritelnStmt:
    @WriteStmt
    .tWriteCR;
+
 
 WriteStmt:
    [
@@ -1763,8 +1784,11 @@ WriteStmt:
 
 
 ReadlnStmt:      % ***
+   % TO DO
    ;
+
 ReadStmt:
+   % TO DO
    ;
 
 % -------------------------------- Utilities -------------------------------

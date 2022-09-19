@@ -162,8 +162,8 @@
    2:    tAssignB          %   "    byte   "    "   "  "   "    "    "   "   "
    2:    tAssignP          %   "    ptr    "    "   "  "   "    "    "   "   "
    2:    tCopy             % #words follows.  tos=src, 2nd=dest (pop 2)
-   2:    tIncGlobalI       % <ptr> - increment int value pointed to by ptr
-   2:    tDecGlobalI       % <ptr> - decrement int value pointed to by ptr
+   2:    tIncI             % increment int value on top of expr stack
+   2:    tDecI             % decrement int value on top of expr stack
    2:    tMultI            % multiply top two integers (replacing with result)
    2:    tDivI
    2:    tAddI  
@@ -470,6 +470,8 @@
    2: AssignStmt( Node decl );
    2: VarExpr( Node decl );
    2: LValueVar( Node decl );
+   2: IncVar( Node decl );
+   2: DecVar( Node decl );
       
       
       % ----------------------------- Declarations ----------------------------
@@ -1638,7 +1640,7 @@
       
       
       % Parse an lvalue expression (e.g. left side of an assign statement)
-      % that stars with the just-accepted identifier indicated by the given decl.
+      % that starts with the just-accepted identifier indicated by the given decl.
       % Leaves the lvalue address on the expression stack,
       % and the type of the value at that address on the type stack.
       %
@@ -1660,66 +1662,78 @@
 3740:    ;
       
       
-3740: IfStmt:
-3742:    @Expr
-3744:    @RequireBoolPop
-3746:    pThen
-3748:    .tJumpFalse
-3750:    oPatchPushHere(patchIf)
-3756:    .tSpace
-3758:    @Statement
-3760:    [
-3760:       | pElse :
-3762:          .tJump
-3764:          oPatchPushHere(patchIf)
-3770:          .tSpace
-3772:          oPatchSwap(patchIf)
-3778:          oPatchPopFwd(patchIf)
-3784:          @Statement
-3786:       | * :
-3791:    ]
-3791:    oPatchPopFwd(patchIf);
+3740: IncVar( Node decl ):
+3742:    @LValueVar( decl )
+3749:    @RequireIntPop
+3751:    @VarExpr( decl )
+3758:    oTypeSPop
+3759:    .tIncI
+3761:    .tAssignI;
       
-3798: ForStmt:
-3800:    pIdent
+3764: DecVar( Node decl ):
+3766:    @LValueVar( decl )
+3773:    @RequireIntPop
+3775:    @VarExpr( decl )
+3782:    oTypeSPop
+3783:    .tDecI
+3785:    .tAssignI;
       
-         % TO DO: this needs to use something like lvalue var instead.
-         %        and similarly allow reference to any var kind below.
-3802:    Node decl
-3802:    decl = oScopeFindRequire
-3807:    [ oNodeType( decl )
-3814:       | nGlobalVar :
-3815:       | nLocalVar :    #eNotImplemented
-3819:       | nParam :       #eNotImplemented
-3823:       | * :            #eNotIntVar
-3834:    ]
-3834:    oTypeSPush( oNodeGet( decl, qType ) )
-3847:    @RequireIntPop
-3849:    .tPushAddrGlobal  @EmitValue( decl )
       
-3858:    ':='
+3788: IfStmt:
+3790:    @Expr
+3792:    @RequireBoolPop
+3794:    pThen
+3796:    .tJumpFalse
+3798:    oPatchPushHere(patchIf)
+3804:    .tSpace
+3806:    @Statement
+3808:    [
+3808:       | pElse :
+3810:          .tJump
+3812:          oPatchPushHere(patchIf)
+3818:          .tSpace
+3820:          oPatchSwap(patchIf)
+3826:          oPatchPopFwd(patchIf)
+3832:          @Statement
+3834:       | * :
+3839:    ]
+3839:    oPatchPopFwd(patchIf);
       
-3860:    @Expr
+      
+3846: ForStmt:
+3848:    pIdent
+      
+3850:    Node decl
+3850:    decl = oScopeFindRequire
+         % TO DO: disallow use of a compound variable field.
+         %        Could do that by disallowing use of LValueIndexes,
+         %        or by double-checking the decl's qType here.
+3855:    @LValueVar( decl )
 3862:    @RequireIntPop
-3864:    .tAssignI
       
-3866:    .tJump oPatchPushHere(patchLoop) .tSpace
-3876:    oPatchPushHere(patchLoop)
-3882:    oPatchSwap(patchLoop)
-3888:    [
-3888:       | pTo :
-3890:          .tIncGlobalI @EmitValue( decl )
-3899:          oPatchPopFwd(patchLoop)
-3905:          .tPushGlobalI @EmitValue( decl )
-3914:          @Expr
-3916:          @RequireIntPop
-3918:          .tGreaterI
-3920:          .tJumpTrue oPatchPushHere(patchLoop) .tSpace
-3930:          oPatchSwap(patchLoop)
-3936:       | pDownto :
-3938:          .tDecGlobalI @EmitValue( decl )
-3947:          oPatchPopFwd(patchLoop)
-3953:          .tPushGlobalI @EmitValue( decl )
+3864:    ':='
+      
+3866:    @Expr
+3868:    @RequireIntPop
+3870:    .tAssignI
+      
+3872:    .tJump oPatchPushHere(patchLoop) .tSpace
+3882:    oPatchPushHere(patchLoop)
+3888:    oPatchSwap(patchLoop)
+3894:    [
+3894:       | pTo :
+3896:          @IncVar( decl )
+3903:          oPatchPopFwd(patchLoop)
+3909:          @VarExpr( decl )  oTypeSPop
+3917:          @Expr
+3919:          @RequireIntPop
+3921:          .tGreaterI
+3923:          .tJumpTrue oPatchPushHere(patchLoop) .tSpace
+3933:          oPatchSwap(patchLoop)
+3939:       | pDownto :
+3941:          @DecVar( decl )
+3948:          oPatchPopFwd(patchLoop)
+3954:          @VarExpr( decl )  oTypeSPop
 3962:          @Expr
 3964:          @RequireIntPop
 3966:          .tLessI
@@ -1732,6 +1746,7 @@
 4002:    .tJump oPatchPopBack(patchLoop)
 4010:    oPatchPopFwd(patchLoop)
 4016:    @PatchExitsPop;
+      
       
 4019: RepeatStmt:
 4021:    oPatchPushHere(patchLoop) % start of loop
@@ -1749,6 +1764,7 @@
 4055:          >
 4057:    ]};
       
+      
 4068: WhileStmt:
 4070:    oPatchPushHere(patchLoop)    % start of loop
 4076:    oCountPush(0)
@@ -1765,6 +1781,7 @@
 4114:    oPatchPopFwd(patchLoop)
 4120:    @PatchExitsPop;
       
+      
 4123: CycleStmt:                     % NOTE, for repeat..until, skips test (??)
 4125:    [ oPatchAnyEntries(patchLoop)
 4132:       | true :
@@ -1774,6 +1791,7 @@
 4147:       | * :
 4152:          #eNotInALoop
 4154:    ];
+      
       
 4155: ExitStmt:
 4157:    [ oPatchAnyEntries(patchLoop)
@@ -1786,6 +1804,7 @@
 4181:          #eNotInALoop
 4183:    ];
       
+      
 4184: BeginStmt:
 4186:    @Statement
 4188:    {[
@@ -1793,9 +1812,11 @@
 4192:       | pEnd :  >
 4196:    ]};
       
+      
 4207: WritelnStmt:
 4209:    @WriteStmt
 4211:    .tWriteCR;
+      
       
 4214: WriteStmt:
 4216:    [
@@ -1821,8 +1842,11 @@
       
       
 4281: ReadlnStmt:      % ***
+         % TO DO
 4284:    ;
+      
 4284: ReadStmt:
+         % TO DO
 4287:    ;
       
       % -------------------------------- Utilities -------------------------------
@@ -4068,11 +4092,11 @@ Generated code:
 3308: oJumpForward 3371
 3310: oCall 4284
 3312: oJumpForward 3371
-3314: oCall 3740
+3314: oCall 3788
 3316: oJumpForward 3371
 3318: oCall 4068
 3320: oJumpForward 3371
-3322: oCall 3798
+3322: oCall 3846
 3324: oJumpForward 3371
 3326: oCall 4019
 3328: oJumpForward 3371
@@ -4322,137 +4346,138 @@ Generated code:
 3737: oCall 2624
 3739: oReturn
 3740: oLocalSpace 0
-3742: oCall 1605
-3744: oCall 4363
-3746: oInput 39
-3748: oEmit 46
-3750: oSetResult 2
-3752: oPushResult
-3753: oPatchPushHere
-3754: oPop 1
-3756: oEmit 52
-3758: oCall 3294
-3760: oInputChoice 3788
-3762: oEmit 44
-3764: oSetResult 2
-3766: oPushResult
-3767: oPatchPushHere
-3768: oPop 1
-3770: oEmit 52
-3772: oSetResult 2
-3774: oPushResult
-3775: oPatchSwap
-3776: oPop 1
-3778: oSetResult 2
-3780: oPushResult
-3781: oPatchPopFwd
-3782: oPop 1
-3784: oCall 3294
-3786: oJumpForward 3791
-3788: Choice Lookup Table
-          40   3762
-3791: oSetResult 2
-3793: oPushResult
-3794: oPatchPopFwd
-3795: oPop 1
-3797: oReturn
-3798: oLocalSpace 1
-3800: oInput 0
-3802: oGetAddrLocal 1
-3804: oPushResult
-3805: oScopeFindRequire
-3806: oAssign
-3807: oGetLocal 1
-3809: oPushResult
-3810: oNodeType
-3811: oPop 1
-3813: oChoice 3825
-3815: oJumpForward 3834
-3817: oError 16
-3819: oJumpForward 3834
-3821: oError 16
-3823: oJumpForward 3834
-3825: Choice Lookup Table
-          15   3821
-          13   3817
-          12   3815
-3832: oError 5
-3834: oGetLocal 1
-3836: oPushResult
-3837: oSetResult 6
-3839: oPushResult
-3840: oNodeGet
-3841: oPop 2
-3843: oPushResult
-3844: oTypeSPush
-3845: oPop 1
-3847: oCall 4336
-3849: oEmit 10
-3851: oGetLocal 1
-3853: oPushResult
-3854: oCall 4600
-3856: oPop 1
-3858: oInput 3
-3860: oCall 1605
+3742: oGetParam 1
+3744: oPushResult
+3745: oCall 3647
+3747: oPop 1
+3749: oCall 4336
+3751: oGetParam 1
+3753: oPushResult
+3754: oCall 2210
+3756: oPop 1
+3758: oTypeSPop
+3759: oEmit 21
+3761: oEmit 17
+3763: oReturn
+3764: oLocalSpace 0
+3766: oGetParam 1
+3768: oPushResult
+3769: oCall 3647
+3771: oPop 1
+3773: oCall 4336
+3775: oGetParam 1
+3777: oPushResult
+3778: oCall 2210
+3780: oPop 1
+3782: oTypeSPop
+3783: oEmit 22
+3785: oEmit 17
+3787: oReturn
+3788: oLocalSpace 0
+3790: oCall 1605
+3792: oCall 4363
+3794: oInput 39
+3796: oEmit 46
+3798: oSetResult 2
+3800: oPushResult
+3801: oPatchPushHere
+3802: oPop 1
+3804: oEmit 52
+3806: oCall 3294
+3808: oInputChoice 3836
+3810: oEmit 44
+3812: oSetResult 2
+3814: oPushResult
+3815: oPatchPushHere
+3816: oPop 1
+3818: oEmit 52
+3820: oSetResult 2
+3822: oPushResult
+3823: oPatchSwap
+3824: oPop 1
+3826: oSetResult 2
+3828: oPushResult
+3829: oPatchPopFwd
+3830: oPop 1
+3832: oCall 3294
+3834: oJumpForward 3839
+3836: Choice Lookup Table
+          40   3810
+3839: oSetResult 2
+3841: oPushResult
+3842: oPatchPopFwd
+3843: oPop 1
+3845: oReturn
+3846: oLocalSpace 1
+3848: oInput 0
+3850: oGetAddrLocal 1
+3852: oPushResult
+3853: oScopeFindRequire
+3854: oAssign
+3855: oGetLocal 1
+3857: oPushResult
+3858: oCall 3647
+3860: oPop 1
 3862: oCall 4336
-3864: oEmit 17
-3866: oEmit 44
-3868: oSetResult 0
-3870: oPushResult
-3871: oPatchPushHere
-3872: oPop 1
-3874: oEmit 52
-3876: oSetResult 0
-3878: oPushResult
-3879: oPatchPushHere
-3880: oPop 1
+3864: oInput 3
+3866: oCall 1605
+3868: oCall 4336
+3870: oEmit 17
+3872: oEmit 44
+3874: oSetResult 0
+3876: oPushResult
+3877: oPatchPushHere
+3878: oPop 1
+3880: oEmit 52
 3882: oSetResult 0
 3884: oPushResult
-3885: oPatchSwap
+3885: oPatchPushHere
 3886: oPop 1
-3888: oInputChoice 3986
-3890: oEmit 21
-3892: oGetLocal 1
-3894: oPushResult
-3895: oCall 4600
-3897: oPop 1
-3899: oSetResult 0
-3901: oPushResult
-3902: oPatchPopFwd
-3903: oPop 1
-3905: oEmit 0
-3907: oGetLocal 1
-3909: oPushResult
-3910: oCall 4600
-3912: oPop 1
-3914: oCall 1605
-3916: oCall 4336
-3918: oEmit 33
-3920: oEmit 45
-3922: oSetResult 0
-3924: oPushResult
-3925: oPatchPushHere
-3926: oPop 1
-3928: oEmit 52
-3930: oSetResult 0
-3932: oPushResult
-3933: oPatchSwap
-3934: oPop 1
-3936: oJumpForward 3992
-3938: oEmit 22
-3940: oGetLocal 1
-3942: oPushResult
-3943: oCall 4600
-3945: oPop 1
-3947: oSetResult 0
-3949: oPushResult
-3950: oPatchPopFwd
-3951: oPop 1
-3953: oEmit 0
-3955: oGetLocal 1
-3957: oPushResult
-3958: oCall 4600
-3960: oPop 1
+3888: oSetResult 0
+3890: oPushResult
+3891: oPatchSwap
+3892: oPop 1
+3894: oInputChoice 3986
+3896: oGetLocal 1
+3898: oPushResult
+3899: oCall 3740
+3901: oPop 1
+3903: oSetResult 0
+3905: oPushResult
+3906: oPatchPopFwd
+3907: oPop 1
+3909: oGetLocal 1
+3911: oPushResult
+3912: oCall 2210
+3914: oPop 1
+3916: oTypeSPop
+3917: oCall 1605
+3919: oCall 4336
+3921: oEmit 33
+3923: oEmit 45
+3925: oSetResult 0
+3927: oPushResult
+3928: oPatchPushHere
+3929: oPop 1
+3931: oEmit 52
+3933: oSetResult 0
+3935: oPushResult
+3936: oPatchSwap
+3937: oPop 1
+3939: oJumpForward 3992
+3941: oGetLocal 1
+3943: oPushResult
+3944: oCall 3764
+3946: oPop 1
+3948: oSetResult 0
+3950: oPushResult
+3951: oPatchPopFwd
+3952: oPop 1
+3954: oGetLocal 1
+3956: oPushResult
+3957: oCall 2210
+3959: oPop 1
+3961: oTypeSPop
 3962: oCall 1605
 3964: oCall 4336
 3966: oEmit 34
@@ -4468,8 +4493,8 @@ Generated code:
 3982: oPop 1
 3984: oJumpForward 3992
 3986: Choice Lookup Table
-          43   3938
-          42   3890
+          43   3941
+          42   3896
 3991: oEndChoice
 3992: oSetResult 0
 3994: oPushResult

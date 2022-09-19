@@ -104,8 +104,8 @@
 #define tAssignB 18
 #define tAssignP 19
 #define tCopy 20
-#define tIncGlobalI 21
-#define tDecGlobalI 22
+#define tIncI 21
+#define tDecI 22
 #define tMultI 23
 #define tDivI 24
 #define tAddI 25
