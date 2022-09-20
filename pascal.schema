@@ -24,12 +24,9 @@ Object ::= nDeclaration
 % TO DO: not sure why I had both nDeclaration and nIdent
 nDeclaration ::= nIdent
 nIdent =>
-        % to do: ditch all the fields, and rely on schema objects instead.
         qIdent:         Integer4
-        qKind:          Integer4   % to do: ditch this. rely on object type.
         qType:          Node            (nType)                 [Alt,Opt]  % for var, func, typeDecl (how about const?)
-        qParamType:     Node            (nType)                 [Alt,Opt]  % for proc/funcs. I represented params as a type
-        qValue:         Integer4   % for const: value  (was short)
+        qValue:         Integer4   % for const: value
                                    % for nGlobalVar: global address
                                    % for nLocalVar: local address (relative to frame ptr)
                                    % for nParam: local address (relative to frame ptr)

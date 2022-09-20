@@ -1863,7 +1863,6 @@ newType( node_type nt, int size ) >> Node:
 newIdent( node_type nt, kind k, int id ) >> Node:
   Node t
   t = oNodeNew( nt )
-  oNodeSetKind( t, qKind, k )   % deprecated attribute
   oNodeSetInt( t, qIdent, id )
   >> t
   ;
