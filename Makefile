@@ -35,12 +35,12 @@ BACK_SRCS = \
   sm.c \
 
 JIT_SRCS = \
-  jit.c \
+  jit.cc \
 
 
 FRONT_OBJS = $(FRONT_SRCS:%.c=$(OBJDIR)/%.o)
 BACK_OBJS = $(BACK_SRCS:%.c=$(OBJDIR)/%.o)
-JIT_OBJS = $(JIT_SRCS:%.c=$(OBJDIR)/%.o)
+JIT_OBJS = $(JIT_SRCS:%.cc=$(OBJDIR)/%.o)
 
 FRONT_LINK_OBJS = \
   $(SCHEMA_DIR)/obj-$(OSTYPE)/node.o \
@@ -86,6 +86,10 @@ $(JIT_EXEC): $(JIT_OBJS) | $(BINDIR)
 # Compile a c file, and additionally produce a .d dependency file.
 $(OBJDIR)/%.o : %.c
 	gcc $(CFLAGS) $(INCLUDE) -MMD -c $< -o $@
+
+# Compile a cc file, and additionally produce a .d dependency file.
+$(OBJDIR)/%.o : %.cc
+	g++ $(CFLAGS) $(INCLUDE) -MMD -c $< -o $@
 
 
 # Objects depend on the existence of $OBJDIR, but not its timestamp

@@ -23,7 +23,7 @@ typedef void (*funcptr)();
 
 
 void parseArgs( int argc, char* argv[] );
-void usage();
+void usage( int status );
 void loadTCode();
 void allocNativeCode();
 void protectNativeCode();
@@ -454,8 +454,8 @@ tCodeNotImplemented( int opcode )
 void
 allocNativeCode()
 {
-  nativeCode = mmap( NULL, nativeCodeLen, PROT_READ | PROT_WRITE,
-                     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0 );
+  nativeCode = (char*) mmap( NULL, nativeCodeLen, PROT_READ | PROT_WRITE,
+                             MAP_PRIVATE | MAP_ANONYMOUS, -1, 0 );
   nativePc = nativeCode;
   if ( nativeCode == NULL ) {
     printf( "error: mmap failed to allocate %ld bytes for native code\n", nativeCodeLen );
