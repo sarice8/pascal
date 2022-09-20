@@ -41,14 +41,14 @@ long stack[stackMax],sp;
 
 // Hardcoded offset from fp to start of params.
 // This is needed to record old fp and method return address.
-// TO DO: maybe the offset shouldl be built into code instead.
+// TO DO: maybe the offset should be built into code instead.
 #define FRAME_PARAMS_OFFSET  (2*PTR_SIZE)
 
 
 
 // good grief, can't hardcode these
-#define dataMax 100000
-char data[dataMax];         /* Data memory */
+#define dataSize 100000
+char data[dataSize];         /* Data memory */
 
 
 // call stack - used for function params, local vars, temp vars
@@ -59,7 +59,7 @@ char data[dataMax];         /* Data memory */
 // e.g. so tAssignI can work equally on global var and local var.
 // 
 #define callStackSize 2000
-#define callStackLowerBound (&data[dataMax - callStackSize])
+#define callStackLowerBound (&data[dataSize - callStackSize])
 char* call_sp;
 char* call_fp;
 
@@ -150,7 +150,7 @@ char *argv[];
 
   pc = 0;                        /* Initialize walker */
   sp = 0;
-  call_sp = &data[dataMax] - PTR_SIZE;
+  call_sp = &data[dataSize] - PTR_SIZE;
 
   walkTable();
 

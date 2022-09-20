@@ -34,8 +34,13 @@ FRONT_SRCS = \
 BACK_SRCS = \
   sm.c \
 
+JIT_SRCS = \
+  jit.c \
+
+
 FRONT_OBJS = $(FRONT_SRCS:%.c=$(OBJDIR)/%.o)
 BACK_OBJS = $(BACK_SRCS:%.c=$(OBJDIR)/%.o)
+JIT_OBJS = $(JIT_SRCS:%.c=$(OBJDIR)/%.o)
 
 FRONT_LINK_OBJS = \
   $(SCHEMA_DIR)/obj-$(OSTYPE)/node.o \
@@ -44,8 +49,11 @@ FRONT_LINK_OBJS = \
 
 BACK_LINK_OBJS =
 
+JIT_LINK_OBJS =
 
-ALL_OBJS = $(FRONT_OBJS) $(FRONT_LINK_OBJS) $(BACK_OBJS) $(BACK_LINK_OBJS)
+
+ALL_OBJS = $(FRONT_OBJS) $(FRONT_LINK_OBJS) $(BACK_OBJS) $(BACK_LINK_OBJS) \
+           $(JIT_OBJS) $(JIT_LINK_OBJS)
 
 # gcc -MMD will create .d files listing dependencies
 DEP = $(ALL_OBJS:%.o=%.d)
@@ -55,10 +63,12 @@ INCLUDE = -I$(SSL_RT_DIR) -I$(DBG_DIR) -I$(SCHEMA_DIR)
 
 FRONT_EXEC = $(BINDIR)/pascal
 BACK_EXEC = $(BINDIR)/sm
+JIT_EXEC = $(BINDIR)/jit
+
 
 # Main target
 
-execs: $(FRONT_EXEC) $(BACK_EXEC)
+execs: $(FRONT_EXEC) $(BACK_EXEC) $(JIT_EXEC)
 
 # Note:  | $(BINDIR) means the exec depends on the existence of $BINDIR, but not its timestamp
 $(FRONT_EXEC): $(FRONT_OBJS) | $(BINDIR)
@@ -67,6 +77,8 @@ $(FRONT_EXEC): $(FRONT_OBJS) | $(BINDIR)
 $(BACK_EXEC): $(BACK_OBJS) | $(BINDIR)
 	cc $^ $(BACK_LINK_OBJS) -o $@
 
+$(JIT_EXEC): $(JIT_OBJS) | $(BINDIR)
+	cc $^ $(JIT_LINK_OBJS) -o $@
 
 # Include all .d files
 -include $(DEP)
@@ -77,7 +89,7 @@ $(OBJDIR)/%.o : %.c
 
 
 # Objects depend on the existence of $OBJDIR, but not its timestamp
-$(FRONT_OBJS) $(BACK_OBJS): | $(OBJDIR)
+$(FRONT_OBJS) $(BACK_OBJS) $(JIT_OBJS): | $(OBJDIR)
 
 $(OBJDIR):
 	mkdir -p $(OBJDIR)

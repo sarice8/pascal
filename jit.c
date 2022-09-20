@@ -1,49 +1,515 @@
+/*
 
-// Test: Can I still emit code to heap memory?
-// Or do I need to protect it somehow.
+  jit.c
 
-// NOTES
-// Some random article about registers in x86
-//   https://stackoverflow.com/questions/36529449/why-are-rbp-and-rsp-called-general-purpose-registers
-//   Wikipedia has some info  https://en.wikipedia.org/wiki/X86
+  This converts the intermediate t-code produced by my Pascal compiler
+  into x86 machine code, and executes it.
 
+*/
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
+#include <assert.h>
 #include <sys/mman.h>
 //  -- for mmap, mprotect
 #include <errno.h>
 
+// This is where we get the definitions for tCode,
+// which originate in SSL.
+#include "pascal.h"
+
 typedef void (*funcptr)();
 
-char* codeMem = 0;
-size_t codeMemLength = 1024;
-char* pc = 0;
 
-void
-outB( char c )
-{
-  *(pc++) = c;
-}
+void parseArgs( int argc, char* argv[] );
+void usage();
+void loadTCode();
+void allocNativeCode();
+void protectNativeCode();
+void outB( char c );
+void outI( int i );
+void generateCode();
+void tCodeNotImplemented( int opcode );
+void executeCode();
 
-void
-outI( int i )
-{
-  int* p = (int*) pc;
-  *(p++) = i;
-  pc = (char*) p;
-}
 
+char* filename = 0;
+
+int* tCode = 0;
+int  tCodeLen = 0;
+
+
+// Runtime data memory, for globals.
+// Right now we don't actually know how much we need!
+//
+// The call stack will not live in here.  It will be part of the
+// same call stack used by this calling program.
+//
+#define dataSize 100000
+char data[dataSize];
+
+
+
+char* nativeCode = 0;
+size_t nativeCodeLen = 10000;
+char* nativePc = 0;
+
+
+// Operand stack
+//
+typedef enum {
+  jit_Operand_Kind_Illegal = 0,
+
+  // operand is the value of a variable
+  jit_Operand_Kind_GlobalB,
+  jit_Operand_Kind_GlobalI,
+  jit_Operand_Kind_GlobalP,
+  jit_Operand_Kind_LocalB,
+  jit_Operand_Kind_LocalI,
+  jit_Operand_Kind_LocalP,
+  jit_Operand_Kind_ParamB,
+  jit_Operand_Kind_ParamI,
+  jit_Operand_Kind_ParamP,
+
+  jit_Operand_Kind_ConstI,
+
+  // operand is the address of a variable
+  jit_Operand_Kind_Addr_Global,
+  jit_Operand_Kind_Addr_Local,
+  jit_Operand_Kind_Addr_Param,
+  jit_Operand_Kind_Addr_Actual,
+
+  // operand is a value in a register.
+  // We either have one byte valid, 4 bytes valid, or 8 bytes valid.
+  // In the case of 4 bytes, we are guaranteed that the higher 4 bytes
+  // of the register are 0 (note: not sign extended), thanks to x86-64 rules.
+  // This is not the case if the valid size is one byte.
+  jit_Operand_Kind_RegB,
+  jit_Operand_Kind_RegI,
+  jit_Operand_Kind_RegP
+
+} jitOperandKind;
+
+
+typedef struct {
+  jitOperandKind kind;
+  int value; // for a var: the var offset
+             // for a const: the const value
+  // ... reg ptr ... or should I use value for a reg id too?
+} operandT;
+
+#define operandStackSize 100
+operandT operandStack[operandStackSize];
 
 
 int
 main( int argc, char* argv[] )
 {
-   // codeMem = malloc(codeMemLength);
-   codeMem = mmap( NULL, codeMemLength, PROT_READ | PROT_WRITE,
-                   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0 );
+  parseArgs( argc, argv );
+  loadTCode();
+  allocNativeCode();
+  generateCode();
+  protectNativeCode();
+  executeCode();
+}
 
-   pc = codeMem;
+void
+parseArgs( int argc, char* argv[] )
+{
+  int arg = 1;
+  while ( arg < argc ) {
+    if ( strcmp( argv[arg], "-h" ) == 0 ) {
+      usage( 0 );
+    } else if ( argv[arg][0] == '-' ) {
+      usage( 1 );
+    } else {
+      break;
+    }
+    ++arg;
+  }
+  if ( arg != argc-1 ) {
+    usage( 1 );
+  }
+  filename = argv[arg];
+}
+
+
+void
+usage( int status )
+{
+  printf( "Usage:   jit <file>\n" );
+  exit( status );
+}
+
+
+// ----------------------------------------------------------------------------
+
+// The general approach is:
+// Operands such as constants and variable references are pushed onto the operand stack,
+// which is a jit-time data structure.  Code for these is not generated immediately.
+// When an operation is seen, the operands are taken from the operand stack,
+// and the appropriate code is generated for that operation with those operands.
+// Results of an operation may be held in a register, which is pushed back onto
+// the operand stack.
+// 
+
+void
+generateCode()
+{
+  int jitSp = -1;  // points to top entry
+
+  int* tCodePc = tCode;
+  int* tCodeEnd = tCode + tCodeLen;
+
+  for ( tCodePc = tCode; tCodePc < tCodeEnd; ) {
+    switch ( *tCodePc++ ) {
+
+      case tPushGlobalI :
+        tCodeNotImplemented( tCodePc[-1] );
+        tCodePc++;
+        break;
+      case tPushGlobalB :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        tCodePc++;
+        break;
+      case tPushGlobalP :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        tCodePc++;
+        break;
+      case tPushLocalI :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        tCodePc++;
+        break;
+      case tPushLocalB :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        tCodePc++;
+        break;
+      case tPushLocalP :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        tCodePc++;
+        break;
+      case tPushParamI :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        tCodePc++;
+        break;
+      case tPushParamB :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        tCodePc++;
+        break;
+      case tPushParamP :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        tCodePc++;
+        break;
+      case tPushConstI :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        tCodePc++;
+        break;
+      case tPushAddrGlobal :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        tCodePc++;
+        break;
+      case tPushAddrLocal :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        tCodePc++;
+        break;
+      case tPushAddrParam :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        tCodePc++;
+        break;
+      case tPushAddrActual :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        tCodePc++;
+        break;
+      case tFetchI :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+      case tFetchB :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+      case tFetchP :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+      case tAssignI :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+      case tAssignB :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+      case tAssignP :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+      case tCopy :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        tCodePc++;
+        break;
+      case tIncI :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+      case tDecI :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+      case tMultI :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+      case tDivI :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+      case tAddI :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+      case tSubI :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+      case tNegI :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+      case tNot :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+      case tAnd :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+      case tOr :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+      case tEqualI :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+      case tNotEqualI :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+      case tGreaterI :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+      case tLessI :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+      case tGreaterEqualI :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+      case tLessEqualI :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+      case tEqualP :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+      case tNotEqualP :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+      case tAllocActuals :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        tCodePc++;
+        break;
+      case tFreeActuals :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        tCodePc++;
+        break;
+      case tCall :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        tCodePc++;
+        break;
+      case tReturn :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+      case tEnter :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        tCodePc++;
+        break;
+      case tJump :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        tCodePc++;
+        break;
+      case tJumpTrue :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        tCodePc++;
+        break;
+      case tJumpFalse :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        tCodePc++;
+        break;
+      case tWriteI :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+      case tWriteBool :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+      case tWriteStr :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+      case tWriteP :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+      case tWriteCR :
+        tCodeNotImplemented( tCodePc[-1] );
+        // TO DO
+        break;
+
+      default:
+        --tCodePc;
+        printf( "Error: bad instruction %d\n", *tCodePc );
+        exit( 1 );
+    }
+  }
+}
+
+
+
+// ----------------------------------------------------------------------------
+
+void
+loadTCode()
+{
+  FILE* src = fopen( filename, "r" );
+  if ( !src ) {
+    printf( "Error: can't open intermediate file %s\n", filename );
+    exit( 1 );
+  }
+  int read = fscanf( src, "%d", &tCodeLen );
+  assert( read == 1 );
+  tCode = (int*) malloc( tCodeLen * sizeof( int ) );
+  assert( tCode != 0 );
+  for ( int i = 0; i < tCodeLen; ++i ) {
+    read = fscanf( src, "%d", &tCode[i] );
+    assert( read == 1 );
+  }
+
+  // Load string literals into data memory
+  // File format: <addr> <#ints> <data ints ...>
+  int address;
+  int count;
+  while ( fscanf( src, "%d", &address ) != EOF ) {
+    read = fscanf( src, "%d", &count );
+    int* intPtr = (int*) &(data[address]);
+    while ( count-- ) {
+      int word;
+      read = fscanf( src, "%d", &word );
+      assert( read == 1 );
+      *intPtr++ = word;
+    }
+  }
+
+  fclose( src );
+  printf( "- program loaded (%d words)\n", tCodeLen );
+}
+
+
+void
+tCodeNotImplemented( int opcode )
+{
+  printf( "Warning: tCode operation %d not supported yet\n", opcode );
+}
+
+
+void
+allocNativeCode()
+{
+  nativeCode = mmap( NULL, nativeCodeLen, PROT_READ | PROT_WRITE,
+                     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0 );
+  nativePc = nativeCode;
+  if ( nativeCode == NULL ) {
+    printf( "error: mmap failed to allocate %ld bytes for native code\n", nativeCodeLen );
+    exit( 1 );
+  }
+}
+
+
+void
+protectNativeCode()
+{
+  // Switch memory from writable to executable.
+  // This also ensures the instruction cache doesn't have stale data.
+  if ( mprotect( nativeCode, nativeCodeLen, PROT_READ | PROT_EXEC ) != 0 ) {
+    printf( "error: mprotect failed with status %d\n", errno );
+    exit( 1 );
+  }
+}
+
+
+void
+executeCode()
+{
+  printf( "Won't execute code until development is further along...\n" );
+  return;
+
+
+  printf( "Executing code ...\n" );
+
+  funcptr f = (funcptr) nativeCode;
+  f();
+
+  printf( "Done\n" );
+}
+
+
+void
+outB( char c )
+{
+  *(nativePc++) = c;
+}
+
+
+void
+outI( int i )
+{
+  int* p = (int*) nativePc;
+  *(p++) = i;
+  nativePc = (char*) p;
+}
+
+
+#if 0
+  // This little dummy function works.
 
    outB( 0x55 );  // push %rbp
    outB( 0x48 );  // mov  %rsp,%rbp
@@ -56,6 +522,9 @@ main( int argc, char* argv[] )
 
    outB( 0xc9 );  // leaveq
    outB( 0xc3 );  // retq
+#endif
+
+
 
 #if 0
    // Old opcodes from very old experiment, which was 32-bit.
@@ -86,20 +555,6 @@ main( int argc, char* argv[] )
    outB( 0xc3 );  // ret
 #endif
 
-   // Switch memory from writable to executable.
-   // This also ensures the instruction cache doesn't have stale data.
-   if ( mprotect( codeMem, codeMemLength, PROT_READ | PROT_EXEC ) != 0 ) {
-     printf( "error: mprotect failed with status %d\n", errno );
-     exit( 1 );
-   }
-
-   printf( "Here we go!\n" );
-
-   funcptr f = (funcptr) codeMem;
-   f();
-
-   printf( "Done\n" );
-}
 
 
 // Here's a bit of assembly from start of main of sm.c
