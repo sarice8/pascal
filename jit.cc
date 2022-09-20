@@ -15,9 +15,18 @@
 //  -- for mmap, mprotect
 #include <errno.h>
 
+
+#include <stack>
+#include <vector>
+
+
 // This is where we get the definitions for tCode,
 // which originate in SSL.
+// Note, some of the symbols conflict with std headers,
+// which I could resolve  by not using preprocessor symbols.
+// Meanwhile as long as I include this after the std headers, it's ok.
 #include "pascal.h"
+
 
 typedef void (*funcptr)();
 
@@ -92,15 +101,33 @@ typedef enum {
 } jitOperandKind;
 
 
-typedef struct {
-  jitOperandKind kind;
-  int value; // for a var: the var offset
-             // for a const: the const value
-  // ... reg ptr ... or should I use value for a reg id too?
-} operandT;
+class registerT
+{
+public:
+  const char* name = "";
+  // ...
+};
 
-#define operandStackSize 100
-operandT operandStack[operandStackSize];
+
+class operandT
+{
+public:
+  operandT( jitOperandKind k, int val )
+    : kind( k ), value( val )
+  {}
+
+  operandT( jitOperandKind k, registerT* r )
+    : kind( k ), reg( r )
+  {}
+
+  jitOperandKind kind = jit_Operand_Kind_Illegal;
+  int value = 0;         // for a var: the var offset
+                         // for a const: the const value
+  registerT* reg = 0;    // for jit_Operand_Kind_Reg*
+};
+
+
+std::stack<operandT> operandStack;
 
 
 int
@@ -157,7 +184,7 @@ usage( int status )
 void
 generateCode()
 {
-  int jitSp = -1;  // points to top entry
+  int jitSp = 0;
 
   int* tCodePc = tCode;
   int* tCodeEnd = tCode + tCodeLen;
@@ -166,73 +193,46 @@ generateCode()
     switch ( *tCodePc++ ) {
 
       case tPushGlobalI :
-        tCodeNotImplemented( tCodePc[-1] );
-        tCodePc++;
+        operandStack.emplace( jit_Operand_Kind_GlobalI, *tCodePc++ );
         break;
       case tPushGlobalB :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
-        tCodePc++;
+        operandStack.emplace( jit_Operand_Kind_GlobalB, *tCodePc++ );
         break;
       case tPushGlobalP :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
-        tCodePc++;
+        operandStack.emplace( jit_Operand_Kind_GlobalP, *tCodePc++ );
         break;
       case tPushLocalI :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
-        tCodePc++;
+        operandStack.emplace( jit_Operand_Kind_LocalI, *tCodePc++ );
         break;
       case tPushLocalB :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
-        tCodePc++;
+        operandStack.emplace( jit_Operand_Kind_LocalB, *tCodePc++ );
         break;
       case tPushLocalP :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
-        tCodePc++;
+        operandStack.emplace( jit_Operand_Kind_LocalP, *tCodePc++ );
         break;
       case tPushParamI :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
-        tCodePc++;
+        operandStack.emplace( jit_Operand_Kind_ParamI, *tCodePc++ );
         break;
       case tPushParamB :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
-        tCodePc++;
+        operandStack.emplace( jit_Operand_Kind_ParamB, *tCodePc++ );
         break;
       case tPushParamP :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
-        tCodePc++;
+        operandStack.emplace( jit_Operand_Kind_ParamP, *tCodePc++ );
         break;
       case tPushConstI :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
-        tCodePc++;
+        operandStack.emplace( jit_Operand_Kind_ConstI, *tCodePc++ );
         break;
       case tPushAddrGlobal :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
-        tCodePc++;
+        operandStack.emplace( jit_Operand_Kind_Addr_Global, *tCodePc++ );
         break;
       case tPushAddrLocal :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
-        tCodePc++;
+        operandStack.emplace( jit_Operand_Kind_Addr_Local, *tCodePc++ );
         break;
       case tPushAddrParam :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
-        tCodePc++;
+        operandStack.emplace( jit_Operand_Kind_Addr_Param, *tCodePc++ );
         break;
       case tPushAddrActual :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
-        tCodePc++;
+        operandStack.emplace( jit_Operand_Kind_Addr_Actual, *tCodePc++ );
         break;
       case tFetchI :
         tCodeNotImplemented( tCodePc[-1] );

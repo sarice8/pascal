@@ -78,7 +78,7 @@ $(BACK_EXEC): $(BACK_OBJS) | $(BINDIR)
 	cc $^ $(BACK_LINK_OBJS) -o $@
 
 $(JIT_EXEC): $(JIT_OBJS) | $(BINDIR)
-	cc $^ $(JIT_LINK_OBJS) -o $@
+	g++ $^ $(JIT_LINK_OBJS) -o $@
 
 # Include all .d files
 -include $(DEP)

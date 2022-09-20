@@ -38,9 +38,7 @@ type node_attribute:
 	qSize
 	qAllocDown
 	qIdent
-	qKind
 	qType
-	qParamType
 	qValue
 	qMainRoutineScope
 	qParams
