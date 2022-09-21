@@ -9,13 +9,14 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <string.h>
 #include <assert.h>
 #include <sys/mman.h>
 //  -- for mmap, mprotect
 #include <errno.h>
 
-
+#include <string>
 #include <stack>
 #include <vector>
 
@@ -41,6 +42,8 @@ void outI( int i );
 void generateCode();
 void tCodeNotImplemented( int opcode );
 void executeCode();
+void fatal( const char* msg, ... );
+void toDo( const char* msg, ... );
 
 
 char* filename = 0;
@@ -65,6 +68,10 @@ size_t nativeCodeLen = 10000;
 char* nativePc = 0;
 
 
+// Offset on call stack from rbp to the first parameter
+#define FRAME_PARAMS_OFFSET (2 * sizeof(void*))
+
+
 // Operand stack
 //
 typedef enum {
@@ -81,13 +88,13 @@ typedef enum {
   jit_Operand_Kind_ParamI,
   jit_Operand_Kind_ParamP,
 
-  jit_Operand_Kind_ConstI,
-
   // operand is the address of a variable
   jit_Operand_Kind_Addr_Global,
   jit_Operand_Kind_Addr_Local,
   jit_Operand_Kind_Addr_Param,
   jit_Operand_Kind_Addr_Actual,
+
+  jit_Operand_Kind_ConstI,
 
   // operand is a value in a register.
   // We either have one byte valid, 4 bytes valid, or 8 bytes valid.
@@ -101,34 +108,134 @@ typedef enum {
 } jitOperandKind;
 
 
-class registerT
+class Register
 {
 public:
-  const char* name = "";
-  // ...
+  // The native id is 4 bits.
+  // The upper bit gives access to registers r8-r15.
+  // If needed, this bit goes in the REX prefix.  See x86=64 docs for more details.
+  //
+  // CalleeSave means that callers are promised that their value will remain intact.
+  // So callees must preserve it if they will use it.
+  //
+  Register( const std::string& name, int nativeId, bool calleeSave )
+    : _name( name ), _nativeId( nativeId ), _calleeSave( calleeSave )
+    {}
+
+  std::string _name = "";
+  int _nativeId = 0;
+  bool _calleeSave = false;
+  bool _inUse = false;
 };
 
+// Note: calling convention for "x86-64 System V" is:
+//   arguments that are classified as "integer/pointer" rather than "memory"
+//   are passed in registers, left to right:  rdi, rsi, rdx, rcx, r8, r9.
+//   Floating point args are passed in xmm0 - xmm7.
+//   See https://stackoverflow.com/questions/2535989/what-are-the-calling-conventions-for-unix-linux-system-calls-and-user-space-f
+// TO DO: Am I really seeing this in my linux programs?
+//   If not, make sure I'm compiling for 64-bit.
+// Windows x64 calling convention is different.  Ugh.
+// These might depend on an off-by-default fastcall pragma or compiler switch.
+// BUT, must be a standard for library calls and extern methods!
 
-class operandT
+// Microsoft describes Windows x64 calling convention ("__fastcall"):
+// https://learn.microsoft.com/en-us/cpp/build/x64-software-conventions?view=msvc-170&viewFallbackFrom=vs-2017
+
+
+Register* regRax = new Register( "rax", 0, false );
+Register* regRcx = new Register( "rcx", 1, false );
+Register* regRdx = new Register( "rdx", 2, false ); 
+Register* regRbx = new Register( "rbx", 3, true );
+Register* regRsp = new Register( "rsp", 4, true );
+Register* regRbp = new Register( "rbp", 5, true );
+Register* regRsi = new Register( "rsi", 6, false );   // "Function arg #2 in 64-bit linux"
+Register* regRdi = new Register( "rdi", 7, false );   // "Function arg #1 in 64-bit linux"
+Register* regR8  = new Register( "r8", 8, false );
+Register* regR9  = new Register( "r9", 9, false );
+Register* regR10 = new Register( "r10", 10, false );
+Register* regR11 = new Register( "r11", 11, false );
+Register* regR12 = new Register( "r12", 12, true );
+Register* regR13 = new Register( "r13", 13, true );
+Register* regR14 = new Register( "r14", 14, true );
+Register* regR15 = new Register( "r15", 15, true );
+
+
+// General purpose registers, in the order we prefer to allocate them.
+//
+Register* registers[] = {
+  regRax,
+  regRcx,
+  regRbx,
+  regRdx,
+  regR8,
+  regR9,
+  regR10,
+  regR11,
+  regR12,
+  regR13,
+  regR14,
+  regR15
+};
+int numRegisters = sizeof(registers) / sizeof(Register*); 
+
+
+class Operand
 {
 public:
-  operandT( jitOperandKind k, int val )
-    : kind( k ), value( val )
+  Operand( jitOperandKind k, int val )
+    : _kind( k ), _value( val )
   {}
 
-  operandT( jitOperandKind k, registerT* r )
-    : kind( k ), reg( r )
+  Operand( jitOperandKind k, Register* r )
+    : _kind( k ), _reg( r )
   {}
 
-  jitOperandKind kind = jit_Operand_Kind_Illegal;
-  int value = 0;         // for a var: the var offset
+  bool isReg() const { return _reg != nullptr; }
+  bool isVar() const { return _kind >= jit_Operand_Kind_GlobalB &&
+                              _kind <= jit_Operand_Kind_ParamP; }
+  bool isAddrOfVar() const { return _kind >= jit_Operand_Kind_Addr_Global &&
+                                    _kind <= jit_Operand_Kind_Addr_Actual; }
+  bool isVarOrAddrOfVar() const { return isVar() || isAddrOfVar(); }
+  bool isConst() const { return _kind == jit_Operand_Kind_ConstI; }
+  int  size() const;  // valid size of the operand value in bytes (1, 4, or 8)
+  void release();     // don't need this register anymore (if any)
+
+  // DATA
+
+  jitOperandKind _kind = jit_Operand_Kind_Illegal;
+  int _value = 0;         // for a var: the var offset
                          // for a const: the const value
-  registerT* reg = 0;    // for jit_Operand_Kind_Reg*
+  Register* _reg = nullptr;    // for jit_Operand_Kind_Reg*
 };
 
 
-std::stack<operandT> operandStack;
+// Don't need this register anymore (if any)
+//
+void
+Operand::release()
+{
+  if ( _reg ) {
+    _reg->_inUse = false;
+  }
+}
 
+
+std::stack<Operand> operandStack;
+
+void swap( Operand& x, Operand& y );
+void operandIntoReg( Operand& x );
+void operandIntoRegCommutative( Operand& x, Operand& y );
+Register* allocateReg();
+
+
+// x86 operations
+//
+void emitAdd( const Operand& x, const Operand& y );
+void emitMov( const Operand& x, const Operand& y );
+
+void emitRex( bool overrideWidth, const Register* operandReg, const Register* baseReg );
+void emitModRMMem( const Register* operandReg, const Register* baseReg, int offset );
 
 int
 main( int argc, char* argv[] )
@@ -180,6 +287,10 @@ usage( int status )
 // Results of an operation may be held in a register, which is pushed back onto
 // the operand stack.
 // 
+// I'll try to simplify constants as I go.
+// I might not be able to avoid generation of dead code, but at least I can
+// jump around it, by turning conditional jumps into unconditional jumps.
+//
 
 void
 generateCode()
@@ -279,9 +390,14 @@ generateCode()
         tCodeNotImplemented( tCodePc[-1] );
         // TO DO
         break;
-      case tAddI :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tAddI : {
+          Operand y = operandStack.top();   operandStack.pop();
+          Operand x = operandStack.top();   operandStack.pop();
+          operandIntoRegCommutative( x, y );
+          emitAdd( x, y );
+          operandStack.push( x );
+          y.release();
+        }
         break;
       case tSubI :
         tCodeNotImplemented( tCodePc[-1] );
@@ -397,23 +513,368 @@ generateCode()
 
       default:
         --tCodePc;
-        printf( "Error: bad instruction %d\n", *tCodePc );
-        exit( 1 );
+        fatal( "bad instruction %d\n", *tCodePc );
     }
   }
 }
 
 
+// ----------------------------------------------------------------------------
+
+// Provide a register.
+// If all are in use, one will be made available by dumping its value
+// into a temporary.
+//
+Register*
+allocateReg()
+{
+  for ( Register* reg : registers ) {
+    if ( !reg->_inUse ) {
+      reg->_inUse = true;
+      return reg;
+    }
+  }  
+
+  fatal( "TO DO: allocReg dump a reg into temporary\n" );
+  return nullptr;
+}
+
+
+// Returns the byte size of the value in the operand.
+// Possible values are 1, 4, 8.
+//
+int
+Operand::size() const
+{
+  switch ( _kind ) {
+    case jit_Operand_Kind_GlobalB:
+    case jit_Operand_Kind_LocalB:
+    case jit_Operand_Kind_ParamB:
+    case jit_Operand_Kind_RegB:
+      return 1;
+
+    case jit_Operand_Kind_GlobalI:
+    case jit_Operand_Kind_LocalI:
+    case jit_Operand_Kind_ParamI:
+    case jit_Operand_Kind_ConstI:
+    case jit_Operand_Kind_RegI:
+      return 4;
+
+    case jit_Operand_Kind_GlobalP:
+    case jit_Operand_Kind_LocalP:
+    case jit_Operand_Kind_ParamP:
+    case jit_Operand_Kind_Addr_Global:
+    case jit_Operand_Kind_Addr_Local:
+    case jit_Operand_Kind_Addr_Param:
+    case jit_Operand_Kind_Addr_Actual:
+    case jit_Operand_Kind_RegP:
+      return 8;
+
+    default:
+      fatal( "Operand::size() - unexpected operand kind %d\n", (int) _kind );
+  }
+  return 1;  // won't reach here
+}
+
+
+// Force (at least) one of the operands into a register.
+// On return, x will be in a register.
+// This is for a commutative operation, so x and y may be swapped.
+//
+void
+operandIntoRegCommutative( Operand& x, Operand& y )
+{
+  if ( x.isReg() ) {
+    return;
+  }
+  if ( y.isReg() ) {
+    swap( x, y );
+    return;
+  }
+  // we'll prefer to put a variable into a register
+  if ( !x.isVarOrAddrOfVar() && y.isVarOrAddrOfVar() ) {
+    swap( x, y );
+  }
+  operandIntoReg( x );
+}
+
+
+// Force the operand into a register, if it isn't already.
+//
+void
+operandIntoReg( Operand& x )
+{
+  if ( x.isReg() ) {
+    return;
+  }
+
+  // The size of the register will depend on the value we're moving into it
+  jitOperandKind regKind;
+  switch ( x.size() ) {
+    case 1:
+      regKind = jit_Operand_Kind_RegB;
+      break;
+    case 4:
+      regKind = jit_Operand_Kind_RegI;
+      break;
+    case 8:
+      regKind = jit_Operand_Kind_RegP;
+      break;
+  }
+  Operand newX( regKind, allocateReg() );
+  emitMov( newX, x );
+  x = newX;
+}
+
+
+void
+swap( Operand& x, Operand& y)
+{
+  Operand temp = x;
+  x = y;
+  y = temp;
+}
+
 
 // ----------------------------------------------------------------------------
+//
+// x86 Operations
+//
+// ----------------------------------------------------------------------------
+
+
+// NOTES
+//
+// Some special cases that I need to be aware of.
+//
+//   rbp and r13 can't be used as a base register with no displacement.
+//   Instead can use an explicit displacement of 0.
+//   And if you want e.g. [r13+rdx], can avoid the problem by switching base/index
+//   i.e. [rdx+r13] when that's an option.
+//   I built this rule into emitModRMMem().
+//
+//   rsp / r12 as a base register always needs a SIB byte.
+//   That's because the ModR/M encoding of base=rsp is the escape code to signal
+//   a SIB byte.  And r12 hits the same limit to simplify decode logic.
+//   I was able to build this rule into emitModRMMem().
+//
+//   rsp can't be an index register.    But, I don't use index registers yet anyway.
+//   (r12 -can- be an index register.)
+//
+
+
+void
+emitAdd( const Operand& x, const Operand& y )
+{
+  toDo( "emitAdd()\n" );
+}
+
+
+// x = y
+// x and y are not both memory references.
+//
+void
+emitMov( const Operand& x, const Operand& y )
+{
+  if ( x.size() != y.size() ) {
+    toDo( "emitMov handle size difference\n" );
+  }
+
+  // For all these moves, the size of the mov will come from y.size()
+  // Later I may need to use min of x and y size, possibly with extensions.
+
+  if ( y.isConst() ) {
+    toDo( "mov x, const\n" );
+
+  } else if ( y.isVar() ) {
+
+    // Can only move memory into register
+    if ( x.isReg() ) {
+
+      switch ( y._kind ) {
+        case jit_Operand_Kind_GlobalB:
+        case jit_Operand_Kind_GlobalI:
+        case jit_Operand_Kind_GlobalP:
+          toDo( "mov x, [addr]   where addr = data + y._value\n" );
+          // TO DO: common practice is to use rip-relative addressing for globals.
+          //        Working with 64-bit immediate values is very limited in x86-64.
+          //        And, anyway, rip-relative allows the compiled & linked code to load anywhere.
+          //        This requires that the data segment and code segment are allocated together by the linker,
+          //        and will keep their relative position.
+          break;
+        case jit_Operand_Kind_LocalB:
+        case jit_Operand_Kind_LocalI:
+        case jit_Operand_Kind_LocalP:
+          toDo( "mov x, [rbp + y._value]\n" );
+          break;
+
+        case jit_Operand_Kind_ParamB:
+          switch ( x._kind ) {
+            case jit_Operand_Kind_RegB:
+              toDo( "..." );
+              break;
+            default:
+              fatal( "emitMov: unexpected operands\n" );
+          }
+          break;
+
+        case jit_Operand_Kind_ParamI:
+          switch ( x._kind ) {
+            case jit_Operand_Kind_RegI:
+              // mov x, [rbp + y._value + FRAME_PARAMS_OFFSET]
+              emitRex( false, x._reg, regRbp );
+              outB( 0x8b );
+              emitModRMMem( x._reg, regRbp, y._value + FRAME_PARAMS_OFFSET );
+              break;
+            default:
+              fatal( "emitMov: unexpected operands\n" );
+          }
+          break;
+
+        case jit_Operand_Kind_ParamP:
+          switch ( x._kind ) {
+            case jit_Operand_Kind_RegP:
+              // mov x, [rbp + y._value + FRAME_PARAMS_OFFSET]
+              emitRex( true, x._reg, regRbp );
+              outB( 0x8b );
+              emitModRMMem( x._reg, regRbp, y._value + FRAME_PARAMS_OFFSET );
+              break;
+            default:
+              fatal( "emitMov: unexpected operands\n" );
+          }
+          break;
+
+        default:
+          fatal( "emitMov: unexpected operands\n" );
+      }
+
+    } else {
+      fatal( "emitMov: unexpected operands\n" );
+    }
+
+
+  } else if ( y.isAddrOfVar() ) {
+    toDo( "mov x, addrOfVar\n" );
+  } else if ( y.isReg() ) {
+    toDo( "mov x, reg\n" );
+  } else {
+    fatal( "emitMov: unexpected operands\n" );
+  }
+}
+
+
+// Emit a REX prefix if necessary.
+// overrideWidth is true if we need to change a 32-bit operation to 64-bit.
+// operandReg is the register that will be specified in the instruction's ModRM.reg field (if any).
+//     The REX.R bit gives access to the extended set of registers there.
+// baseReg is the register that will be specified in the instruction's ModRM.rm field
+//     or the SIB.base field (if any).  The REX.B field gives access to extended registers there.
+// I'm not using SIB index registers, so far, so don't need the REX.X bit.
+// 
+void
+emitRex( bool overrideWidth, const Register* operandReg, const Register* baseReg )
+{
+  int rex = 0x40;
+  if ( overrideWidth ) {
+    rex |= 8;  // REX.W
+  }
+  if ( operandReg && operandReg->_nativeId >= 8 ) {
+    rex |= 4;  // REX.R
+  }
+  if ( baseReg && baseReg->_nativeId >= 8 ) {
+    rex |= 1;  // REX.B
+  }
+  if ( rex != 0x40 ) {
+    outB( rex );
+  }
+}
+
+
+// Emit a ModR/M sequence suitable for a memory reference.
+// operandReg is the standalone register used by the opcond (and might be null).
+// baseReg is the base of the memory reference.
+// offset is the offset from the baseReg.
+// For now, I'm not allowing for use of an index register in addition to the base.
+//
+void
+emitModRMMem( const Register* operandReg, const Register* baseReg, int offset )
+{
+  // TO DO: am I right that we might not have operandReg? What encoding then - 0?
+  int operandRegId = operandReg->_nativeId;
+  int baseRegId = baseReg->_nativeId;
+
+  // Special case: if baseReg is rsp or r12, we must use the SIB byte
+  // to do a [base + index].  This is because esp/rsp in ModRM's r/m field
+  // is how one requests an SIB byte.
+  // We can still do plain [base] via SIB too - by specifying esp/rsp as the index
+  // which is treated as no-index.
+  // The SIB byte goes between ModRM byte and any displacement.
+  bool needSib = false;
+  int sib = 0;
+  if ( baseReg == regRsp || baseReg == regR12 ) {
+    needSib = true;
+    sib = ( regRsp->_nativeId << 3 ) | baseReg->_nativeId;
+  }
+
+  int rm = ( operandRegId << 3 );
+  if ( ( offset == 0 ) &&
+       ( baseReg != regRbp ) &&
+       ( baseReg != regR13 ) ) {
+    // mod 00 - no displacement
+    // (Note another special case: rbp/r13 may not use this case. They fall through to next.)
+    outB( rm | baseRegId );
+    if ( needSib ) {
+      outB( sib );
+    }
+  } else if ( offset <= 127 && offset >= -128 ) {
+    // mod 01 - disp8
+    outB( 0x40 | rm | baseRegId );
+    if ( needSib ) {
+      outB( sib );
+    }
+    outB( offset );
+  } else {
+    // mod 10 - disp32
+    outB( 0x80 | rm | baseRegId );
+    if ( needSib ) {
+      outB( sib );
+    }
+    outI( offset );
+  }
+}
+
+
+// ----------------------------------------------------------------------------
+
+void
+fatal( const char* msg, ... )
+{
+  va_list args;
+  va_start( args, msg );
+  printf( "Error: " );
+  vprintf( msg, args );
+  va_end( args );
+  exit( 1 );
+}
+
+void
+toDo( const char* msg, ... )
+{
+  va_list args;
+  va_start( args, msg );
+  printf( "TO DO: " );
+  vprintf( msg, args );
+  va_end( args );
+}
+
+
 
 void
 loadTCode()
 {
   FILE* src = fopen( filename, "r" );
   if ( !src ) {
-    printf( "Error: can't open intermediate file %s\n", filename );
-    exit( 1 );
+    fatal( "can't open intermediate file %s\n", filename );
   }
   int read = fscanf( src, "%d", &tCodeLen );
   assert( read == 1 );
@@ -458,8 +919,7 @@ allocNativeCode()
                              MAP_PRIVATE | MAP_ANONYMOUS, -1, 0 );
   nativePc = nativeCode;
   if ( nativeCode == NULL ) {
-    printf( "error: mmap failed to allocate %ld bytes for native code\n", nativeCodeLen );
-    exit( 1 );
+    fatal( "mmap failed to allocate %ld bytes for native code\n", nativeCodeLen );
   }
 }
 
@@ -470,8 +930,7 @@ protectNativeCode()
   // Switch memory from writable to executable.
   // This also ensures the instruction cache doesn't have stale data.
   if ( mprotect( nativeCode, nativeCodeLen, PROT_READ | PROT_EXEC ) != 0 ) {
-    printf( "error: mprotect failed with status %d\n", errno );
-    exit( 1 );
+    fatal( "mprotect failed with status %d\n", errno );
   }
 }
 
