@@ -232,10 +232,13 @@ Register* allocateReg();
 // x86 operations
 //
 void emitAdd( const Operand& x, const Operand& y );
+void emitSub( const Operand& x, const Operand& y );
 void emitMov( const Operand& x, const Operand& y );
 
 void emitRex( bool overrideWidth, const Register* operandReg, const Register* baseReg );
 void emitModRMMem( const Register* operandReg, const Register* baseReg, int offset );
+void emitModRM_OpcRM( int opcodeExtension, const Register* rm );
+
 
 int
 main( int argc, char* argv[] )
@@ -303,92 +306,148 @@ generateCode()
   for ( tCodePc = tCode; tCodePc < tCodeEnd; ) {
     switch ( *tCodePc++ ) {
 
-      case tPushGlobalI :
-        operandStack.emplace( jit_Operand_Kind_GlobalI, *tCodePc++ );
+      case tPushGlobalI : {
+          operandStack.emplace( jit_Operand_Kind_GlobalI, *tCodePc++ );
+        }
         break;
-      case tPushGlobalB :
-        operandStack.emplace( jit_Operand_Kind_GlobalB, *tCodePc++ );
+      case tPushGlobalB : {
+          operandStack.emplace( jit_Operand_Kind_GlobalB, *tCodePc++ );
+        }
         break;
-      case tPushGlobalP :
-        operandStack.emplace( jit_Operand_Kind_GlobalP, *tCodePc++ );
+      case tPushGlobalP : {
+          operandStack.emplace( jit_Operand_Kind_GlobalP, *tCodePc++ );
+        }
         break;
-      case tPushLocalI :
-        operandStack.emplace( jit_Operand_Kind_LocalI, *tCodePc++ );
+      case tPushLocalI : {
+          operandStack.emplace( jit_Operand_Kind_LocalI, *tCodePc++ );
+        }
         break;
-      case tPushLocalB :
-        operandStack.emplace( jit_Operand_Kind_LocalB, *tCodePc++ );
+      case tPushLocalB : {
+          operandStack.emplace( jit_Operand_Kind_LocalB, *tCodePc++ );
+        }
         break;
-      case tPushLocalP :
-        operandStack.emplace( jit_Operand_Kind_LocalP, *tCodePc++ );
+      case tPushLocalP : {
+          operandStack.emplace( jit_Operand_Kind_LocalP, *tCodePc++ );
+        }
         break;
-      case tPushParamI :
-        operandStack.emplace( jit_Operand_Kind_ParamI, *tCodePc++ );
+      case tPushParamI : {
+          operandStack.emplace( jit_Operand_Kind_ParamI, *tCodePc++ );
+        }
         break;
-      case tPushParamB :
-        operandStack.emplace( jit_Operand_Kind_ParamB, *tCodePc++ );
+      case tPushParamB : {
+          operandStack.emplace( jit_Operand_Kind_ParamB, *tCodePc++ );
+        }
         break;
-      case tPushParamP :
-        operandStack.emplace( jit_Operand_Kind_ParamP, *tCodePc++ );
+      case tPushParamP : {
+          operandStack.emplace( jit_Operand_Kind_ParamP, *tCodePc++ );
+        }
         break;
-      case tPushConstI :
-        operandStack.emplace( jit_Operand_Kind_ConstI, *tCodePc++ );
+      case tPushConstI : {
+          operandStack.emplace( jit_Operand_Kind_ConstI, *tCodePc++ );
+        }
         break;
-      case tPushAddrGlobal :
-        operandStack.emplace( jit_Operand_Kind_Addr_Global, *tCodePc++ );
+      case tPushAddrGlobal : {
+          operandStack.emplace( jit_Operand_Kind_Addr_Global, *tCodePc++ );
+        }
         break;
-      case tPushAddrLocal :
-        operandStack.emplace( jit_Operand_Kind_Addr_Local, *tCodePc++ );
+      case tPushAddrLocal : {
+          operandStack.emplace( jit_Operand_Kind_Addr_Local, *tCodePc++ );
+        }
         break;
-      case tPushAddrParam :
-        operandStack.emplace( jit_Operand_Kind_Addr_Param, *tCodePc++ );
+      case tPushAddrParam : {
+          operandStack.emplace( jit_Operand_Kind_Addr_Param, *tCodePc++ );
+        }
         break;
-      case tPushAddrActual :
-        operandStack.emplace( jit_Operand_Kind_Addr_Actual, *tCodePc++ );
+      case tPushAddrActual : {
+          operandStack.emplace( jit_Operand_Kind_Addr_Actual, *tCodePc++ );
+        }
         break;
-      case tFetchI :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tFetchI : {
+          Register* r = allocateReg();
+          Operand x = operandStack.top();   operandStack.pop();
+          tCodeNotImplemented( tCodePc[-1] );
+          operandStack.emplace( jit_Operand_Kind_RegI, r );
+          x.release();
+        }
         break;
-      case tFetchB :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tFetchB : {
+          Register* r = allocateReg();
+          Operand x = operandStack.top();   operandStack.pop();
+          tCodeNotImplemented( tCodePc[-1] );
+          operandStack.emplace( jit_Operand_Kind_RegB, r );
+          x.release();
+        }
         break;
-      case tFetchP :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tFetchP : {
+          Register* r = allocateReg();
+          Operand x = operandStack.top();   operandStack.pop();
+          tCodeNotImplemented( tCodePc[-1] );
+          operandStack.emplace( jit_Operand_Kind_RegP, r );
+          x.release();
+        }
         break;
-      case tAssignI :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tAssignI : {
+          Operand x = operandStack.top();   operandStack.pop();
+          Operand y = operandStack.top();   operandStack.pop();
+          tCodeNotImplemented( tCodePc[-1] );
+          x.release();
+          y.release();
+        }
         break;
-      case tAssignB :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tAssignB : {
+          Operand x = operandStack.top();   operandStack.pop();
+          Operand y = operandStack.top();   operandStack.pop();
+          tCodeNotImplemented( tCodePc[-1] );
+          x.release();
+          y.release();
+        }
         break;
-      case tAssignP :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tAssignP : {
+          Operand x = operandStack.top();   operandStack.pop();
+          Operand y = operandStack.top();   operandStack.pop();
+          tCodeNotImplemented( tCodePc[-1] );
+          x.release();
+          y.release();
+        }
         break;
-      case tCopy :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
-        tCodePc++;
+      case tCopy : {
+          Operand x = operandStack.top();   operandStack.pop();
+          Operand y = operandStack.top();   operandStack.pop();
+          tCodePc++;
+          tCodeNotImplemented( tCodePc[-1] );
+          x.release();
+          y.release();
+        }
         break;
-      case tIncI :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tIncI : {
+          tCodeNotImplemented( tCodePc[-1] );
+        }
         break;
-      case tDecI :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tDecI : {
+          tCodeNotImplemented( tCodePc[-1] );
+        }
         break;
-      case tMultI :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tMultI : {
+          Operand x = operandStack.top();   operandStack.pop();
+          Operand y = operandStack.top();   operandStack.pop();
+          if ( x.isConst() ) {
+            swap( x, y );
+          }
+          operandIntoReg( x );
+          tCodeNotImplemented( tCodePc[-1] );
+          operandStack.push( x );
+          y.release();
+        }
         break;
-      case tDivI :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tDivI : {
+          Operand x = operandStack.top();   operandStack.pop();
+          Operand y = operandStack.top();   operandStack.pop();
+          // The following is dummy code that all needs to be replaced.
+          operandIntoReg( x );
+          tCodeNotImplemented( tCodePc[-1] );
+          operandStack.push( x );
+          y.release();
+        }
         break;
       case tAddI : {
           Operand y = operandStack.top();   operandStack.pop();
@@ -399,116 +458,200 @@ generateCode()
           y.release();
         }
         break;
-      case tSubI :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tSubI : {
+          Operand y = operandStack.top();   operandStack.pop();
+          Operand x = operandStack.top();   operandStack.pop();
+          operandIntoReg( x );
+          tCodeNotImplemented( tCodePc[-1] );
+          operandStack.push( x );
+          y.release();
+        }
         break;
-      case tNegI :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tNegI : {
+          tCodeNotImplemented( tCodePc[-1] );
+        }
         break;
-      case tNot :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tNot : {
+          tCodeNotImplemented( tCodePc[-1] );
+        }
         break;
-      case tAnd :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tAnd : {
+          // TO DO: don't I need to implement short-circuit and / or somewhere?
+          //   I imagine needs to be in higher level front end?
+          Operand y = operandStack.top();   operandStack.pop();
+          Operand x = operandStack.top();   operandStack.pop();
+          // The following is dummy code that all needs to be replaced.
+          operandIntoReg( x );
+          tCodeNotImplemented( tCodePc[-1] );
+          operandStack.push( x );
+          y.release();
+        }
         break;
-      case tOr :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tOr : {
+          Operand y = operandStack.top();   operandStack.pop();
+          Operand x = operandStack.top();   operandStack.pop();
+          // The following is dummy code that all needs to be replaced.
+          operandIntoReg( x );
+          tCodeNotImplemented( tCodePc[-1] );
+          operandStack.push( x );
+          y.release();
+        }
         break;
-      case tEqualI :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tEqualI : {
+          Operand y = operandStack.top();   operandStack.pop();
+          Operand x = operandStack.top();   operandStack.pop();
+          // The following is dummy code that all needs to be replaced.
+          operandIntoReg( x );
+          tCodeNotImplemented( tCodePc[-1] );
+          operandStack.push( x );
+          y.release();
+        }
         break;
-      case tNotEqualI :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tNotEqualI : {
+          Operand y = operandStack.top();   operandStack.pop();
+          Operand x = operandStack.top();   operandStack.pop();
+          // The following is dummy code that all needs to be replaced.
+          operandIntoReg( x );
+          tCodeNotImplemented( tCodePc[-1] );
+          operandStack.push( x );
+          y.release();
+        }
         break;
-      case tGreaterI :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tGreaterI : {
+          Operand y = operandStack.top();   operandStack.pop();
+          Operand x = operandStack.top();   operandStack.pop();
+          // The following is dummy code that all needs to be replaced.
+          operandIntoReg( x );
+          tCodeNotImplemented( tCodePc[-1] );
+          operandStack.push( x );
+          y.release();
+        }
         break;
-      case tLessI :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tLessI : {
+          Operand y = operandStack.top();   operandStack.pop();
+          Operand x = operandStack.top();   operandStack.pop();
+          // The following is dummy code that all needs to be replaced.
+          operandIntoReg( x );
+          tCodeNotImplemented( tCodePc[-1] );
+          operandStack.push( x );
+          y.release();
+        }
         break;
-      case tGreaterEqualI :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tGreaterEqualI : {
+          Operand y = operandStack.top();   operandStack.pop();
+          Operand x = operandStack.top();   operandStack.pop();
+          // The following is dummy code that all needs to be replaced.
+          operandIntoReg( x );
+          tCodeNotImplemented( tCodePc[-1] );
+          operandStack.push( x );
+          y.release();
+        }
         break;
-      case tLessEqualI :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tLessEqualI : {
+          Operand y = operandStack.top();   operandStack.pop();
+          Operand x = operandStack.top();   operandStack.pop();
+          // The following is dummy code that all needs to be replaced.
+          operandIntoReg( x );
+          tCodeNotImplemented( tCodePc[-1] );
+          operandStack.push( x );
+          y.release();
+        }
         break;
-      case tEqualP :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tEqualP : {
+          Operand y = operandStack.top();   operandStack.pop();
+          Operand x = operandStack.top();   operandStack.pop();
+          // The following is dummy code that all needs to be replaced.
+          operandIntoReg( x );
+          tCodeNotImplemented( tCodePc[-1] );
+          operandStack.push( x );
+          y.release();
+        }
         break;
-      case tNotEqualP :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tNotEqualP : {
+          Operand y = operandStack.top();   operandStack.pop();
+          Operand x = operandStack.top();   operandStack.pop();
+          // The following is dummy code that all needs to be replaced.
+          operandIntoReg( x );
+          tCodeNotImplemented( tCodePc[-1] );
+          operandStack.push( x );
+          y.release();
+        }
         break;
-      case tAllocActuals :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
-        tCodePc++;
+      case tAllocActuals : {
+          int size = *tCodePc++;
+          emitSub( Operand( jit_Operand_Kind_RegP, regRsp ),
+                   Operand( jit_Operand_Kind_ConstI, size ) );
+        }
         break;
-      case tFreeActuals :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
-        tCodePc++;
+      case tFreeActuals : {
+          int size = *tCodePc++;
+          emitAdd( Operand( jit_Operand_Kind_RegP, regRsp ),
+                   Operand( jit_Operand_Kind_ConstI, size ) );
+        }
         break;
-      case tCall :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
-        tCodePc++;
+      case tCall : {
+          tCodeNotImplemented( tCodePc[-1] );
+          tCodePc++;
+        }
         break;
-      case tReturn :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tReturn : {
+          tCodeNotImplemented( tCodePc[-1] );
+        }
         break;
-      case tEnter :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
-        tCodePc++;
+      case tEnter : {
+          tCodeNotImplemented( tCodePc[-1] );
+          // TO DO: remember the address of the local-space value,
+          //        so jit can bump it for tempraries too.
+          //        We'll need to keep it a 32-bit offset regardless of current value.
+          tCodePc++;
+        }
         break;
-      case tJump :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
-        tCodePc++;
+      case tJump : {
+          tCodeNotImplemented( tCodePc[-1] );
+          tCodePc++;
+        }
         break;
-      case tJumpTrue :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
-        tCodePc++;
+      case tJumpTrue : {
+          Operand x = operandStack.top();   operandStack.pop();
+          tCodePc++;
+          tCodeNotImplemented( tCodePc[-1] );
+          x.release();
+        }
         break;
-      case tJumpFalse :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
-        tCodePc++;
+      case tJumpFalse : {
+          Operand x = operandStack.top();   operandStack.pop();
+          tCodePc++;
+          tCodeNotImplemented( tCodePc[-1] );
+          x.release();
+        }
         break;
-      case tWriteI :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tWriteI : {
+          Operand x = operandStack.top();   operandStack.pop();
+          tCodeNotImplemented( tCodePc[-1] );
+          x.release();
+        }
         break;
-      case tWriteBool :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tWriteBool : {
+          Operand x = operandStack.top();   operandStack.pop();
+          tCodeNotImplemented( tCodePc[-1] );
+          x.release();
+        }
         break;
-      case tWriteStr :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tWriteStr : {
+          Operand x = operandStack.top();   operandStack.pop();
+          tCodeNotImplemented( tCodePc[-1] );
+          x.release();
+        }
         break;
-      case tWriteP :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tWriteP : {
+          Operand x = operandStack.top();   operandStack.pop();
+          tCodeNotImplemented( tCodePc[-1] );
+          x.release();
+        }
         break;
-      case tWriteCR :
-        tCodeNotImplemented( tCodePc[-1] );
-        // TO DO
+      case tWriteCR : {
+          tCodeNotImplemented( tCodePc[-1] );
+        }
         break;
 
       default:
@@ -663,10 +806,120 @@ swap( Operand& x, Operand& y)
 //
 
 
+// x += y
+// x is a register
+//
 void
 emitAdd( const Operand& x, const Operand& y )
 {
-  toDo( "emitAdd()\n" );
+  assert( x.isReg() );
+
+  switch ( y._kind ) {
+    case jit_Operand_Kind_GlobalB:
+    case jit_Operand_Kind_GlobalI:
+    case jit_Operand_Kind_GlobalP:
+    case jit_Operand_Kind_LocalB:
+    case jit_Operand_Kind_LocalI:
+    case jit_Operand_Kind_LocalP:
+    case jit_Operand_Kind_ParamB:
+    case jit_Operand_Kind_ParamI:
+    case jit_Operand_Kind_ParamP:
+    case jit_Operand_Kind_Addr_Global:
+    case jit_Operand_Kind_Addr_Local:
+    case jit_Operand_Kind_Addr_Param:
+    case jit_Operand_Kind_Addr_Actual:
+      toDo( "emitAdd()\n" );
+      break;
+
+    case jit_Operand_Kind_ConstI:
+      switch ( x._kind ) {
+        case jit_Operand_Kind_RegB:
+          toDo( "emitAdd()\n" );
+          break;
+        case jit_Operand_Kind_RegI:
+          emitRex( false, nullptr, x._reg );
+          outB( 0x81 );
+          emitModRM_OpcRM( 0, x._reg );
+          outI( y._value );
+          break;
+        case jit_Operand_Kind_RegP:
+          emitRex( true, nullptr, x._reg );
+          outB( 0x81 );
+          emitModRM_OpcRM( 0, x._reg );
+          outI( y._value );
+          break;
+        default:
+          fatal( "emitAdd: unexpected operands\n" );
+      }
+
+      break;
+
+    case jit_Operand_Kind_RegB:
+    case jit_Operand_Kind_RegI:
+    case jit_Operand_Kind_RegP:
+      toDo( "emitAdd()\n" );
+      break;
+    default:
+      fatal( "emitAdd: unexpected operands\n" );
+  }
+}
+
+
+// x -= y
+// x is a register
+//
+void
+emitSub( const Operand& x, const Operand& y )
+{
+  assert( x.isReg() );
+
+  switch ( y._kind ) {
+    case jit_Operand_Kind_GlobalB:
+    case jit_Operand_Kind_GlobalI:
+    case jit_Operand_Kind_GlobalP:
+    case jit_Operand_Kind_LocalB:
+    case jit_Operand_Kind_LocalI:
+    case jit_Operand_Kind_LocalP:
+    case jit_Operand_Kind_ParamB:
+    case jit_Operand_Kind_ParamI:
+    case jit_Operand_Kind_ParamP:
+    case jit_Operand_Kind_Addr_Global:
+    case jit_Operand_Kind_Addr_Local:
+    case jit_Operand_Kind_Addr_Param:
+    case jit_Operand_Kind_Addr_Actual:
+      toDo( "emitSub()\n" );
+      break;
+
+    case jit_Operand_Kind_ConstI:
+      switch ( x._kind ) {
+        case jit_Operand_Kind_RegB:
+          toDo( "emitSub()\n" );
+          break;
+        case jit_Operand_Kind_RegI:
+          emitRex( false, nullptr, x._reg );
+          outB( 0x81 );
+          emitModRM_OpcRM( 5, x._reg );
+          outI( y._value );
+          break;
+        case jit_Operand_Kind_RegP:
+          emitRex( true, nullptr, x._reg );
+          outB( 0x81 );
+          emitModRM_OpcRM( 5, x._reg );
+          outI( y._value );
+          break;
+        default:
+          fatal( "emitSub: unexpected operands\n" );
+      }
+      break;
+
+    case jit_Operand_Kind_RegB:
+    case jit_Operand_Kind_RegI:
+    case jit_Operand_Kind_RegP:
+      toDo( "emitSub()\n" );
+      break;
+    default:
+      fatal( "emitSub: unexpected operands\n" );
+  }
 }
 
 
@@ -769,6 +1022,9 @@ emitMov( const Operand& x, const Operand& y )
 //     The REX.R bit gives access to the extended set of registers there.
 // baseReg is the register that will be specified in the instruction's ModRM.rm field
 //     or the SIB.base field (if any).  The REX.B field gives access to extended registers there.
+//     Note that some instructions (e.g. ADD REG, immediate) use the Mod/RM rm field for the register,
+//     because they use the reg field as an opcode extension.   So be sure to pass the register
+//     to this method's "baseReg" in that case.
 // I'm not using SIB index registers, so far, so don't need the REX.X bit.
 // 
 void
@@ -841,6 +1097,21 @@ emitModRMMem( const Register* operandReg, const Register* baseReg, int offset )
     }
     outI( offset );
   }
+}
+
+// This form of ModR/M is used for immediate register(s), and indirect registers.
+// opcodeExtension is a bit pattern specified for the instruction,
+// and is stored in the "Reg" field of ModR/M.    rm is a register stored in the "RM" field.
+// So, this form is only used for instructions that use one register.
+//
+// It is necessary to check the Intel documentation for a specific instruction
+// to know which of these ModR/M encodings should be used.
+//
+void
+emitModRM_OpcRM( int opcodeExtension, const Register* rm )
+{
+  // mod 11
+  outB( 0xc0 | (opcodeExtension << 3) | rm->_nativeId );
 }
 
 
