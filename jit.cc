@@ -76,6 +76,7 @@ char* nativePc = 0;
 //
 typedef enum {
   jit_Operand_Kind_Illegal = 0,
+  jit_Operand_Kind_None,
 
   // operand is the value of a variable
   jit_Operand_Kind_GlobalB,
@@ -106,6 +107,12 @@ typedef enum {
   jit_Operand_Kind_RegP
 
 } jitOperandKind;
+
+
+constexpr int
+KindPair( jitOperandKind x, jitOperandKind y ) {
+  return ( ( int )x ) << 8 | ( int )y;
+}
 
 
 class Register
@@ -226,6 +233,7 @@ std::stack<Operand> operandStack;
 void swap( Operand& x, Operand& y );
 void operandIntoReg( Operand& x );
 void operandIntoRegCommutative( Operand& x, Operand& y );
+void operandKindAddrIntoReg( Operand& x );
 Register* allocateReg();
 
 
@@ -452,6 +460,8 @@ generateCode()
       case tAddI : {
           Operand y = operandStack.top();   operandStack.pop();
           Operand x = operandStack.top();   operandStack.pop();
+          operandKindAddrIntoReg( x );
+          operandKindAddrIntoReg( y );
           operandIntoRegCommutative( x, y );
           emitAdd( x, y );
           operandStack.push( x );
@@ -461,6 +471,8 @@ generateCode()
       case tSubI : {
           Operand y = operandStack.top();   operandStack.pop();
           Operand x = operandStack.top();   operandStack.pop();
+          operandKindAddrIntoReg( x );
+          operandKindAddrIntoReg( y );
           operandIntoReg( x );
           tCodeNotImplemented( tCodePc[-1] );
           operandStack.push( x );
@@ -770,6 +782,21 @@ operandIntoReg( Operand& x )
 }
 
 
+// If operand has kind Addr_*, move it into a register.
+//
+void
+operandKindAddrIntoReg( Operand& x )
+{
+  if ( !x.isAddrOfVar() ) {
+    return;
+  }
+
+  Operand newX( jit_Operand_Kind_RegP, allocateReg() );
+  emitMov( newX, x );
+  x = newX;
+}
+
+
 void
 swap( Operand& x, Operand& y)
 {
@@ -812,53 +839,90 @@ swap( Operand& x, Operand& y)
 void
 emitAdd( const Operand& x, const Operand& y )
 {
-  assert( x.isReg() );
+  switch ( KindPair( x._kind, y._kind ) ) {
 
-  switch ( y._kind ) {
-    case jit_Operand_Kind_GlobalB:
-    case jit_Operand_Kind_GlobalI:
-    case jit_Operand_Kind_GlobalP:
-    case jit_Operand_Kind_LocalB:
-    case jit_Operand_Kind_LocalI:
-    case jit_Operand_Kind_LocalP:
-    case jit_Operand_Kind_ParamB:
-    case jit_Operand_Kind_ParamI:
-    case jit_Operand_Kind_ParamP:
-    case jit_Operand_Kind_Addr_Global:
-    case jit_Operand_Kind_Addr_Local:
-    case jit_Operand_Kind_Addr_Param:
-    case jit_Operand_Kind_Addr_Actual:
-      toDo( "emitAdd()\n" );
+    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_ConstI ):
+      toDo( "emitAdd\n" );
       break;
 
-    case jit_Operand_Kind_ConstI:
-      switch ( x._kind ) {
-        case jit_Operand_Kind_RegB:
-          toDo( "emitAdd()\n" );
-          break;
-        case jit_Operand_Kind_RegI:
-          emitRex( false, nullptr, x._reg );
-          outB( 0x81 );
-          emitModRM_OpcRM( 0, x._reg );
-          outI( y._value );
-          break;
-        case jit_Operand_Kind_RegP:
-          emitRex( true, nullptr, x._reg );
-          outB( 0x81 );
-          emitModRM_OpcRM( 0, x._reg );
-          outI( y._value );
-          break;
-        default:
-          fatal( "emitAdd: unexpected operands\n" );
-      }
-
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ConstI ):
+      emitRex( false, nullptr, x._reg );
+      outB( 0x81 );
+      emitModRM_OpcRM( 0, x._reg );
+      outI( y._value );
       break;
 
-    case jit_Operand_Kind_RegB:
-    case jit_Operand_Kind_RegI:
-    case jit_Operand_Kind_RegP:
-      toDo( "emitAdd()\n" );
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ConstI ):
+      emitRex( true, nullptr, x._reg );
+      outB( 0x81 );
+      emitModRM_OpcRM( 0, x._reg );
+      outI( y._value );
       break;
+
+    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_RegB ):
+      toDo( "emitAdd\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_RegI ):
+      toDo( "emitAdd\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegI ):
+      toDo( "emitAdd\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegP ):
+      toDo( "emitAdd\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_GlobalB ):
+      toDo( "emitAdd\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_GlobalI ):
+      toDo( "emitAdd\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_GlobalI ):
+      toDo( "emitAdd\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_GlobalP ):
+      toDo( "emitAdd\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_LocalB ):
+      toDo( "emitAdd\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_LocalI ):
+      toDo( "emitAdd\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_LocalI ):
+      toDo( "emitAdd\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_LocalP ):
+      toDo( "emitAdd\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_ParamB ):
+      toDo( "emitAdd\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ParamI ):
+      toDo( "emitAdd\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ParamI ):
+      toDo( "emitAdd\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ParamP ):
+      toDo( "emitAdd\n" );
+      break;
+
     default:
       fatal( "emitAdd: unexpected operands\n" );
   }
@@ -871,52 +935,90 @@ emitAdd( const Operand& x, const Operand& y )
 void
 emitSub( const Operand& x, const Operand& y )
 {
-  assert( x.isReg() );
+  switch ( KindPair( x._kind, y._kind ) ) {
 
-  switch ( y._kind ) {
-    case jit_Operand_Kind_GlobalB:
-    case jit_Operand_Kind_GlobalI:
-    case jit_Operand_Kind_GlobalP:
-    case jit_Operand_Kind_LocalB:
-    case jit_Operand_Kind_LocalI:
-    case jit_Operand_Kind_LocalP:
-    case jit_Operand_Kind_ParamB:
-    case jit_Operand_Kind_ParamI:
-    case jit_Operand_Kind_ParamP:
-    case jit_Operand_Kind_Addr_Global:
-    case jit_Operand_Kind_Addr_Local:
-    case jit_Operand_Kind_Addr_Param:
-    case jit_Operand_Kind_Addr_Actual:
-      toDo( "emitSub()\n" );
+    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_ConstI ):
+      toDo( "emitSub\n" );
       break;
 
-    case jit_Operand_Kind_ConstI:
-      switch ( x._kind ) {
-        case jit_Operand_Kind_RegB:
-          toDo( "emitSub()\n" );
-          break;
-        case jit_Operand_Kind_RegI:
-          emitRex( false, nullptr, x._reg );
-          outB( 0x81 );
-          emitModRM_OpcRM( 5, x._reg );
-          outI( y._value );
-          break;
-        case jit_Operand_Kind_RegP:
-          emitRex( true, nullptr, x._reg );
-          outB( 0x81 );
-          emitModRM_OpcRM( 5, x._reg );
-          outI( y._value );
-          break;
-        default:
-          fatal( "emitSub: unexpected operands\n" );
-      }
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ConstI ):
+      emitRex( false, nullptr, x._reg );
+      outB( 0x81 );
+      emitModRM_OpcRM( 5, x._reg );
+      outI( y._value );
       break;
 
-    case jit_Operand_Kind_RegB:
-    case jit_Operand_Kind_RegI:
-    case jit_Operand_Kind_RegP:
-      toDo( "emitSub()\n" );
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ConstI ):
+      emitRex( true, nullptr, x._reg );
+      outB( 0x81 );
+      emitModRM_OpcRM( 5, x._reg );
+      outI( y._value );
       break;
+
+    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_RegB ):
+      toDo( "emitSub\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_RegI ):
+      toDo( "emitSub\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegI ):
+      toDo( "emitSub\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegP ):
+      toDo( "emitSub\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_GlobalB ):
+      toDo( "emitSub\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_GlobalI ):
+      toDo( "emitSub\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_GlobalI ):
+      toDo( "emitSub\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_GlobalP ):
+      toDo( "emitSub\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_LocalB ):
+      toDo( "emitSub\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_LocalI ):
+      toDo( "emitSub\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_LocalI ):
+      toDo( "emitSub\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_LocalP ):
+      toDo( "emitSub\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_ParamB ):
+      toDo( "emitSub\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ParamI ):
+      toDo( "emitSub\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ParamI ):
+      toDo( "emitSub\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ParamP ):
+      toDo( "emitSub\n" );
+      break;
+
     default:
       fatal( "emitSub: unexpected operands\n" );
   }
@@ -929,89 +1031,190 @@ emitSub( const Operand& x, const Operand& y )
 void
 emitMov( const Operand& x, const Operand& y )
 {
+  // TO DO: common practice is to use rip-relative addressing for globals.
+  //        Working with 64-bit immediate values is very limited in x86-64.
+  //        And, anyway, rip-relative allows the compiled & linked code to load anywhere.
+  //        This requires that the data segment and code segment are allocated together by the linker,
+  //        and will keep their relative position.
+
+
   if ( x.size() != y.size() ) {
     toDo( "emitMov handle size difference\n" );
   }
 
-  // For all these moves, the size of the mov will come from y.size()
-  // Later I may need to use min of x and y size, possibly with extensions.
+  switch ( KindPair( x._kind, y._kind ) ) {
 
-  if ( y.isConst() ) {
-    toDo( "mov x, const\n" );
+    case KindPair( jit_Operand_Kind_GlobalB, jit_Operand_Kind_ConstI ):
+      toDo( "emitMov\n" );
+      break;
 
-  } else if ( y.isVar() ) {
+    case KindPair( jit_Operand_Kind_GlobalB, jit_Operand_Kind_RegB ):
+      toDo( "emitMov\n" );
+      break;
 
-    // Can only move memory into register
-    if ( x.isReg() ) {
 
-      switch ( y._kind ) {
-        case jit_Operand_Kind_GlobalB:
-        case jit_Operand_Kind_GlobalI:
-        case jit_Operand_Kind_GlobalP:
-          toDo( "mov x, [addr]   where addr = data + y._value\n" );
-          // TO DO: common practice is to use rip-relative addressing for globals.
-          //        Working with 64-bit immediate values is very limited in x86-64.
-          //        And, anyway, rip-relative allows the compiled & linked code to load anywhere.
-          //        This requires that the data segment and code segment are allocated together by the linker,
-          //        and will keep their relative position.
-          break;
-        case jit_Operand_Kind_LocalB:
-        case jit_Operand_Kind_LocalI:
-        case jit_Operand_Kind_LocalP:
-          toDo( "mov x, [rbp + y._value]\n" );
-          break;
+    case KindPair( jit_Operand_Kind_GlobalI, jit_Operand_Kind_ConstI ):
+      toDo( "emitMov\n" );
+      break;
 
-        case jit_Operand_Kind_ParamB:
-          switch ( x._kind ) {
-            case jit_Operand_Kind_RegB:
-              toDo( "..." );
-              break;
-            default:
-              fatal( "emitMov: unexpected operands\n" );
-          }
-          break;
+    case KindPair( jit_Operand_Kind_GlobalI, jit_Operand_Kind_RegI ):
+      toDo( "emitMov\n" );
+      break;
 
-        case jit_Operand_Kind_ParamI:
-          switch ( x._kind ) {
-            case jit_Operand_Kind_RegI:
-              // mov x, [rbp + y._value + FRAME_PARAMS_OFFSET]
-              emitRex( false, x._reg, regRbp );
-              outB( 0x8b );
-              emitModRMMem( x._reg, regRbp, y._value + FRAME_PARAMS_OFFSET );
-              break;
-            default:
-              fatal( "emitMov: unexpected operands\n" );
-          }
-          break;
 
-        case jit_Operand_Kind_ParamP:
-          switch ( x._kind ) {
-            case jit_Operand_Kind_RegP:
-              // mov x, [rbp + y._value + FRAME_PARAMS_OFFSET]
-              emitRex( true, x._reg, regRbp );
-              outB( 0x8b );
-              emitModRMMem( x._reg, regRbp, y._value + FRAME_PARAMS_OFFSET );
-              break;
-            default:
-              fatal( "emitMov: unexpected operands\n" );
-          }
-          break;
+    case KindPair( jit_Operand_Kind_GlobalP, jit_Operand_Kind_ConstI ):
+      toDo( "emitMov\n" );
+      break;
 
-        default:
-          fatal( "emitMov: unexpected operands\n" );
-      }
+    case KindPair( jit_Operand_Kind_GlobalP, jit_Operand_Kind_RegP ):
+      toDo( "emitMov\n" );
+      break;
 
-    } else {
+
+    case KindPair( jit_Operand_Kind_LocalB, jit_Operand_Kind_ConstI ):
+      toDo( "emitMov\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_LocalB, jit_Operand_Kind_RegB ):
+      toDo( "emitMov\n" );
+      break;
+
+
+    case KindPair( jit_Operand_Kind_LocalI, jit_Operand_Kind_ConstI ):
+      toDo( "emitMov\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_LocalI, jit_Operand_Kind_RegI ):
+      toDo( "emitMov\n" );
+      break;
+
+
+    case KindPair( jit_Operand_Kind_LocalP, jit_Operand_Kind_ConstI ):
+      toDo( "emitMov\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_LocalP, jit_Operand_Kind_RegP ):
+      toDo( "emitMov\n" );
+      break;
+
+
+    case KindPair( jit_Operand_Kind_ParamB, jit_Operand_Kind_ConstI ):
+      toDo( "emitMov\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_ParamB, jit_Operand_Kind_RegB ):
+      toDo( "emitMov\n" );
+      break;
+
+
+    case KindPair( jit_Operand_Kind_ParamI, jit_Operand_Kind_ConstI ):
+      toDo( "emitMov\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_ParamI, jit_Operand_Kind_RegI ):
+      toDo( "emitMov\n" );
+      break;
+
+
+    case KindPair( jit_Operand_Kind_ParamP, jit_Operand_Kind_ConstI ):
+      toDo( "emitMov\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_ParamP, jit_Operand_Kind_RegP ):
+      toDo( "emitMov\n" );
+      break;
+
+
+    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_GlobalB ):
+      toDo( "emitMov\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_LocalB ):
+      toDo( "emitMov\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_ParamB ):
+      toDo( "emitMov\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_ConstI ):
+      toDo( "emitMov\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_RegB ):
+      toDo( "emitMov\n" );
+      break;
+
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_GlobalI ):
+      toDo( "emitMov\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_LocalI ):
+      toDo( "emitMov\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ParamI ):
+      // mov x_reg, [rbp + y._value + FRAME_PARAMS_OFFSET]
+      emitRex( false, x._reg, regRbp );
+      outB( 0x8b );
+      emitModRMMem( x._reg, regRbp, y._value + FRAME_PARAMS_OFFSET );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ConstI ):
+      toDo( "emitMov\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_RegI ):
+      toDo( "emitMov\n" );
+      break;
+
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_GlobalP ):
+      toDo( "emitMov\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_LocalP ):
+      toDo( "emitMov\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ParamP ):
+      // mov reg_x, [rbp + y._value + FRAME_PARAMS_OFFSET]
+      emitRex( true, x._reg, regRbp );
+      outB( 0x8b );
+      emitModRMMem( x._reg, regRbp, y._value + FRAME_PARAMS_OFFSET );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_Addr_Global ):
+      // lea reg, [rip-relative]
+      toDo( "emitMov\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_Addr_Local ):
+      // lea reg, [rbp+offset]
+      toDo( "emitMov\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_Addr_Param ):
+      // lea reg, [rbp+offset+FRAME_PARAMS_OFFSET]
+      toDo( "emitMov\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_Addr_Actual ):
+      // lea reg, [rsp+offset]
+      toDo( "emitMov\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ConstI ):
+      toDo( "emitMov\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegP ):
+      toDo( "emitMov\n" );
+      break;
+
+    default:
       fatal( "emitMov: unexpected operands\n" );
-    }
-
-
-  } else if ( y.isAddrOfVar() ) {
-    toDo( "mov x, addrOfVar\n" );
-  } else if ( y.isReg() ) {
-    toDo( "mov x, reg\n" );
-  } else {
-    fatal( "emitMov: unexpected operands\n" );
   }
 }
 
