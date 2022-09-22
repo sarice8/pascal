@@ -841,7 +841,36 @@ emitAdd( const Operand& x, const Operand& y )
 {
   switch ( KindPair( x._kind, y._kind ) ) {
 
+    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_GlobalB ):
+      toDo( "emitAdd\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_LocalB ):
+      toDo( "emitAdd\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_ParamB ):
+      toDo( "emitAdd\n" );
+      break;
+
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_ConstI ):
+      toDo( "emitAdd\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_RegB ):
+      toDo( "emitAdd\n" );
+      break;
+
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_GlobalI ):
+      toDo( "emitAdd\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_LocalI ):
+      toDo( "emitAdd\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ParamI ):
       toDo( "emitAdd\n" );
       break;
 
@@ -852,34 +881,12 @@ emitAdd( const Operand& x, const Operand& y )
       outI( y._value );
       break;
 
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ConstI ):
-      emitRex( true, nullptr, x._reg );
-      outB( 0x81 );
-      emitModRM_OpcRM( 0, x._reg );
-      outI( y._value );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_RegB ):
-      toDo( "emitAdd\n" );
-      break;
-
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_RegI ):
       toDo( "emitAdd\n" );
       break;
 
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegI ):
-      toDo( "emitAdd\n" );
-      break;
 
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegP ):
-      toDo( "emitAdd\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_GlobalB ):
-      toDo( "emitAdd\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_GlobalI ):
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_GlobalP ):
       toDo( "emitAdd\n" );
       break;
 
@@ -887,15 +894,7 @@ emitAdd( const Operand& x, const Operand& y )
       toDo( "emitAdd\n" );
       break;
 
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_GlobalP ):
-      toDo( "emitAdd\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_LocalB ):
-      toDo( "emitAdd\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_LocalI ):
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_LocalP ):
       toDo( "emitAdd\n" );
       break;
 
@@ -903,15 +902,7 @@ emitAdd( const Operand& x, const Operand& y )
       toDo( "emitAdd\n" );
       break;
 
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_LocalP ):
-      toDo( "emitAdd\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_ParamB ):
-      toDo( "emitAdd\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ParamI ):
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ParamP ):
       toDo( "emitAdd\n" );
       break;
 
@@ -919,7 +910,18 @@ emitAdd( const Operand& x, const Operand& y )
       toDo( "emitAdd\n" );
       break;
 
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ParamP ):
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ConstI ):
+      emitRex( true, nullptr, x._reg );
+      outB( 0x81 );
+      emitModRM_OpcRM( 0, x._reg );
+      outI( y._value );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegP ):
+      toDo( "emitAdd\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegI ):
       toDo( "emitAdd\n" );
       break;
 
@@ -937,7 +939,36 @@ emitSub( const Operand& x, const Operand& y )
 {
   switch ( KindPair( x._kind, y._kind ) ) {
 
+    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_GlobalB ):
+      toDo( "emitSub\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_LocalB ):
+      toDo( "emitSub\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_ParamB ):
+      toDo( "emitSub\n" );
+      break;
+
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_ConstI ):
+      toDo( "emitSub\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_RegB ):
+      toDo( "emitSub\n" );
+      break;
+
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_GlobalI ):
+      toDo( "emitSub\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_LocalI ):
+      toDo( "emitSub\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ParamI ):
       toDo( "emitSub\n" );
       break;
 
@@ -948,34 +979,12 @@ emitSub( const Operand& x, const Operand& y )
       outI( y._value );
       break;
 
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ConstI ):
-      emitRex( true, nullptr, x._reg );
-      outB( 0x81 );
-      emitModRM_OpcRM( 5, x._reg );
-      outI( y._value );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_RegB ):
-      toDo( "emitSub\n" );
-      break;
-
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_RegI ):
       toDo( "emitSub\n" );
       break;
 
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegI ):
-      toDo( "emitSub\n" );
-      break;
 
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegP ):
-      toDo( "emitSub\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_GlobalB ):
-      toDo( "emitSub\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_GlobalI ):
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_GlobalP ):
       toDo( "emitSub\n" );
       break;
 
@@ -983,15 +992,7 @@ emitSub( const Operand& x, const Operand& y )
       toDo( "emitSub\n" );
       break;
 
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_GlobalP ):
-      toDo( "emitSub\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_LocalB ):
-      toDo( "emitSub\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_LocalI ):
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_LocalP ):
       toDo( "emitSub\n" );
       break;
 
@@ -999,15 +1000,7 @@ emitSub( const Operand& x, const Operand& y )
       toDo( "emitSub\n" );
       break;
 
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_LocalP ):
-      toDo( "emitSub\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_ParamB ):
-      toDo( "emitSub\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ParamI ):
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ParamP ):
       toDo( "emitSub\n" );
       break;
 
@@ -1015,7 +1008,18 @@ emitSub( const Operand& x, const Operand& y )
       toDo( "emitSub\n" );
       break;
 
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ParamP ):
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ConstI ):
+      emitRex( true, nullptr, x._reg );
+      outB( 0x81 );
+      emitModRM_OpcRM( 5, x._reg );
+      outI( y._value );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegP ):
+      toDo( "emitSub\n" );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegI ):
       toDo( "emitSub\n" );
       break;
 
@@ -1466,7 +1470,7 @@ outI( int i )
    // start stack frame
 
    outB( 0x55 );  // push ebp       -- Now is push rbp
-   outB( 0x8b );  // mov ebp, esp   -- Need to switch to rsp, rbp.  Getting SEGV on this.
+   outB( 0x8b );  // mov ebp, esp   -- Need to switch to rsp, rbp.
    outB( 0xec );
    outB( 0x81 );  // sub esp, (int) 20
    outB( 0xec );
