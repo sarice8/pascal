@@ -59,13 +59,17 @@ int  tCodeLen = 0;
 // The call stack will not live in here.  It will be part of the
 // same call stack used by this calling program.
 //
+// Static data is allocated near code, so we can use rip-relative addressing.
+//
 #define dataSize 100000
-char data[dataSize];
+char* data = 0;
 
 
 
 char* nativeCode = 0;
 size_t nativeCodeLen = 10000;
+size_t nativeCodeAllocSize = 0;
+size_t PAGE_SIZE = 8192;
 char* nativePc = 0;
 
 
@@ -89,6 +93,10 @@ typedef enum {
   jit_Operand_Kind_ParamB,
   jit_Operand_Kind_ParamI,
   jit_Operand_Kind_ParamP,
+  // Actual* won't occur on expression stack, but is used internally to help assign to actuals
+  jit_Operand_Kind_ActualB,
+  jit_Operand_Kind_ActualI,
+  jit_Operand_Kind_ActualP,
 
   // operand is the address of a variable
   jit_Operand_Kind_Addr_Global,
@@ -204,7 +212,7 @@ public:
 
   bool isReg() const { return _reg != nullptr; }
   bool isVar() const { return _kind >= jit_Operand_Kind_GlobalB &&
-                              _kind <= jit_Operand_Kind_ParamP; }
+                              _kind <= jit_Operand_Kind_ActualP; }
   bool isAddrOfVar() const { return _kind >= jit_Operand_Kind_Addr_Global &&
                                     _kind <= jit_Operand_Kind_Addr_Actual; }
   bool isVarOrAddrOfVar() const { return isVar() || isAddrOfVar(); }
@@ -239,6 +247,7 @@ void operandIntoReg( Operand& x );
 void operandIntoRegCommutative( Operand& x, Operand& y );
 void operandKindAddrIntoReg( Operand& x );
 void operandNotMem( Operand& x );
+void operandVarAtAddr( Operand& x, int size );
 Register* allocateReg();
 
 
@@ -253,7 +262,8 @@ void emitModRMMem( const Register* operandReg, const Register* baseReg, int offs
 void emitModRM_OpcRMMem( int opcodeExtension, const Register* baseReg, int offset );
 void emitModRM_OpcRM( int opcodeExtension, const Register* rm );
 void emitModRM_RegReg( const Register* opcodeReg, const Register* rm );
-void emitModRMMemRipRelative( const Register* operandReg, void* globalPtr );
+void emitModRMMemRipRelative( const Register* operandReg, void* globalPtr, int numAdditionalInstrBytes );
+void emitModRM_OpcRMMemRipRelative( int opcodeExtension, void* globalPtr, int numAdditionalInstrBytes );
 
 
 int
@@ -405,38 +415,15 @@ generateCode()
       case tAssignI : {
           Operand y = operandStack.top();   operandStack.pop();
           Operand x = operandStack.top();   operandStack.pop();
-
           // If x is a simple variable's address, we can mov into that variable.
           // The variable size is assumed to match the size of this Assign.
-          switch( x._kind ) {
-            case jit_Operand_Kind_Addr_Global: {
-                Operand newX( jit_Operand_Kind_GlobalI, x._value );
-                operandNotMem( y );
-                emitMov( newX, y );
-              }
-              break;
-            case jit_Operand_Kind_Addr_Local: {
-                Operand newX( jit_Operand_Kind_LocalI, x._value );
-                operandNotMem( y );
-                emitMov( newX, y );
-              }
-              break;
-            case jit_Operand_Kind_Addr_Param: {
-                Operand newX( jit_Operand_Kind_ParamI, x._value );
-                operandNotMem( y );
-                emitMov( newX, y );
-              }
-              break;
-            case jit_Operand_Kind_Addr_Actual:
-              // I don't have jit_Operand_Kind_ActualI so can't use emitMov itself.
-              // Either extend things, or have another method e.g. emitMovToActual( ... )
-              toDo( "assign to actual\n" );
-              break;
-
-            default:
-              tCodeNotImplemented( tCodePc[-1] );
+          if ( x.isAddrOfVar() ) {
+            operandVarAtAddr( x, 4 );
+            operandNotMem( y );
+            emitMov( x, y );
+          } else {
+            tCodeNotImplemented( tCodePc[-1] );
           }
-
           x.release();
           y.release();
         }
@@ -444,7 +431,15 @@ generateCode()
       case tAssignB : {
           Operand y = operandStack.top();   operandStack.pop();
           Operand x = operandStack.top();   operandStack.pop();
-          tCodeNotImplemented( tCodePc[-1] );
+          // If x is a simple variable's address, we can mov into that variable.
+          // The variable size is assumed to match the size of this Assign.
+          if ( x.isAddrOfVar() ) {
+            operandVarAtAddr( x, 1 );
+            operandNotMem( y );
+            emitMov( x, y );
+          } else {
+            tCodeNotImplemented( tCodePc[-1] );
+          }
           x.release();
           y.release();
         }
@@ -452,7 +447,15 @@ generateCode()
       case tAssignP : {
           Operand y = operandStack.top();   operandStack.pop();
           Operand x = operandStack.top();   operandStack.pop();
-          tCodeNotImplemented( tCodePc[-1] );
+          // If x is a simple variable's address, we can mov into that variable.
+          // The variable size is assumed to match the size of this Assign.
+          if ( x.isAddrOfVar() ) {
+            operandVarAtAddr( x, 8 );
+            operandNotMem( y );
+            emitMov( x, y );
+          } else {
+            tCodeNotImplemented( tCodePc[-1] );
+          }
           x.release();
           y.release();
         }
@@ -848,6 +851,89 @@ operandKindAddrIntoReg( Operand& x )
 }
 
 
+// Given operand x of kind Addr_*.
+// Give back an operand that describes a variable at that addr,
+// with the given byte size.
+// This does not generate code to dereference the address,
+// it only describes the variable.
+//
+void
+operandVarAtAddr( Operand& x, int size )
+{
+  assert( x.isAddrOfVar() );
+  jitOperandKind newKind = jit_Operand_Kind_Illegal;
+
+  switch ( x._kind ) {
+    case jit_Operand_Kind_Addr_Global:
+      switch ( size ) {
+        case 1:
+          newKind = jit_Operand_Kind_GlobalB;
+          break;
+        case 4:
+          newKind = jit_Operand_Kind_GlobalI;
+          break;
+        case 8:
+          newKind = jit_Operand_Kind_GlobalP;
+          break;
+        default:
+          break;
+      }
+      break;
+    case jit_Operand_Kind_Addr_Local:
+      switch ( size ) {
+        case 1:
+          newKind = jit_Operand_Kind_LocalB;
+          break;
+        case 4:
+          newKind = jit_Operand_Kind_LocalI;
+          break;
+        case 8:
+          newKind = jit_Operand_Kind_LocalP;
+          break;
+        default:
+          break;
+      }
+      break;
+    case jit_Operand_Kind_Addr_Param:
+      switch ( size ) {
+        case 1:
+          newKind = jit_Operand_Kind_ParamB;
+          break;
+        case 4:
+          newKind = jit_Operand_Kind_ParamI;
+          break;
+        case 8:
+          newKind = jit_Operand_Kind_ParamP;
+          break;
+        default:
+          break;
+      }
+      break;
+    case jit_Operand_Kind_Addr_Actual:
+      switch ( size ) {
+        case 1:
+          newKind = jit_Operand_Kind_ActualB;
+          break;
+        case 4:
+          newKind = jit_Operand_Kind_ActualI;
+          break;
+        case 8:
+          newKind = jit_Operand_Kind_ActualP;
+          break;
+        default:
+          break;
+      }
+      break;
+    default:
+      break;
+  }
+  assert( newKind != jit_Operand_Kind_Illegal );
+
+  Operand newX( newKind, x._value );
+  x = newX;
+}
+
+
 void
 swap( Operand& x, Operand& y)
 {
@@ -1096,40 +1182,52 @@ emitSub( const Operand& x, const Operand& y )
 void
 emitMov( const Operand& x, const Operand& y )
 {
-  // TO DO: common practice is to use rip-relative addressing for globals.
-  //        Working with 64-bit immediate values is very limited in x86-64.
-  //        And, anyway, rip-relative allows the compiled & linked code to load anywhere.
-  //        This requires that the data segment and code segment are allocated together by the linker,
-  //        and will keep their relative position.
-
   switch ( KindPair( x._kind, y._kind ) ) {
 
     case KindPair( jit_Operand_Kind_GlobalB, jit_Operand_Kind_ConstI ):
-      toDo( "emitMov\n" );
+      // mov [rip + offsetToGlobal], immmediate8
+      emitRex( false, nullptr, nullptr );
+      outB( 0xc6 );
+      emitModRM_OpcRMMemRipRelative( 0, &data[x._value], 1 );
+      outB( y._value );
       break;
 
     case KindPair( jit_Operand_Kind_GlobalB, jit_Operand_Kind_RegB ):
-      toDo( "emitMov\n" );
+      // mov [rip + offsetToGlobal], reg8
+      emitRex( false, y._reg, nullptr );
+      outB( 0x88 );
+      emitModRMMemRipRelative( y._reg, &data[x._value], 0 );
       break;
 
-
     case KindPair( jit_Operand_Kind_GlobalI, jit_Operand_Kind_ConstI ):
-      toDo( "emitMov\n" );
+      // mov [rip + offsetToGlobal], immmediate32
+      emitRex( false, nullptr, nullptr );
+      outB( 0xc7 );
+      emitModRM_OpcRMMemRipRelative( 0, &data[x._value], 4 );
+      outI( y._value );
       break;
 
     case KindPair( jit_Operand_Kind_GlobalI, jit_Operand_Kind_RegI ):
-      toDo( "emitMov\n" );
+      // mov [rip + offsetToGlobal], reg32
+      emitRex( false, y._reg, nullptr );
+      outB( 0x89 );
+      emitModRMMemRipRelative( y._reg, &data[x._value], 0 );
       break;
 
-
     case KindPair( jit_Operand_Kind_GlobalP, jit_Operand_Kind_ConstI ):
-      toDo( "emitMov\n" );
+      // mov [rip + offsetToGlobal], immmediate32 sign-extended to 64 bits
+      emitRex( true, nullptr, nullptr );
+      outB( 0xc7 );
+      emitModRM_OpcRMMemRipRelative( 0, &data[x._value], 4 );
+      outI( y._value );
       break;
 
     case KindPair( jit_Operand_Kind_GlobalP, jit_Operand_Kind_RegP ):
-      toDo( "emitMov\n" );
+      // mov [rip + offsetToGlobal], reg64
+      emitRex( true, y._reg, nullptr );
+      outB( 0x89 );
+      emitModRMMemRipRelative( y._reg, &data[x._value], 0 );
       break;
-
 
     case KindPair( jit_Operand_Kind_LocalB, jit_Operand_Kind_ConstI ):
       // mov [rbp+offset], immediate8
@@ -1140,7 +1238,6 @@ emitMov( const Operand& x, const Operand& y )
       break;
 
     case KindPair( jit_Operand_Kind_LocalB, jit_Operand_Kind_RegB ):
-      toDo( "emitMov\n" );
       // mov [rbp+offset], reg8
       emitRex( false, y._reg, regRbp );
       outB( 0x88 );
@@ -1178,7 +1275,6 @@ emitMov( const Operand& x, const Operand& y )
       break;
 
     case KindPair( jit_Operand_Kind_ParamB, jit_Operand_Kind_ConstI ):
-      toDo( "emitMov\n" );
       // mov [rbp + offset + FRAME_PARAMS_OFFSET], immediate8
       emitRex( false, nullptr, regRbp );
       outB( 0xc6 );
@@ -1223,8 +1319,60 @@ emitMov( const Operand& x, const Operand& y )
       emitModRMMem( y._reg, regRbp, x._value + FRAME_PARAMS_OFFSET );
       break;
 
+    // Note, Kind_Actual* only appear on the left side of emitMov,
+    // and not in any other operations.
+    // They are used to assign to actual space, when setting up a call.
+
+    case KindPair( jit_Operand_Kind_ActualB, jit_Operand_Kind_ConstI ):
+      // mov [rsp + offset], immediate8
+      emitRex( false, nullptr, regRsp );
+      outB( 0xc6 );
+      emitModRM_OpcRMMem( 0, regRsp, x._value );
+      outB( y._value );
+      break;
+
+    case KindPair( jit_Operand_Kind_ActualB, jit_Operand_Kind_RegB ):
+      // mov [rsp + offset], reg8
+      emitRex( false, y._reg, regRsp );
+      outB( 0x88 );
+      emitModRMMem( y._reg, regRsp, x._value );
+      break;
+
+    case KindPair( jit_Operand_Kind_ActualI, jit_Operand_Kind_ConstI ):
+      // mov [rsp + offset], immediate32
+      emitRex( false, nullptr, regRsp );
+      outB( 0xc7 );
+      emitModRM_OpcRMMem( 0, regRsp, x._value );
+      outI( y._value );
+      break;
+
+    case KindPair( jit_Operand_Kind_ActualI, jit_Operand_Kind_RegI ):
+      // mov [rsp + offset], reg32
+      emitRex( false, y._reg, regRsp );
+      outB( 0x89 );
+      emitModRMMem( y._reg, regRsp, x._value );
+      break;
+
+    case KindPair( jit_Operand_Kind_ActualP, jit_Operand_Kind_ConstI ):
+      // mov [rsp + offset], immediate32 sign-extended to 64 bits
+      emitRex( true, nullptr, regRsp );
+      outB( 0xc7 );
+      emitModRM_OpcRMMem( 0, regRsp, x._value );
+      outI( y._value );
+      break;
+
+    case KindPair( jit_Operand_Kind_ActualP, jit_Operand_Kind_RegP ):
+      // mov [rsp + offset], reg64
+      emitRex( true, y._reg, regRsp );
+      outB( 0x89 );
+      emitModRMMem( y._reg, regRsp, x._value );
+      break;
+
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_GlobalB ):
-      toDo( "emitMov\n" );
+      // mov reg8, [rip + offsetToGlobal]
+      emitRex( false, x._reg, nullptr );
+      outB( 0x8a );
+      emitModRMMemRipRelative( x._reg, &data[y._value], 0 );
       break;
 
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_LocalB ):
@@ -1251,7 +1399,6 @@ emitMov( const Operand& x, const Operand& y )
       break;
 
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_RegB ):
-      toDo( "emitMov\n" );
       // mov x_reg8, y_reg8
       emitRex( false, x._reg, y._reg );
       outB( 0x8a );
@@ -1259,27 +1406,28 @@ emitMov( const Operand& x, const Operand& y )
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_GlobalI ):
-      // mov x_reg, [rip + offsetToGlobal]
+      // mov x_reg32, [rip + offsetToGlobal]
       emitRex( false, x._reg, nullptr );
       outB( 0x8b );
-      emitModRMMemRipRelative( x._reg, &data[y._value] );
+      emitModRMMemRipRelative( x._reg, &data[y._value], 0 );
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_LocalI ):
-      // mov x_reg, [rbp + y._value]
+      // mov x_reg32, [rbp + y._value]
       emitRex( false, x._reg, regRbp );
       outB( 0x8b );
       emitModRMMem( x._reg, regRbp, y._value );
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ParamI ):
-      // mov x_reg, [rbp + y._value + FRAME_PARAMS_OFFSET]
+      // mov x_reg32, [rbp + y._value + FRAME_PARAMS_OFFSET]
       emitRex( false, x._reg, regRbp );
       outB( 0x8b );
       emitModRMMem( x._reg, regRbp, y._value + FRAME_PARAMS_OFFSET );
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ConstI ):
+      // mov x_reg32, immediate32
       emitRex( false, nullptr, x._reg );
       outB( 0xb8 | regIdLowBits( x._reg->_nativeId ) );
       outI( y._value );
@@ -1293,7 +1441,10 @@ emitMov( const Operand& x, const Operand& y )
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_GlobalP ):
-      toDo( "emitMov\n" );
+      // mov x_reg64, [rip + offsetToGlobal]
+      emitRex( true, x._reg, nullptr );
+      outB( 0x8b );
+      emitModRMMemRipRelative( x._reg, &data[y._value], 0 );
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_LocalP ):
@@ -1311,8 +1462,10 @@ emitMov( const Operand& x, const Operand& y )
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_Addr_Global ):
-      // lea reg, [rip-relative]
-      toDo( "emitMov\n" );
+      // lea reg, [rip + offsetToGlobal]
+      emitRex( true, x._reg, nullptr );
+      outB( 0x8d );
+      emitModRMMemRipRelative( x._reg, &data[y._value], 0 );
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_Addr_Local ):
@@ -1337,9 +1490,9 @@ emitMov( const Operand& x, const Operand& y )
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ConstI ):
-      // mov reg64, immediate64 (sign-extended from the given 32-bit constant).
-      // NOTE: from intel docs it sounds like this instruction really does take immediate64
-      //       rather than simply sign-extending immediate32.
+      // mov reg64, immediate64 (which I sign-extend from the given 32-bit constant).
+      // NOTE: this instruction really does take immediate64 rather than simply
+      // sign-extending immediate32.
       emitRex( true, nullptr, x._reg );
       outB( 0xb8 | regIdLowBits( x._reg->_nativeId ) );
       outL( (long) y._value );
@@ -1505,21 +1658,37 @@ emitModRM_OpcRMMem( int opcodeExtension, const Register* baseReg, int offset )
 // This is the common way to access static memory, since it only needs a 32-bit offset.
 // (64-bit immediates are very limited in x86-64).  And it is relocatable.
 //
-// operandReg is the other operand of the instruction (in reg field), and may be nullptr.
+// operandReg is the other operand of the instruction (in reg field).
 //
-// TO DO: rip-relative needs a bit of work.
-//        I need to allocate data near nativeCode, so they are within 2 GB of each other.
-//        But I'll need to keep it read/write, so can't use the same mmap/mprotect.
-//        Unless I can mprotect a smaller block than my mmap pages.
-//        Also, once that is solved, double-check that the calculated offset is exactly right.
+// numAdditionalInstrBytes is how many bytes the caller is going to write for this instruction
+// after the Mod/RM byte and displacement.   Typically 0, but more if there is an immediate argument.
+// We need this because rip-relative is relative to the address after this entire instruction.
 //
 void
-emitModRMMemRipRelative( const Register* operandReg, void* globalPtr )
+emitModRMMemRipRelative( const Register* operandReg, void* globalPtr, int numAdditionalInstrBytes )
 {
   // mod 00
   // In this mode, r/m field 5 indicates [rip+offset32] rather than [rbp] 
   outB( ( regIdLowBits( operandReg->_nativeId ) << 3 ) | 0x5 );
-  outI( (long) globalPtr - (long) nativePc );
+  // rip-relative is relative to the next instruction.  Where will that be:
+  char* nextInstrAddr = nativePc + 4 + numAdditionalInstrBytes;
+  outI( (long) globalPtr - (long) nextInstrAddr );
+}
+
+
+// This form of ModR/M references static memory, relative to rip.
+// Similar to emitModRMMemRipRelative(), but for an instruction that has an
+// opcode extension stored in the ModR/M's reg field, rather than a register.
+//
+void
+emitModRM_OpcRMMemRipRelative( int opcodeExtension, void* globalPtr, int numAdditionalInstrBytes )
+{
+  // mod 00
+  // In this mode, r/m field 5 indicates [rip+offset32] rather than [rbp] 
+  outB( ( opcodeExtension << 3 ) | 0x5 );
+  // rip-relative is relative to the next instruction.  Where will that be:
+  char* nextInstrAddr = nativePc + 4 + numAdditionalInstrBytes;
+  outI( (long) globalPtr - (long) nextInstrAddr );
 }
 
 
@@ -1620,11 +1789,24 @@ tCodeNotImplemented( int opcode )
 void
 allocNativeCode()
 {
-  nativeCode = (char*) mmap( NULL, nativeCodeLen, PROT_READ | PROT_WRITE,
+  // We'll allocate memory for native code followed contiguously by static data.
+  // This will ensure the static data is within 2GB of the code, and we can use
+  // rip-relative addressing for it.
+  //
+  // Round up the code allocation to a multiple of pages, so we'll be able to
+  // mprotect the code but not the data.   I think linux default page size is 4K
+  // but I'll use 8K.
+  //
+  nativeCodeAllocSize = ( (nativeCodeLen / PAGE_SIZE) + 1 ) * PAGE_SIZE;
+  int allocSize = nativeCodeAllocSize + dataSize;
+
+  // Allocate memory for both code and static data.
+  nativeCode = (char*) mmap( NULL, allocSize, PROT_READ | PROT_WRITE,
                              MAP_PRIVATE | MAP_ANONYMOUS, -1, 0 );
   nativePc = nativeCode;
+  data = nativeCode + nativeCodeAllocSize;
   if ( nativeCode == NULL ) {
-    fatal( "mmap failed to allocate %ld bytes for native code\n", nativeCodeLen );
+    fatal( "mmap failed to allocate %ld bytes for native code and data\n", allocSize );
   }
 }
 
@@ -1634,7 +1816,7 @@ protectNativeCode()
 {
   // Switch memory from writable to executable.
   // This also ensures the instruction cache doesn't have stale data.
-  if ( mprotect( nativeCode, nativeCodeLen, PROT_READ | PROT_EXEC ) != 0 ) {
+  if ( mprotect( nativeCode, nativeCodeAllocSize, PROT_READ | PROT_EXEC ) != 0 ) {
     fatal( "mprotect failed with status %d\n", errno );
   }
 }
