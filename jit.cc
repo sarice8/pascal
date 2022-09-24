@@ -34,7 +34,7 @@ typedef void (*funcptr)();
 
 void parseArgs( int argc, char* argv[] );
 void usage( int status );
-void loadTCode();
+void loadTCodeAndAllocNativeCode();
 void allocNativeCode();
 void protectNativeCode();
 void outB( char c );
@@ -113,7 +113,13 @@ typedef enum {
   // This is not the case if the valid size is one byte.
   jit_Operand_Kind_RegB,
   jit_Operand_Kind_RegI,
-  jit_Operand_Kind_RegP
+  jit_Operand_Kind_RegP,
+
+  // operand is a value pointed to by a register.
+  // For now, these are just used by emitMov, and won't appear on expression stack.
+  jit_Operand_Kind_RegP_DerefB,
+  jit_Operand_Kind_RegP_DerefI,
+  jit_Operand_Kind_RegP_DerefP
 
 } jitOperandKind;
 
@@ -210,12 +216,20 @@ public:
     : _kind( k ), _reg( r )
   {}
 
-  bool isReg() const { return _reg != nullptr; }
+  Operand( jitOperandKind k, Register* r, int val )
+    : _kind( k ), _reg( r ), _value( val )
+  {}
+
+  bool isReg() const { return _kind >= jit_Operand_Kind_RegB &&
+                              _kind <= jit_Operand_Kind_RegP; }
   bool isVar() const { return _kind >= jit_Operand_Kind_GlobalB &&
                               _kind <= jit_Operand_Kind_ActualP; }
   bool isAddrOfVar() const { return _kind >= jit_Operand_Kind_Addr_Global &&
                                     _kind <= jit_Operand_Kind_Addr_Actual; }
   bool isVarOrAddrOfVar() const { return isVar() || isAddrOfVar(); }
+  bool isDeref() const { return _kind >= jit_Operand_Kind_RegP_DerefB &&
+                                _kind <= jit_Operand_Kind_RegP_DerefP; }
+  bool isMem() const { return isVar() || isAddrOfVar() || isDeref(); }
   bool isConst() const { return _kind == jit_Operand_Kind_ConstI; }
   int  size() const;  // valid size of the operand value in bytes (1, 4, or 8)
   void release();     // don't need this register anymore (if any)
@@ -247,7 +261,7 @@ void operandIntoReg( Operand& x );
 void operandIntoRegCommutative( Operand& x, Operand& y );
 void operandKindAddrIntoReg( Operand& x );
 void operandNotMem( Operand& x );
-void operandVarAtAddr( Operand& x, int size );
+void operandDeref( Operand& x, int valueSize );
 Register* allocateReg();
 
 
@@ -270,8 +284,7 @@ int
 main( int argc, char* argv[] )
 {
   parseArgs( argc, argv );
-  loadTCode();
-  allocNativeCode();
+  loadTCodeAndAllocNativeCode();
   generateCode();
   protectNativeCode();
   executeCode();
@@ -324,6 +337,9 @@ usage( int status )
 void
 generateCode()
 {
+  // Fold constants? May want to turn off during some unit testing.
+  bool doConst = true;
+
   int jitSp = 0;
 
   int* tCodePc = tCode;
@@ -389,41 +405,62 @@ generateCode()
         }
         break;
       case tFetchI : {
-          Register* r = allocateReg();
           Operand x = operandStack.top();   operandStack.pop();
-          tCodeNotImplemented( tCodePc[-1] );
-          operandStack.emplace( jit_Operand_Kind_RegI, r );
+          // x is a pointer to a value of size 4.
+          // Make x refer to the pointed-to value
+          operandDeref( x, 4 );
+          // If I allow jit_Operand_Kind_RegP_Deref* on the operand stack,
+          // then we could just push x and be done.
+          // The actual retrieval of the value can be included in the next operation.
+          // But, for now, we only handle that operand kind in emitMov.
+          // So we have to retrieve it into a register now.
+          Operand result( jit_Operand_Kind_RegI, allocateReg() );
+          emitMov( result, x );
+          operandStack.push( result );
           x.release();
         }
         break;
       case tFetchB : {
-          Register* r = allocateReg();
           Operand x = operandStack.top();   operandStack.pop();
-          tCodeNotImplemented( tCodePc[-1] );
-          operandStack.emplace( jit_Operand_Kind_RegB, r );
+          // x is a pointer to a value of size 1.
+          // Make x refer to the pointed-to value
+          operandDeref( x, 1 );
+          // If I allow jit_Operand_Kind_RegP_Deref* on the operand stack,
+          // then we could just push x and be done.
+          // The actual retrieval of the value can be included in the next operation.
+          // But, for now, we only handle that operand kind in emitMov.
+          // So we have to retrieve it into a register now.
+          Operand result( jit_Operand_Kind_RegB, allocateReg() );
+          emitMov( result, x );
+          operandStack.push( result );
           x.release();
         }
         break;
       case tFetchP : {
-          Register* r = allocateReg();
           Operand x = operandStack.top();   operandStack.pop();
-          tCodeNotImplemented( tCodePc[-1] );
-          operandStack.emplace( jit_Operand_Kind_RegP, r );
+          // x is a pointer to a value of size 8.
+          // Make x refer to the pointed-to value
+          operandDeref( x, 8 );
+          // If I allow jit_Operand_Kind_RegP_Deref* on the operand stack,
+          // then we could just push x and be done.
+          // The actual retrieval of the value can be included in the next operation.
+          // But, for now, we only handle that operand kind in emitMov.
+          // So we have to retrieve it into a register now.
+          Operand result( jit_Operand_Kind_RegP, allocateReg() );
+          emitMov( result, x );
+          operandStack.push( result );
           x.release();
         }
         break;
       case tAssignI : {
           Operand y = operandStack.top();   operandStack.pop();
           Operand x = operandStack.top();   operandStack.pop();
-          // If x is a simple variable's address, we can mov into that variable.
-          // The variable size is assumed to match the size of this Assign.
-          if ( x.isAddrOfVar() ) {
-            operandVarAtAddr( x, 4 );
-            operandNotMem( y );
-            emitMov( x, y );
-          } else {
-            tCodeNotImplemented( tCodePc[-1] );
-          }
+          // x is a pointer to a value of size 4.
+          // Make x refer to the pointed-to value (still usable as target of mov)
+          operandDeref( x, 4 );
+          // x will be a memory reference, so y must not also be in memory.
+          operandNotMem( y );
+          emitMov( x, y );
           x.release();
           y.release();
         }
@@ -431,15 +468,12 @@ generateCode()
       case tAssignB : {
           Operand y = operandStack.top();   operandStack.pop();
           Operand x = operandStack.top();   operandStack.pop();
-          // If x is a simple variable's address, we can mov into that variable.
-          // The variable size is assumed to match the size of this Assign.
-          if ( x.isAddrOfVar() ) {
-            operandVarAtAddr( x, 1 );
-            operandNotMem( y );
-            emitMov( x, y );
-          } else {
-            tCodeNotImplemented( tCodePc[-1] );
-          }
+          // x is a pointer to a value of size 1.
+          // Make x refer to the pointed-to value (still usable as target of mov)
+          operandDeref( x, 1 );
+          // x will be a memory reference, so y must not also be in memory.
+          operandNotMem( y );
+          emitMov( x, y );
           x.release();
           y.release();
         }
@@ -447,15 +481,12 @@ generateCode()
       case tAssignP : {
           Operand y = operandStack.top();   operandStack.pop();
           Operand x = operandStack.top();   operandStack.pop();
-          // If x is a simple variable's address, we can mov into that variable.
-          // The variable size is assumed to match the size of this Assign.
-          if ( x.isAddrOfVar() ) {
-            operandVarAtAddr( x, 8 );
-            operandNotMem( y );
-            emitMov( x, y );
-          } else {
-            tCodeNotImplemented( tCodePc[-1] );
-          }
+          // x is a pointer to a value of size 8.
+          // Make x refer to the pointed-to value (still usable as target of mov)
+          operandDeref( x, 8 );
+          // x will be a memory reference, so y must not also be in memory.
+          operandNotMem( y );
+          emitMov( x, y );
           x.release();
           y.release();
         }
@@ -480,12 +511,16 @@ generateCode()
       case tMultI : {
           Operand y = operandStack.top();   operandStack.pop();
           Operand x = operandStack.top();   operandStack.pop();
-          if ( x.isConst() ) {
-            swap( x, y );
+          if ( doConst && x.isConst() && y.isConst() ) {
+            operandStack.emplace( x._kind, x._value * y._value );
+          } else {
+            if ( x.isConst() ) {
+              swap( x, y );
+            }
+            operandIntoReg( x );
+            tCodeNotImplemented( tCodePc[-1] );
+            operandStack.push( x );
           }
-          operandIntoReg( x );
-          tCodeNotImplemented( tCodePc[-1] );
-          operandStack.push( x );
           y.release();
         }
         break;
@@ -499,25 +534,51 @@ generateCode()
           y.release();
         }
         break;
+      case tAddPI : {
+          Operand y = operandStack.top();   operandStack.pop();
+          Operand x = operandStack.top();   operandStack.pop();
+          if ( doConst && x.isAddrOfVar() && y.isConst() ) {
+            operandStack.emplace( x._kind, x._value + y._value );
+          } else {
+            operandKindAddrIntoReg( x );
+            operandKindAddrIntoReg( y );
+            operandIntoReg( x );
+            // TO DO: something to indicate that we want y sign-extended to ptr,
+            //    or that we really do want to produce a 64-bit result.
+            //    Maybe it's enough that x will already be a regP.
+            emitAdd( x, y );
+            operandStack.push( x );
+          }
+          y.release();
+        }
+        break;
       case tAddI : {
           Operand y = operandStack.top();   operandStack.pop();
           Operand x = operandStack.top();   operandStack.pop();
-          operandKindAddrIntoReg( x );
-          operandKindAddrIntoReg( y );
-          operandIntoRegCommutative( x, y );
-          emitAdd( x, y );
-          operandStack.push( x );
+          if ( doConst && x.isConst() && y.isConst() ) {
+            operandStack.emplace( x._kind, x._value + y._value );
+          } else {
+            operandKindAddrIntoReg( x );
+            operandKindAddrIntoReg( y );
+            operandIntoRegCommutative( x, y );
+            emitAdd( x, y );
+            operandStack.push( x );
+          }
           y.release();
         }
         break;
       case tSubI : {
           Operand y = operandStack.top();   operandStack.pop();
           Operand x = operandStack.top();   operandStack.pop();
-          operandKindAddrIntoReg( x );
-          operandKindAddrIntoReg( y );
-          operandIntoReg( x );
-          tCodeNotImplemented( tCodePc[-1] );
-          operandStack.push( x );
+          if ( doConst && x.isConst() && y.isConst() ) {
+            operandStack.emplace( x._kind, x._value - y._value );
+          } else {
+            operandKindAddrIntoReg( x );
+            operandKindAddrIntoReg( y );
+            operandIntoReg( x );
+            tCodeNotImplemented( tCodePc[-1] );
+            operandStack.push( x );
+          }
           y.release();
         }
         break;
@@ -830,7 +891,7 @@ operandIntoReg( Operand& x )
 void
 operandNotMem( Operand& x )
 {
-  if ( x.isVarOrAddrOfVar() ) {
+  if ( x.isMem() ) {
     operandIntoReg( x );
   }
 }
@@ -851,29 +912,30 @@ operandKindAddrIntoReg( Operand& x )
 }
 
 
-// Given operand x of kind Addr_*.
-// Give back an operand that describes a variable at that addr,
-// with the given byte size.
-// This does not generate code to dereference the address,
-// it only describes the variable.
+// x is a pointer to a value of the given byte size.
+// Make x refer to the pointed-to value.
+// The resulting operand can be used as the left or right argument of emitMov().
 //
 void
-operandVarAtAddr( Operand& x, int size )
+operandDeref( Operand& x, int size )
 {
-  assert( x.isAddrOfVar() );
-  jitOperandKind newKind = jit_Operand_Kind_Illegal;
+  if ( x.isVar() ) {
+    // the pointer is stored in a variable, so we need to fetch the pointer first.
+    operandIntoReg( x );
+  }
 
+  // Create an opcond that represents the pointed-to value.
   switch ( x._kind ) {
     case jit_Operand_Kind_Addr_Global:
       switch ( size ) {
         case 1:
-          newKind = jit_Operand_Kind_GlobalB;
+          x = Operand( jit_Operand_Kind_GlobalB, x._value );
           break;
         case 4:
-          newKind = jit_Operand_Kind_GlobalI;
+          x = Operand( jit_Operand_Kind_GlobalI, x._value );
           break;
         case 8:
-          newKind = jit_Operand_Kind_GlobalP;
+          x = Operand( jit_Operand_Kind_GlobalP, x._value );
           break;
         default:
           break;
@@ -882,13 +944,13 @@ operandVarAtAddr( Operand& x, int size )
     case jit_Operand_Kind_Addr_Local:
       switch ( size ) {
         case 1:
-          newKind = jit_Operand_Kind_LocalB;
+          x = Operand( jit_Operand_Kind_LocalB, x._value );
           break;
         case 4:
-          newKind = jit_Operand_Kind_LocalI;
+          x = Operand( jit_Operand_Kind_LocalI, x._value );
           break;
         case 8:
-          newKind = jit_Operand_Kind_LocalP;
+          x = Operand( jit_Operand_Kind_LocalP, x._value );
           break;
         default:
           break;
@@ -897,13 +959,13 @@ operandVarAtAddr( Operand& x, int size )
     case jit_Operand_Kind_Addr_Param:
       switch ( size ) {
         case 1:
-          newKind = jit_Operand_Kind_ParamB;
+          x = Operand( jit_Operand_Kind_ParamB, x._value );
           break;
         case 4:
-          newKind = jit_Operand_Kind_ParamI;
+          x = Operand( jit_Operand_Kind_ParamI, x._value );
           break;
         case 8:
-          newKind = jit_Operand_Kind_ParamP;
+          x = Operand( jit_Operand_Kind_ParamP, x._value );
           break;
         default:
           break;
@@ -912,25 +974,37 @@ operandVarAtAddr( Operand& x, int size )
     case jit_Operand_Kind_Addr_Actual:
       switch ( size ) {
         case 1:
-          newKind = jit_Operand_Kind_ActualB;
+          x = Operand( jit_Operand_Kind_ActualB, x._value );
           break;
         case 4:
-          newKind = jit_Operand_Kind_ActualI;
+          x = Operand( jit_Operand_Kind_ActualI, x._value );
           break;
         case 8:
-          newKind = jit_Operand_Kind_ActualP;
+          x = Operand( jit_Operand_Kind_ActualP, x._value );
           break;
         default:
           break;
       }
       break;
+    case jit_Operand_Kind_RegP:
+      switch ( size ) {
+        case 1:
+          x = Operand( jit_Operand_Kind_RegP_DerefB, x._reg, 0 );
+          break;
+        case 4:
+          x = Operand( jit_Operand_Kind_RegP_DerefI, x._reg, 0 );
+          break;
+        case 8:
+          x = Operand( jit_Operand_Kind_RegP_DerefP, x._reg, 0 );
+          break;
+        default:
+          break;
+      }
+      break;    
     default:
+      fatal( "operandDeref: unexpected operands\n" );
       break;
   }
-  assert( newKind != jit_Operand_Kind_Illegal );
-
-  Operand newX( newKind, x._value );
-  x = newX;
 }
 
 
@@ -1233,7 +1307,7 @@ emitMov( const Operand& x, const Operand& y )
       // mov [rbp+offset], immediate8
       emitRex( false, nullptr, regRbp );
       outB( 0xc6 );
-      emitModRM_OpcRM( 0, regRbp );
+      emitModRM_OpcRMMem( 0, regRbp, x._value );
       outB( y._value );
       break;
 
@@ -1248,7 +1322,7 @@ emitMov( const Operand& x, const Operand& y )
       // mov [rbp+offset], immediate32
       emitRex( false, nullptr, regRbp );
       outB( 0xc7 );
-      emitModRM_OpcRM( 0, regRbp );
+      emitModRM_OpcRMMem( 0, regRbp, x._value );
       outI( y._value );
       break;
 
@@ -1263,7 +1337,7 @@ emitMov( const Operand& x, const Operand& y )
       // mov [rbp+offset], immediate32 sign-extended to 64 bits
       emitRex( true, nullptr, regRbp );
       outB( 0xc7 );
-      emitModRM_OpcRM( 0, regRbp );
+      emitModRM_OpcRMMem( 0, regRbp, x._value );
       outI( y._value );
       break;
 
@@ -1405,6 +1479,13 @@ emitMov( const Operand& x, const Operand& y )
       emitModRM_RegReg( x._reg, y._reg );
       break;
 
+    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_RegP_DerefB ):
+      // mov x_reg8, [y_reg64 + offset]
+      emitRex( false, x._reg, y._reg );
+      outB( 0x8a );
+      emitModRMMem( x._reg, y._reg, y._value );
+      break;
+
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_GlobalI ):
       // mov x_reg32, [rip + offsetToGlobal]
       emitRex( false, x._reg, nullptr );
@@ -1438,6 +1519,13 @@ emitMov( const Operand& x, const Operand& y )
       emitRex( false, x._reg, y._reg );
       outB( 0x8b );
       emitModRM_RegReg( x._reg, y._reg );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_RegP_DerefI ):
+      // mov x_reg32, [y_reg64 + offset]
+      emitRex( false, x._reg, y._reg );
+      outB( 0x8b );
+      emitModRMMem( x._reg, y._reg, y._value );
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_GlobalP ):
@@ -1503,6 +1591,58 @@ emitMov( const Operand& x, const Operand& y )
       emitRex( true, x._reg, y._reg );
       outB( 0x8b );
       emitModRM_RegReg( x._reg, y._reg );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegP_DerefP ):
+      // mov x_reg64, [y_reg64 + offset]
+      emitRex( true, x._reg, y._reg );
+      outB( 0x8b );
+      emitModRMMem( x._reg, y._reg, y._value );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP_DerefB, jit_Operand_Kind_ConstI ):
+      // mov [reg64+offset], immediate8
+      emitRex( false, nullptr, x._reg );
+      outB( 0xc6 );
+      emitModRM_OpcRMMem( 0, x._reg, x._value );
+      outI( y._value );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP_DerefB, jit_Operand_Kind_RegB ):
+      // mov [x_reg64 + offset], y_reg8
+      emitRex( false, y._reg, x._reg );
+      outB( 0x88 );
+      emitModRMMem( y._reg, x._reg, x._value );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP_DerefI, jit_Operand_Kind_ConstI ):
+      // mov [reg64+offset], immediate32
+      emitRex( false, nullptr, x._reg );
+      outB( 0xc7 );
+      emitModRM_OpcRMMem( 0, x._reg, x._value );
+      outI( y._value );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP_DerefI, jit_Operand_Kind_RegI ):
+      // mov [x_reg64 + offset], y_reg32
+      emitRex( false, y._reg, x._reg );
+      outB( 0x89 );
+      emitModRMMem( y._reg, x._reg, x._value );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP_DerefP, jit_Operand_Kind_ConstI ):
+      // mov [reg64+offset], immediate32 sign-extended to 64 bits
+      emitRex( true, nullptr, x._reg );
+      outB( 0xc7 );
+      emitModRM_OpcRMMem( 0, x._reg, x._value );
+      outI( y._value );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP_DerefP, jit_Operand_Kind_RegP ):
+      // mov [x_reg64 + offset], y_reg64
+      emitRex( true, y._reg, x._reg );
+      outB( 0x89 );
+      emitModRMMem( y._reg, x._reg, x._value );
       break;
 
     default:
@@ -1708,8 +1848,6 @@ emitModRM_OpcRM( int opcodeExtension, const Register* rm )
 }
 
 
-
-
 void
 emitModRM_RegReg( const Register* opcodeReg, const Register* rm )
 {
@@ -1744,7 +1882,7 @@ toDo( const char* msg, ... )
 
 
 void
-loadTCode()
+loadTCodeAndAllocNativeCode()
 {
   FILE* src = fopen( filename, "r" );
   if ( !src ) {
@@ -1759,6 +1897,9 @@ loadTCode()
     assert( read == 1 );
   }
 
+  // Need to alloc memory before loading initialized static data
+  allocNativeCode();
+
   // Load string literals into data memory
   // File format: <addr> <#ints> <data ints ...>
   int address;
@@ -1771,7 +1912,7 @@ loadTCode()
       read = fscanf( src, "%d", &word );
       assert( read == 1 );
       *intPtr++ = word;
-    }
+    } 
   }
 
   fclose( src );

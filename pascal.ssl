@@ -166,7 +166,8 @@ output:
    tDecI             % decrement int value on top of expr stack
    tMultI            % multiply top two integers (replacing with result)
    tDivI
-   tAddI  
+   tAddPI            % add ptr (2nd value) and int (top value), resulting in a ptr
+   tAddI
    tSubI
    tNegI             % top entry *= -1
    tNot              % negate top boolean
@@ -1280,7 +1281,7 @@ ArraySubscripts:
       ]
 
       % update start address
-      .tAddI
+      .tAddPI
       [
          | ']' :  >
          | ',' :
@@ -1308,7 +1309,7 @@ RecordFieldRef:
    offset = oNodeGetInt( field, qValue )
    [ equal_zero( offset )
       | false :
-         .tPushConstI oEmitInt( offset ) .tAddI
+         .tPushConstI oEmitInt( offset ) .tAddPI
       | * :
    ]
 

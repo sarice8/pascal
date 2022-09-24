@@ -273,6 +273,10 @@ walkTable()
               stack[sp-1] /= stack[sp];
               sp--;
               continue;
+       case tAddPI :
+              stack[sp-1] += stack[sp];
+              sp--;
+              continue;
        case tAddI :
               stack[sp-1] += stack[sp];
               sp--;
@@ -442,6 +446,7 @@ dumpTable()
        case tDecI :          op0("tDecI");
        case tMultI :         op0("tMultI");
        case tDivI :          op0("tDivI");
+       case tAddPI :         op0("tAddPI");
        case tAddI :          op0("tAddI");
        case tSubI :          op0("tSubI");
        case tNegI :          op0("tNegI");
