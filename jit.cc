@@ -262,6 +262,7 @@ void operandIntoRegCommutative( Operand& x, Operand& y );
 void operandKindAddrIntoReg( Operand& x );
 void operandNotMem( Operand& x );
 void operandDeref( Operand& x, int valueSize );
+void operandExtendToP( Operand& x );
 Register* allocateReg();
 
 
@@ -542,10 +543,14 @@ generateCode()
           } else {
             operandKindAddrIntoReg( x );
             operandKindAddrIntoReg( y );
+            // Sign-extend y to 64-bits so we can add it directly to x.
+            operandExtendToP( y );
+            // A little optimization
+            if ( ( y._kind == jit_Operand_Kind_RegP ) &&
+                 ( x._kind != jit_Operand_Kind_RegP ) ) {
+              swap( x, y );
+            }
             operandIntoReg( x );
-            // TO DO: something to indicate that we want y sign-extended to ptr,
-            //    or that we really do want to produce a 64-bit result.
-            //    Maybe it's enough that x will already be a regP.
             emitAdd( x, y );
             operandStack.push( x );
           }
@@ -576,7 +581,7 @@ generateCode()
             operandKindAddrIntoReg( x );
             operandKindAddrIntoReg( y );
             operandIntoReg( x );
-            tCodeNotImplemented( tCodePc[-1] );
+            emitSub( x, y );
             operandStack.push( x );
           }
           y.release();
@@ -1008,6 +1013,31 @@ operandDeref( Operand& x, int size )
 }
 
 
+// Sign-extend the operand to a 64-bit value.
+// Exception: we don't bother to extend a ConstI
+// because many instructions can sign-extend an immediate32 to 64 bits.
+//
+void
+operandExtendToP( Operand& x )
+{
+  if ( x.size() == 8 ) {
+    return;
+  }
+
+  if ( x.isConst() ) {
+    // won't bother extending const, as noted above
+  } else if ( x.isVar() || x.isDeref() ) {
+    Operand newX( jit_Operand_Kind_RegP, allocateReg() );
+    emitMov( newX, x );   // knows how to sign-extend
+    x = newX;
+  } else if ( x.isReg() ) {
+    Operand newX( jit_Operand_Kind_RegP, x._reg );
+    emitMov( newX, x );   // mov register to itself, with sign extension
+    x = newX;
+  }
+}
+
+
 void
 swap( Operand& x, Operand& y)
 {
@@ -1076,9 +1106,11 @@ emitAdd( const Operand& x, const Operand& y )
       toDo( "emitAdd\n" );
       break;
 
-
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_GlobalI ):
-      toDo( "emitAdd\n" );
+      // add reg_x, [rip + offsetToGlobal]
+      emitRex( false, x._reg, nullptr );
+      outB( 0x03 );
+      emitModRMMemRipRelative( x._reg, &data[y._value], 0 );
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_LocalI ):
@@ -1103,35 +1135,35 @@ emitAdd( const Operand& x, const Operand& y )
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_RegI ):
-      toDo( "emitAdd\n" );
+      // add reg_x32, reg_y32
+      emitRex( false, x._reg, y._reg );
+      outB( 0x03 );
+      emitModRM_RegReg( x._reg, regRbp );
       break;
-
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_GlobalP ):
-      toDo( "emitAdd\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_GlobalI ):
-      toDo( "emitAdd\n" );
+      // add reg_x64, [rip + offsetToGlobal]
+      emitRex( true, x._reg, nullptr );
+      outB( 0x03 );
+      emitModRMMemRipRelative( x._reg, &data[y._value], 0 );
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_LocalP ):
-      toDo( "emitAdd\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_LocalI ):
-      toDo( "emitAdd\n" );
+      // add reg_x64, [rbp + y.value];
+      emitRex( true, x._reg, regRbp );
+      outB( 0x03 );
+      emitModRMMem( x._reg, regRbp, y._value );
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ParamP ):
-      toDo( "emitAdd\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ParamI ):
-      toDo( "emitAdd\n" );
+      // add reg_x64, [rbp + y.value + FRAME_PARAMS_OFFSET]
+      emitRex( true, x._reg, regRbp );
+      outB( 0x03 );
+      emitModRMMem( x._reg, regRbp, y._value + FRAME_PARAMS_OFFSET );
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ConstI ):
+      // add reg64, immediate32 sign-extended to 64 bits
       emitRex( true, nullptr, x._reg );
       outB( 0x81 );
       emitModRM_OpcRM( 0, x._reg );
@@ -1139,11 +1171,10 @@ emitAdd( const Operand& x, const Operand& y )
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegP ):
-      toDo( "emitAdd\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegI ):
-      toDo( "emitAdd\n" );
+      // add x_reg64, y_reg64
+      emitRex( true, y._reg, x._reg );
+      outB( 0x01 );
+      emitModRM_RegReg( y._reg, x._reg );
       break;
 
     default:
@@ -1182,15 +1213,24 @@ emitSub( const Operand& x, const Operand& y )
 
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_GlobalI ):
-      toDo( "emitSub\n" );
+      // sub x_reg32, [rip + offsetToGlobal]
+      emitRex( false, x._reg, nullptr );
+      outB( 0x2b );
+      emitModRMMemRipRelative( x._reg, &data[y._value], 0 );
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_LocalI ):
-      toDo( "emitSub\n" );
+      // sub x_reg32, [rbp+offset]
+      emitRex( false, x._reg, regRbp );
+      outB( 0x2b );
+      emitModRMMem( x._reg, regRbp, y._value );
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ParamI ):
-      toDo( "emitSub\n" );
+      // sub x_reg32, [rbp + offset + FRAME_PARAMS_OFFSET]
+      emitRex( false, x._reg, regRbp );
+      outB( 0x2b );
+      emitModRMMem( x._reg, regRbp, y._value + FRAME_PARAMS_OFFSET );
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ConstI ):
@@ -1201,32 +1241,31 @@ emitSub( const Operand& x, const Operand& y )
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_RegI ):
-      toDo( "emitSub\n" );
+      // sub x_reg32, y_reg32
+      emitRex( false, x._reg, y._reg );
+      outB( 0x2b );
+      emitModRM_RegReg( x._reg, y._reg );
       break;
-
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_GlobalP ):
-      toDo( "emitSub\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_GlobalI ):
-      toDo( "emitSub\n" );
+      // sub x_reg64, [rip + offsetToGlobal]
+      emitRex( true, x._reg, nullptr );
+      outB( 0x2b );
+      emitModRMMemRipRelative( x._reg, &data[y._value], 0 );
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_LocalP ):
-      toDo( "emitSub\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_LocalI ):
-      toDo( "emitSub\n" );
+      // sub x_reg32, [rbp+offset]
+      emitRex( true, x._reg, regRbp );
+      outB( 0x2b );
+      emitModRMMem( x._reg, regRbp, y._value );
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ParamP ):
-      toDo( "emitSub\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ParamI ):
-      toDo( "emitSub\n" );
+      // sub x_reg32, [rbp + offset + FRAME_PARAMS_OFFSET]
+      emitRex( true, x._reg, regRbp );
+      outB( 0x2b );
+      emitModRMMem( x._reg, regRbp, y._value + FRAME_PARAMS_OFFSET );
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ConstI ):
@@ -1237,11 +1276,10 @@ emitSub( const Operand& x, const Operand& y )
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegP ):
-      toDo( "emitSub\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegI ):
-      toDo( "emitSub\n" );
+      // sub x_reg64, y_reg64
+      emitRex( true, x._reg, y._reg );
+      outB( 0x2b );
+      emitModRM_RegReg( x._reg, y._reg );
       break;
 
     default:
@@ -1528,6 +1566,13 @@ emitMov( const Operand& x, const Operand& y )
       emitModRMMem( x._reg, y._reg, y._value );
       break;
 
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_GlobalI ):
+      // movsxd x_reg64, [rip + offsetToGlobal] 32 bits sign-extended to 64 bits
+      emitRex( true, x._reg, nullptr );
+      outB( 0x63 );
+      emitModRMMemRipRelative( x._reg, &data[y._value], 0 );
+      break;
+
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_GlobalP ):
       // mov x_reg64, [rip + offsetToGlobal]
       emitRex( true, x._reg, nullptr );
@@ -1535,11 +1580,25 @@ emitMov( const Operand& x, const Operand& y )
       emitModRMMemRipRelative( x._reg, &data[y._value], 0 );
       break;
 
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_LocalI ):
+      // movsxd x_reg64, [rbp + y._value] 32 bits sign-extended to 64 bits
+      emitRex( true, x._reg, regRbp );
+      outB( 0x63 );
+      emitModRMMem( x._reg, regRbp, y._value );
+      break;
+
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_LocalP ):
       // mov x_reg, [rbp + y._value]
       emitRex( true, x._reg, regRbp );
       outB( 0x8b );
       emitModRMMem( x._reg, regRbp, y._value );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ParamI ):
+      // mov x_reg64, [rbp + y._value + FRAME_PARAMS_OFFSET] 32 bits sign-extended to 64 bits
+      emitRex( true, x._reg, regRbp );
+      outB( 0x63 );
+      emitModRMMem( x._reg, regRbp, y._value + FRAME_PARAMS_OFFSET );
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ParamP ):
@@ -1586,11 +1645,25 @@ emitMov( const Operand& x, const Operand& y )
       outL( (long) y._value );
       break;
 
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegI ):
+      // movsxd x_reg64, y_reg32 sign-extended to 64 bits
+      emitRex( true, x._reg, y._reg );
+      outB( 0x63 );
+      emitModRM_RegReg( x._reg, y._reg );
+      break;
+
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegP ):
       // mov x_reg64, y_reg64
       emitRex( true, x._reg, y._reg );
       outB( 0x8b );
       emitModRM_RegReg( x._reg, y._reg );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegP_DerefI ):
+      // movsxd x_reg64, [y_reg64 + offset] 32 bits sign-extended to 64 bits
+      emitRex( true, x._reg, y._reg );
+      outB( 0x63 );
+      emitModRMMem( x._reg, y._reg, y._value );
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegP_DerefP ):
@@ -1636,6 +1709,14 @@ emitMov( const Operand& x, const Operand& y )
       outB( 0xc7 );
       emitModRM_OpcRMMem( 0, x._reg, x._value );
       outI( y._value );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP_DerefP, jit_Operand_Kind_RegI ):
+      // I can't mov into memory with sign extension in one instruction,
+      // because movsxd only moves into register.
+      // But I can do it in two steps, moving the register to itself with extension first.
+      // On the other hand, maybe I don't need this (same goes for the VarP, RegI cases).
+      toDo( "emitMov: moving memoryP, regI with sign extension\n" );
       break;
 
     case KindPair( jit_Operand_Kind_RegP_DerefP, jit_Operand_Kind_RegP ):
