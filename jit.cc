@@ -282,6 +282,7 @@ std::vector<Operand> operandStack;
 void swap( Operand& x, Operand& y );
 void operandIntoReg( Operand& x );
 void operandIntoRegCommutative( Operand& x, Operand& y );
+void operandIntoSpecificReg( Operand& x, Register* reg, int size );
 void operandKindAddrIntoReg( Operand& x );
 void operandNotMem( Operand& x );
 void operandDeref( Operand& x, int valueSize );
@@ -815,40 +816,40 @@ generateCode()
         break;
       case tWriteI : {
           Operand x = operandStack.back();   operandStack.pop_back();
-          tCodeNotImplemented( tCodePc[-1] );
-
           // We need to form a call with the native calling convention.
           // At the moment it's simple because I only support these simple 1-parameter methods.
           Register* paramReg1 = paramRegs[0];
-          Operand op1( jit_Operand_Kind_RegI, paramReg1 );
-          if ( op1 != x ) {
-            forceAllocateReg( op1._reg );
-            emitMov( op1, x );
-          }
+          operandIntoSpecificReg( x, paramReg1, 4 );
           emitCallExtern( (char*) runlibWriteI );
           x.release();
         }
         break;
       case tWriteBool : {
           Operand x = operandStack.back();   operandStack.pop_back();
-          tCodeNotImplemented( tCodePc[-1] );
+          Register* paramReg1 = paramRegs[0];
+          operandIntoSpecificReg( x, paramReg1, 1 );
+          emitCallExtern( (char*) runlibWriteBool );
           x.release();
         }
         break;
       case tWriteStr : {
           Operand x = operandStack.back();   operandStack.pop_back();
-          tCodeNotImplemented( tCodePc[-1] );
+          Register* paramReg1 = paramRegs[0];
+          operandIntoSpecificReg( x, paramReg1, 8 );
+          emitCallExtern( (char*) runlibWriteStr );
           x.release();
         }
         break;
       case tWriteP : {
           Operand x = operandStack.back();   operandStack.pop_back();
-          tCodeNotImplemented( tCodePc[-1] );
+          Register* paramReg1 = paramRegs[0];
+          operandIntoSpecificReg( x, paramReg1, 8 );
+          emitCallExtern( (char*) runlibWriteP );
           x.release();
         }
         break;
       case tWriteCR : {
-          tCodeNotImplemented( tCodePc[-1] );
+          emitCallExtern( (char*) runlibWriteCR );
         }
         break;
 
@@ -1103,6 +1104,62 @@ operandIntoReg( Operand& x )
   Operand newX( regKind, allocateReg() );
   emitMov( newX, x );
   x = newX;
+}
+
+
+// Ensure the operand is in the given register, with the given data size
+//
+void
+operandIntoSpecificReg( Operand& x, Register* reg, int size )
+{
+  jitOperandKind desiredKind = jit_Operand_Kind_Illegal;
+
+  switch ( size ) {
+    case 1:
+      desiredKind = jit_Operand_Kind_RegB;
+      break;
+    case 4:
+      desiredKind = jit_Operand_Kind_RegI;
+      break;
+    case 8:
+      desiredKind = jit_Operand_Kind_RegP;
+      break;
+    default:
+      fatal( "operandIntoSpecificReg: unexpected size\n" );
+  }
+  Operand desiredOp( desiredKind, reg );
+  // If it's already there, with the right size, we don't need to do anything.
+  // If it's in the right register, but with a smaller size,
+  // move to itself to sign-extend.
+  if ( x.isReg() && x._reg == reg && x.size() >= size ) {
+    // The operand is already as desired
+    // (or bigger size, but that should be ok)
+    // TO DO: make sure mov from larger to smaller is always accepted.
+  } else if ( x.isReg() && x._reg == reg && x.size() < size ) {
+    // In the correct reg, but need to extend the value.
+    // We can do that by moving to itself.
+    emitMov( desiredOp, x );
+    x = desiredOp;
+  } else {
+    // Not in the right place yet.
+
+    // TO DO: I think I have a logical flaw with inUse / release.
+    // e.g. if x is RegDeref using the desired reg.
+    //    forceAllocateReg would dump the operand to a temporary,
+    // and update the operand on the expr stack.
+    // BUT the x variable the caller has passed down to here is
+    // no longer on the expr stack.  So it wouldn't get updated.
+    // And maybe the dump-to-temporary wouldn't actually dump anything
+    // since we don't see th operand on the stack.
+    // Probably I should leave x and y operands on the stack
+    // while the instruction is being processed, and only remove them
+    // at the end?  Need to think about it.
+
+    forceAllocateReg( desiredOp._reg );
+    emitMov( desiredOp, x );
+    x.release();
+    x = desiredOp;
+  }
 }
 
 
@@ -2367,10 +2424,6 @@ protectNativeCode()
 void
 executeCode()
 {
-  printf( "Won't execute code until development is further along...\n" );
-  return;
-
-
   printf( "Executing code ...\n" );
 
   funcptr f = (funcptr) nativeCode;
