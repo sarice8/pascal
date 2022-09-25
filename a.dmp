@@ -23,4 +23,17 @@
   36	tAddPI
   37	tFetchI
   38	tAssignI
-  39	tReturn
+  39	tPushGlobalI	  12
+  41	tWriteI
+  42	tWriteCR
+  43	tPushAddrGlobal	  28
+  45	tPushGlobalI	   8
+  47	tPushConstI	   1
+  49	tSubI
+  50	tPushConstI	   4
+  52	tMultI
+  53	tAddPI
+  54	tFetchI
+  55	tWriteI
+  56	tWriteCR
+  57	tReturn

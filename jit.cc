@@ -19,6 +19,7 @@
 #include <string>
 #include <stack>
 #include <vector>
+#include <unordered_map>
 
 
 // This is where we get the definitions for tCode,
@@ -41,6 +42,7 @@ void outB( char c );
 void outI( int i );
 void outL( long l );
 void generateCode();
+void finishMethod();
 void tCodeNotImplemented( int opcode );
 void executeCode();
 void fatal( const char* msg, ... );
@@ -140,15 +142,21 @@ public:
   // CalleeSave means that callers are promised that their value will remain intact.
   // So callees must preserve it if they will use it.
   //
-  Register( const std::string& name, int nativeId, bool calleeSave )
-    : _name( name ), _nativeId( nativeId ), _calleeSave( calleeSave )
+  Register( const std::string& name, int nativeId, bool calleeSaveLinux64, bool calleeSaveWin64 )
+    : _name( name ), _nativeId( nativeId ), _calleeSave( calleeSaveLinux64 ),
+      _calleeSaveWin64( calleeSaveWin64 )
     {}
 
   std::string _name = "";
   int _nativeId = 0;
   bool _calleeSave = false;
+  bool _calleeSaveWin64 = false;   // to do. currently ignored.
   bool _inUse = false;
 };
+
+int regIdLowBits( int nativeId ) { return nativeId & 0x7; }
+int regIdHighBit( int nativeId ) { return nativeId >> 3; }
+
 
 // Note: calling convention for "x86-64 System V" is:
 //   arguments that are classified as "integer/pointer" rather than "memory"
@@ -165,22 +173,22 @@ public:
 // https://learn.microsoft.com/en-us/cpp/build/x64-software-conventions?view=msvc-170&viewFallbackFrom=vs-2017
 
 
-Register* regRax = new Register( "rax", 0, false );
-Register* regRcx = new Register( "rcx", 1, false );
-Register* regRdx = new Register( "rdx", 2, false ); 
-Register* regRbx = new Register( "rbx", 3, true );
-Register* regRsp = new Register( "rsp", 4, true );
-Register* regRbp = new Register( "rbp", 5, true );
-Register* regRsi = new Register( "rsi", 6, false );   // "Function arg #2 in 64-bit linux"
-Register* regRdi = new Register( "rdi", 7, false );   // "Function arg #1 in 64-bit linux"
-Register* regR8  = new Register( "r8", 8, false );
-Register* regR9  = new Register( "r9", 9, false );
-Register* regR10 = new Register( "r10", 10, false );
-Register* regR11 = new Register( "r11", 11, false );
-Register* regR12 = new Register( "r12", 12, true );
-Register* regR13 = new Register( "r13", 13, true );
-Register* regR14 = new Register( "r14", 14, true );
-Register* regR15 = new Register( "r15", 15, true );
+Register* regRax = new Register( "rax", 0, false, false );
+Register* regRcx = new Register( "rcx", 1, false, false );
+Register* regRdx = new Register( "rdx", 2, false, false ); 
+Register* regRbx = new Register( "rbx", 3, true, true );
+Register* regRsp = new Register( "rsp", 4, false, false );
+Register* regRbp = new Register( "rbp", 5, true, true );
+Register* regRsi = new Register( "rsi", 6, false, true );   // "Function arg #2 in 64-bit linux"
+Register* regRdi = new Register( "rdi", 7, false, true );   // "Function arg #1 in 64-bit linux"
+Register* regR8  = new Register( "r8", 8, false, false );
+Register* regR9  = new Register( "r9", 9, false, false );
+Register* regR10 = new Register( "r10", 10, false, false );
+Register* regR11 = new Register( "r11", 11, false, false );
+Register* regR12 = new Register( "r12", 12, true, true );
+Register* regR13 = new Register( "r13", 13, true, true );
+Register* regR14 = new Register( "r14", 14, true, true );
+Register* regR15 = new Register( "r15", 15, true, true );
 
 
 // General purpose registers, in the order we prefer to allocate them.
@@ -201,8 +209,13 @@ Register* registers[] = {
 };
 int numRegisters = sizeof(registers) / sizeof(Register*); 
 
-int regIdLowBits( int nativeId ) { return nativeId & 0x7; }
-int regIdHighBit( int nativeId ) { return nativeId >> 3; }
+std::vector<Register*> paramRegsLinux64 = { regRdi, regRsi, regRdx, regRcx, regR8, regR9 };
+std::vector<Register*> paramRegsWin64 = { regRcx, regRdx, regR8, regR9 };
+// TO DO: there are also differences in use of XMM/YMM/ZMM registers as params.  Floating point. (Also vector? or no?)
+// TO DO: there are also differences for return value.
+
+// For now, hardcoded for linux64
+std::vector<Register*>& paramRegs = paramRegsLinux64;
 
 
 class Operand
@@ -234,6 +247,15 @@ public:
   int  size() const;  // valid size of the operand value in bytes (1, 4, or 8)
   void release();     // don't need this register anymore (if any)
 
+  bool operator==( const Operand& other ) const {
+    return _kind == other._kind &&
+           _value == other._value &&
+           _reg == other._reg;
+  }
+  bool operator!=( const Operand& other ) const {
+    return !( *this == other );
+  }
+
   // DATA
 
   jitOperandKind _kind = jit_Operand_Kind_Illegal;
@@ -254,7 +276,8 @@ Operand::release()
 }
 
 
-std::stack<Operand> operandStack;
+// std::stack doesn't allow traversal of all elements
+std::vector<Operand> operandStack;
 
 void swap( Operand& x, Operand& y );
 void operandIntoReg( Operand& x );
@@ -264,10 +287,30 @@ void operandNotMem( Operand& x );
 void operandDeref( Operand& x, int valueSize );
 void operandExtendToP( Operand& x );
 Register* allocateReg();
+void forceAllocateReg( Register* reg );
+Operand allocateTemp( int size );
+void preserveRegsAcrossCall();
+
+
+std::unordered_map<int, char*> labels;
+std::vector< std::pair< int*, int> > patches;
+
+void defineLabel( int label, char* addr );
+char* findLabel( int label );
+void requestPatch( int* patchAt, int label );
+void makePatches();
+
+int* currLocalSpaceAddr = 0;
+int currLocalSpace = 0;
 
 
 // x86 operations
 //
+void emitEnter( int localSpace );
+void emitReturn();
+void emitReturnFromInitialStub();
+void emitCall( char* addr );
+void emitCallExtern( char* addr );
 void emitAdd( const Operand& x, const Operand& y );
 void emitSub( const Operand& x, const Operand& y );
 void emitMov( const Operand& x, const Operand& y );
@@ -279,6 +322,13 @@ void emitModRM_OpcRM( int opcodeExtension, const Register* rm );
 void emitModRM_RegReg( const Register* opcodeReg, const Register* rm );
 void emitModRMMemRipRelative( const Register* operandReg, void* globalPtr, int numAdditionalInstrBytes );
 void emitModRM_OpcRMMemRipRelative( int opcodeExtension, void* globalPtr, int numAdditionalInstrBytes );
+
+// runtime library methods
+extern void runlibWriteI( int val );
+extern void runlibWriteBool( int val );
+extern void runlibWriteStr( char* ptr );
+extern void runlibWriteP( char* ptr );
+extern void runlibWriteCR();
 
 
 int
@@ -347,66 +397,71 @@ generateCode()
   int* tCodeEnd = tCode + tCodeLen;
 
   for ( tCodePc = tCode; tCodePc < tCodeEnd; ) {
+
+    // I don't have labels yet.
+    // Instead, define each tCode address as a label.
+    defineLabel( tCodePc - tCode, nativePc );
+
     switch ( *tCodePc++ ) {
 
       case tPushGlobalI : {
-          operandStack.emplace( jit_Operand_Kind_GlobalI, *tCodePc++ );
+          operandStack.emplace_back( jit_Operand_Kind_GlobalI, *tCodePc++ );
         }
         break;
       case tPushGlobalB : {
-          operandStack.emplace( jit_Operand_Kind_GlobalB, *tCodePc++ );
+          operandStack.emplace_back( jit_Operand_Kind_GlobalB, *tCodePc++ );
         }
         break;
       case tPushGlobalP : {
-          operandStack.emplace( jit_Operand_Kind_GlobalP, *tCodePc++ );
+          operandStack.emplace_back( jit_Operand_Kind_GlobalP, *tCodePc++ );
         }
         break;
       case tPushLocalI : {
-          operandStack.emplace( jit_Operand_Kind_LocalI, *tCodePc++ );
+          operandStack.emplace_back( jit_Operand_Kind_LocalI, *tCodePc++ );
         }
         break;
       case tPushLocalB : {
-          operandStack.emplace( jit_Operand_Kind_LocalB, *tCodePc++ );
+          operandStack.emplace_back( jit_Operand_Kind_LocalB, *tCodePc++ );
         }
         break;
       case tPushLocalP : {
-          operandStack.emplace( jit_Operand_Kind_LocalP, *tCodePc++ );
+          operandStack.emplace_back( jit_Operand_Kind_LocalP, *tCodePc++ );
         }
         break;
       case tPushParamI : {
-          operandStack.emplace( jit_Operand_Kind_ParamI, *tCodePc++ );
+          operandStack.emplace_back( jit_Operand_Kind_ParamI, *tCodePc++ );
         }
         break;
       case tPushParamB : {
-          operandStack.emplace( jit_Operand_Kind_ParamB, *tCodePc++ );
+          operandStack.emplace_back( jit_Operand_Kind_ParamB, *tCodePc++ );
         }
         break;
       case tPushParamP : {
-          operandStack.emplace( jit_Operand_Kind_ParamP, *tCodePc++ );
+          operandStack.emplace_back( jit_Operand_Kind_ParamP, *tCodePc++ );
         }
         break;
       case tPushConstI : {
-          operandStack.emplace( jit_Operand_Kind_ConstI, *tCodePc++ );
+          operandStack.emplace_back( jit_Operand_Kind_ConstI, *tCodePc++ );
         }
         break;
       case tPushAddrGlobal : {
-          operandStack.emplace( jit_Operand_Kind_Addr_Global, *tCodePc++ );
+          operandStack.emplace_back( jit_Operand_Kind_Addr_Global, *tCodePc++ );
         }
         break;
       case tPushAddrLocal : {
-          operandStack.emplace( jit_Operand_Kind_Addr_Local, *tCodePc++ );
+          operandStack.emplace_back( jit_Operand_Kind_Addr_Local, *tCodePc++ );
         }
         break;
       case tPushAddrParam : {
-          operandStack.emplace( jit_Operand_Kind_Addr_Param, *tCodePc++ );
+          operandStack.emplace_back( jit_Operand_Kind_Addr_Param, *tCodePc++ );
         }
         break;
       case tPushAddrActual : {
-          operandStack.emplace( jit_Operand_Kind_Addr_Actual, *tCodePc++ );
+          operandStack.emplace_back( jit_Operand_Kind_Addr_Actual, *tCodePc++ );
         }
         break;
       case tFetchI : {
-          Operand x = operandStack.top();   operandStack.pop();
+          Operand x = operandStack.back();   operandStack.pop_back();
           // x is a pointer to a value of size 4.
           // Make x refer to the pointed-to value
           operandDeref( x, 4 );
@@ -417,12 +472,12 @@ generateCode()
           // So we have to retrieve it into a register now.
           Operand result( jit_Operand_Kind_RegI, allocateReg() );
           emitMov( result, x );
-          operandStack.push( result );
+          operandStack.push_back( result );
           x.release();
         }
         break;
       case tFetchB : {
-          Operand x = operandStack.top();   operandStack.pop();
+          Operand x = operandStack.back();   operandStack.pop_back();
           // x is a pointer to a value of size 1.
           // Make x refer to the pointed-to value
           operandDeref( x, 1 );
@@ -433,12 +488,12 @@ generateCode()
           // So we have to retrieve it into a register now.
           Operand result( jit_Operand_Kind_RegB, allocateReg() );
           emitMov( result, x );
-          operandStack.push( result );
+          operandStack.push_back( result );
           x.release();
         }
         break;
       case tFetchP : {
-          Operand x = operandStack.top();   operandStack.pop();
+          Operand x = operandStack.back();   operandStack.pop_back();
           // x is a pointer to a value of size 8.
           // Make x refer to the pointed-to value
           operandDeref( x, 8 );
@@ -449,13 +504,13 @@ generateCode()
           // So we have to retrieve it into a register now.
           Operand result( jit_Operand_Kind_RegP, allocateReg() );
           emitMov( result, x );
-          operandStack.push( result );
+          operandStack.push_back( result );
           x.release();
         }
         break;
       case tAssignI : {
-          Operand y = operandStack.top();   operandStack.pop();
-          Operand x = operandStack.top();   operandStack.pop();
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
           // x is a pointer to a value of size 4.
           // Make x refer to the pointed-to value (still usable as target of mov)
           operandDeref( x, 4 );
@@ -467,8 +522,8 @@ generateCode()
         }
         break;
       case tAssignB : {
-          Operand y = operandStack.top();   operandStack.pop();
-          Operand x = operandStack.top();   operandStack.pop();
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
           // x is a pointer to a value of size 1.
           // Make x refer to the pointed-to value (still usable as target of mov)
           operandDeref( x, 1 );
@@ -480,8 +535,8 @@ generateCode()
         }
         break;
       case tAssignP : {
-          Operand y = operandStack.top();   operandStack.pop();
-          Operand x = operandStack.top();   operandStack.pop();
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
           // x is a pointer to a value of size 8.
           // Make x refer to the pointed-to value (still usable as target of mov)
           operandDeref( x, 8 );
@@ -493,8 +548,8 @@ generateCode()
         }
         break;
       case tCopy : {
-          Operand y = operandStack.top();   operandStack.pop();
-          Operand x = operandStack.top();   operandStack.pop();
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
           tCodePc++;
           tCodeNotImplemented( tCodePc[-1] );
           x.release();
@@ -510,36 +565,36 @@ generateCode()
         }
         break;
       case tMultI : {
-          Operand y = operandStack.top();   operandStack.pop();
-          Operand x = operandStack.top();   operandStack.pop();
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
           if ( doConst && x.isConst() && y.isConst() ) {
-            operandStack.emplace( x._kind, x._value * y._value );
+            operandStack.emplace_back( x._kind, x._value * y._value );
           } else {
             if ( x.isConst() ) {
               swap( x, y );
             }
             operandIntoReg( x );
             tCodeNotImplemented( tCodePc[-1] );
-            operandStack.push( x );
+            operandStack.push_back( x );
           }
           y.release();
         }
         break;
       case tDivI : {
-          Operand y = operandStack.top();   operandStack.pop();
-          Operand x = operandStack.top();   operandStack.pop();
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
           // The following is dummy code that all needs to be replaced.
           operandIntoReg( x );
           tCodeNotImplemented( tCodePc[-1] );
-          operandStack.push( x );
+          operandStack.push_back( x );
           y.release();
         }
         break;
       case tAddPI : {
-          Operand y = operandStack.top();   operandStack.pop();
-          Operand x = operandStack.top();   operandStack.pop();
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
           if ( doConst && x.isAddrOfVar() && y.isConst() ) {
-            operandStack.emplace( x._kind, x._value + y._value );
+            operandStack.emplace_back( x._kind, x._value + y._value );
           } else {
             operandKindAddrIntoReg( x );
             operandKindAddrIntoReg( y );
@@ -552,37 +607,37 @@ generateCode()
             }
             operandIntoReg( x );
             emitAdd( x, y );
-            operandStack.push( x );
+            operandStack.push_back( x );
           }
           y.release();
         }
         break;
       case tAddI : {
-          Operand y = operandStack.top();   operandStack.pop();
-          Operand x = operandStack.top();   operandStack.pop();
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
           if ( doConst && x.isConst() && y.isConst() ) {
-            operandStack.emplace( x._kind, x._value + y._value );
+            operandStack.emplace_back( x._kind, x._value + y._value );
           } else {
             operandKindAddrIntoReg( x );
             operandKindAddrIntoReg( y );
             operandIntoRegCommutative( x, y );
             emitAdd( x, y );
-            operandStack.push( x );
+            operandStack.push_back( x );
           }
           y.release();
         }
         break;
       case tSubI : {
-          Operand y = operandStack.top();   operandStack.pop();
-          Operand x = operandStack.top();   operandStack.pop();
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
           if ( doConst && x.isConst() && y.isConst() ) {
-            operandStack.emplace( x._kind, x._value - y._value );
+            operandStack.emplace_back( x._kind, x._value - y._value );
           } else {
             operandKindAddrIntoReg( x );
             operandKindAddrIntoReg( y );
             operandIntoReg( x );
             emitSub( x, y );
-            operandStack.push( x );
+            operandStack.push_back( x );
           }
           y.release();
         }
@@ -598,102 +653,102 @@ generateCode()
       case tAnd : {
           // TO DO: don't I need to implement short-circuit and / or somewhere?
           //   I imagine needs to be in higher level front end?
-          Operand y = operandStack.top();   operandStack.pop();
-          Operand x = operandStack.top();   operandStack.pop();
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
           // The following is dummy code that all needs to be replaced.
           operandIntoReg( x );
           tCodeNotImplemented( tCodePc[-1] );
-          operandStack.push( x );
+          operandStack.push_back( x );
           y.release();
         }
         break;
       case tOr : {
-          Operand y = operandStack.top();   operandStack.pop();
-          Operand x = operandStack.top();   operandStack.pop();
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
           // The following is dummy code that all needs to be replaced.
           operandIntoReg( x );
           tCodeNotImplemented( tCodePc[-1] );
-          operandStack.push( x );
+          operandStack.push_back( x );
           y.release();
         }
         break;
       case tEqualI : {
-          Operand y = operandStack.top();   operandStack.pop();
-          Operand x = operandStack.top();   operandStack.pop();
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
           // The following is dummy code that all needs to be replaced.
           operandIntoReg( x );
           tCodeNotImplemented( tCodePc[-1] );
-          operandStack.push( x );
+          operandStack.push_back( x );
           y.release();
         }
         break;
       case tNotEqualI : {
-          Operand y = operandStack.top();   operandStack.pop();
-          Operand x = operandStack.top();   operandStack.pop();
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
           // The following is dummy code that all needs to be replaced.
           operandIntoReg( x );
           tCodeNotImplemented( tCodePc[-1] );
-          operandStack.push( x );
+          operandStack.push_back( x );
           y.release();
         }
         break;
       case tGreaterI : {
-          Operand y = operandStack.top();   operandStack.pop();
-          Operand x = operandStack.top();   operandStack.pop();
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
           // The following is dummy code that all needs to be replaced.
           operandIntoReg( x );
           tCodeNotImplemented( tCodePc[-1] );
-          operandStack.push( x );
+          operandStack.push_back( x );
           y.release();
         }
         break;
       case tLessI : {
-          Operand y = operandStack.top();   operandStack.pop();
-          Operand x = operandStack.top();   operandStack.pop();
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
           // The following is dummy code that all needs to be replaced.
           operandIntoReg( x );
           tCodeNotImplemented( tCodePc[-1] );
-          operandStack.push( x );
+          operandStack.push_back( x );
           y.release();
         }
         break;
       case tGreaterEqualI : {
-          Operand y = operandStack.top();   operandStack.pop();
-          Operand x = operandStack.top();   operandStack.pop();
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
           // The following is dummy code that all needs to be replaced.
           operandIntoReg( x );
           tCodeNotImplemented( tCodePc[-1] );
-          operandStack.push( x );
+          operandStack.push_back( x );
           y.release();
         }
         break;
       case tLessEqualI : {
-          Operand y = operandStack.top();   operandStack.pop();
-          Operand x = operandStack.top();   operandStack.pop();
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
           // The following is dummy code that all needs to be replaced.
           operandIntoReg( x );
           tCodeNotImplemented( tCodePc[-1] );
-          operandStack.push( x );
+          operandStack.push_back( x );
           y.release();
         }
         break;
       case tEqualP : {
-          Operand y = operandStack.top();   operandStack.pop();
-          Operand x = operandStack.top();   operandStack.pop();
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
           // The following is dummy code that all needs to be replaced.
           operandIntoReg( x );
           tCodeNotImplemented( tCodePc[-1] );
-          operandStack.push( x );
+          operandStack.push_back( x );
           y.release();
         }
         break;
       case tNotEqualP : {
-          Operand y = operandStack.top();   operandStack.pop();
-          Operand x = operandStack.top();   operandStack.pop();
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
           // The following is dummy code that all needs to be replaced.
           operandIntoReg( x );
           tCodeNotImplemented( tCodePc[-1] );
-          operandStack.push( x );
+          operandStack.push_back( x );
           y.release();
         }
         break;
@@ -710,20 +765,33 @@ generateCode()
         }
         break;
       case tCall : {
-          tCodeNotImplemented( tCodePc[-1] );
-          tCodePc++;
+          // TO DO: move in-use registers that are not callee-save, into temporaries,
+          //        and update operand stack to refer to temp instead.
+          preserveRegsAcrossCall();
+          int tCodeAddr = *tCodePc++;
+          char* addr = findLabel( tCodeAddr );
+          emitCall( addr );
+          if ( !addr ) {
+            requestPatch( (int*) ( nativePc - 4 ), tCodeAddr );
+          }
         }
         break;
       case tReturn : {
-          tCodeNotImplemented( tCodePc[-1] );
+          if ( !currLocalSpaceAddr ) {
+            // We have not done tEnter.
+            // That means we are in the dummy mini-method at the start of the tCode,
+            // and there is no stack frame to unwind.   Simply return.
+            emitReturnFromInitialStub();
+          } else {
+            emitReturn();
+          }
         }
         break;
       case tEnter : {
-          tCodeNotImplemented( tCodePc[-1] );
-          // TO DO: remember the address of the local-space value,
-          //        so jit can bump it for tempraries too.
-          //        We'll need to keep it a 32-bit offset regardless of current value.
-          tCodePc++;
+          // We're starting a new method.  Take this opportunity to wrap up
+          // the previous method, if necessary.
+          finishMethod();
+          emitEnter( *tCodePc++ );
         }
         break;
       case tJump : {
@@ -732,39 +800,49 @@ generateCode()
         }
         break;
       case tJumpTrue : {
-          Operand x = operandStack.top();   operandStack.pop();
+          Operand x = operandStack.back();   operandStack.pop_back();
           tCodePc++;
           tCodeNotImplemented( tCodePc[-1] );
           x.release();
         }
         break;
       case tJumpFalse : {
-          Operand x = operandStack.top();   operandStack.pop();
+          Operand x = operandStack.back();   operandStack.pop_back();
           tCodePc++;
           tCodeNotImplemented( tCodePc[-1] );
           x.release();
         }
         break;
       case tWriteI : {
-          Operand x = operandStack.top();   operandStack.pop();
+          Operand x = operandStack.back();   operandStack.pop_back();
           tCodeNotImplemented( tCodePc[-1] );
+
+          // We need to form a call with the native calling convention.
+          // At the moment it's simple because I only support these simple 1-parameter methods.
+          Register* paramReg1 = paramRegs[0];
+          Operand op1( jit_Operand_Kind_RegI, paramReg1 );
+          if ( op1 != x ) {
+            forceAllocateReg( op1._reg );
+            emitMov( op1, x );
+          }
+          emitCallExtern( (char*) runlibWriteI );
           x.release();
         }
         break;
       case tWriteBool : {
-          Operand x = operandStack.top();   operandStack.pop();
+          Operand x = operandStack.back();   operandStack.pop_back();
           tCodeNotImplemented( tCodePc[-1] );
           x.release();
         }
         break;
       case tWriteStr : {
-          Operand x = operandStack.top();   operandStack.pop();
+          Operand x = operandStack.back();   operandStack.pop_back();
           tCodeNotImplemented( tCodePc[-1] );
           x.release();
         }
         break;
       case tWriteP : {
-          Operand x = operandStack.top();   operandStack.pop();
+          Operand x = operandStack.back();   operandStack.pop_back();
           tCodeNotImplemented( tCodePc[-1] );
           x.release();
         }
@@ -778,6 +856,22 @@ generateCode()
         --tCodePc;
         fatal( "bad instruction %d\n", *tCodePc );
     }
+  }
+
+  finishMethod();
+  makePatches();
+}
+
+
+// Perform some fix-up work on the method we've just completed.
+// No harm if this is called more than once at the end of a method.
+//
+void
+finishMethod()
+{
+  if ( currLocalSpaceAddr ) {
+    *currLocalSpaceAddr = currLocalSpace;
+    currLocalSpaceAddr = nullptr;
   }
 }
 
@@ -801,6 +895,128 @@ allocateReg()
   fatal( "TO DO: allocReg dump a reg into temporary\n" );
   return nullptr;
 }
+
+
+// Force reg to be available (possibly by dumping to a temporary),
+// and allocate it.
+// TO DO: I could also dump into a different register.
+//
+void
+forceAllocateReg( Register* reg )
+{
+  if ( reg->_inUse ) {
+    // Dump to temporary.
+    // We'll need to scan through the operand stack, since those operands will
+    // need to change to refer to the temporary.
+    // And, this gives us an opportunity to see how big the temp needs to be.
+
+    for ( Operand& x : operandStack ) {
+      if ( x.isReg() && x._reg == reg ) {
+        Operand newX = allocateTemp( x.size() );
+        emitMov( newX, x );
+        x.release();
+        // replace entry in operand stack
+        x = newX;
+      } else if ( x.isDeref() && x._reg == reg ) {
+        // would need work if this can happen
+        fatal( "forceAllocateReg: unexpected Deref in operand stack\n" );
+      }
+    }
+  }
+  reg->_inUse = true;
+}
+
+
+// Move in-use registers that are not callee-save, into temporaries,
+// and update operand stack to refer to temp instead.
+//
+void
+preserveRegsAcrossCall()
+{
+  for ( Operand& x : operandStack ) {
+    if ( x.isReg() && !x._reg->_calleeSave ) {
+      // TO DO: if same reg is referenced by multiple opconds in the stack,
+      //        share the same temporary too.  But only if they have the same size.
+      Operand newX = allocateTemp( x.size() );
+      emitMov( newX, x );
+      x.release();
+      // replace entry in operand stack
+      x = newX;
+    } else if ( x.isDeref() && !x._reg->_calleeSave ) {
+      // would need work if this can happen
+      fatal( "unexpected Deref in operand stack at call\n" );
+    }
+  }
+}
+
+
+// Allocate a temporary variable of the given byte size (1, 4, 8).
+//
+Operand
+allocateTemp( int size )
+{
+  currLocalSpace += size;
+  jitOperandKind newKind = jit_Operand_Kind_Illegal;
+  switch ( size ) {
+    case 1:
+      newKind = jit_Operand_Kind_LocalB;
+      break;
+    case 4:
+      newKind = jit_Operand_Kind_LocalI;
+      break;
+    case 8:
+      newKind = jit_Operand_Kind_LocalP;
+      break;
+    default:
+      fatal( "allocateTemp: unexpected size %d\n", size );
+  }
+  return Operand( newKind, -currLocalSpace );
+}
+
+
+// Define the given label to mean the given native address.
+//
+void
+defineLabel( int label, char* addr )
+{
+  labels[label] = addr;
+}
+
+// Find the native address of the label.
+// Returns NULL if not defined.
+//
+char*
+findLabel( int label )
+{
+  return labels[label];
+}
+
+// Request future patching a label's address
+// to be installed at the given location.
+// When the address is installed, it will be written as a
+// rip-relative value, assuming the integer being patched
+// are the final bytes of its instruction.
+//
+void
+requestPatch( int* patchAt, int label )
+{
+  patches.emplace_back( patchAt, label );  
+}
+
+void
+makePatches()
+{
+  for ( auto patch : patches ) {
+    char* targetAddr = findLabel( patch.second );
+    if ( !targetAddr ) {
+      fatal( "makePatches: label %d was never defined\n", patch.second );
+    }
+    int* patchAt = patch.first;
+    char* nextInstr = ( (char*)patchAt ) + 4;
+    *patchAt = targetAddr - nextInstr;
+  }
+}
+
 
 
 // Returns the byte size of the value in the operand.
@@ -1076,6 +1292,110 @@ swap( Operand& x, Operand& y)
 //   rsp can't be an index register.    But, I don't use index registers yet anyway.
 //   (r12 -can- be an index register.)
 //
+
+
+// Emit entry code at the start of a method.
+// Given the number of local variable space requested by the tcode.
+// This value can be increased later by jit for our own temporaries.
+//
+// Remember the address of the local-space value,
+// so jit can bump it for tempraries too.
+// We'll need to keep it a 32-bit offset regardless of current value.
+//
+void
+emitEnter( int localSpace )
+{
+  // push rbp
+  outB( 0x50 + regRbp->_nativeId );
+
+  // mov rbp, rsp
+  emitMov( Operand( jit_Operand_Kind_RegP, regRbp ),
+           Operand( jit_Operand_Kind_RegP, regRsp ) );
+
+  // sub rsp, localSpace
+  // NOTE: use 32-bit regardless of value, so we can increase it later.
+  emitSub( Operand( jit_Operand_Kind_RegP, regRsp ),
+           Operand( jit_Operand_Kind_ConstI, localSpace ) );
+    
+  currLocalSpace = localSpace;
+  currLocalSpaceAddr = (int*) ( nativePc - 4 );   // we know it is the 4 bytes just written
+
+
+  // TO DO: preserve callee-save registers that this method might use.
+  // Previously I pushed esi edi.  But rules different now.
+  // I can preserve by push/pop or move into temp / move out of temp.
+  // But note! push/pop is not supported for r8 - r15.
+}
+
+
+// Emit the code to unwind the stack frame created by emitEnter, and return.
+//
+void
+emitReturn()
+{
+  // TO DO: unpreserve the callee-save registers saved by emitEnter.
+
+  // mov rsp, rbp
+  emitMov( Operand( jit_Operand_Kind_RegP, regRsp ),
+           Operand( jit_Operand_Kind_RegP, regRbp ) );
+
+  // pop rbp
+  outB( 0x58 + regRbp->_nativeId );
+
+  // ret
+  outB( 0xc3 );
+}
+
+
+// The tCode currently starts with a dummy mini-method that just does call + return,
+// with no enter thus no stack frame to unwind.
+// I could add tEnter to that method too, to avoid this special case.
+void
+emitReturnFromInitialStub()
+{
+  // ret
+  outB( 0xc3 );
+}
+
+
+// Emit a call to the given addr.
+// Addr may be nullptr if it isn't known yet.
+// We use rip-relative addressing, so the addr must be within 2 GB
+// of the current code.
+//
+void
+emitCall( char* addr )
+{
+  // call rip-relative address
+  outB( 0xe8 );
+  char* nextInstr = nativePc + 4;
+  outI( (long) addr - (long) nextInstr );
+}
+
+
+// Emit a call to the given addr,
+// which might not be within 2GB of rip.
+// e.g. this is used to call runtime library methods.
+//
+// This is only emitting the call instruction,
+// it's not dealing with any calling convention regarding
+// parameters, stack frame, return value, caller-save registers.
+//
+void
+emitCallExtern( char* addr )
+{
+  Operand x( jit_Operand_Kind_RegP, allocateReg() );
+  // mov reg, 64-bit address
+  emitRex( true, nullptr, x._reg );
+  outB( 0xb8 | regIdLowBits( x._reg->_nativeId ) );
+  outL( (long) addr );
+
+  // call [reg]
+  outB( 0xff );
+  emitModRM_OpcRM( 2, x._reg );
+
+  x.release();
+}
 
 
 // x += y
@@ -2084,6 +2404,48 @@ outL( long l )
    *(p++) = l;
    nativePc = (char*) p;
 }
+
+
+
+// ----------------------------------------------------------------------------
+// Runtime library methods.
+// These can be called by the generated code.
+// ----------------------------------------------------------------------------
+
+void
+runlibWriteI( int val )
+{
+  printf( "%d", val );
+}
+
+// TO DO: argument type byte or int?
+void
+runlibWriteBool( int val )
+{
+  printf( val ? "TRUE" : "FALSE" );
+}
+
+void
+runlibWriteStr( char* ptr )
+{
+  printf( "%s", ptr );
+}
+
+void
+runlibWriteP( char* ptr )
+{
+  printf( " <%p>", ptr );
+}
+
+void
+runlibWriteCR()
+{
+  printf( "\n" );
+}
+
+
+
+// ----------------------------------------------------------------------------
 
 
 #if 0

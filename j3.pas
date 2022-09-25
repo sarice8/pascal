@@ -33,6 +33,10 @@ begin
 
   I2 := A1[ I1 ];
 
+  writeln( I2 );
+  writeln( A1[ I1 ] );
+
+
  {
   A1[ I1 + 1 ] := 14;
 
