@@ -17,16 +17,12 @@ title: 'Pascal Compiler 1.1.5 -- Jan 01 ''90';
 %    09Sep22   I have returned.  Migrate symbol table to schema, to ease development.
 %
 %  NOTES
-%    1) During a loop, the top counter counts the number of 'exit'
-%       statements to be patched.
-%    2) During a loop, the top entry in the patchLoop stack is the addr
-%       of the start of the loop (used by 'cycle' to repeat the loop).
-%    3) The 'value' of a var symbol is its allocated address.
-%    4) References to vars of intrinsic types, and pointer types,
+%    -  The 'value' of a var symbol is its allocated address.
+%    -  References to vars of intrinsic types, and pointer types,
 %       pushes the value of the var on the expr stack.  Referenecs to
 %       vars of compound types (arrays, records...) pushes the address
 %       on the expr stack.
-%    5) Just as there is only one type table entry for a given (named) type,
+%    -  Just as there is only one type table entry for a given (named) type,
 %       there is only one type table entry for a pointer to a named type.
 %       When a pointer type is declared, a field in the TT entry of the
 %       type pointed to will be set to indicate the TT entry of the pointer
@@ -68,6 +64,7 @@ title: 'Pascal Compiler 1.1.5 -- Jan 01 ''90';
 %      https://www.freepascal.org/docs-html/prog/prog.html
 %      https://en.wikipedia.org/wiki/Turbo_Pascal
 %      https://en.wikipedia.org/wiki/Pascal_(programming_language)#Standards
+%      http://www.standardpascaline.org/
 %
 
 input:
@@ -183,12 +180,13 @@ output:
    tNotEqualP
    tAllocActuals     % <#bytes> - make space on call stack for actual params (adjusting call stack sp)
    tFreeActuals      % <#bytes> - discard space on call stack allocated by tAllocActuals
-   tCall             % addr follows
+   tCall             % <label#>
    tReturn
    tEnter            % <#bytes> - start a stack frame on the call stack, reserving #bytes of local variable space
-   tJump             % addr follows
-   tJumpTrue         % addr follows  (pops top of stack, jumps if true)
-   tJumpFalse        % addr follows  (pops top of stack, jumps if false)
+   tJump             % <label#>
+   tJumpTrue         % <label#>  (pops top of stack, jumps if true)
+   tJumpFalse        % <label#>  (pops top of stack, jumps if false)
+   tLabel            % <label#> - define label# at the current address
    tWriteI           % for writeln : write integer on tos, pop
    tWriteBool        %  "     "    : write TRUE/FALSE, pop
    tWriteStr         %  "     "    : write string whose addr is on tos, pop
@@ -262,6 +260,9 @@ type typ:
    tyParams          % like record; a collection of proc/func params
    tySet;
 
+type Label:
+   labelNull;
+
 
 % Some general schema node operations.
 % node_type and node_attribute are defined in generated file pascal_schema.ssl included above.
@@ -272,6 +273,7 @@ mechanism node_mech:
     oNodeSetInt (Node, node_attribute, int) % set int attribute of node
     oNodeSetBoolean (Node, node_attribute, boolean)
     oNodeSetKind (Node, node_attribute, kind) % set attribute of node  *** MIGHT NOT NEED
+    oNodeSetLabel( Node, node_attribute, Label )
     oNodeGet (Node, node_attribute) >> Node    % get Node attribute of node
     oNodeGetInt (Node, node_attribute) >> int  % get int attribute of node
     oNodeGetBoolean (Node, node_attribute) >> boolean  % get int attribute of node
@@ -294,8 +296,10 @@ mechanism node_vec_mech:
     ;
 
 
+
 mechanism emit_mech:
     oEmitInt( int )              % emit int into the generated code
+    oEmitLabel( Label )
     Here >> int                  % current address in the generated code
     oPatch( int addr, int val )  % patch an int into address in the generated code
     ;
@@ -309,6 +313,7 @@ mechanism math:
     equal( int x, int y ) >> boolean
     equal_zero (int) >> boolean
     equal_node_type (node_type, node_type) >> boolean     % Want equal_<type> for every type
+    equal_label( Label, Label ) >> boolean
     ;
 
 mechanism more_builtins:      % These should be built-in SSL operations
@@ -353,6 +358,11 @@ mechanism id_mech:
     ;
 
 
+
+mechanism label_mech:
+   oLabelNew >> Label
+   ;
+
 mechanism count :
    oCountPush(int)          % start a new counter, with initial value
    oCountInc
@@ -371,19 +381,13 @@ mechanism string :
    oStringAllocLit;            % alloc data space for strlit, push address
                                %   on value stack
 
-type patchStack:
-   patchLoop                   % addr of start of loop (repeat, while, for)
-   patchExit                   % addrs where jumps out of loop are
-                               %   (use count mechanism to count how many)
-   patchIf;                    % addr of jump around code in 'if' statement
-
-mechanism patch:               % note, creates absolute-address jumps
-   oPatchPushHere(patchStack)  % put current address on a patch stack
-   oPatchAnyEntries(patchStack) >> boolean     % anything in patch stack?
-   oPatchSwap(patchStack)      % swap top two entries
-   oPatchDup(patchStack)       % duplicate the top entry
-   oPatchPopFwd(patchStack)    % store here at x (x=top of stack), pop stack
-   oPatchPopBack(patchStack);  % emit x (so advance 'here'), pop stack
+% track labels for the loop we're in, if any
+mechanism loop_mech:
+   oLoopPush( Label cycleLabel, Label exitLabel )
+   oLoopCycleLabel >> Label
+   oLoopExitLabel >> Label
+   oLoopPop
+   ;
 
 rules
 
@@ -400,9 +404,9 @@ Node    StringType
 
 % -------------------------- Forward Declarations -------------------------
 
-Block( node_type varNodeType, out int addr );
+Block( node_type varNodeType, Label labelForBody );
 BlockDecls( node_type varNodeType );
-BlockStmt( out int addr );
+BlockStmt( Label labelForBody );
 VarDecl( node_type varNodeType );
 newType( node_type nt, int size ) >> Node;
 newIdent( node_type nt, kind k, int id ) >> Node;
@@ -429,8 +433,10 @@ Program:
    @installBuiltIns
 
    % Start by calling the main program routine
-   int patchCallMain
-   .tCall  patchCallMain = Here  .tSpace
+   Label mainLabel
+   mainLabel = oLabelNew
+
+   .tCall  oEmitLabel( mainLabel )
    .tReturn
 
    pProgram
@@ -469,25 +475,18 @@ Program:
    % The block statement includes a stack frame, and enter/return,
    % even for the main routine.
    % That will be necessary for temporaries allocated in the main routine.
-   int addr
-   @BlockStmt( addr )
+   @BlockStmt( mainLabel )
 
    oScopeEnd   % main routine scope
-
-   oPatch( patchCallMain, addr )
 
    '.'
    oScopeEnd   % global scope
    ;
 
 
-% Returns the addr of the block's statements.
-% This might differ from the Here on entry to this rule,
-% due to method declarations in the block.
-%
-Block( node_type varNodeType, out int addr ):
+Block( node_type varNodeType, Label labelForBody ):
    @BlockDecls( varNodeType )
-   @BlockStmt( addr )
+   @BlockStmt( labelForBody )
    ;
 
 
@@ -502,8 +501,8 @@ BlockDecls( node_type varNodeType ):
    ]};
 
 
-BlockStmt( out int addr ):
-   addr = Here
+BlockStmt( Label labelForBody ):
+   .tLabel  oEmitLabel( labelForBody )
 
    % Proc, func, and main routine all start with tEnter
    % to create a stack frame.  This will be used for temporaries
@@ -548,9 +547,10 @@ ProcDecl:
    oNodeSetBoolean( oScopeCurrent, qAllocDown, true )
    oNodeSet( decl, qChildScope, oScopeCurrent )
 
-   int addr
-   @Block( nLocalVar, addr )
-   oNodeSetInt( decl, qValue, addr )
+   Label label
+   label = oLabelNew
+   @Block( nLocalVar, label )
+   oNodeSetLabel( decl, qValue, label )
    oNodeSetBoolean( decl, qAddrDefined, true )
    oScopeEnd
 
@@ -597,9 +597,10 @@ FuncDecl:
    oNodeSetBoolean( oScopeCurrent, qAllocDown, true )
    oNodeSet( decl, qChildScope, oScopeCurrent )
 
-   int addr
-   @Block( nLocalVar, addr )
-   oNodeSetInt( decl, qValue, addr )
+   Label label
+   label = oLabelNew
+   @Block( nLocalVar, label )
+   oNodeSetLabel( decl, qValue, label )
    oNodeSetBoolean( decl, qAddrDefined, true )
    oScopeEnd
 
@@ -1015,7 +1016,16 @@ BoolTerm:
 BoolFactor:
    [
       | pNot :
-         @ArithExpr
+         % TO DO: Is the grammar shown in FPC docs standard?
+         %   That's where I took the recursive definition  factor: 'not' factor
+         %   If not where can I find the a standard grammar.
+         %
+         % TO DO: FPC says there is a xor operator too, which I don't accept.
+         % TO DO: apparently operator and or xor not  can work as bitwise operations on integer/ordinal
+         %     operands, in addition to being short-circuit boolean operations.
+         %     I haven't allowed for that yet.
+
+         @BoolFactor
          @RequireBool
          .tNot
       | * :
@@ -1623,24 +1633,27 @@ DecVar( Node decl ):
 
 
 IfStmt:
+   Label falseLabel
+   falseLabel = oLabelNew
+
    @Expr
    @RequireBoolPop
    pThen
-   .tJumpFalse
-   oPatchPushHere(patchIf)
-   .tSpace
+   .tJumpFalse  oEmitLabel( falseLabel )
    @Statement
    [
       | pElse :
-         .tJump
-         oPatchPushHere(patchIf)
-         .tSpace
-         oPatchSwap(patchIf)
-         oPatchPopFwd(patchIf)
+         Label doneLabel
+         doneLabel = oLabelNew
+
+         .tJump  oEmitLabel( doneLabel )
+         .tLabel oEmitLabel( falseLabel )
          @Statement
+         .tLabel oEmitLabel( doneLabel )
+
       | * :
-   ]
-   oPatchPopFwd(patchIf);
+         .tLabel oEmitLabel( falseLabel )
+   ];
 
 
 ForStmt:
@@ -1660,40 +1673,51 @@ ForStmt:
    @RequireIntPop
    .tAssignI
 
-   .tJump oPatchPushHere(patchLoop) .tSpace
-   oPatchPushHere(patchLoop)
-   oPatchSwap(patchLoop)
+   Label exitLabel
+   exitLabel = oLabelNew
+
+   Label checkLabel
+   checkLabel = oLabelNew
+   .tJump  oEmitLabel( checkLabel )
+
+   Label cycleLabel
+   cycleLabel = oLabelNew
+   .tLabel  oEmitLabel( cycleLabel )
    [
       | pTo :
          @IncVar( decl )
-         oPatchPopFwd(patchLoop)
+         .tLabel  oEmitLabel( checkLabel )
          @VarExpr( decl )  oTypeSPop
          @Expr
          @RequireIntPop
          .tGreaterI
-         .tJumpTrue oPatchPushHere(patchLoop) .tSpace
-         oPatchSwap(patchLoop)
+         .tJumpTrue  oEmitLabel( exitLabel )
       | pDownto :
          @DecVar( decl )
-         oPatchPopFwd(patchLoop)
+         .tLabel  oEmitLabel( checkLabel )
          @VarExpr( decl )  oTypeSPop
          @Expr
          @RequireIntPop
          .tLessI
-         .tJumpTrue oPatchPushHere(patchLoop) .tSpace
-         oPatchSwap(patchLoop)
+         .tJumpTrue  oEmitLabel( exitLabel )
    ]
-   oCountPush(0)          % count 'exit' patches
+   oLoopPush( cycleLabel, exitLabel )
    pDo
    @Statement
-   .tJump oPatchPopBack(patchLoop)
-   oPatchPopFwd(patchLoop)
-   @PatchExitsPop;
+   .tJump  oEmitLabel( cycleLabel )
+   .tLabel  oEmitLabel( exitLabel )
+   oLoopPop;
 
 
 RepeatStmt:
-   oPatchPushHere(patchLoop) % start of loop
-   oCountPush(0)          % count the 'exit' patches
+   Label cycleLabel
+   cycleLabel = oLabelNew
+   .tLabel  oEmitLabel( cycleLabel )
+
+   Label exitLabel
+   exitLabel = oLabelNew
+
+   oLoopPush( cycleLabel, exitLabel )
    @Statement
    {[
       | ';' :
@@ -1701,50 +1725,47 @@ RepeatStmt:
       | pUntil :
          @Expr
          @RequireBoolPop
-         .tJumpFalse
-         oPatchPopBack(patchLoop)
-         @PatchExitsPop
+         .tJumpFalse  oEmitLabel( cycleLabel )
          >
-   ]};
+   ]}
+   .tLabel  oEmitLabel( exitLabel )
+   oLoopPop;
 
 
 WhileStmt:
-   oPatchPushHere(patchLoop)    % start of loop
-   oCountPush(0)
+   Label cycleLabel
+   cycleLabel = oLabelNew
+   .tLabel  oEmitLabel( cycleLabel )
+
+   Label exitLabel
+   exitLabel = oLabelNew
+
+   oLoopPush( cycleLabel, exitLabel )
    @Expr
    @RequireBoolPop
    pDo
-   .tJumpFalse
-   oPatchPushHere(patchLoop)    % jump out
-   .tSpace
-   oPatchSwap(patchLoop)        % start on top
+   .tJumpFalse  oEmitLabel( exitLabel )
    @Statement
-   .tJump
-   oPatchPopBack(patchLoop)
-   oPatchPopFwd(patchLoop)
-   @PatchExitsPop;
+   .tJump  oEmitLabel( cycleLabel )
+   .tLabel  oEmitLabel( exitLabel )
+   oLoopPop;
 
 
 CycleStmt:                     % NOTE, for repeat..until, skips test (??)
-   [ oPatchAnyEntries(patchLoop)
+   [ equal_label( oLoopCycleLabel, labelNull )
       | true :
-         .tJump
-         oPatchDup(patchLoop)  % addr of start
-         oPatchPopBack(patchLoop)
-      | * :
          #eNotInALoop
+      | false :
+         .tJump  oEmitLabel( oLoopCycleLabel )
    ];
 
 
 ExitStmt:
-   [ oPatchAnyEntries(patchLoop)
+   [ equal_label( oLoopExitLabel, labelNull )
       | true :
-         .tJump
-         oPatchPushHere(patchExit)
-         .tSpace
-         oCountInc
-      | * :
          #eNotInALoop
+      | false :
+         .tJump  oEmitLabel( oLoopExitLabel )
    ];
 
 
@@ -1793,14 +1814,6 @@ ReadStmt:
    ;
 
 % -------------------------------- Utilities -------------------------------
-
-PatchExitsPop:
-   {[ oCountIsZero
-      | false : oPatchPopFwd(patchExit)
-                oCountDec
-      | * :     >
-   ]}
-   oCountPop;
 
 
 % Require that the top two types on the type stack are matching (ignoring subranges).

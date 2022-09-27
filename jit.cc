@@ -399,10 +399,6 @@ generateCode()
 
   for ( tCodePc = tCode; tCodePc < tCodeEnd; ) {
 
-    // I don't have labels yet.
-    // Instead, define each tCode address as a label.
-    defineLabel( tCodePc - tCode, nativePc );
-
     switch ( *tCodePc++ ) {
 
       case tPushGlobalI : {
@@ -812,6 +808,10 @@ generateCode()
           tCodePc++;
           tCodeNotImplemented( tCodePc[-1] );
           x.release();
+        }
+        break;
+      case tLabel : {
+          defineLabel( *tCodePc++, nativePc );
         }
         break;
       case tWriteI : {
@@ -2374,7 +2374,7 @@ loadTCodeAndAllocNativeCode()
   }
 
   fclose( src );
-  printf( "- program loaded (%d words)\n", tCodeLen );
+  printf( "Jit - program loaded (%d words)\n", tCodeLen );
 }
 
 

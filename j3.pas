@@ -15,8 +15,14 @@ type ArrayType = array [1..4] of integer;
 
 var R1: RecType;
 var A1: ArrayType;
+var B1, B2: boolean;
 
 begin
+
+ // Test
+ B1 := true;
+ B2 := not B1;
+ B2 := not not B1;
 
  {
   I1 := 8;

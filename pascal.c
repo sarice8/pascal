@@ -112,27 +112,6 @@ int dVS[dVSsize], dVSptr;        /* value stack */
 #define dSLsize 400
 int dSL[dSLsize], dSLptr;        /* string literal table */
 
-/* code patch stacks */
-
-#define dPatchLsize 40
-#define dPatchEsize 200
-#define dPatchIsize 40
-
-int dPatchL[dPatchLsize];    /* loop starts */
-int dPatchE[dPatchEsize];    /* loop exits */
-int dPatchI[dPatchIsize];    /* 'if' jumps */
-
-/* array pointing to patch stacks */
-
-struct dPStype {
-  int* stack;
-  int  ptr;
-  int  size;
-} dPS[3] = 
-   {dPatchL, 0, dPatchLsize,
-    dPatchE, 0, dPatchEsize,
-    dPatchI, 0, dPatchIsize};
-
 
 // A dynamic vector of NODE_PTR's
 typedef struct NodeVecStruct {
@@ -140,6 +119,16 @@ typedef struct NodeVecStruct {
   int capacity;
   NODE_PTR*  elements;
 } NodeVec, *NODE_VEC_PTR;
+
+int labelCount;
+
+// loop stack
+#define dLSsize 100
+struct {
+    int cycleLabel;
+    int exitLabel;
+} dLS[dLSsize];
+int dLSptr = 0;
 
 
 void
@@ -301,6 +290,8 @@ init_my_operations()
   // Initialize node package (schema runtime module)
   nodeInit();
 
+  labelCount = 0;
+
   // Note: global scope will be created by the ssl program,
   // as will predefined types and constants.
 }
@@ -343,6 +334,7 @@ NODE_PTR dNode;  // temporary for several mechanisms
     case oNodeSetInt:
     case oNodeSetBoolean:
     case oNodeSetKind:
+    case oNodeSetLabel:
             nodeSetValue ((NODE_PTR)ssl_argv(0,3), ssl_argv(1,3), ssl_argv(2,3));
             continue;
     case oNodeGet:
@@ -420,6 +412,9 @@ NODE_PTR dNode;  // temporary for several mechanisms
     case oEmitInt :
             w_outTable[w_here++] = ssl_param;
             continue;
+    case oEmitLabel :
+            w_outTable[w_here++] = ssl_param;
+            continue;
     case Here :
             ssl_result = w_here;
             continue;
@@ -452,6 +447,9 @@ NODE_PTR dNode;  // temporary for several mechanisms
             ssl_result = (ssl_param == 0);
             continue;
     case equal_node_type :
+            ssl_result = (ssl_argv(0,2) == ssl_argv(1,2));
+            continue;
+    case equal_label :
             ssl_result = (ssl_argv(0,2) == ssl_argv(1,2));
             continue;
 
@@ -610,6 +608,13 @@ NODE_PTR dNode;  // temporary for several mechanisms
             continue;
 
 
+     /* Mechanism label_mech */
+
+     case oLabelNew :
+            ssl_result = ++labelCount;
+            continue;
+
+
      /* Mechanism count */
 
      case oCountPush :
@@ -687,37 +692,33 @@ NODE_PTR dNode;  // temporary for several mechanisms
             }
 
 
-     /* Mechanism patch */
+     /* Mechanism loop */
 
-     case oPatchPushHere :
-            if (++dPS[ssl_param].ptr==dPS[ssl_param].size)
-                  ssl_fatal("patch overflow");
-            dPS[ssl_param].stack[dPS[ssl_param].ptr] = w_here;
-            continue;
-     case oPatchAnyEntries :
-            ssl_result = dPS[ssl_param].ptr>0;
-            continue;
-     case oPatchSwap : {
-            int* ptr = &dPS[ssl_param].stack[dPS[ssl_param].ptr-1];
-            int temp = ptr[0];
-            ptr[0] = ptr[1];
-            ptr[1] = temp;
-            continue;
+     case oLoopPush :
+            if ( ++dLSptr == dLSsize ) {
+                ssl_fatal("loop stack overflow");
             }
-     case oPatchDup : {
-            int* intPtr = &dPS[ssl_param].stack[dPS[ssl_param].ptr++];
-            intPtr[1] = intPtr[0];
+            dLS[dLSptr].cycleLabel = ssl_argv(0, 2);
+            dLS[dLSptr].exitLabel = ssl_argv(1, 2);
             continue;
+     case oLoopCycleLabel:
+            if ( dLSptr > 0 ) {
+                ssl_result = dLS[dLSptr].cycleLabel;
+            } else {
+                ssl_result = 0;
             }
-     case oPatchPopFwd : {
-            int loc = dPS[ssl_param].stack[dPS[ssl_param].ptr--];
-            w_outTable[loc] = w_here;
             continue;
+     case oLoopExitLabel:
+            if ( dLSptr > 0 ) {
+                ssl_result = dLS[dLSptr].cycleLabel;
+            } else {
+                ssl_result = 0;
             }
-     case oPatchPopBack :
-            w_outTable[w_here] = dPS[ssl_param].stack[dPS[ssl_param].ptr--];
-            w_here++;
             continue;
+     case oLoopPop:
+            --dLSptr;
+            continue;
+
 
 
 #include "ssl_end.h"

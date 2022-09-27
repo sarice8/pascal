@@ -22,6 +22,12 @@
 #include <dos.h>
 #endif // AMIGA
 
+
+#include <unordered_map>
+#include <string>
+#include <vector>
+
+
 #include "pascal.h"
 
 FILE *src,*dmp;
@@ -72,14 +78,82 @@ char trace, underflow, dump;
 void walkTable();
 void dumpTable();
 void hitBreak();
-void fatal( char* msg );
+void fatal( const char* msg );
 void cleanup();
 
+void defineLabels();
+void defineLabel( int label, int addr );
 
-void
-main(argc,argv)
-int argc;
-char *argv[];
+struct instrInfo_s {
+  const char* name;
+  int args;
+};
+
+struct instrInfo_s tCodeInstrs[] = {
+  { "tPushGlobalI", 1 },
+  { "tPushGlobalB", 1 },
+  { "tPushGlobalP", 1 },
+  { "tPushLocalI", 1 },
+  { "tPushLocalB", 1 }, 
+  { "tPushLocalP", 1 },
+  { "tPushParamI", 1 },
+  { "tPushParamB", 1 }, 
+  { "tPushParamP", 1 },
+  { "tPushConstI", 1 },
+  { "tPushAddrGlobal", 1 },
+  { "tPushAddrLocal", 1 },
+  { "tPushAddrParam", 1 },
+  { "tPushAddrActual", 1 },
+  { "tFetchI", 0 },
+  { "tFetchB", 0 },
+  { "tFetchP", 0 },
+  { "tAssignI", 0 },
+  { "tAssignB", 0 },
+  { "tAssignP", 0 },
+  { "tCopy", 1 },
+  { "tIncI", 0 },
+  { "tDecI", 0 },
+  { "tMultI", 0 },
+  { "tDivI", 0 },
+  { "tAddPI", 0 },
+  { "tAddI", 0 },
+  { "tSubI", 0 },
+  { "tNegI", 0 },
+  { "tNot", 0 },
+  { "tAnd", 0 },
+  { "tOr", 0 },
+  { "tEqualI", 0 },
+  { "tNotEqualI", 0 },
+  { "tGreaterI", 0 },
+  { "tLessI", 0 },
+  { "tGreaterEqualI", 0 },
+  { "tLessEqualI", 0 },
+  { "tEqualP", 0 },
+  { "tNotEqualP", 0 },
+  { "tAllocActuals", 1 },
+  { "tFreeActuals", 1 },
+  { "tCall", 1 },
+  { "tReturn", 0 },
+  { "tEnter", 1 },
+  { "tJump", 1 },
+  { "tJumpTrue", 1 },
+  { "tJumpFalse", 1 },
+  { "tLabel", 1 },
+  { "tWriteI", 0 },
+  { "tWriteBool", 0 },
+  { "tWriteStr", 0 },
+  { "tWriteP", 0 },
+  { "tWriteCR", 0 }
+};
+int numtCodeInstrs = sizeof(tCodeInstrs) / sizeof(tCodeInstrs[0]);
+
+
+std::unordered_map<int, int> labels;   // label# -> tcode addr
+
+
+
+int
+main( int argc, char* argv[] )
 {
   trace = 0;
 
@@ -146,6 +220,9 @@ char *argv[];
     exit(0);
   }
 
+  /* Scan through the code to find the labels */
+  defineLabels();
+
   /* Execute code */
 
   pc = 0;                        /* Initialize walker */
@@ -156,6 +233,37 @@ char *argv[];
 
   printf(".Done\n");
   cleanup();
+}
+
+
+void
+defineLabels()
+{
+  pc = 0;
+  while (pc < codeWords) {
+    int instr = code[pc];
+    if ( instr == tLabel ) {
+      defineLabel( code[pc+1], pc+2 );
+    }
+    pc += 1 + tCodeInstrs[instr].args;
+  }
+}
+
+
+void
+defineLabel( int label, int addr )
+{
+  labels[ label ] = addr;
+}
+
+int
+findLabel( int label )
+{
+  auto it = labels.find( label );
+  if ( it == labels.end() ) {
+    fatal( "undefined label\n" );
+  }
+  return it->second;
 }
 
 
@@ -341,7 +449,7 @@ walkTable()
        case tCall :
               if (++sp==stackMax) fatal("call stack overflow");
               stack[sp] = pc+1;
-              pc = code[pc];
+              pc = findLabel( code[pc] );
               continue;
        case tReturn :
               if (call_fp) {
@@ -366,20 +474,24 @@ walkTable()
               if (call_sp < callStackLowerBound) fatal("call stack overflow");
               continue;
        case tJump :
-              pc = code[pc];
+              pc = findLabel( code[pc] );
               continue;
        case tJumpTrue :
               if (stack[sp--]) {
-                pc = code[pc];
+                pc = findLabel( code[pc] );
                 continue;
               }
               pc++;
               continue;
        case tJumpFalse :
               if (!stack[sp--]) {
-                pc = code[pc];
+                pc = findLabel( code[pc] );
                 continue;
               }
+              pc++;
+              continue;
+       case tLabel :
+              // Defines a label.  This is a no-op during execution.
               pc++;
               continue;
        case tWriteI :
@@ -406,8 +518,6 @@ walkTable()
 }
 
 
-#define op0(str) { fprintf(dmp,"%s\n",str); continue; }
-#define op1(str) { fprintf(dmp,"%s\t%4d\n",str,code[pc++]); continue; }
 
 void
 dumpTable()
@@ -417,66 +527,28 @@ dumpTable()
     exit(5);
   }
 
-   pc = 0;
-   while (pc < codeWords) {
-     fprintf(dmp,"%4d\t",pc);
-     switch (code[pc++]) {
-       case tPushGlobalI :   op1("tPushGlobalI");
-       case tPushGlobalB :   op1("tPushGlobalB"); 
-       case tPushGlobalP :   op1("tPushGlobalP");
-       case tPushLocalI :    op1("tPushLocalI");
-       case tPushLocalB :    op1("tPushLocalB"); 
-       case tPushLocalP :    op1("tPushLocalP");
-       case tPushParamI :    op1("tPushParamI");
-       case tPushParamB :    op1("tPushParamB"); 
-       case tPushParamP :    op1("tPushParamP");
-       case tPushConstI :    op1("tPushConstI");
-       case tPushAddrGlobal : op1("tPushAddrGlobal");
-       case tPushAddrLocal :  op1("tPushAddrLocal");
-       case tPushAddrParam :  op1("tPushAddrParam");
-       case tPushAddrActual : op1("tPushAddrActual");
-       case tFetchI :        op0("tFetchI");
-       case tFetchB :        op0("tFetchB");
-       case tFetchP :        op0("tFetchP");
-       case tAssignI :       op0("tAssignI");
-       case tAssignB :       op0("tAssignB");
-       case tAssignP :       op0("tAssignP");
-       case tCopy :          op1("tCopy   ");
-       case tIncI :          op0("tIncI");
-       case tDecI :          op0("tDecI");
-       case tMultI :         op0("tMultI");
-       case tDivI :          op0("tDivI");
-       case tAddPI :         op0("tAddPI");
-       case tAddI :          op0("tAddI");
-       case tSubI :          op0("tSubI");
-       case tNegI :          op0("tNegI");
-       case tNot :           op0("tNot");
-       case tAnd :           op0("tAnd");
-       case tOr :            op0("tOr");
-       case tEqualI :        op0("tEqualI");
-       case tNotEqualI :     op0("tNotEqualI");
-       case tGreaterI   :    op0("tGreaterI");
-       case tLessI :         op0("tLessI");
-       case tGreaterEqualI : op0("tGreaterEqualI");
-       case tLessEqualI :    op0("tLessEqualI");
-       case tEqualP :        op0("tEqualP");
-       case tNotEqualP :     op0("tNotEqualP");
-       case tAllocActuals :  op1("tAllocActuals");
-       case tFreeActuals :   op1("tFreeActuals");
-       case tCall :          op1("tCall   ");
-       case tReturn :        op0("tReturn");
-       case tEnter :         op1("tEnter");
-       case tJump :          op1("tJump   ");
-       case tJumpTrue :      op1("tJumpTrue");
-       case tJumpFalse :     op1("tJumpFalse");
-       case tWriteI :        op0("tWriteI");
-       case tWriteBool :     op0("tWriteBool");
-       case tWriteStr :      op0("tWriteStr");
-       case tWriteP :        op0("tWriteP");
-       case tWriteCR :       op0("tWriteCR");
-       default :             op0("???");
-     }
-   }
+  for ( pc = 0; pc < codeWords; ) {
+    fprintf( dmp, "%4d\t", pc );
+
+    int instr = code[pc++];
+    if ( instr >= 0 && instr < numtCodeInstrs ) {
+      switch ( tCodeInstrs[instr].args ) {
+        case 0:
+          fprintf( dmp, "%s\n", tCodeInstrs[instr].name );
+          break;
+        case 1:
+          fprintf( dmp, "%s\t%4d\n", tCodeInstrs[instr].name, code[pc++] );
+         break;
+        default:
+         printf( "dumpTable: unexpected number of args\n" );
+          exit(1);
+      }
+    } else {
+      fprintf( dmp, "?\n" );
+      pc++;
+    }
+  }
+  fclose( dmp );
 }
 
 
@@ -491,7 +563,7 @@ hitBreak()
 
 
 void
-fatal( char* msg )
+fatal( const char* msg )
 {
   printf(".FATAL - %s at %d\n",msg,pc);
   exit(5);

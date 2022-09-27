@@ -32,14 +32,14 @@ FRONT_SRCS = \
   pascal_schema.c \
 
 BACK_SRCS = \
-  sm.c \
+  sm.cc \
 
 JIT_SRCS = \
   jit.cc \
 
 
 FRONT_OBJS = $(FRONT_SRCS:%.c=$(OBJDIR)/%.o)
-BACK_OBJS = $(BACK_SRCS:%.c=$(OBJDIR)/%.o)
+BACK_OBJS = $(BACK_SRCS:%.cc=$(OBJDIR)/%.o)
 JIT_OBJS = $(JIT_SRCS:%.cc=$(OBJDIR)/%.o)
 
 FRONT_LINK_OBJS = \
@@ -75,7 +75,7 @@ $(FRONT_EXEC): $(FRONT_OBJS) | $(BINDIR)
 	cc $^ $(DBG_OBJS) $(FRONT_LINK_OBJS) $(DBG_STUBS) -o $@
 
 $(BACK_EXEC): $(BACK_OBJS) | $(BINDIR)
-	cc $^ $(BACK_LINK_OBJS) -o $@
+	g++ $^ $(BACK_LINK_OBJS) -o $@
 
 $(JIT_EXEC): $(JIT_OBJS) | $(BINDIR)
 	g++ $^ $(JIT_LINK_OBJS) -o $@
