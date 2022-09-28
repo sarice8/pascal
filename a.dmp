@@ -2,51 +2,52 @@
    2	tReturn
    3	tLabel	   1
    5	tEnter	   0
-   7	tPushAddrGlobal	  44
-   9	tPushConstI	   1
-  11	tAssignB
-  12	tPushAddrGlobal	  45
-  14	tPushGlobalB	  44
-  16	tNot
-  17	tAssignB
-  18	tPushAddrGlobal	  45
-  20	tPushGlobalB	  44
-  22	tNot
-  23	tNot
-  24	tAssignB
-  25	tPushAddrGlobal	   8
-  27	tPushConstI	   3
-  29	tAssignI
-  30	tPushAddrGlobal	  28
-  32	tPushGlobalI	   8
-  34	tPushConstI	   1
-  36	tSubI
-  37	tPushConstI	   4
-  39	tMultI
-  40	tAddPI
-  41	tPushConstI	  15
+   7	tPushAddrGlobal	   8
+   9	tPushConstI	   3
+  11	tAssignI
+  12	tPushAddrGlobal	  28
+  14	tPushGlobalI	   8
+  16	tPushConstI	   1
+  18	tSubI
+  19	tPushConstI	   4
+  21	tMultI
+  22	tAddPI
+  23	tPushGlobalI	   8
+  25	tPushConstI	   5
+  27	tMultI
+  28	tAssignI
+  29	tPushAddrGlobal	  12
+  31	tPushAddrGlobal	  28
+  33	tPushGlobalI	   8
+  35	tPushConstI	   1
+  37	tSubI
+  38	tPushConstI	   4
+  40	tMultI
+  41	tAddPI
+  42	tFetchI
   43	tAssignI
-  44	tPushAddrGlobal	  12
-  46	tPushAddrGlobal	  28
-  48	tPushGlobalI	   8
-  50	tPushConstI	   1
-  52	tSubI
-  53	tPushConstI	   4
-  55	tMultI
-  56	tAddPI
-  57	tFetchI
-  58	tAssignI
-  59	tPushGlobalI	  12
-  61	tWriteI
-  62	tWriteCR
-  63	tPushAddrGlobal	  28
-  65	tPushGlobalI	   8
-  67	tPushConstI	   1
-  69	tSubI
-  70	tPushConstI	   4
-  72	tMultI
-  73	tAddPI
-  74	tFetchI
-  75	tWriteI
-  76	tWriteCR
-  77	tReturn
+  44	tPushAddrGlobal	  28
+  46	tPushGlobalI	   8
+  48	tPushConstI	   1
+  50	tSubI
+  51	tPushConstI	   4
+  53	tMultI
+  54	tAddPI
+  55	tPushGlobalI	   8
+  57	tPushGlobalI	  12
+  59	tMultI
+  60	tAssignI
+  61	tPushGlobalI	  12
+  63	tWriteI
+  64	tWriteCR
+  65	tPushAddrGlobal	  28
+  67	tPushGlobalI	   8
+  69	tPushConstI	   1
+  71	tSubI
+  72	tPushConstI	   4
+  74	tMultI
+  75	tAddPI
+  76	tFetchI
+  77	tWriteI
+  78	tWriteCR
+  79	tReturn

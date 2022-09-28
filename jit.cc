@@ -147,6 +147,8 @@ public:
       _calleeSaveWin64( calleeSaveWin64 )
     {}
 
+  void release() { _inUse = false; }
+
   std::string _name = "";
   int _nativeId = 0;
   bool _calleeSave = false;
@@ -271,7 +273,7 @@ void
 Operand::release()
 {
   if ( _reg ) {
-    _reg->_inUse = false;
+    _reg->release();
   }
 }
 
@@ -300,6 +302,8 @@ void defineLabel( int label, char* addr );
 char* findLabel( int label );
 void requestPatch( int* patchAt, int label );
 void makePatches();
+int isPowerOf2( int x );
+
 
 int* currLocalSpaceAddr = 0;
 int currLocalSpace = 0;
@@ -314,6 +318,8 @@ void emitCall( char* addr );
 void emitCallExtern( char* addr );
 void emitAdd( const Operand& x, const Operand& y );
 void emitSub( const Operand& x, const Operand& y );
+void emitMult( const Operand& x, const Operand& y );
+void emitShl( const Operand& x, const Operand& y );
 void emitMov( const Operand& x, const Operand& y );
 
 void emitRex( bool overrideWidth, const Register* operandReg, const Register* baseReg );
@@ -564,14 +570,24 @@ generateCode()
       case tMultI : {
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
+          int bits;
+          if ( x.isConst() && !y.isConst() ) {
+            swap( x, y );
+          }
           if ( doConst && x.isConst() && y.isConst() ) {
             operandStack.emplace_back( x._kind, x._value * y._value );
-          } else {
-            if ( x.isConst() ) {
-              swap( x, y );
-            }
+          } else if ( doConst && y.isConst() && y._value == 0 ) {
+            operandStack.emplace_back( x._kind, 0 );
+          } else if ( doConst && y.isConst() && y._value == 1 ) {
+            operandStack.push_back( x );
+          } else if ( y.isConst() && ( bits = isPowerOf2( y._value ) ) ) {
             operandIntoReg( x );
-            tCodeNotImplemented( tCodePc[-1] );
+            Operand shiftBy( jit_Operand_Kind_ConstI, bits );
+            emitShl( x, shiftBy );
+            operandStack.push_back( x );
+          } else {
+            operandIntoReg( x );
+            emitMult( x, y );
             operandStack.push_back( x );
           }
           y.release();
@@ -1018,6 +1034,21 @@ makePatches()
   }
 }
 
+
+// If x is a power of 2 (not including 2^0),
+// return the power, i.e. how many bits to shift 1 left to get it.
+// Returns 0 if not a power of 2 (not including 2^0).
+//
+int
+isPowerOf2( int x )
+{
+  for ( int bits = 0; bits < 32 ; ++bits ) {
+    if ( x == ( 1 << bits ) ) {
+      return bits;
+    }
+  }
+  return 0;
+}
 
 
 // Returns the byte size of the value in the operand.
@@ -1663,6 +1694,100 @@ emitSub( const Operand& x, const Operand& y )
       fatal( "emitSub: unexpected operands\n" );
   }
 }
+
+
+// x * y
+// x is a register
+//
+void
+emitMult( const Operand& x, const Operand& y )
+{
+  switch ( KindPair( x._kind, y._kind ) ) {
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_GlobalI ):
+      // imul reg32, [rip + offsetToGlobal]
+      emitRex( false, x._reg, nullptr );
+      // this opcode is two bytes
+      outB( 0x0f );
+      outB( 0xaf );
+      emitModRMMemRipRelative( x._reg, &data[y._value], 0 );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_LocalI ):
+      // imul reg32, [rbp + y._value]
+      emitRex( false, x._reg, regRbp );
+      // this opcode is two bytes
+      outB( 0x0f );
+      outB( 0xaf );
+      emitModRMMem( x._reg, regRbp, y._value );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ParamI ):
+      // imul reg32, [rbp + y._value + FRAME_PARAMS_OFFSET]
+      emitRex( false, x._reg, regRbp );
+      // this opcode is two bytes
+      outB( 0x0f );
+      outB( 0xaf );
+      emitModRMMem( x._reg, regRbp, y._value + FRAME_PARAMS_OFFSET );
+      break;
+ 
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ConstI ):
+      // imul x_reg32, x_reg32, immediate32   -- i.e. x = x * i
+      emitRex( false, x._reg, x._reg );
+      outB( 0x69 );
+      emitModRM_RegReg( x._reg, x._reg );
+      outI( y._value );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_RegI ):
+      // imul x_reg32, y_reg32
+      emitRex( false, x._reg, y._reg );
+      // this opcode is two bytes
+      outB( 0x0f );
+      outB( 0xaf );
+      emitModRM_RegReg( x._reg, y._reg );
+      break;
+
+    default:
+      toDo( "emitMult\n" );
+      break;
+  }
+}
+
+
+// x << y
+// x is a register
+//
+void
+emitShl( const Operand& x, const Operand& y )
+{
+  switch ( KindPair( x._kind, y._kind ) ) {
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_GlobalI ):
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_LocalI ):
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ParamI ):
+      toDo( "emitShl\n" );
+      // NOTE: SHL only supports y in CL.  Or consider VEX instruction SHLX.
+      break;
+    
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ConstI ):
+      // shl reg32, immediate8
+      emitRex( false, nullptr, x._reg );
+      outB( 0xc1 );
+      emitModRM_OpcRM( 4, x._reg );
+      outB( y._value );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_RegI ):
+      toDo( "emitShl\n" );
+      // NOTE: SHL only supports y in CL.  Or consider VEX instruction SHLX.
+      break;
+
+    default:
+      fatal( "emitMov: unexpected operands\n" );
+  }
+}
+
 
 
 // x = y

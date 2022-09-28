@@ -19,11 +19,6 @@ var B1, B2: boolean;
 
 begin
 
- // Test
- B1 := true;
- B2 := not B1;
- B2 := not not B1;
-
  {
   I1 := 8;
   I2 := I1 + 10 + 22;
@@ -35,9 +30,10 @@ begin
  }
 
   I1 := 3;
-  A1[ I1 ] := 15;
+  A1[ I1 ] := I1 * 5;
 
   I2 := A1[ I1 ];
+  A1[ I1 ] := I1 * I2;
 
   writeln( I2 );
   writeln( A1[ I1 ] );
