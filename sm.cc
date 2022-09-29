@@ -551,17 +551,11 @@ dumpTable()
 
     int instr = code[pc++];
     if ( instr >= 0 && instr < numtCodeInstrs ) {
-      switch ( tCodeInstrs[instr].args ) {
-        case 0:
-          fprintf( dmp, "%s\n", tCodeInstrs[instr].name );
-          break;
-        case 1:
-          fprintf( dmp, "%s\t%4d\n", tCodeInstrs[instr].name, code[pc++] );
-         break;
-        default:
-         printf( "dumpTable: unexpected number of args\n" );
-          exit(1);
+      fprintf( dmp, "%s", tCodeInstrs[instr].name );
+      for ( int a = 0; a < tCodeInstrs[instr].args; ++a ) {
+        fprintf( dmp, "\t%4d", code[pc++] );
       }
+      fprintf( dmp, "\n" );
     } else {
       fprintf( dmp, "?\n" );
       pc++;

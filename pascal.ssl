@@ -391,6 +391,13 @@ mechanism loop_mech:
    oLoopPop
    ;
 
+% for hacky debugging
+mechanism msg_mech:
+   oMsg( int num )             % print message "oMsg <num>"
+   oMsgTrace( int num )        % print message "oMsg <num>" followed by ssl traceback
+   ;
+
+
 rules
 
 % ----------------------------- Global Variables ----------------------------

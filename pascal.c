@@ -25,6 +25,13 @@
 // Schema database access functions
 #include "node.h"
 
+// Optionally integrate SSL debugger
+#ifdef INTEGRATE_SSL_DEBUGGER
+#include "debug.h"
+#define DEBUG_INFO_FILE      "pascal.dbg"
+#define PROGRAM_LISTING_FILE "pascal.lst"
+#endif
+
 // SSL definitions generated for this program
 #define  SSL_INCLUDE_ERR_TABLE
 #include "pascal.h"
@@ -131,30 +138,109 @@ struct {
 int dLSptr = 0;
 
 
+// Integration with SSL debugger
+
+int optionDebug = 0;
+
+#ifdef INTEGRATE_SSL_DEBUGGER
+
 void
-main(argc,argv)
-int argc;
-char *argv[];
+dump_int( void* variable, void* udata )
+{
+  printf( "\t%d\n", *(int*)variable );        
+}
+
+void
+dump_node_short( void* variable, void* udata )
+{
+  NODE_PTR node_ptr = *((NODE_PTR*)variable);
+  // double-dereference, because debugger calls us with a pointer to the variable,
+  // not the value of the variable.
+  nodeDumpNodeShort( node_ptr );
+}
+
+void
+dump_node_stack_short( void* variable, void* udata )
+{
+  int top = *(int*) udata;
+  NODE_PTR* stack = (NODE_PTR*) variable;
+  for ( int i = top; i > 0; --i ) {
+    nodeDumpNodeShort( stack[i] );
+  }
+}
+
+//
+// NODE_PTR dTypeStack[dTypeStackSize];
+// int dTypeStackPtr;
+
+
+dbg_variables debug_variables[] = {
+    /* "Name",     address,             udata,           function */
+
+    "Here",        (char*) &w_here,       NULL,          dump_int,
+    "TypeStack",   (char*) dTypeStack,    (char*) &dTypeStackPtr,    dump_node_stack_short,
+
+    /*  Type displayers  */
+    "Node",        DBG_TYPE_DISPLAY,      NULL,          dump_node_short,
+
+    "",            NULL,                0,               NULL,
+};
+
+#endif // INTEGRATE_SSL_DEBUGGER
+
+//
+// ------------------------------------------------------------------------------------
+//
+
+void
+usage()
+{
+  int hasDebugger = 0;
+#ifdef INTEGRATE_SSL_DEBUGGER
+  hasDebugger = 1;
+#endif
+  printf( "Usage:  pascal [-l]%s <file>\n", hasDebugger ? " [-d]" : "" );
+  printf( "  -l : create listing\n" );
+  if ( hasDebugger ) {
+    printf( "  -d : run ssl debugger\n" );
+  }
+}
+
+
+int
+main( int argc, char* argv[] )
 {
   int entries,temp;
   int arg;
 
-  /* Prepare Files */
-
   t_listing = 0;
-  arg = 1;
-  if (arg<argc && argv[arg][0]=='-') {
-    if (argv[arg][1]=='L' || argv[arg][1]=='l')
+
+  for ( arg = 1; ( arg < argc ) && ( argv[arg][0] == '-' ); ++arg ) {
+    if ( strcmp( argv[arg], "-l" ) == 0 ) {
       t_listing = 1;
-    arg++;
+    } else if ( strcmp( argv[arg], "-d" ) == 0 ) {
+      optionDebug = 1;
+    } else {
+      usage();
+      exit( 1 );
+    }
   }
-  if (arg>=argc) {
-    printf("Usage:  pascal [-List] <file>\n");
-    exit(10);
+
+  if ( arg >= argc ) {
+    printf( "Missing filename\n" );
+    usage();
+    exit( 1 );
   }
+
+  /* Prepare Files */
 
   ssl_init();
   init_my_scanner();
+
+#ifdef INTEGRATE_SSL_DEBUGGER
+  ssl_set_debug( optionDebug );
+  ssl_set_debug_info( DEBUG_INFO_FILE, PROGRAM_LISTING_FILE, oBreak, debug_variables );
+#endif
 
   strcpy(t_lineBuffer,argv[arg]);
   strcpy(t_lineBuffer+strlen(argv[arg]),".pas");
@@ -236,6 +322,7 @@ struct ssl_token_table_struct my_operator_table[] = {
   "[",                  pLSquare,
   "]",                  pRSquare,
   "^",                  pCarat,
+  "@",                  pAt,
   "*",                  pTimes,
   "/",                  pDivide,
   "+",                  pPlus,
@@ -719,6 +806,18 @@ NODE_PTR dNode;  // temporary for several mechanisms
             --dLSptr;
             continue;
 
+
+     /* Mechanism msg_mech */
+
+     case oMsg :
+            printf( "oMsg %ld\n", ssl_param );
+            continue;
+     case oMsgTrace :
+            printf( "oMsg %ld\n", ssl_param );
+            ssl_warning( "  oMsg occurred" );
+            ssl_traceback();
+            // ssl_print_input_position();
+            continue;
 
 
 #include "ssl_end.h"

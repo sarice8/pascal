@@ -52,6 +52,15 @@ begin
   writeln( I2 );
   writeln( A1[ I1 ] );
 
+  if ( I1 < 3 ) then
+    writeln( 'Stmt 1' )
+  else
+    writeln( 'Stmt 2' );
+
+  if ( ( I1 < 3 ) and ( I2 > 10 ) ) then
+    writeln( 'Stmt 3' )
+  else
+    writeln( 'Stmt 4' );
 
  {
   A1[ I1 + 1 ] := 14;

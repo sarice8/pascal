@@ -21,8 +21,8 @@ SCHEMA_DIR       = $(RELEASE)/schema/1.3
 
 
 
-CFLAGS = -g -Werror
-#CFLAGS = -O3 -Werror
+CFLAGS = -g -Werror -DINTEGRATE_SSL_DEBUGGER
+#CFLAGS = -O3 -Werror -DINTEGRATE_SSL_DEBUGGER
 
 OBJDIR = ./obj-$(OSTYPE)
 BINDIR = ./bin-$(OSTYPE)

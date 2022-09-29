@@ -1,6 +1,6 @@
 #!/bin/sh
 
-./bin-${OSTYPE}/pascal $1
+./bin-${OSTYPE}/pascal $*
 
 # First, just dump the table without executing
 ./bin-${OSTYPE}/sm -d a.out

@@ -301,6 +301,8 @@
 #define oLoopCycleLabel 91
 #define oLoopExitLabel 92
 #define oLoopPop 93
+#define oMsg 94
+#define oMsgTrace 95
 
 #ifdef SSL_INCLUDE_ERR_TABLE
 
