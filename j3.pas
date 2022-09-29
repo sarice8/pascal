@@ -15,9 +15,23 @@ type ArrayType = array [1..4] of integer;
 
 var R1: RecType;
 var A1: ArrayType;
-var B1, B2: boolean;
+var B1, B2, B3, B4: boolean;
 
 begin
+
+ // grammar test
+ B2 := false;
+ B3 := true;
+ B4 := false;
+ B1 := B2 = B3 <> B4;   // gives true, for either (B2=B3)<>B4 or B2=(B3<>B4) but expect former
+ writeln( 'B1 = ', B1 );
+ I1 := - 3;
+
+ // These are accepted by FPC, but not sure what grammar allows them.
+ // I1 := - -3;
+ // I1 := -+-+-3;
+ // I1 := 3 --+-+-3;
+ // writeln( 'I1 = ', I1 );
 
  {
   I1 := 8;

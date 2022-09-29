@@ -83,6 +83,7 @@ void cleanup();
 
 void defineLabels();
 void defineLabel( int label, int addr );
+void defineLabelAlias( int label, int aliasToLabel );
 
 struct instrInfo_s {
   const char* name;
@@ -139,6 +140,7 @@ struct instrInfo_s tCodeInstrs[] = {
   { "tJumpTrue", 1 },
   { "tJumpFalse", 1 },
   { "tLabel", 1 },
+  { "tLabelAlias", 2 },
   { "tWriteI", 0 },
   { "tWriteBool", 0 },
   { "tWriteStr", 0 },
@@ -149,7 +151,7 @@ int numtCodeInstrs = sizeof(tCodeInstrs) / sizeof(tCodeInstrs[0]);
 
 
 std::unordered_map<int, int> labels;   // label# -> tcode addr
-
+std::unordered_map<int, int> labelAliases;  // label# -> aliasToLabel#
 
 
 int
@@ -239,11 +241,12 @@ main( int argc, char* argv[] )
 void
 defineLabels()
 {
-  pc = 0;
-  while (pc < codeWords) {
+  for ( pc = 0; pc < codeWords; ) {
     int instr = code[pc];
     if ( instr == tLabel ) {
       defineLabel( code[pc+1], pc+2 );
+    } else if ( instr == tLabelAlias ) {
+      defineLabelAlias( code[pc+1], code[pc+2] );
     }
     pc += 1 + tCodeInstrs[instr].args;
   }
@@ -256,14 +259,25 @@ defineLabel( int label, int addr )
   labels[ label ] = addr;
 }
 
+void
+defineLabelAlias( int label, int aliasToLabel )
+{
+  labelAliases[ label ] = aliasToLabel;
+}
+
 int
 findLabel( int label )
 {
   auto it = labels.find( label );
-  if ( it == labels.end() ) {
-    fatal( "undefined label\n" );
+  if ( it != labels.end() ) {
+    return it->second;
   }
-  return it->second;
+  auto it2 = labelAliases.find( label );
+  if ( it2 != labelAliases.end() ) {
+    return findLabel( it2->second );
+  }  
+  fatal( "undefined label\n" );
+  return 0;
 }
 
 
@@ -492,6 +506,11 @@ walkTable()
               continue;
        case tLabel :
               // Defines a label.  This is a no-op during execution.
+              pc++;
+              continue;
+       case tLabelAlias :
+              // Defines a label alias.  This is a no-op during execution.
+              pc++;
               pc++;
               continue;
        case tWriteI :

@@ -296,9 +296,11 @@ void preserveRegsAcrossCall();
 
 
 std::unordered_map<int, char*> labels;
+std::unordered_map<int, int> labelAliases;
 std::vector< std::pair< int*, int> > patches;
 
 void defineLabel( int label, char* addr );
+void defineLabelAlias( int label, int aliasToLabel );
 char* findLabel( int label );
 void requestPatch( int* patchAt, int label );
 void makePatches();
@@ -830,6 +832,12 @@ generateCode()
           defineLabel( *tCodePc++, nativePc );
         }
         break;
+      case tLabelAlias : {
+          int label = *tCodePc++;
+          int aliasToLabel = *tCodePc++;
+          defineLabelAlias( *tCodePc++, aliasToLabel );
+        }
+        break;
       case tWriteI : {
           Operand x = operandStack.back();   operandStack.pop_back();
           // We need to form a call with the native calling convention.
@@ -999,14 +1007,34 @@ defineLabel( int label, char* addr )
   labels[label] = addr;
 }
 
+// Define the given label to be an alias of another label aliasToLabel
+// (which might itself be defined as an alias).
+//
+void
+defineLabelAlias( int label, int aliasToLabel )
+{
+  labelAliases[label] = aliasToLabel;
+}
+
+
 // Find the native address of the label.
 // Returns NULL if not defined.
 //
 char*
 findLabel( int label )
 {
-  return labels[label];
+  auto it = labels.find( label );
+  if ( it != labels.end() ) {
+    return it->second;
+  }
+  auto it2 = labelAliases.find( label );
+  if ( it2 != labelAliases.end() ) {
+    return findLabel( it2->second );
+  }
+  // This label has not yet been defined
+  return nullptr;
 }
+
 
 // Request future patching a label's address
 // to be installed at the given location.

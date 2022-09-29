@@ -96,6 +96,10 @@ nType ::= nIntegerType
 
 nType ::= nBooleanType
 
+% nBooleanCFType is an expression type that's represented by control flow rather than a value.
+% It's not used in the symbol table.
+nType ::= nBooleanCFType
+
 nType ::= nCharType
 
 nType ::= nStringType

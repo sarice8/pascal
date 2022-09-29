@@ -86,6 +86,7 @@ input:
    pLSquare      '['
    pRSquare      ']'
    pCarat        '^'
+   pAt           '@'
    pDot          '.'
    pDotDot       '..'
    pTimes        '*'
@@ -187,6 +188,7 @@ output:
    tJumpTrue         % <label#>  (pops top of stack, jumps if true)
    tJumpFalse        % <label#>  (pops top of stack, jumps if false)
    tLabel            % <label#> - define label# at the current address
+   tLabelAlias       % <label#> <aliasToLabel#> - defines label to be an alias of another label
    tWriteI           % for writeln : write integer on tos, pop
    tWriteBool        %  "     "    : write TRUE/FALSE, pop
    tWriteStr         %  "     "    : write string whose addr is on tos, pop
@@ -399,6 +401,7 @@ Node    globalScope            % global nScope
 Node    FileType
 Node    IntegerType
 Node    BooleanType
+Node    BooleanCFType
 Node    CharType
 Node    StringType
 
@@ -415,10 +418,16 @@ TypeRef( out Node theType );
 PointerTypeTo( Node theType ) >> Node;
 OrdinalLow( Node theType ) >> int;
 AssignStmt( Node decl );
+BooleanExprControlFlow( out Label falseLabel );
+
 VarExpr( Node decl );
 LValueVar( Node decl );
 IncVar( Node decl );
 DecVar( Node decl );
+
+CFToVal( inout Label falseLabel );
+ValToCF( out Label falseLabel );
+
 
 
 % ----------------------------- Declarations ----------------------------
@@ -909,16 +918,102 @@ ConstExpr:
          oValueNegate
    ];
 
-%
-% General run-time expressions
-% The type stack tracks the type of the expression.
-%
 
+
+
+% Parse an expression, leaving a value on the runtime expr stack
+% and its type on the type stack.
+%
+% This rule does not export control flow (though it may generate
+% control flow internally for subexpressions).
+%
 Expr:
-   @BoolExpr
+   Label falseLabel
+   falseLabel = labelNull
+
+   @ExprAllowCF( falseLabel )
+   @CFToVal( falseLabel );
+
+
+% Parse a Boolean expression, producing control flow code rather than a value.
+% Does not leave a value on the runtime expr stack.
+% Does not leave a type on the type stack.
+%
+% If the expression is true, the code will fall through to the end (Here).
+% If the expression is false, the code will jump to the given falseLabel,
+% which this rule will allocate but not define the location for.
+% The caller must do so.
+%
+BooleanExprControlFlow( out Label falseLabel ):
+   @ExprAllowCF( falseLabel )
+   [ oTypeSNodeType
+      | nBooleanCFType :
+      | nBooleanType :
+         % convert value to control flow
+         falseLabel = oLabelNew
+         .tJumpFalse  oEmitLabel( falseLabel )
+      | * :
+         #eNotBoolean
+   ]
+   oTypeSPop;
+
+
+% If the current expr result is control flow, convert it to a value.
+% falseLabel is the label that had been used by the control flow.
+% On return it will be set to labelNull.
+%
+CFToVal( inout Label falseLabel ):
+   [ oTypeSNodeType
+      | nBooleanCFType :
+         Label doneLabel
+         doneLabel = oLabelNew
+         .tPushConstI  oEmitInt( 1 )
+         .tJump  oEmitLabel( doneLabel )
+         .tLabel  oEmitLabel( falseLabel )
+         .tPushConstI  oEmitInt( 0 )
+         .tLabel  oEmitLabel( doneLabel )
+         oTypeSPop
+         oTypeSPush( BooleanType )
+         falseLabel = labelNull
+      | * :
+   ];
+
+
+% If the current expr result is boolean value, convert it to control flow.
+% falseLabel will be allocated by this rule and passed back.
+% The caller must define its location.
+%
+ValToCF( out Label falseLabel ):
+   [ oTypeSNodeType
+      | nBooleanType :
+         falseLabel = oLabelNew
+         .tJumpFalse  oEmitLabel( falseLabel )
+         oTypeSPop
+         oTypeSPush( BooleanCFType )
+      | * :
+   ];
+
+
+% Parse an expression.  It may produce a value on the expr stack,
+% or control flow, depending on what's seen in the expression.
+% Leaves the expression type on the type stack.
+%
+% If the expression produces control flow, the expression type will be
+% nBooleanCFType.  In this case, a true value falls through to Here,
+% and a false value jumps to falseLabel.  This rule will allocate falseLabel
+% and return it, but will not define its location; the caller must do so.
+%
+% If the expression produces a value, the value will be left on the
+% expression stack, and the type will be some type other than nBooleanCFType.
+% In this case, falseLabel is ignored.
+%
+ExprAllowCF( out Label falseLabel ):
+   @BoolExprAllowCF( falseLabel )
    {[
       | '=' :
-         @BoolExpr
+         @CFToVal( falseLabel )
+         @BoolExprAllowCF( falseLabel )
+         @CFToVal( falseLabel )
          @MatchTypes
          [ oTypeSNodeType
             | nIntegerType, nBooleanType :  .tEqualI
@@ -930,7 +1025,9 @@ Expr:
          oTypeSPush( BooleanType )
 
       | '<>' :
-         @BoolExpr
+         @CFToVal( falseLabel )
+         @BoolExprAllowCF( falseLabel )
+         @CFToVal( falseLabel )
          @MatchTypes
          [ oTypeSNodeType
             | nIntegerType, nBooleanType :  .tNotEqualI
@@ -942,7 +1039,9 @@ Expr:
          oTypeSPush( BooleanType )
 
       | '<' :
-         @BoolExpr
+         @CFToVal( falseLabel )
+         @BoolExprAllowCF( falseLabel )
+         @CFToVal( falseLabel )
          @MatchTypes
          [ oTypeSNodeType
             | nIntegerType, nBooleanType :  .tLessI
@@ -953,7 +1052,9 @@ Expr:
          oTypeSPush( BooleanType )
 
       | '>' :
-         @BoolExpr
+         @CFToVal( falseLabel )
+         @BoolExprAllowCF( falseLabel )
+         @CFToVal( falseLabel )
          @MatchTypes
          [ oTypeSNodeType
             | nIntegerType, nBooleanType :  .tGreaterI
@@ -964,7 +1065,9 @@ Expr:
          oTypeSPush( BooleanType )
 
       | '<=' :
-         @BoolExpr
+         @CFToVal( falseLabel )
+         @BoolExprAllowCF( falseLabel )
+         @CFToVal( falseLabel )
          @MatchTypes
          [ oTypeSNodeType
             | nIntegerType, nBooleanType :  .tLessEqualI
@@ -975,7 +1078,9 @@ Expr:
          oTypeSPush( BooleanType )
 
       | '>=' :
-         @BoolExpr
+         @CFToVal( falseLabel )
+         @BoolExprAllowCF( falseLabel )
+         @CFToVal( falseLabel )
          @MatchTypes
          [ oTypeSNodeType
             | nIntegerType, nBooleanType :  .tGreaterEqualI
@@ -989,46 +1094,139 @@ Expr:
          >
    ]};
 
-BoolExpr:
-   @BoolTerm
+
+BoolExprAllowCF( out Label falseLabel ):
+   Label trueLabel
+   trueLabel = labelNull
+
+   @BoolTermAllowCF( falseLabel )
    {[
       | pOr :
-         @RequireBoolPop
-         @BoolTerm
-         @RequireBool
-         .tOr
+         [ oTypeSNodeType
+            | nBooleanCFType :
+               % We are true here. Jump ahead to done
+               [ equal_label( trueLabel, labelNull )
+                  | true :  trueLabel = oLabelNew
+                  | * :
+               ]
+               .tJump  oEmitLabel( trueLabel )
+            | nBooleanType :
+               @ValToCF( falseLabel )
+               % We might be true here. If so, jump ahead to done
+               [ equal_label( trueLabel, labelNull )
+                  | true :  trueLabel = oLabelNew
+                  | * :
+               ]
+               .tJumpTrue  oEmitLabel( trueLabel )
+            | * : #eNotBoolean
+         ]
+         oTypeSPop
+
+         % false in previous term will jump here, to try this alternative term
+         .tLabel  oEmitLabel( falseLabel )
+
+         % we'll get a new falseLabel for this term
+         falseLabel = labelNull
+         @BoolTermAllowCF( falseLabel )
+
+         [ oTypeSNodeType
+            | nBooleanCFType :
+            | nBooleanType :
+               @ValToCF( falseLabel )
+            | * : #eNotBoolean
+         ]
+
+         oTypeSPop
+         oTypeSPush( BooleanCFType )
+
       | * :
          >
-   ]};
+   ]}
 
-BoolTerm:
-   @BoolFactor
+   % any short-circuit trues jump here to the end
+   [ equal_label( trueLabel, labelNull )
+      | false :
+         .tLabel  oEmitLabel( trueLabel )
+      | * :
+   ]
+   ;
+
+
+BoolTermAllowCF( out Label falseLabel ):
+   Label overallFalseLabel
+   overallFalseLabel = labelNull
+
+   @BoolFactorAllowCF( falseLabel )
    {[
       | pAnd :
-         @RequireBoolPop
-         @BoolFactor
-         @RequireBool
-         .tAnd
+         [ oTypeSNodeType
+            | nBooleanCFType :
+            | nBooleanType :
+               @ValToCF( falseLabel )
+            | * :
+               #eNotBoolean
+         ]
+         oTypeSPop
+
+         % We're going to have a different falseLabel for each term,
+         % because we let each rule allocate its own (rather than accepting labels passed in).
+         % And in this case we want them all to go to the same place,
+         % to be determined by the caller.
+         %
+         % I'll allow for label aliases.  This will be more optimal than generating
+         % multiple private false-handling code segments, that the true path would have to
+         % jump around.  That would be hard to eliminate afterwards.
+
+         [ equal_label( overallFalseLabel, labelNull )
+            | true :
+               overallFalseLabel = oLabelNew
+               .tLabelAlias  oEmitLabel( falseLabel )  oEmitLabel( overallFalseLabel )
+               falseLabel = overallFalseLabel
+            | * :
+         ]
+
+         Label factorFalseLabel
+         factorFalseLabel = labelNull
+         @BoolFactorAllowCF( factorFalseLabel )
+
+         [ oTypeSNodeType
+            | nBooleanCFType :
+            | nBooleanType :
+               @ValToCF( factorFalseLabel )
+            | * : #eNotBoolean
+         ]
+        .tLabelAlias  oEmitLabel( factorFalseLabel )  oEmitLabel( overallFalseLabel )
+
       | * :
          >
    ]};
 
-BoolFactor:
+BoolFactorAllowCF( out Label falseLabel ):
    [
       | pNot :
-         % TO DO: Is the grammar shown in FPC docs standard?
-         %   That's where I took the recursive definition  factor: 'not' factor
-         %   If not where can I find the a standard grammar.
-         %
-         % TO DO: FPC says there is a xor operator too, which I don't accept.
-         % TO DO: apparently operator and or xor not  can work as bitwise operations on integer/ordinal
-         %     operands, in addition to being short-circuit boolean operations.
-         %     I haven't allowed for that yet.
+         Label factorFalseLabel
+         factorFalseLabel = labelNull
 
-         @BoolFactor
-         @RequireBool
-         .tNot
+         @BoolFactorAllowCF( factorFalseLabel )
+         [ oTypeSNodeType
+            | nBooleanCFType :
+               % We have control flow, and are sitting at the point that has value false.
+               falseLabel = oLabelNew
+               .tJump  oEmitLabel( falseLabel )
+               % The true path jumps here
+               .tLabel  oEmitLabel( factorFalseLabel )
+
+            | nBooleanType :
+               % I have a value.  I'll leave it as a value, rather than create control flow.
+               % See how this goes.
+               .tNot
+
+            | * : #eNotBoolean
+         ]
+
       | * :
+         % TO DO: I'll want to add "AllowCF" for the lower stuff too,
+         % so the Primary ( expr ) gets it.
          @ArithExpr
    ];
 
@@ -1123,7 +1321,7 @@ Primary:
                oTypeSPush( IntegerType )
          ]
 
-      | '^' :        % ^var
+      | '@' :        % @var -- pointer to var
          pIdent
 
          Node decl
@@ -1634,12 +1832,10 @@ DecVar( Node decl ):
 
 IfStmt:
    Label falseLabel
-   falseLabel = oLabelNew
+   falseLabel = labelNull
 
-   @Expr
-   @RequireBoolPop
+   @BooleanExprControlFlow( falseLabel )
    pThen
-   .tJumpFalse  oEmitLabel( falseLabel )
    @Statement
    [
       | pElse :
@@ -1929,6 +2125,7 @@ installBuiltIns:
    FileType = @newType( nFileType, 4 )
    IntegerType = @newType( nIntegerType, 4 )
    BooleanType = @newType( nBooleanType, 1 )
+   BooleanCFType = @newType( nBooleanCFType, 1 )
    CharType = @newType( nCharType, 1 )
    StringType = @newType( nStringType, 256 )    % string with default length 256
 
