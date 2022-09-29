@@ -305,6 +305,10 @@ void ssl_warning( char* msg );
 void ssl_error( char* msg );
 void ssl_assert_fun( int expr, int line_num );
 
+/*  For debugging  */
+void ssl_traceback();
+void ssl_print_input_position();
+
 /*
  * --------------------------------------------------------------------------
  *                        Private types & variables
