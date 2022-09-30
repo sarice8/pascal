@@ -9,18 +9,69 @@
   14	tPushConstI	   0
   16	tAssignI
   17	tPushGlobalI	   8
-  19	tPushConstI	   3
-  21	tLessI
+  19	tPushConstI	   0
+  21	tEqualI
   22	tJumpFalse	   2
-  24	tLabelAlias	   2	   3
-  27	tPushGlobalI	  12
-  29	tPushConstI	  10
-  31	tGreaterI
-  32	tJumpFalse	   4
-  34	tLabelAlias	   4	   3
-  37	tPushGlobalI	   8
-  39	tPushGlobalI	  12
-  41	tNotEqualI
-  42	tJumpFalse	   5
-  44	tLabelAlias	   5	   3
-  47	tPushAddrGlobal	  16
+  24	tPushAddrGlobal	  20
+  26	tWriteStr
+  27	tWriteCR
+  28	tLabel	   2
+  30	tPushGlobalI	   8
+  32	tPushConstI	   3
+  34	tLessI
+  35	tJumpFalse	   3
+  37	tLabelAlias	   3	   4
+  40	tPushGlobalI	  12
+  42	tPushConstI	  10
+  44	tGreaterI
+  45	tJumpFalse	   5
+  47	tLabelAlias	   5	   4
+  50	tPushGlobalI	   8
+  52	tPushGlobalI	  12
+  54	tNotEqualI
+  55	tJumpFalse	   6
+  57	tLabelAlias	   6	   4
+  60	tPushAddrGlobal	  16
+  62	tPushConstI	 100
+  64	tAssignI
+  65	tJump	   7
+  67	tLabel	   4
+  69	tPushAddrGlobal	  16
+  71	tPushConstI	 200
+  73	tAssignI
+  74	tLabel	   7
+  76	tLabel	   8
+  78	tPushGlobalI	   8
+  80	tPushConstI	   5
+  82	tLessI
+  83	tJumpFalse	   9
+  85	tPushAddrGlobal	  26
+  87	tWriteStr
+  88	tPushGlobalI	   8
+  90	tWriteI
+  91	tWriteCR
+  92	tPushAddrGlobal	   8
+  94	tPushGlobalI	   8
+  96	tPushConstI	   1
+  98	tAddI
+  99	tAssignI
+ 100	tJump	   8
+ 102	tLabel	   9
+ 104	tLabel	  10
+ 106	tPushAddrGlobal	   8
+ 108	tPushGlobalI	   8
+ 110	tPushConstI	   1
+ 112	tSubI
+ 113	tAssignI
+ 114	tPushAddrGlobal	  32
+ 116	tWriteStr
+ 117	tPushGlobalI	   8
+ 119	tWriteI
+ 120	tWriteCR
+ 121	tPushGlobalI	   8
+ 123	tPushConstI	   0
+ 125	tLessI
+ 126	tJumpFalse	  12
+ 128	tLabelAlias	  12	  10
+ 131	tLabel	  11
+ 133	tReturn

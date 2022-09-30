@@ -169,8 +169,6 @@ output:
    tSubI
    tNegI             % top entry *= -1
    tNot              % negate top boolean
-   tAnd              % boolean AND of top 2 (pop 2, push 1)
-   tOr               % boolean OR or top 2 (pop 2, push 1)
    tEqualI           % top two entries equal? (pop 2, push 1) (true=1)
    tNotEqualI        %    NOTE, these all work for booleans too
    tGreaterI         % 2nd entry greater than top entry? (pop 2, push answer)
@@ -426,6 +424,16 @@ PointerTypeTo( Node theType ) >> Node;
 OrdinalLow( Node theType ) >> int;
 AssignStmt( Node decl );
 BooleanExprControlFlow( out Label falseLabel );
+ExprAllowCF( out Label falseLabel );
+BoolExprAllowCF( out Label falseLabel );
+BoolTermAllowCF( out Label falseLabel );
+BoolFactorAllowCF( out Label falseLabel );
+ArithExprAllowCF( out Label falseLabel );
+TermAllowCF( out Label falseLabel );
+FactorAllowCF( out Label falseLabel );
+PrimaryAllowCF( out Label falseLabel );
+
+
 
 VarExpr( Node decl );
 LValueVar( Node decl );
@@ -900,7 +908,7 @@ TypeRef( out Node resultType ):
    ];
 
 
-% ------------------------------ Expressions -----------------------------
+% --------------------------- Const Expressions --------------------------
 
 % Constant expressions: currently, only literal integers or previously
 % named constant integers are supported, possibly with a negation.
@@ -927,7 +935,45 @@ ConstExpr:
 
 
 
+% ------------------------------ Expressions -----------------------------
 
+% There are two wrappers leading into expression parsing:
+%   Expr()
+%   BooleanExprControlFlow( out Label falseLabel )
+%
+% Expr always produces a value on the runtime expr stack,
+% and pushes its type on the type stack.
+%
+% BooleanExprControlFlow always generates control-flow code.
+% It does not push a value on the runtime expr stack.
+% It does not push a type on the type stack.
+% The control flow code ends up at Here if the expr is true,
+% and jumps to falseLabel if the expr is false.
+% This rule allocates falseLabel, and passes it back.
+% The caller will need to define its location.
+%
+% The internal methods of expr parsing may produce a mix of
+% values and control flow, depending on the operators seen.
+% We don't always do one or the other, hoping to be efficient for
+% cases like   "func_call( bool_var1, bool_var2 )"
+% as well as  "if bool_expr1 or bool_expr2 then ...".
+% If a subexpression rule produces control flow, it will allocate a
+% falseLabel and pass it back up.  And it will push the
+% result type as BooleanCFType, to distinguish from BooleanType
+% which corresponds with a boolean value on the expr stack.
+% 
+% Note that my expression parsing is broken into more levels than
+% grammars describe for Pascal precedence levels.  This follows my
+% original parser implementation.  I think my rationale was that
+% operators from the levels that I split up couldn't have been
+% mixed anyway, since they require different data types
+% (e.g. boolean vs int/real).  And splitting them up simplified
+% my code.  But, I should revisit this.
+%
+
+
+% Public entry point:
+%
 % Parse an expression, leaving a value on the runtime expr stack
 % and its type on the type stack.
 %
@@ -942,6 +988,8 @@ Expr:
    @CFToVal( falseLabel );
 
 
+% Public entry point:
+%
 % Parse a Boolean expression, producing control flow code rather than a value.
 % Does not leave a value on the runtime expr stack.
 % Does not leave a type on the type stack.
@@ -1232,66 +1280,64 @@ BoolFactorAllowCF( out Label falseLabel ):
          ]
 
       | * :
-         % TO DO: I'll want to add "AllowCF" for the lower stuff too,
-         % so the Primary ( expr ) gets it.
-         @ArithExpr
+         @ArithExprAllowCF( falseLabel )
    ];
 
-ArithExpr:
-   @Term
+ArithExprAllowCF( out Label falseLabel ):
+   @TermAllowCF( falseLabel )
    {[
       | pPlus :
          @RequireIntPop
-         @Term
+         @TermAllowCF( falseLabel )  % actually not allowing CF, will be caught by type check
          @RequireInt
          .tAddI
       | pMinus :
          @RequireIntPop
-         @Term
+         @TermAllowCF( falseLabel )
          @RequireInt
          .tSubI
       | * :
          >
    ]};
 
-Term:
-   @Factor
+TermAllowCF( out Label falseLabel ):
+   @FactorAllowCF( falseLabel )
    {[
       | pTimes :
          @RequireIntPop
-         @Factor
+         @FactorAllowCF( falseLabel )  % actually not allowing CF, will be caught by type check
          @RequireInt
          .tMultI
       | pDivide :
          @RequireIntPop
-         @Factor
+         @FactorAllowCF( falseLabel )
          @RequireInt
          .tDivI
       | * :
          >
    ]};
 
-Factor:
+FactorAllowCF( out Label falseLabel ):
    [
       | pPlus :
-         @Primary
+         @PrimaryAllowCF( falseLabel )  % actually not allowing CF, will be caught by type check
          @RequireInt
       | pMinus :
-         @Primary
+         @PrimaryAllowCF( falseLabel )
          @RequireInt
          .tNegI
       | * :
-         @Primary
+         @PrimaryAllowCF( falseLabel )
    ];
 
-Primary:
+PrimaryAllowCF( out Label falseLabel ):
    [
       | pIntLit :
          .tPushConstI  oEmitInt( TOKEN_VALUE )
          oTypeSPush( IntegerType )
 
       | '(' :
-         @Expr
+         @ExprAllowCF( falseLabel )
          ')'
 
       | pStrLit :
@@ -1926,9 +1972,9 @@ RepeatStmt:
       | ';' :
          @Statement
       | pUntil :
-         @Expr
-         @RequireBoolPop
-         .tJumpFalse  oEmitLabel( cycleLabel )
+         Label falseLabel
+         @BooleanExprControlFlow( falseLabel )
+         .tLabelAlias  oEmitLabel( falseLabel )  oEmitLabel( cycleLabel )
          >
    ]}
    .tLabel  oEmitLabel( exitLabel )
@@ -1941,13 +1987,10 @@ WhileStmt:
    .tLabel  oEmitLabel( cycleLabel )
 
    Label exitLabel
-   exitLabel = oLabelNew
+   @BooleanExprControlFlow( exitLabel )
 
    oLoopPush( cycleLabel, exitLabel )
-   @Expr
-   @RequireBoolPop
    pDo
-   .tJumpFalse  oEmitLabel( exitLabel )
    @Statement
    .tJump  oEmitLabel( cycleLabel )
    .tLabel  oEmitLabel( exitLabel )

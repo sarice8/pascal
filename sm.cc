@@ -121,8 +121,6 @@ struct instrInfo_s tCodeInstrs[] = {
   { "tSubI", 0 },
   { "tNegI", 0 },
   { "tNot", 0 },
-  { "tAnd", 0 },
-  { "tOr", 0 },
   { "tEqualI", 0 },
   { "tNotEqualI", 0 },
   { "tGreaterI", 0 },
@@ -412,14 +410,6 @@ walkTable()
               continue;
        case tNot :
               stack[sp] = !stack[sp];
-              continue;
-       case tAnd :
-              stack[sp-1] = stack[sp-1] && stack[sp];
-              sp--;
-              continue;
-       case tOr :
-              stack[sp-1] = stack[sp-1] || stack[sp];
-              sp--;
               continue;
        case tEqualI :
               stack[sp-1] = stack[sp-1] == stack[sp];
