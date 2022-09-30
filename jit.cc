@@ -293,6 +293,8 @@ swapConditionFlag( ConditionFlags& f ) {
 class Operand
 {
 public:
+  Operand() = default;
+
   Operand( jitOperandKind k, int val )
     : _kind( k ), _value( val )
   {}
@@ -365,6 +367,8 @@ void operandKindAddrIntoReg( Operand& x );
 void operandNotMem( Operand& x );
 void operandDeref( Operand& x, int valueSize );
 void operandExtendToP( Operand& x );
+Operand operandCompare( Operand& x, Operand& y, ConditionFlags flags );
+
 Register* allocateReg();
 void forceAllocateReg( Register* reg );
 Operand allocateTemp( int size );
@@ -394,6 +398,8 @@ void emitReturn();
 void emitReturnFromInitialStub();
 void emitCall( char* addr );
 void emitCallExtern( char* addr );
+void emitJmpToLabel( int label );
+void emitJccToLabel( int label, ConditionFlags flags );
 void emitJmp( char* addr );
 void emitJcc( char* addr, ConditionFlags flags );
 void emitAdd( const Operand& x, const Operand& y );
@@ -406,7 +412,7 @@ void emitMov( const Operand& x, const Operand& y );
 void emitRex( bool overrideWidth, const Register* operandReg, const Register* baseReg );
 void emitModRMMem( const Register* operandReg, const Register* baseReg, int offset );
 void emitModRM_OpcRMMem( int opcodeExtension, const Register* baseReg, int offset );
-void emitModRM_OpcRM( int opcodeExtension, const Register* rm );
+void emitModRM_OpcRMReg( int opcodeExtension, const Register* rm );
 void emitModRM_RegReg( const Register* opcodeReg, const Register* rm );
 void emitModRMMemRipRelative( const Register* operandReg, void* globalPtr, int numAdditionalInstrBytes );
 void emitModRM_OpcRMMemRipRelative( int opcodeExtension, void* globalPtr, int numAdditionalInstrBytes );
@@ -750,95 +756,85 @@ generateCode()
           if ( doConst && x.isConst() && y.isConst() ) {
             operandStack.emplace_back( x._kind, x._value == y._value ? 1 : 0 );
           } else {
-            ConditionFlags flags = FlagE;
-            // Meet requirements for emitCmp:
-            // don't support addr in x or y.
-            //   TO DO: that shouldn't come up here anyway, but need to distinguish better between EqualI EqualP
-            operandKindAddrIntoReg( x );
-            operandKindAddrIntoReg( y );
-            // Only y can be const
-            if ( x.isConst() ) {
-              swap( x, y );
-              swapConditionFlag( flags );   // This is a no-op, just for consistency with other comparisons
-            }
-            // x and y may not both be in memory
-            if ( x.isMem() && y.isMem() ) {
-              operandIntoReg( x );
-            }
-            emitCmp( x, y );
-            operandStack.emplace_back( jit_Operand_Kind_Flags, flags );
+            operandStack.push_back( operandCompare( x, y, FlagE ) );
           }
           x.release();
           y.release();
         }
         break;
       case tNotEqualI : {
-          tCodeNotImplemented( tCodePc[-1] );
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
-          // The following is dummy code that all needs to be replaced.
-          operandIntoReg( x );
-          operandStack.push_back( x );
+          if ( doConst && x.isConst() && y.isConst() ) {
+            operandStack.emplace_back( x._kind, x._value != y._value ? 1 : 0 );
+          } else {
+            operandStack.push_back( operandCompare( x, y, FlagNE ) );
+          }
+          x.release();
           y.release();
         }
         break;
       case tGreaterI : {
-          tCodeNotImplemented( tCodePc[-1] );
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
-          // The following is dummy code that all needs to be replaced.
-          operandIntoReg( x );
-          operandStack.push_back( x );
+          if ( doConst && x.isConst() && y.isConst() ) {
+            operandStack.emplace_back( x._kind, x._value > y._value ? 1 : 0 );
+          } else {
+            operandStack.push_back( operandCompare( x, y, FlagG ) );
+          }
+          x.release();
           y.release();
         }
         break;
       case tLessI : {
-          tCodeNotImplemented( tCodePc[-1] );
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
-          // The following is dummy code that all needs to be replaced.
-          operandIntoReg( x );
-          operandStack.push_back( x );
+          if ( doConst && x.isConst() && y.isConst() ) {
+            operandStack.emplace_back( x._kind, x._value < y._value ? 1 : 0 );
+          } else {
+            operandStack.push_back( operandCompare( x, y, FlagL ) );
+          }
+          x.release();
           y.release();
         }
         break;
       case tGreaterEqualI : {
-          tCodeNotImplemented( tCodePc[-1] );
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
-          // The following is dummy code that all needs to be replaced.
-          operandIntoReg( x );
-          operandStack.push_back( x );
+          if ( doConst && x.isConst() && y.isConst() ) {
+            operandStack.emplace_back( x._kind, x._value >= y._value ? 1 : 0 );
+          } else {
+            operandStack.push_back( operandCompare( x, y, FlagGE ) );
+          }
+          x.release();
           y.release();
         }
         break;
       case tLessEqualI : {
-          tCodeNotImplemented( tCodePc[-1] );
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
-          // The following is dummy code that all needs to be replaced.
-          operandIntoReg( x );
-          operandStack.push_back( x );
+          if ( doConst && x.isConst() && y.isConst() ) {
+            operandStack.emplace_back( x._kind, x._value <= y._value ? 1 : 0 );
+          } else {
+            operandStack.push_back( operandCompare( x, y, FlagLE ) );
+          }
+          x.release();
           y.release();
         }
         break;
       case tEqualP : {
-          tCodeNotImplemented( tCodePc[-1] );
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
-          // The following is dummy code that all needs to be replaced.
-          operandIntoReg( x );
-          operandStack.push_back( x );
+          operandStack.push_back( operandCompare( x, y, FlagE ) );
+          x.release();
           y.release();
         }
         break;
       case tNotEqualP : {
-          tCodeNotImplemented( tCodePc[-1] );
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
-          // The following is dummy code that all needs to be replaced.
-          operandIntoReg( x );
-          operandStack.push_back( x );
+          operandStack.push_back( operandCompare( x, y, FlagNE ) );
+          x.release();
           y.release();
         }
         break;
@@ -886,25 +882,28 @@ generateCode()
         break;
       case tJump : {
           int label = *tCodePc++;
-          char* addr = findLabel( label );
-          emitJmp( addr );
-          if ( !addr ) {
-            requestPatch( (int*) ( nativePc - 4 ), label );
-          }
+          emitJmpToLabel( label );
         }
         break;
       case tJumpTrue : {
           Operand x = operandStack.back();   operandStack.pop_back();
           int label = *tCodePc++;
-          char* addr = findLabel( label );
-          if ( x.isFlags() ) {
-            ConditionFlags flags = x._flags;
-            emitJcc( addr, flags );
-            if ( !addr) {
-              requestPatch( (int*) ( nativePc - 4 ), label );
+          if ( x.isConst() ) {
+            if ( x._value ) {
+              // unconditional jump
+              emitJmpToLabel( label );
+            } else {
+              // unconditional no-op
             }
+          } else if ( x.isFlags() ) {
+            ConditionFlags flags = x._flags;
+            emitJccToLabel( label, flags );
           } else {
-            toDo( "tJumpTrue without flags\n" );
+            // x <> 0
+            Operand c( jit_Operand_Kind_ConstI, 0 );
+            Operand cmpOp = operandCompare( x, c, FlagNE );
+            // conditional jump
+            emitJccToLabel( label, FlagE );
           }
           x.release();
         }
@@ -912,16 +911,23 @@ generateCode()
       case tJumpFalse : {
           Operand x = operandStack.back();   operandStack.pop_back();
           int label = *tCodePc++;
-          char* addr = findLabel( label );
-          if ( x.isFlags() ) {
+          if ( x.isConst() ) {
+            if ( x._value ) {
+              // unconditional no-op
+            } else {
+              // unconditional jump
+              emitJmpToLabel( label );
+            }
+          } else if ( x.isFlags() ) {
             ConditionFlags flags = x._flags;
             negateConditionFlag( flags );
-            emitJcc( addr, flags );
-            if ( !addr) {
-              requestPatch( (int*) ( nativePc - 4 ), label );
-            }
+            emitJccToLabel( label, flags );
           } else {
-            toDo( "tJumpFalse without flags\n" );
+            // x <> 0
+            Operand c( jit_Operand_Kind_ConstI, 0 );
+            Operand cmpOp = operandCompare( x, c, FlagNE );
+            // conditional jump
+            emitJccToLabel( label, FlagNE );
           }
           x.release();
         }
@@ -1470,11 +1476,39 @@ operandExtendToP( Operand& x )
 
 
 void
-swap( Operand& x, Operand& y)
+swap( Operand& x, Operand& y )
 {
   Operand temp = x;
   x = y;
   y = temp;
+}
+
+
+// Generate a comparison of two operands.
+// The condition flags indicates what should be considered a true result.
+// Returns the result operand (which will usually be a Flags Operand).
+//
+Operand
+operandCompare( Operand& x, Operand& y, ConditionFlags flags )
+{
+  // emitCmp doesn't support addr in x or y.
+  operandKindAddrIntoReg( x );
+  operandKindAddrIntoReg( y );
+
+  // emitCmp doesn't support const in x.
+  if ( x.isConst() ) {
+    swap( x, y );
+    swapConditionFlag( flags );
+  }
+
+  // emitCmp doesn't allow both x and y in memory.
+  if ( x.isMem() && y.isMem() ) {
+    operandIntoReg( x );
+  }
+
+  emitCmp( x, y );
+
+  return Operand( jit_Operand_Kind_Flags, flags );
 }
 
 
@@ -1607,9 +1641,37 @@ emitCallExtern( char* addr )
 
   // call [reg]
   outB( 0xff );
-  emitModRM_OpcRM( 2, x._reg );
+  emitModRM_OpcRMReg( 2, x._reg );
 
   x.release();
+}
+
+
+// Emit an unconditional jump to the given label.
+// Will request patching of this instruction if the label address isn't known yet.
+//
+void
+emitJmpToLabel( int label )
+{
+  char* addr = findLabel( label );
+  emitJmp( addr );
+  if ( !addr) {
+    requestPatch( (int*) ( nativePc - 4 ), label );
+  }
+}
+
+
+// Emit a conditional jump to the given label.
+// Will request patching of this instruction if the label address isn't known yet.
+//
+void
+emitJccToLabel( int label, ConditionFlags flags )
+{
+  char* addr = findLabel( label );
+  emitJcc( addr, flags );
+  if ( !addr) {
+    requestPatch( (int*) ( nativePc - 4 ), label );
+  }
 }
 
 
@@ -1699,7 +1761,7 @@ emitAdd( const Operand& x, const Operand& y )
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ConstI ):
       emitRex( false, nullptr, x._reg );
       outB( 0x81 );
-      emitModRM_OpcRM( 0, x._reg );
+      emitModRM_OpcRMReg( 0, x._reg );
       outI( y._value );
       break;
 
@@ -1735,7 +1797,7 @@ emitAdd( const Operand& x, const Operand& y )
       // add reg64, immediate32 sign-extended to 64 bits
       emitRex( true, nullptr, x._reg );
       outB( 0x81 );
-      emitModRM_OpcRM( 0, x._reg );
+      emitModRM_OpcRMReg( 0, x._reg );
       outI( y._value );
       break;
 
@@ -1805,7 +1867,7 @@ emitSub( const Operand& x, const Operand& y )
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ConstI ):
       emitRex( false, nullptr, x._reg );
       outB( 0x81 );
-      emitModRM_OpcRM( 5, x._reg );
+      emitModRM_OpcRMReg( 5, x._reg );
       outI( y._value );
       break;
 
@@ -1840,7 +1902,7 @@ emitSub( const Operand& x, const Operand& y )
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ConstI ):
       emitRex( true, nullptr, x._reg );
       outB( 0x81 );
-      emitModRM_OpcRM( 5, x._reg );
+      emitModRM_OpcRMReg( 5, x._reg );
       outI( y._value );
       break;
 
@@ -1935,7 +1997,7 @@ emitShl( const Operand& x, const Operand& y )
       // shl reg32, immediate8
       emitRex( false, nullptr, x._reg );
       outB( 0xc1 );
-      emitModRM_OpcRM( 4, x._reg );
+      emitModRM_OpcRMReg( 4, x._reg );
       outB( y._value );
       break;
 
@@ -1973,44 +2035,173 @@ emitCmp( const Operand& x, const Operand& y )
       outI( y._value );
       break;
 
-
     case KindPair( jit_Operand_Kind_GlobalI, jit_Operand_Kind_RegI ):
+      // cmp [rip + offsetToGlobal], reg32
+      emitRex( false, y._reg, nullptr );
+      outB( 0x39 );
+      emitModRMMemRipRelative( y._reg, &data[x._value], 0 );
+      break;
+
     case KindPair( jit_Operand_Kind_GlobalP, jit_Operand_Kind_ConstI ):
+      // cmp [rip + offsetToGlobal], immediate32 sign-extended to 64 bits
+      emitRex( true, nullptr, nullptr );
+      outB( 0x81 );
+      emitModRM_OpcRMMemRipRelative( 7, &data[x._value], 4 );
+      outI( y._value );
+      break;
+
     case KindPair( jit_Operand_Kind_GlobalP, jit_Operand_Kind_RegP ):
+      // cmp [rip + offsetToGlobal], reg64
+      emitRex( true, y._reg, nullptr );
+      outB( 0x39 );
+      emitModRMMemRipRelative( y._reg, &data[x._value], 0 );
+      break;
 
     case KindPair( jit_Operand_Kind_LocalB, jit_Operand_Kind_ConstI ):
     case KindPair( jit_Operand_Kind_LocalB, jit_Operand_Kind_RegB ):
+      toDo( "emitCmp\n" );
+
     case KindPair( jit_Operand_Kind_LocalI, jit_Operand_Kind_ConstI ):
+      // cmp [rbp + x._value], immediate32
+      emitRex( false, nullptr, regRbp );
+      outB( 0x81 );
+      emitModRM_OpcRMMem( 7, regRbp, x._value );
+      outI( y._value );
+      break;
+
     case KindPair( jit_Operand_Kind_LocalI, jit_Operand_Kind_RegI ):
+      // cmp [rbp + x._value], reg32
+      emitRex( false, y._reg, regRbp );
+      outB( 0x39 );
+      emitModRMMem( y._reg, regRbp, x._value );
+      break;
+
     case KindPair( jit_Operand_Kind_LocalP, jit_Operand_Kind_ConstI ):
+      // cmp [rbp + x._value], immediate32 sign-extended to 64 bits
+      emitRex( true, nullptr, regRbp );
+      outB( 0x81 );
+      emitModRM_OpcRMMem( 7, regRbp, x._value );
+      outI( y._value );
+      break;
+
     case KindPair( jit_Operand_Kind_LocalP, jit_Operand_Kind_RegP ):
+      // cmp [rbp + x._value], reg64
+      emitRex( true, y._reg, regRbp );
+      outB( 0x39 );
+      emitModRMMem( y._reg, regRbp, x._value );
+      break;
 
     case KindPair( jit_Operand_Kind_ParamB, jit_Operand_Kind_ConstI ):
     case KindPair( jit_Operand_Kind_ParamB, jit_Operand_Kind_RegB ):
+      toDo( "emitCmp\n" );
+
     case KindPair( jit_Operand_Kind_ParamI, jit_Operand_Kind_ConstI ):
+      // cmp [rbp + x._value + FRAME_PARAMS_OFFSET], immediate32
+      emitRex( false, nullptr, regRbp );
+      outB( 0x81 );
+      emitModRM_OpcRMMem( 7, regRbp, x._value + FRAME_PARAMS_OFFSET );
+      outI( y._value );
+      break;
+
     case KindPair( jit_Operand_Kind_ParamI, jit_Operand_Kind_RegI ):
+      // cmp [rbp + x._value + FRAME_PARAMS_OFFSET], reg32
+      emitRex( false, y._reg, regRbp );
+      outB( 0x39 );
+      emitModRMMem( y._reg, regRbp, x._value + FRAME_PARAMS_OFFSET );
+      break;
+
     case KindPair( jit_Operand_Kind_ParamP, jit_Operand_Kind_ConstI ):
+      // cmp [rbp + x._value + FRAME_PARAMS_OFFSET], immediate32 sign-extended to 64 bits
+      emitRex( true, nullptr, regRbp );
+      outB( 0x81 );
+      emitModRM_OpcRMMem( 7, regRbp, x._value + FRAME_PARAMS_OFFSET );
+      outI( y._value );
+      break;
+
     case KindPair( jit_Operand_Kind_ParamP, jit_Operand_Kind_RegP ):
+      // cmp [rbp + x._value + FRAME_PARAMS_OFFSET], reg64
+      emitRex( true, y._reg, regRbp );
+      outB( 0x39 );
+      emitModRMMem( y._reg, regRbp, x._value + FRAME_PARAMS_OFFSET );
+      break;
 
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_GlobalB ):
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_LocalB ):
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_ParamB ):
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_ConstI ):
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_RegB ):
+      toDo( "emitCmp\n" );
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_GlobalI ):
+      // cmp reg32, [rip + offsetToGlobal]
+      emitRex( false, x._reg, nullptr );
+      outB( 0x3b );
+      emitModRMMemRipRelative( x._reg, &data[y._value], 0 );
+      break;
+
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_LocalI ):
+      // cmp reg32, [rbp + y.value]
+      emitRex( false, x._reg, regRbp );
+      outB( 0x3b );
+      emitModRMMem( x._reg, regRbp, y._value );
+      break;
+
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ParamI ):
+      // cmp reg32, [rbp + y.value + FRAME_PARAMS_OFFSET]
+      emitRex( false, x._reg, regRbp );
+      outB( 0x3b );
+      emitModRMMem( x._reg, regRbp, y._value + FRAME_PARAMS_OFFSET );
+      break;
+
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ConstI ):
+      // cmp reg32, immediate32
+      emitRex( false, nullptr, x._reg );
+      outB( 0x81 );
+      emitModRM_OpcRMReg( 7, x._reg );
+      outI( y._value );
+      break;
+
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_RegI ):
+      // cmp x_reg32, y_reg32
+      emitRex( false, x._reg, y._reg );
+      outB( 0x3b );
+      emitModRM_RegReg( x._reg, y._reg );
+      break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_GlobalP ):
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_LocalP ):
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ParamP ):
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ConstI ):
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegP ):
+      // cmp reg64, [rip + offsetToGlobal]
+      emitRex( true, x._reg, nullptr );
+      outB( 0x3b );
+      emitModRMMemRipRelative( x._reg, &data[y._value], 0 );
+      break;
 
-      toDo( "emitCmp\n" );
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_LocalP ):
+      // cmp reg64, [rbp + y.value]
+      emitRex( true, x._reg, regRbp );
+      outB( 0x3b );
+      emitModRMMem( x._reg, regRbp, y._value );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ParamP ):
+      // cmp reg64, [rbp + y.value + FRAME_PARAMS_OFFSET]
+      emitRex( true, x._reg, regRbp );
+      outB( 0x3b );
+      emitModRMMem( x._reg, regRbp, y._value + FRAME_PARAMS_OFFSET );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ConstI ):
+      // cmp reg64, immediate32 sign extended to 64 bits
+      emitRex( true, nullptr, x._reg );
+      outB( 0x81 );
+      emitModRM_OpcRMReg( 7, x._reg );
+      outI( y._value );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegP ):
+      // cmp x_reg64, y_reg64
+      emitRex( true, x._reg, y._reg );
+      outB( 0x3b );
+      emitModRM_RegReg( x._reg, y._reg );
       break;
 
     default:
@@ -2644,7 +2835,7 @@ emitModRM_OpcRMMemRipRelative( int opcodeExtension, void* globalPtr, int numAddi
 }
 
 
-// This form of ModR/M is used for an immediate register.
+// This form of ModR/M is used for an immediate register, not a memory reference.
 // opcodeExtension is a bit pattern specified for the instruction,
 // and is stored in the "Reg" field of ModR/M.    rm is a register stored in the "RM" field.
 // So, this form is only used for instructions that use one register.
@@ -2653,7 +2844,7 @@ emitModRM_OpcRMMemRipRelative( int opcodeExtension, void* globalPtr, int numAddi
 // to know which of these ModR/M encodings should be used.
 //
 void
-emitModRM_OpcRM( int opcodeExtension, const Register* rm )
+emitModRM_OpcRMReg( int opcodeExtension, const Register* rm )
 {
   // mod 11
   outB( 0xc0 | (opcodeExtension << 3) | regIdLowBits( rm->_nativeId ) );
