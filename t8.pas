@@ -137,10 +137,10 @@ BEGIN
   begin
     j := i;
     writeln( 'j is ', j );
-    //exit;
-    //cycle;
-    //exit;
-    //exit;
+    //break;
+    //continue;
+    //break;
+    //break;
   end;
 
   i := c1 + 2;
@@ -162,10 +162,8 @@ BEGIN
 
   for i := 1 to 9 do
     begin
-     (*
       if I = 3 then
-        cycle;
-      *)
+        continue;
       for j := 1 to 2 do
         a1[i][J,J] := i;
     end;

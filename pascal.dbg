@@ -1,4 +1,4 @@
-2222
+2223
 -1
 -1
 -1
@@ -55,6 +55,7 @@
 2
 2
 2
+-1
 -1
 -1
 -1
@@ -2393,18 +2394,18 @@
 773 doneLabel nLocal 241 2
 615 ForStmt nRule 4511
 776 decl nLocal 214 1
-777 exitLabel nLocal 241 2
+777 breakLabel nLocal 241 2
 779 checkLabel nLocal 241 3
-780 cycleLabel nLocal 241 4
+780 continueLabel nLocal 241 4
 617 RepeatStmt nRule 4685
-782 cycleLabel nLocal 241 1
-783 exitLabel nLocal 241 2
+782 continueLabel nLocal 241 1
+783 breakLabel nLocal 241 2
 785 falseLabel nLocal 241 3
 619 WhileStmt nRule 4765
-787 cycleLabel nLocal 241 1
-788 exitLabel nLocal 241 2
-621 CycleStmt nRule 4818
-623 ExitStmt nRule 4850
+787 continueLabel nLocal 241 1
+788 breakLabel nLocal 241 2
+621 ContinueStmt nRule 4818
+623 BreakStmt nRule 4850
 625 BeginStmt nRule 4882
 627 WritelnStmt nRule 4905
 629 WriteStmt nRule 4912

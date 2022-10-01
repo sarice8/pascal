@@ -15,6 +15,7 @@ title: 'Pascal Compiler 1.1.5 -- Jan 01 ''90';
 %    23Oct89   Fixed for statement, so CYCLE goes to next step.
 %    01Jan90   Added string literals
 %    09Sep22   I have returned.  Migrate symbol table to schema, to ease development.
+%    01Oct22   Language: Switch from cycle/exit (Mac Pascal extension) to continue/break (Borland).
 %
 %  NOTES
 %    -  The 'value' of a var symbol is its allocated address.
@@ -122,8 +123,8 @@ input:
    pWhile
    pRepeat
    pUntil
-   pCycle
-   pExit
+   pContinue
+   pBreak
    pReturn
    pAnd
    pOr
@@ -159,7 +160,7 @@ output:
    tAssignI          % assign int value on top of stack to addr under it (pop both)
    tAssignB          %   "    byte   "    "   "  "   "    "    "   "   "
    tAssignP          %   "    ptr    "    "   "  "   "    "    "   "   "
-   tCopy             % #words follows.  tos=src, 2nd=dest (pop 2)
+   tCopy             % <#bytes> - copy bytes.  tos=src, 2nd=dest (pop 2)
    tIncI             % increment int value on top of expr stack
    tDecI             % decrement int value on top of expr stack
    tMultI            % multiply top two integers (replacing with result)
@@ -383,9 +384,9 @@ mechanism string :
 
 % track labels for the loop we're in, if any
 mechanism loop_mech:
-   oLoopPush( Label cycleLabel, Label exitLabel )
-   oLoopCycleLabel >> Label
-   oLoopExitLabel >> Label
+   oLoopPush( Label continueLabel, Label breakLabel )
+   oLoopContinueLabel >> Label
+   oLoopBreakLabel >> Label
    oLoopPop
    ;
 
@@ -1746,8 +1747,8 @@ Statement:
       | pWhile :       @WhileStmt
       | pFor :         @ForStmt
       | pRepeat :      @RepeatStmt
-      | pExit :        @ExitStmt
-      | pCycle :       @CycleStmt
+      | pBreak :       @BreakStmt
+      | pContinue :    @ContinueStmt
       | pBegin :       @BeginStmt
       | pIdent :       @AssignOrCallStmt
       | * :            % null statement : don't accept any tokens
@@ -1922,16 +1923,16 @@ ForStmt:
    @RequireIntPop
    .tAssignI
 
-   Label exitLabel
-   exitLabel = oLabelNew
+   Label breakLabel
+   breakLabel = oLabelNew
 
    Label checkLabel
    checkLabel = oLabelNew
    .tJump  oEmitLabel( checkLabel )
 
-   Label cycleLabel
-   cycleLabel = oLabelNew
-   .tLabel  oEmitLabel( cycleLabel )
+   Label continueLabel
+   continueLabel = oLabelNew
+   .tLabel  oEmitLabel( continueLabel )
    [
       | pTo :
          @IncVar( decl )
@@ -1940,7 +1941,7 @@ ForStmt:
          @Expr
          @RequireIntPop
          .tGreaterI
-         .tJumpTrue  oEmitLabel( exitLabel )
+         .tJumpTrue  oEmitLabel( breakLabel )
       | pDownto :
          @DecVar( decl )
          .tLabel  oEmitLabel( checkLabel )
@@ -1948,25 +1949,25 @@ ForStmt:
          @Expr
          @RequireIntPop
          .tLessI
-         .tJumpTrue  oEmitLabel( exitLabel )
+         .tJumpTrue  oEmitLabel( breakLabel )
    ]
-   oLoopPush( cycleLabel, exitLabel )
+   oLoopPush( continueLabel, breakLabel )
    pDo
    @Statement
-   .tJump  oEmitLabel( cycleLabel )
-   .tLabel  oEmitLabel( exitLabel )
+   .tJump  oEmitLabel( continueLabel )
+   .tLabel  oEmitLabel( breakLabel )
    oLoopPop;
 
 
 RepeatStmt:
-   Label cycleLabel
-   cycleLabel = oLabelNew
-   .tLabel  oEmitLabel( cycleLabel )
+   Label continueLabel
+   continueLabel = oLabelNew
+   .tLabel  oEmitLabel( continueLabel )
 
-   Label exitLabel
-   exitLabel = oLabelNew
+   Label breakLabel
+   breakLabel = oLabelNew
 
-   oLoopPush( cycleLabel, exitLabel )
+   oLoopPush( continueLabel, breakLabel )
    @Statement
    {[
       | ';' :
@@ -1974,44 +1975,44 @@ RepeatStmt:
       | pUntil :
          Label falseLabel
          @BooleanExprControlFlow( falseLabel )
-         .tLabelAlias  oEmitLabel( falseLabel )  oEmitLabel( cycleLabel )
+         .tLabelAlias  oEmitLabel( falseLabel )  oEmitLabel( continueLabel )
          >
    ]}
-   .tLabel  oEmitLabel( exitLabel )
+   .tLabel  oEmitLabel( breakLabel )
    oLoopPop;
 
 
 WhileStmt:
-   Label cycleLabel
-   cycleLabel = oLabelNew
-   .tLabel  oEmitLabel( cycleLabel )
+   Label continueLabel
+   continueLabel = oLabelNew
+   .tLabel  oEmitLabel( continueLabel )
 
-   Label exitLabel
-   @BooleanExprControlFlow( exitLabel )
+   Label breakLabel
+   @BooleanExprControlFlow( breakLabel )
 
-   oLoopPush( cycleLabel, exitLabel )
+   oLoopPush( continueLabel, breakLabel )
    pDo
    @Statement
-   .tJump  oEmitLabel( cycleLabel )
-   .tLabel  oEmitLabel( exitLabel )
+   .tJump  oEmitLabel( continueLabel )
+   .tLabel  oEmitLabel( breakLabel )
    oLoopPop;
 
 
-CycleStmt:                     % NOTE, for repeat..until, skips test (??)
-   [ equal_label( oLoopCycleLabel, labelNull )
+ContinueStmt:                     % NOTE, for repeat..until, skips test (??)
+   [ equal_label( oLoopContinueLabel, labelNull )
       | true :
          #eNotInALoop
       | false :
-         .tJump  oEmitLabel( oLoopCycleLabel )
+         .tJump  oEmitLabel( oLoopContinueLabel )
    ];
 
 
-ExitStmt:
-   [ equal_label( oLoopExitLabel, labelNull )
+BreakStmt:
+   [ equal_label( oLoopBreakLabel, labelNull )
       | true :
          #eNotInALoop
       | false :
-         .tJump  oEmitLabel( oLoopExitLabel )
+         .tJump  oEmitLabel( oLoopBreakLabel )
    ];
 
 

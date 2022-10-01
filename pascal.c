@@ -132,8 +132,8 @@ int labelCount;
 // loop stack
 #define dLSsize 100
 struct {
-    int cycleLabel;
-    int exitLabel;
+    int continueLabel;
+    int breakLabel;
 } dLS[dLSsize];
 int dLSptr = 0;
 
@@ -296,8 +296,8 @@ struct ssl_token_table_struct my_keyword_table[] = {
   "while",              pWhile,
   "repeat",             pRepeat,
   "until",              pUntil,
-  "cycle",              pCycle,
-  "exit",               pExit,
+  "continue",           pContinue,
+  "break",              pBreak,
   "return",             pReturn,
   "and",                pAnd,
   "or",                 pOr,
@@ -785,19 +785,19 @@ NODE_PTR dNode;  // temporary for several mechanisms
             if ( ++dLSptr == dLSsize ) {
                 ssl_fatal("loop stack overflow");
             }
-            dLS[dLSptr].cycleLabel = ssl_argv(0, 2);
-            dLS[dLSptr].exitLabel = ssl_argv(1, 2);
+            dLS[dLSptr].continueLabel = ssl_argv(0, 2);
+            dLS[dLSptr].breakLabel = ssl_argv(1, 2);
             continue;
-     case oLoopCycleLabel:
+     case oLoopContinueLabel:
             if ( dLSptr > 0 ) {
-                ssl_result = dLS[dLSptr].cycleLabel;
+                ssl_result = dLS[dLSptr].continueLabel;
             } else {
                 ssl_result = 0;
             }
             continue;
-     case oLoopExitLabel:
+     case oLoopBreakLabel:
             if ( dLSptr > 0 ) {
-                ssl_result = dLS[dLSptr].cycleLabel;
+                ssl_result = dLS[dLSptr].breakLabel;
             } else {
                 ssl_result = 0;
             }

@@ -15,6 +15,7 @@
       %    23Oct89   Fixed for statement, so CYCLE goes to next step.
       %    01Jan90   Added string literals
       %    09Sep22   I have returned.  Migrate symbol table to schema, to ease development.
+      %    01Oct22   Language: Switch from cycle/exit (Mac Pascal extension) to continue/break (Borland).
       %
       %  NOTES
       %    -  The 'value' of a var symbol is its allocated address.
@@ -122,8 +123,8 @@
    2:    pWhile
    2:    pRepeat
    2:    pUntil
-   2:    pCycle
-   2:    pExit
+   2:    pContinue
+   2:    pBreak
    2:    pReturn
    2:    pAnd
    2:    pOr
@@ -159,7 +160,7 @@
    2:    tAssignI          % assign int value on top of stack to addr under it (pop both)
    2:    tAssignB          %   "    byte   "    "   "  "   "    "    "   "   "
    2:    tAssignP          %   "    ptr    "    "   "  "   "    "    "   "   "
-   2:    tCopy             % #words follows.  tos=src, 2nd=dest (pop 2)
+   2:    tCopy             % <#bytes> - copy bytes.  tos=src, 2nd=dest (pop 2)
    2:    tIncI             % increment int value on top of expr stack
    2:    tDecI             % decrement int value on top of expr stack
    2:    tMultI            % multiply top two integers (replacing with result)
@@ -440,9 +441,9 @@
       
       % track labels for the loop we're in, if any
    2: mechanism loop_mech:
-   2:    oLoopPush( Label cycleLabel, Label exitLabel )
-   2:    oLoopCycleLabel >> Label
-   2:    oLoopExitLabel >> Label
+   2:    oLoopPush( Label continueLabel, Label breakLabel )
+   2:    oLoopContinueLabel >> Label
+   2:    oLoopBreakLabel >> Label
    2:    oLoopPop
    2:    ;
       
@@ -1803,8 +1804,8 @@
 3973:       | pWhile :       @WhileStmt
 3977:       | pFor :         @ForStmt
 3981:       | pRepeat :      @RepeatStmt
-3985:       | pExit :        @ExitStmt
-3989:       | pCycle :       @CycleStmt
+3985:       | pBreak :       @BreakStmt
+3989:       | pContinue :    @ContinueStmt
 3993:       | pBegin :       @BeginStmt
 3997:       | pIdent :       @AssignOrCallStmt
 4001:       | * :            % null statement : don't accept any tokens
@@ -1979,16 +1980,16 @@
 4533:    @RequireIntPop
 4535:    .tAssignI
       
-4537:    Label exitLabel
-4537:    exitLabel = oLabelNew
+4537:    Label breakLabel
+4537:    breakLabel = oLabelNew
       
 4542:    Label checkLabel
 4542:    checkLabel = oLabelNew
 4547:    .tJump  oEmitLabel( checkLabel )
       
-4555:    Label cycleLabel
-4555:    cycleLabel = oLabelNew
-4560:    .tLabel  oEmitLabel( cycleLabel )
+4555:    Label continueLabel
+4555:    continueLabel = oLabelNew
+4560:    .tLabel  oEmitLabel( continueLabel )
 4568:    [
 4568:       | pTo :
 4570:          @IncVar( decl )
@@ -1997,7 +1998,7 @@
 4593:          @Expr
 4595:          @RequireIntPop
 4597:          .tGreaterI
-4599:          .tJumpTrue  oEmitLabel( exitLabel )
+4599:          .tJumpTrue  oEmitLabel( breakLabel )
 4607:       | pDownto :
 4609:          @DecVar( decl )
 4616:          .tLabel  oEmitLabel( checkLabel )
@@ -2005,25 +2006,25 @@
 4632:          @Expr
 4634:          @RequireIntPop
 4636:          .tLessI
-4638:          .tJumpTrue  oEmitLabel( exitLabel )
+4638:          .tJumpTrue  oEmitLabel( breakLabel )
 4646:    ]
-4654:    oLoopPush( cycleLabel, exitLabel )
+4654:    oLoopPush( continueLabel, breakLabel )
 4663:    pDo
 4665:    @Statement
-4667:    .tJump  oEmitLabel( cycleLabel )
-4675:    .tLabel  oEmitLabel( exitLabel )
+4667:    .tJump  oEmitLabel( continueLabel )
+4675:    .tLabel  oEmitLabel( breakLabel )
 4683:    oLoopPop;
       
       
 4685: RepeatStmt:
-4687:    Label cycleLabel
-4687:    cycleLabel = oLabelNew
-4692:    .tLabel  oEmitLabel( cycleLabel )
+4687:    Label continueLabel
+4687:    continueLabel = oLabelNew
+4692:    .tLabel  oEmitLabel( continueLabel )
       
-4700:    Label exitLabel
-4700:    exitLabel = oLabelNew
+4700:    Label breakLabel
+4700:    breakLabel = oLabelNew
       
-4705:    oLoopPush( cycleLabel, exitLabel )
+4705:    oLoopPush( continueLabel, breakLabel )
 4714:    @Statement
 4716:    {[
 4716:       | ';' :
@@ -2031,44 +2032,44 @@
 4720:       | pUntil :
 4722:          Label falseLabel
 4722:          @BooleanExprControlFlow( falseLabel )
-4729:          .tLabelAlias  oEmitLabel( falseLabel )  oEmitLabel( cycleLabel )
+4729:          .tLabelAlias  oEmitLabel( falseLabel )  oEmitLabel( continueLabel )
 4743:          >
 4745:    ]}
-4755:    .tLabel  oEmitLabel( exitLabel )
+4755:    .tLabel  oEmitLabel( breakLabel )
 4763:    oLoopPop;
       
       
 4765: WhileStmt:
-4767:    Label cycleLabel
-4767:    cycleLabel = oLabelNew
-4772:    .tLabel  oEmitLabel( cycleLabel )
+4767:    Label continueLabel
+4767:    continueLabel = oLabelNew
+4772:    .tLabel  oEmitLabel( continueLabel )
       
-4780:    Label exitLabel
-4780:    @BooleanExprControlFlow( exitLabel )
+4780:    Label breakLabel
+4780:    @BooleanExprControlFlow( breakLabel )
       
-4787:    oLoopPush( cycleLabel, exitLabel )
+4787:    oLoopPush( continueLabel, breakLabel )
 4796:    pDo
 4798:    @Statement
-4800:    .tJump  oEmitLabel( cycleLabel )
-4808:    .tLabel  oEmitLabel( exitLabel )
+4800:    .tJump  oEmitLabel( continueLabel )
+4808:    .tLabel  oEmitLabel( breakLabel )
 4816:    oLoopPop;
       
       
-4818: CycleStmt:                     % NOTE, for repeat..until, skips test (??)
-4820:    [ equal_label( oLoopCycleLabel, labelNull )
+4818: ContinueStmt:                     % NOTE, for repeat..until, skips test (??)
+4820:    [ equal_label( oLoopContinueLabel, labelNull )
 4829:       | true :
 4830:          #eNotInALoop
 4832:       | false :
-4834:          .tJump  oEmitLabel( oLoopCycleLabel )
+4834:          .tJump  oEmitLabel( oLoopContinueLabel )
 4841:    ];
       
       
-4850: ExitStmt:
-4852:    [ equal_label( oLoopExitLabel, labelNull )
+4850: BreakStmt:
+4852:    [ equal_label( oLoopBreakLabel, labelNull )
 4861:       | true :
 4862:          #eNotInALoop
 4864:       | false :
-4866:          .tJump  oEmitLabel( oLoopExitLabel )
+4866:          .tJump  oEmitLabel( oLoopBreakLabel )
 4873:    ];
       
       
@@ -5278,7 +5279,7 @@ Generated code:
 4816: oLoopPop
 4817: oReturn
 4818: oLocalSpace 0
-4820: oLoopCycleLabel
+4820: oLoopContinueLabel
 4821: oPushResult
 4822: oSetResult 0
 4824: oPushResult
@@ -5288,7 +5289,7 @@ Generated code:
 4830: oError 18
 4832: oJumpForward 4849
 4834: oEmit 43
-4836: oLoopCycleLabel
+4836: oLoopContinueLabel
 4837: oPushResult
 4838: oEmitLabel
 4839: oPop 1
@@ -5299,7 +5300,7 @@ Generated code:
 4848: oEndChoice
 4849: oReturn
 4850: oLocalSpace 0
-4852: oLoopExitLabel
+4852: oLoopBreakLabel
 4853: oPushResult
 4854: oSetResult 0
 4856: oPushResult
@@ -5309,7 +5310,7 @@ Generated code:
 4862: oError 18
 4864: oJumpForward 4881
 4866: oEmit 43
-4868: oLoopExitLabel
+4868: oLoopBreakLabel
 4869: oPushResult
 4870: oEmitLabel
 4871: oPop 1

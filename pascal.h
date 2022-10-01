@@ -74,8 +74,8 @@
 #define pWhile 46
 #define pRepeat 47
 #define pUntil 48
-#define pCycle 49
-#define pExit 50
+#define pContinue 49
+#define pBreak 50
 #define pReturn 51
 #define pAnd 52
 #define pOr 53
@@ -296,8 +296,8 @@
 #define oValuePop 88
 #define oStringAllocLit 89
 #define oLoopPush 90
-#define oLoopCycleLabel 91
-#define oLoopExitLabel 92
+#define oLoopContinueLabel 91
+#define oLoopBreakLabel 92
 #define oLoopPop 93
 #define oMsg 94
 #define oMsgTrace 95

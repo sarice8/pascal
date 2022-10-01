@@ -406,6 +406,8 @@ void emitAdd( const Operand& x, const Operand& y );
 void emitSub( const Operand& x, const Operand& y );
 void emitMult( const Operand& x, const Operand& y );
 void emitShl( const Operand& x, const Operand& y );
+void emitInc( const Operand& x );
+void emitDec( const Operand& x );
 void emitCmp( const Operand& x, const Operand& y );
 void emitMov( const Operand& x, const Operand& y );
 
@@ -851,20 +853,51 @@ generateCode()
         }
         break;
       case tCopy : {
-          tCodeNotImplemented( tCodePc[-1] );
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
-          tCodePc++;
+          int bytes = *tCodePc++;
+          // copy bytes to dest=x from src=y
+          // rep movsb needs particular registers.  rdi = dest, rsi = src, ecx = bytes
+          operandIntoSpecificReg( x, regRdi, 8 );
+          operandIntoSpecificReg( y, regRsi, 8 );
+          forceAllocateReg( regRcx );
+          Operand countReg( jit_Operand_Kind_RegI, regRcx );
+          Operand countConst( jit_Operand_Kind_ConstI, bytes );
+          emitMov( countReg, countConst );
+          outB( 0xf3 );  // rep
+          outB( 0xa4 );  // movsb
+          // note rep movsb advances forwards or backwards depending on direction flag
+          // (controlled by cld or std).  But the convention on windows at least is
+          // that direction flag is always cleared (forwards) by the system & around interrupts.
+          // Assume linux is same.  So I should be able to count on that.
+          countReg.release();
           x.release();
           y.release();
         }
         break;
       case tIncI : {
-          tCodeNotImplemented( tCodePc[-1] );
+          Operand x = operandStack.back();  operandStack.pop_back();
+          if ( x.isConst() ) {
+            operandStack.emplace_back( jit_Operand_Kind_ConstI, x._value + 1 );
+          } else {
+            // x must be a regiser.  This is because I defined tInc to operate on
+            // the top value in the expression stack, so can't inc a variable directly.
+            operandIntoReg( x );
+            emitInc( x );
+            operandStack.push_back( x );
+          }
         }
         break;
       case tDecI : {
-          tCodeNotImplemented( tCodePc[-1] );
+          Operand x = operandStack.back();  operandStack.pop_back();
+          if ( x.isConst() ) {
+            operandStack.emplace_back( jit_Operand_Kind_ConstI, x._value - 1 );
+          } else {
+            // x must be a register (see tInc).
+            operandIntoReg( x );
+            emitDec( x );
+            operandStack.push_back( x );
+          }
         }
         break;
       case tMultI : {
@@ -2159,6 +2192,63 @@ emitShl( const Operand& x, const Operand& y )
   }
 }
 
+
+// ++x
+// x is a register.
+//
+void
+emitInc( const Operand& x )
+{
+  switch ( x._kind ) {
+
+    case jit_Operand_Kind_RegB:
+      // inc reg8
+      emit( Instr( 0xfe ).opc( 0 ).rmReg( x._reg ) );
+      break;
+
+    case jit_Operand_Kind_RegI:
+      // inc reg32
+      emit( Instr( 0xff ).opc( 0 ).rmReg( x._reg ) );
+      break;
+
+    case jit_Operand_Kind_RegP:
+      // inc reg64
+      emit( Instr( 0xff ).w().opc( 0 ).rmReg( x._reg ) );
+      break;
+
+    default:
+      fatal( "emitInc: unexpected operands\n" );
+  }
+}
+
+
+// --x
+// x is a register.
+//
+void
+emitDec( const Operand& x )
+{
+  switch ( x._kind ) {
+
+    case jit_Operand_Kind_RegB:
+      // dec reg8
+      emit( Instr( 0xfe ).opc( 1 ).rmReg( x._reg ) );
+      break;
+
+    case jit_Operand_Kind_RegI:
+      // dec reg32
+      emit( Instr( 0xff ).opc( 1 ).rmReg( x._reg ) );
+      break;
+
+    case jit_Operand_Kind_RegP:
+      // dec reg64
+      emit( Instr( 0xff ).w().opc( 1 ).rmReg( x._reg ) );
+      break;
+
+    default:
+      fatal( "emitDec: unexpected operands\n" );
+  }
+}
 
 
 // Compare x and y
