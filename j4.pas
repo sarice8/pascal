@@ -5,6 +5,8 @@ program test (input, output);
 var I1: integer;
 var I2: integer;
 var I3: integer;
+var B1: boolean;
+var B2: boolean;
 
 begin
 
@@ -14,6 +16,11 @@ begin
 
   if I1 = 0 then
     writeln( 'Hello' );
+
+  B1 := I1 < 3;
+  writeln( 'B1 = ', B1 );
+  B1 := not ( I1 < 3 );
+  writeln( 'B1 = ', B1 );
 
   if ( ( I1 < 3 ) and ( I2 > 10 ) and ( I1 <> I2 ) ) then
     I3 := 100

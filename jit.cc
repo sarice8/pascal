@@ -7,6 +7,27 @@
 
 */
 
+/*
+
+BUGS
+
+I have these problems.
+
+  var B1: boolean;
+  var I1, I2: integer;
+  B1 := I1 < I3;
+  writeln( B1 );
+
+  - Reading byte var from B1 is generating mov into bh
+    Seems the encoding is messed up for 8-bit regs.
+    Need to review how to indicate the proper set, including r8-r15.
+    Probably this is affected by not needing byte reg codes for rbp etc.
+
+
+*/
+
+
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -368,6 +389,7 @@ void operandNotMem( Operand& x );
 void operandDeref( Operand& x, int valueSize );
 void operandExtendToP( Operand& x );
 Operand operandCompare( Operand& x, Operand& y, ConditionFlags flags );
+void operandFlagsToValue( Operand& x, int size );
 
 Register* allocateReg();
 void forceAllocateReg( Register* reg );
@@ -409,6 +431,7 @@ void emitShl( const Operand& x, const Operand& y );
 void emitInc( const Operand& x );
 void emitDec( const Operand& x );
 void emitCmp( const Operand& x, const Operand& y );
+void emitSet( const Operand& x, ConditionFlags flags );
 void emitMov( const Operand& x, const Operand& y );
 
 void emitRex( bool overrideWidth, const Register* operandReg, const Register* baseReg );
@@ -829,6 +852,8 @@ generateCode()
       case tAssignB : {
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
+          // allow for y being flags
+          operandFlagsToValue( y, 1 );
           // x is a pointer to a value of size 1.
           // Make x refer to the pointed-to value (still usable as target of mov)
           operandDeref( x, 1 );
@@ -993,7 +1018,23 @@ generateCode()
         }
         break;
       case tNot : {
-          tCodeNotImplemented( tCodePc[-1] );
+          Operand x = operandStack.back();   operandStack.pop_back();
+          if ( doConst && x.isConst() ) {
+            operandStack.emplace_back( x._kind, x._value == 0 ? 1 : 0 );
+          } else if ( x.isFlags() ) {
+            ConditionFlags flags = x._flags;
+            negateConditionFlag( flags );
+            operandStack.emplace_back( jit_Operand_Kind_Flags, flags );
+          } else {
+            // x = 0  (leaving result in flags)
+            Operand zero( jit_Operand_Kind_ConstI, 0 );
+            Operand result = operandCompare( x, zero, FlagE );
+            x.release();
+            // Oh, but subsequent expr instructions might not be prepared to see Flags yet.
+            // I might be obligated to produce 0/1 for now.
+            operandFlagsToValue( result, 1 );
+            operandStack.push_back( result );
+          }
         }
         break;
       case tEqualI : {
@@ -1758,6 +1799,35 @@ operandCompare( Operand& x, Operand& y, ConditionFlags flags )
 }
 
 
+// If x is a Flags operand, covert it to a 0/1 value.
+// Given the byte size of the value we want.
+//
+void
+operandFlagsToValue( Operand& x, int size )
+{
+  if ( x.isFlags() ) {
+    jitOperandKind kind = jit_Operand_Kind_Illegal;
+    switch ( size ) {
+      case 1:
+        kind = jit_Operand_Kind_RegB;
+        break;
+      case 4:
+        kind = jit_Operand_Kind_RegI;
+        break;
+      case 8:
+        kind = jit_Operand_Kind_RegP;
+        break;
+      default:
+        fatal( "operandFlagsToValue: unexpected size\n" );
+    }
+
+    Operand result = Operand( kind, allocateReg() );
+    emitSet( result, x._flags );
+    x = result;
+  }
+}
+
+
 // ----------------------------------------------------------------------------
 //
 // x86 Operations
@@ -2397,6 +2467,38 @@ emitCmp( const Operand& x, const Operand& y )
 }
 
 
+// set x to 1 or 0, according to the current condition flags.
+// flags indicates which condition should produce 1.
+// x is a register.
+//
+void
+emitSet( const Operand& x, ConditionFlags flags )
+{
+  switch ( x._kind ) {
+    case jit_Operand_Kind_RegB:
+      // set<cc> x_reg8
+      // Note the set opcode is aligned with the condition codes.
+      // Note this instruction is unusual in that the reg field of ModR/M is unused and ignored.
+      emit( Instr( 0x0f, 0x10 + (int)flags ).rmReg( x._reg ) );
+      break;
+    case jit_Operand_Kind_RegI:
+      // set<cc> x_reg8  -- this sets only a byte value
+      emit( Instr( 0x0f, 0x10 + (int)flags ).rmReg( x._reg ) );
+      // movsx x_reg32, x_reg8  -- sign extend to 32 bits
+      emit( Instr( 0x0f, 0xbe ).reg( x._reg ).rmReg( x._reg ) );
+      break;   
+    case jit_Operand_Kind_RegP:
+      // set<cc> x_reg8  -- this sets only a byte value
+      emit( Instr( 0x0f, 0x10 + (int)flags ).rmReg( x._reg ) );
+      // movsx x_reg64, x_reg8  -- sign extend to 64 bits
+      emit( Instr( 0x0f, 0xbe ).w().reg( x._reg ).rmReg( x._reg ) );
+      break;
+    default:
+      fatal( "emitSet: unexpected operands\n" );
+  }
+}
+
+
 // x = y
 // x and y are not both memory references.
 //
@@ -2922,10 +3024,12 @@ emitModRM_OpcRMReg( int opcodeExtension, const Register* rm )
 
 
 void
-emitModRM_RegReg( const Register* opcodeReg, const Register* rm )
+emitModRM_RegReg( const Register* reg, const Register* rmReg )
 {
   // mod 11
-  outB( 0xc0 | ( regIdLowBits( opcodeReg->_nativeId ) << 3) | regIdLowBits( rm->_nativeId ) );
+  // There are some rare instructions where the reg field is unused and ignored (e.g. set<cc>).
+  // So allow for reg == nullptr.
+  outB( 0xc0 | ( regIdLowBits( reg ? reg->_nativeId : 0 ) << 3) | regIdLowBits( rmReg->_nativeId ) );
 }
 
 
