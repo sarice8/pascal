@@ -10,6 +10,7 @@ begin
 
   I1 := 0;
   I2 := 0;
+  I3 := I1 + I2;
 
   if I1 = 0 then
     writeln( 'Hello' );

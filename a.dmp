@@ -1,77 +1,904 @@
    0	tCall	   1
    2	tReturn
-   3	tLabel	   1
-   5	tEnter	   0
-   7	tPushAddrGlobal	   8
-   9	tPushConstI	   0
+   3	tLabel	   2
+   5	tEnter	   4
+   7	tPushAddrGlobal	 384
+   9	tPushParamI	   0
   11	tAssignI
-  12	tPushAddrGlobal	  12
-  14	tPushConstI	   0
+  12	tPushAddrGlobal	 384
+  14	tPushParamI	   4
   16	tAssignI
-  17	tPushGlobalI	   8
-  19	tPushConstI	   0
-  21	tEqualI
-  22	tJumpFalse	   2
-  24	tPushAddrGlobal	  20
-  26	tWriteStr
-  27	tWriteCR
-  28	tLabel	   2
-  30	tPushGlobalI	   8
-  32	tPushConstI	   3
-  34	tLessI
-  35	tJumpFalse	   3
-  37	tLabelAlias	   3	   4
-  40	tPushGlobalI	  12
-  42	tPushConstI	  10
-  44	tGreaterI
-  45	tJumpFalse	   5
-  47	tLabelAlias	   5	   4
-  50	tPushGlobalI	   8
-  52	tPushGlobalI	  12
-  54	tNotEqualI
-  55	tJumpFalse	   6
-  57	tLabelAlias	   6	   4
-  60	tPushAddrGlobal	  16
-  62	tPushConstI	 100
-  64	tAssignI
-  65	tJump	   7
-  67	tLabel	   4
-  69	tPushAddrGlobal	  16
-  71	tPushConstI	 200
-  73	tAssignI
-  74	tLabel	   7
-  76	tLabel	   8
-  78	tPushGlobalI	   8
-  80	tPushConstI	   5
-  82	tLessI
-  83	tJumpFalse	   9
-  85	tPushAddrGlobal	  26
-  87	tWriteStr
-  88	tPushGlobalI	   8
-  90	tWriteI
-  91	tWriteCR
-  92	tPushAddrGlobal	   8
-  94	tPushGlobalI	   8
-  96	tPushConstI	   1
-  98	tAddI
-  99	tAssignI
- 100	tJump	   8
- 102	tLabel	   9
- 104	tLabel	  10
- 106	tPushAddrGlobal	   8
- 108	tPushGlobalI	   8
- 110	tPushConstI	   1
- 112	tSubI
- 113	tAssignI
- 114	tPushAddrGlobal	  32
- 116	tWriteStr
- 117	tPushGlobalI	   8
- 119	tWriteI
- 120	tWriteCR
- 121	tPushGlobalI	   8
- 123	tPushConstI	   0
- 125	tLessI
- 126	tJumpFalse	  12
- 128	tLabelAlias	  12	  10
- 131	tLabel	  11
- 133	tReturn
+  17	tPushAddrGlobal	 384
+  19	tPushParamI	   8
+  21	tAssignI
+  22	tPushAddrGlobal	 388
+  24	tWriteStr
+  25	tWriteCR
+  26	tPushAddrGlobal	 405
+  28	tWriteStr
+  29	tPushGlobalI	 384
+  31	tWriteI
+  32	tWriteCR
+  33	tPushAddrLocal	  -4
+  35	tPushParamI	   0
+  37	tPushParamI	   4
+  39	tAddI
+  40	tPushParamI	   8
+  42	tAddI
+  43	tAssignI
+  44	tPushAddrGlobal	 415
+  46	tWriteStr
+  47	tPushParamI	   0
+  49	tWriteI
+  50	tWriteCR
+  51	tPushAddrGlobal	 423
+  53	tWriteStr
+  54	tPushParamI	   4
+  56	tWriteI
+  57	tWriteCR
+  58	tPushAddrGlobal	 431
+  60	tWriteStr
+  61	tPushParamI	   8
+  63	tWriteI
+  64	tWriteCR
+  65	tPushAddrGlobal	 439
+  67	tWriteStr
+  68	tPushLocalI	  -4
+  70	tWriteI
+  71	tWriteCR
+  72	tReturn
+  73	tLabel	   3
+  75	tEnter	  16
+  77	tPushAddrGlobal	 450
+  79	tWriteStr
+  80	tWriteCR
+  81	tPushAddrParam	   0
+  83	tPushParamI	   0
+  85	tPushConstI	1000
+  87	tAddI
+  88	tAssignI
+  89	tPushParamP	   4
+  91	tPushParamP	   4
+  93	tFetchI
+  94	tPushConstI	2000
+  96	tAddI
+  97	tAssignI
+  98	tPushParamP	  12
+ 100	tPushParamP	  12
+ 102	tFetchI
+ 103	tPushConstI	3000
+ 105	tAddI
+ 106	tAssignI
+ 107	tPushAddrParam	  20
+ 109	tPushParamI	  20
+ 111	tPushConstI	4000
+ 113	tAddI
+ 114	tAssignI
+ 115	tPushAddrGlobal	 467
+ 117	tWriteStr
+ 118	tPushParamI	   0
+ 120	tWriteI
+ 121	tWriteCR
+ 122	tPushAddrGlobal	 475
+ 124	tWriteStr
+ 125	tPushParamP	   4
+ 127	tFetchI
+ 128	tWriteI
+ 129	tWriteCR
+ 130	tPushAddrGlobal	 483
+ 132	tWriteStr
+ 133	tPushParamP	  12
+ 135	tFetchI
+ 136	tWriteI
+ 137	tWriteCR
+ 138	tPushAddrGlobal	 491
+ 140	tWriteStr
+ 141	tPushParamI	  20
+ 143	tWriteI
+ 144	tWriteCR
+ 145	tPushAddrLocal	 -16
+ 147	tPushParamI	   0
+ 149	tAssignI
+ 150	tPushAddrLocal	 -16
+ 152	tPushConstI	   4
+ 154	tAddPI
+ 155	tPushParamP	   4
+ 157	tFetchI
+ 158	tAssignI
+ 159	tPushAddrLocal	 -16
+ 161	tPushConstI	   8
+ 163	tAddPI
+ 164	tPushParamP	  12
+ 166	tFetchI
+ 167	tAssignI
+ 168	tPushParamP	  24
+ 170	tPushAddrLocal	 -16
+ 172	tCopy	  16
+ 174	tReturn
+ 175	tLabel	   4
+ 177	tEnter	  16
+ 179	tPushAddrLocal	 -16
+ 181	tPushParamI	   0
+ 183	tAssignI
+ 184	tPushAddrLocal	 -16
+ 186	tPushConstI	   4
+ 188	tAddPI
+ 189	tPushParamI	   4
+ 191	tAssignI
+ 192	tPushAddrLocal	 -16
+ 194	tPushConstI	   8
+ 196	tAddPI
+ 197	tPushParamI	   0
+ 199	tAssignI
+ 200	tPushParamP	   8
+ 202	tPushAddrLocal	 -16
+ 204	tFetchI
+ 205	tPushAddrLocal	 -16
+ 207	tPushConstI	   4
+ 209	tAddPI
+ 210	tFetchI
+ 211	tAddI
+ 212	tPushAddrLocal	 -16
+ 214	tPushConstI	   8
+ 216	tAddPI
+ 217	tFetchI
+ 218	tAddI
+ 219	tAssignI
+ 220	tReturn
+ 221	tLabel	   1
+ 223	tEnter	   4
+ 225	tPushAddrGlobal	 499
+ 227	tWriteStr
+ 228	tWriteCR
+ 229	tPushAddrGlobal	 296
+ 231	tAllocActuals	  16
+ 233	tPushAddrActual	   0
+ 235	tPushConstI	  10
+ 237	tAssignI
+ 238	tPushAddrActual	   4
+ 240	tPushConstI	  20
+ 242	tAssignI
+ 243	tPushAddrActual	   8
+ 245	tPushAddrLocal	  -4
+ 247	tAssignP
+ 248	tCall	   4
+ 250	tPushAddrLocal	  -4
+ 252	tFetchI
+ 253	tFreeActuals	  16
+ 255	tAssignI
+ 256	tPushAddrGlobal	 510
+ 258	tWriteStr
+ 259	tPushGlobalI	 296
+ 261	tWriteI
+ 262	tWriteCR
+ 263	tPushAddrGlobal	 524
+ 265	tWriteStr
+ 266	tWriteCR
+ 267	tAllocActuals	  12
+ 269	tPushAddrActual	   0
+ 271	tPushConstI	 100
+ 273	tAssignI
+ 274	tPushAddrActual	   4
+ 276	tPushConstI	 200
+ 278	tAssignI
+ 279	tPushAddrActual	   8
+ 281	tPushConstI	 300
+ 283	tAssignI
+ 284	tCall	   2
+ 286	tFreeActuals	  12
+ 288	tAllocActuals	  12
+ 290	tPushAddrActual	   0
+ 292	tPushConstI	 400
+ 294	tAssignI
+ 295	tPushAddrActual	   4
+ 297	tPushConstI	 500
+ 299	tAssignI
+ 300	tPushAddrActual	   8
+ 302	tPushConstI	 600
+ 304	tAssignI
+ 305	tCall	   2
+ 307	tFreeActuals	  12
+ 309	tPushAddrGlobal	 296
+ 311	tPushConstI	   5
+ 313	tAssignI
+ 314	tPushAddrGlobal	 300
+ 316	tPushConstI	  10
+ 318	tAssignI
+ 319	tAllocActuals	  32
+ 321	tPushAddrActual	   0
+ 323	tPushConstI	   1
+ 325	tAssignI
+ 326	tPushAddrActual	   4
+ 328	tPushAddrGlobal	 296
+ 330	tAssignP
+ 331	tPushAddrActual	  12
+ 333	tPushAddrGlobal	 300
+ 335	tAssignP
+ 336	tPushAddrActual	  20
+ 338	tPushConstI	   4
+ 340	tAssignI
+ 341	tPushAddrActual	  24
+ 343	tPushAddrGlobal	 316
+ 345	tAssignP
+ 346	tCall	   3
+ 348	tFreeActuals	  32
+ 350	tAllocActuals	  32
+ 352	tPushAddrActual	   0
+ 354	tPushConstI	   1
+ 356	tAssignI
+ 357	tPushAddrActual	   4
+ 359	tPushAddrGlobal	 296
+ 361	tAssignP
+ 362	tPushAddrActual	  12
+ 364	tPushAddrGlobal	 300
+ 366	tAssignP
+ 367	tPushAddrActual	  20
+ 369	tPushConstI	   4
+ 371	tAssignI
+ 372	tPushAddrActual	  24
+ 374	tPushAddrGlobal	 316
+ 376	tAssignP
+ 377	tCall	   3
+ 379	tFreeActuals	  32
+ 381	tPushAddrGlobal	 535
+ 383	tWriteStr
+ 384	tPushGlobalI	 296
+ 386	tWriteI
+ 387	tPushAddrGlobal	 553
+ 389	tWriteStr
+ 390	tPushGlobalI	 300
+ 392	tWriteI
+ 393	tWriteCR
+ 394	tPushAddrGlobal	 559
+ 396	tWriteStr
+ 397	tPushAddrGlobal	 316
+ 399	tFetchI
+ 400	tWriteI
+ 401	tPushAddrGlobal	 571
+ 403	tWriteStr
+ 404	tPushAddrGlobal	 316
+ 406	tPushConstI	   4
+ 408	tAddPI
+ 409	tFetchI
+ 410	tWriteI
+ 411	tPushAddrGlobal	 581
+ 413	tWriteStr
+ 414	tPushAddrGlobal	 316
+ 416	tPushConstI	   8
+ 418	tAddPI
+ 419	tFetchI
+ 420	tWriteI
+ 421	tWriteCR
+ 422	tPushAddrGlobal	 591
+ 424	tWriteStr
+ 425	tWriteCR
+ 426	tPushAddrGlobal	 316
+ 428	tPushConstI	   1
+ 430	tAssignI
+ 431	tPushAddrGlobal	 316
+ 433	tPushConstI	   4
+ 435	tAddPI
+ 436	tPushConstI	   2
+ 438	tAssignI
+ 439	tPushAddrGlobal	 316
+ 441	tPushConstI	   8
+ 443	tAddPI
+ 444	tPushConstI	   3
+ 446	tAssignI
+ 447	tPushAddrGlobal	 316
+ 449	tPushConstI	  12
+ 451	tAddPI
+ 452	tPushConstI	   4
+ 454	tAssignI
+ 455	tPushAddrGlobal	 332
+ 457	tPushAddrGlobal	 316
+ 459	tCopy	  16
+ 461	tPushAddrGlobal	 604
+ 463	tWriteStr
+ 464	tPushAddrGlobal	 316
+ 466	tFetchI
+ 467	tWriteI
+ 468	tPushAddrGlobal	 316
+ 470	tPushConstI	   4
+ 472	tAddPI
+ 473	tFetchI
+ 474	tWriteI
+ 475	tPushAddrGlobal	 316
+ 477	tPushConstI	   8
+ 479	tAddPI
+ 480	tFetchI
+ 481	tWriteI
+ 482	tPushAddrGlobal	 316
+ 484	tPushConstI	  12
+ 486	tAddPI
+ 487	tFetchI
+ 488	tWriteI
+ 489	tWriteCR
+ 490	tPushAddrGlobal	 608
+ 492	tWriteStr
+ 493	tPushAddrGlobal	 332
+ 495	tFetchI
+ 496	tWriteI
+ 497	tPushAddrGlobal	 332
+ 499	tPushConstI	   4
+ 501	tAddPI
+ 502	tFetchI
+ 503	tWriteI
+ 504	tPushAddrGlobal	 332
+ 506	tPushConstI	   8
+ 508	tAddPI
+ 509	tFetchI
+ 510	tWriteI
+ 511	tPushAddrGlobal	 332
+ 513	tPushConstI	  12
+ 515	tAddPI
+ 516	tFetchI
+ 517	tWriteI
+ 518	tWriteCR
+ 519	tPushAddrGlobal	 348
+ 521	tPushConstI	   4
+ 523	tAddPI
+ 524	tPushAddrGlobal	 316
+ 526	tCopy	  16
+ 528	tPushAddrGlobal	 348
+ 530	tPushConstI	  20
+ 532	tAddPI
+ 533	tPushConstI	  10
+ 535	tAssignI
+ 536	tPushAddrGlobal	 348
+ 538	tPushConstI	  20
+ 540	tAddPI
+ 541	tPushConstI	   4
+ 543	tAddPI
+ 544	tPushConstI	  20
+ 546	tAssignI
+ 547	tPushAddrGlobal	 348
+ 549	tPushConstI	  20
+ 551	tAddPI
+ 552	tPushConstI	   8
+ 554	tAddPI
+ 555	tPushConstI	  30
+ 557	tAssignI
+ 558	tPushAddrGlobal	 348
+ 560	tPushConstI	  20
+ 562	tAddPI
+ 563	tPushConstI	  12
+ 565	tAddPI
+ 566	tPushConstI	  40
+ 568	tAssignI
+ 569	tPushAddrGlobal	 612
+ 571	tWriteStr
+ 572	tPushAddrGlobal	 348
+ 574	tPushConstI	   4
+ 576	tAddPI
+ 577	tFetchI
+ 578	tWriteI
+ 579	tPushAddrGlobal	 348
+ 581	tPushConstI	   4
+ 583	tAddPI
+ 584	tPushConstI	   4
+ 586	tAddPI
+ 587	tFetchI
+ 588	tWriteI
+ 589	tPushAddrGlobal	 348
+ 591	tPushConstI	   4
+ 593	tAddPI
+ 594	tPushConstI	   8
+ 596	tAddPI
+ 597	tFetchI
+ 598	tWriteI
+ 599	tPushAddrGlobal	 348
+ 601	tPushConstI	   4
+ 603	tAddPI
+ 604	tPushConstI	  12
+ 606	tAddPI
+ 607	tFetchI
+ 608	tWriteI
+ 609	tWriteCR
+ 610	tPushAddrGlobal	 620
+ 612	tWriteStr
+ 613	tPushAddrGlobal	 348
+ 615	tPushConstI	  20
+ 617	tAddPI
+ 618	tFetchI
+ 619	tWriteI
+ 620	tPushAddrGlobal	 348
+ 622	tPushConstI	  20
+ 624	tAddPI
+ 625	tPushConstI	   4
+ 627	tAddPI
+ 628	tFetchI
+ 629	tWriteI
+ 630	tPushAddrGlobal	 348
+ 632	tPushConstI	  20
+ 634	tAddPI
+ 635	tPushConstI	   8
+ 637	tAddPI
+ 638	tFetchI
+ 639	tWriteI
+ 640	tPushAddrGlobal	 348
+ 642	tPushConstI	  20
+ 644	tAddPI
+ 645	tPushConstI	  12
+ 647	tAddPI
+ 648	tFetchI
+ 649	tWriteI
+ 650	tWriteCR
+ 651	tPushAddrGlobal	 628
+ 653	tWriteStr
+ 654	tPushAddrGlobal	   8
+ 656	tPushConstI	   1
+ 658	tPushConstI	   1
+ 660	tSubI
+ 661	tPushConstI	  16
+ 663	tMultI
+ 664	tAddPI
+ 665	tPushConstI	   2
+ 667	tPushConstI	   1
+ 669	tSubI
+ 670	tPushConstI	   8
+ 672	tMultI
+ 673	tAddPI
+ 674	tPushConstI	   1
+ 676	tPushConstI	   1
+ 678	tSubI
+ 679	tPushConstI	   4
+ 681	tMultI
+ 682	tAddPI
+ 683	tFetchI
+ 684	tWriteI
+ 685	tWriteCR
+ 686	tPushAddrGlobal	 634
+ 688	tWriteStr
+ 689	tPushAddrGlobal	   8
+ 691	tPushConstI	   1
+ 693	tPushConstI	   1
+ 695	tSubI
+ 696	tPushConstI	  16
+ 698	tMultI
+ 699	tAddPI
+ 700	tPushConstI	   2
+ 702	tPushConstI	   1
+ 704	tSubI
+ 705	tPushConstI	   8
+ 707	tMultI
+ 708	tAddPI
+ 709	tPushConstI	   1
+ 711	tPushConstI	   1
+ 713	tSubI
+ 714	tPushConstI	   4
+ 716	tMultI
+ 717	tAddPI
+ 718	tFetchI
+ 719	tWriteI
+ 720	tWriteCR
+ 721	tPushAddrGlobal	 640
+ 723	tWriteStr
+ 724	tPushAddrGlobal	   8
+ 726	tPushConstI	   1
+ 728	tPushConstI	   1
+ 730	tSubI
+ 731	tPushConstI	  16
+ 733	tMultI
+ 734	tAddPI
+ 735	tPushConstI	   2
+ 737	tPushConstI	   1
+ 739	tSubI
+ 740	tPushConstI	   8
+ 742	tMultI
+ 743	tAddPI
+ 744	tPushConstI	   1
+ 746	tPushConstI	   1
+ 748	tSubI
+ 749	tPushConstI	   4
+ 751	tMultI
+ 752	tAddPI
+ 753	tFetchI
+ 754	tWriteI
+ 755	tWriteCR
+ 756	tPushAddrGlobal	 648
+ 758	tWriteStr
+ 759	tWriteCR
+ 760	tPushAddrGlobal	 296
+ 762	tPushConstI	   1
+ 764	tAssignI
+ 765	tJump	   6
+ 767	tLabel	   7
+ 769	tPushAddrGlobal	 296
+ 771	tPushGlobalI	 296
+ 773	tIncI
+ 774	tAssignI
+ 775	tLabel	   6
+ 777	tPushGlobalI	 296
+ 779	tPushConstI	   9
+ 781	tGreaterI
+ 782	tJumpTrue	   5
+ 784	tPushAddrGlobal	 300
+ 786	tPushConstI	   1
+ 788	tAssignI
+ 789	tJump	   9
+ 791	tLabel	  10
+ 793	tPushAddrGlobal	 300
+ 795	tPushGlobalI	 300
+ 797	tIncI
+ 798	tAssignI
+ 799	tLabel	   9
+ 801	tPushGlobalI	 300
+ 803	tPushConstI	   2
+ 805	tGreaterI
+ 806	tJumpTrue	   8
+ 808	tPushAddrGlobal	   8
+ 810	tPushGlobalI	 296
+ 812	tPushConstI	   1
+ 814	tSubI
+ 815	tPushConstI	  16
+ 817	tMultI
+ 818	tAddPI
+ 819	tPushGlobalI	 300
+ 821	tPushConstI	   1
+ 823	tSubI
+ 824	tPushConstI	   8
+ 826	tMultI
+ 827	tAddPI
+ 828	tPushGlobalI	 300
+ 830	tPushConstI	   1
+ 832	tSubI
+ 833	tPushConstI	   4
+ 835	tMultI
+ 836	tAddPI
+ 837	tPushGlobalI	 296
+ 839	tAssignI
+ 840	tJump	  10
+ 842	tLabel	   8
+ 844	tJump	   7
+ 846	tLabel	   5
+ 848	tPushAddrGlobal	 660
+ 850	tWriteStr
+ 851	tPushAddrGlobal	   8
+ 853	tPushConstI	   1
+ 855	tPushConstI	   1
+ 857	tSubI
+ 858	tPushConstI	  16
+ 860	tMultI
+ 861	tAddPI
+ 862	tPushConstI	   2
+ 864	tPushConstI	   1
+ 866	tSubI
+ 867	tPushConstI	   8
+ 869	tMultI
+ 870	tAddPI
+ 871	tPushConstI	   1
+ 873	tPushConstI	   1
+ 875	tSubI
+ 876	tPushConstI	   4
+ 878	tMultI
+ 879	tAddPI
+ 880	tFetchI
+ 881	tWriteI
+ 882	tWriteCR
+ 883	tPushAddrGlobal	 296
+ 885	tPushConstI	   9
+ 887	tAssignI
+ 888	tJump	  12
+ 890	tLabel	  13
+ 892	tPushAddrGlobal	 296
+ 894	tPushGlobalI	 296
+ 896	tDecI
+ 897	tAssignI
+ 898	tLabel	  12
+ 900	tPushGlobalI	 296
+ 902	tPushConstI	   1
+ 904	tLessI
+ 905	tJumpTrue	  11
+ 907	tPushAddrGlobal	   8
+ 909	tPushGlobalI	 296
+ 911	tPushConstI	   1
+ 913	tSubI
+ 914	tPushConstI	  16
+ 916	tMultI
+ 917	tAddPI
+ 918	tPushConstI	   2
+ 920	tPushConstI	   1
+ 922	tSubI
+ 923	tPushConstI	   8
+ 925	tMultI
+ 926	tAddPI
+ 927	tPushConstI	   1
+ 929	tPushConstI	   1
+ 931	tSubI
+ 932	tPushConstI	   4
+ 934	tMultI
+ 935	tAddPI
+ 936	tFetchI
+ 937	tWriteI
+ 938	tWriteCR
+ 939	tPushAddrGlobal	 668
+ 941	tWriteStr
+ 942	tPushAddrGlobal	   8
+ 944	tPushGlobalI	 296
+ 946	tPushConstI	   1
+ 948	tSubI
+ 949	tPushConstI	  16
+ 951	tMultI
+ 952	tAddPI
+ 953	tPushConstI	   1
+ 955	tPushConstI	   1
+ 957	tSubI
+ 958	tPushConstI	   8
+ 960	tMultI
+ 961	tAddPI
+ 962	tPushConstI	   1
+ 964	tPushConstI	   1
+ 966	tSubI
+ 967	tPushConstI	   4
+ 969	tMultI
+ 970	tAddPI
+ 971	tFetchI
+ 972	tWriteI
+ 973	tPushAddrGlobal	   8
+ 975	tPushGlobalI	 296
+ 977	tPushConstI	   1
+ 979	tSubI
+ 980	tPushConstI	  16
+ 982	tMultI
+ 983	tAddPI
+ 984	tPushConstI	   1
+ 986	tPushConstI	   1
+ 988	tSubI
+ 989	tPushConstI	   8
+ 991	tMultI
+ 992	tAddPI
+ 993	tPushConstI	   2
+ 995	tPushConstI	   1
+ 997	tSubI
+ 998	tPushConstI	   4
+1000	tMultI
+1001	tAddPI
+1002	tFetchI
+1003	tWriteI
+1004	tPushAddrGlobal	   8
+1006	tPushGlobalI	 296
+1008	tPushConstI	   1
+1010	tSubI
+1011	tPushConstI	  16
+1013	tMultI
+1014	tAddPI
+1015	tPushConstI	   1
+1017	tPushConstI	   1
+1019	tSubI
+1020	tPushConstI	   8
+1022	tMultI
+1023	tAddPI
+1024	tPushConstI	   1
+1026	tPushConstI	   1
+1028	tSubI
+1029	tPushConstI	   4
+1031	tMultI
+1032	tAddPI
+1033	tFetchI
+1034	tWriteI
+1035	tPushAddrGlobal	   8
+1037	tPushGlobalI	 296
+1039	tPushConstI	   1
+1041	tSubI
+1042	tPushConstI	  16
+1044	tMultI
+1045	tAddPI
+1046	tPushConstI	   1
+1048	tPushConstI	   1
+1050	tSubI
+1051	tPushConstI	   8
+1053	tMultI
+1054	tAddPI
+1055	tPushConstI	   2
+1057	tPushConstI	   1
+1059	tSubI
+1060	tPushConstI	   4
+1062	tMultI
+1063	tAddPI
+1064	tFetchI
+1065	tWriteI
+1066	tPushAddrGlobal	   8
+1068	tPushGlobalI	 296
+1070	tPushConstI	   1
+1072	tSubI
+1073	tPushConstI	  16
+1075	tMultI
+1076	tAddPI
+1077	tPushConstI	   1
+1079	tPushConstI	   1
+1081	tSubI
+1082	tPushConstI	   8
+1084	tMultI
+1085	tAddPI
+1086	tPushConstI	   1
+1088	tPushConstI	   1
+1090	tSubI
+1091	tPushConstI	   4
+1093	tMultI
+1094	tAddPI
+1095	tFetchI
+1096	tWriteI
+1097	tPushAddrGlobal	   8
+1099	tPushGlobalI	 296
+1101	tPushConstI	   1
+1103	tSubI
+1104	tPushConstI	  16
+1106	tMultI
+1107	tAddPI
+1108	tPushConstI	   1
+1110	tPushConstI	   1
+1112	tSubI
+1113	tPushConstI	   8
+1115	tMultI
+1116	tAddPI
+1117	tPushConstI	   2
+1119	tPushConstI	   1
+1121	tSubI
+1122	tPushConstI	   4
+1124	tMultI
+1125	tAddPI
+1126	tFetchI
+1127	tWriteI
+1128	tWriteCR
+1129	tPushAddrGlobal	 672
+1131	tWriteStr
+1132	tPushAddrGlobal	   8
+1134	tPushGlobalI	 296
+1136	tPushConstI	   1
+1138	tSubI
+1139	tPushConstI	  16
+1141	tMultI
+1142	tAddPI
+1143	tPushConstI	   2
+1145	tPushConstI	   1
+1147	tSubI
+1148	tPushConstI	   8
+1150	tMultI
+1151	tAddPI
+1152	tPushConstI	   1
+1154	tPushConstI	   1
+1156	tSubI
+1157	tPushConstI	   4
+1159	tMultI
+1160	tAddPI
+1161	tFetchI
+1162	tWriteI
+1163	tPushAddrGlobal	   8
+1165	tPushGlobalI	 296
+1167	tPushConstI	   1
+1169	tSubI
+1170	tPushConstI	  16
+1172	tMultI
+1173	tAddPI
+1174	tPushConstI	   2
+1176	tPushConstI	   1
+1178	tSubI
+1179	tPushConstI	   8
+1181	tMultI
+1182	tAddPI
+1183	tPushConstI	   2
+1185	tPushConstI	   1
+1187	tSubI
+1188	tPushConstI	   4
+1190	tMultI
+1191	tAddPI
+1192	tFetchI
+1193	tWriteI
+1194	tPushAddrGlobal	   8
+1196	tPushGlobalI	 296
+1198	tPushConstI	   1
+1200	tSubI
+1201	tPushConstI	  16
+1203	tMultI
+1204	tAddPI
+1205	tPushConstI	   2
+1207	tPushConstI	   1
+1209	tSubI
+1210	tPushConstI	   8
+1212	tMultI
+1213	tAddPI
+1214	tPushConstI	   1
+1216	tPushConstI	   1
+1218	tSubI
+1219	tPushConstI	   4
+1221	tMultI
+1222	tAddPI
+1223	tFetchI
+1224	tWriteI
+1225	tPushAddrGlobal	   8
+1227	tPushGlobalI	 296
+1229	tPushConstI	   1
+1231	tSubI
+1232	tPushConstI	  16
+1234	tMultI
+1235	tAddPI
+1236	tPushConstI	   2
+1238	tPushConstI	   1
+1240	tSubI
+1241	tPushConstI	   8
+1243	tMultI
+1244	tAddPI
+1245	tPushConstI	   2
+1247	tPushConstI	   1
+1249	tSubI
+1250	tPushConstI	   4
+1252	tMultI
+1253	tAddPI
+1254	tFetchI
+1255	tWriteI
+1256	tPushAddrGlobal	   8
+1258	tPushGlobalI	 296
+1260	tPushConstI	   1
+1262	tSubI
+1263	tPushConstI	  16
+1265	tMultI
+1266	tAddPI
+1267	tPushConstI	   2
+1269	tPushConstI	   1
+1271	tSubI
+1272	tPushConstI	   8
+1274	tMultI
+1275	tAddPI
+1276	tPushConstI	   1
+1278	tPushConstI	   1
+1280	tSubI
+1281	tPushConstI	   4
+1283	tMultI
+1284	tAddPI
+1285	tFetchI
+1286	tWriteI
+1287	tPushAddrGlobal	   8
+1289	tPushGlobalI	 296
+1291	tPushConstI	   1
+1293	tSubI
+1294	tPushConstI	  16
+1296	tMultI
+1297	tAddPI
+1298	tPushConstI	   2
+1300	tPushConstI	   1
+1302	tSubI
+1303	tPushConstI	   8
+1305	tMultI
+1306	tAddPI
+1307	tPushConstI	   2
+1309	tPushConstI	   1
+1311	tSubI
+1312	tPushConstI	   4
+1314	tMultI
+1315	tAddPI
+1316	tFetchI
+1317	tWriteI
+1318	tWriteCR
+1319	tPushAddrGlobal	   8
+1321	tPushGlobalI	 296
+1323	tPushConstI	   1
+1325	tSubI
+1326	tPushConstI	  16
+1328	tMultI
+1329	tAddPI
+1330	tPushConstI	   2
+1332	tPushConstI	   1
+1334	tSubI
+1335	tPushConstI	   8
+1337	tMultI
+1338	tAddPI
+1339	tPushConstI	   1
+1341	tPushConstI	   1
+1343	tSubI
+1344	tPushConstI	   4
+1346	tMultI
+1347	tAddPI
+1348	tFetchI
+1349	tWriteI
+1350	tWriteCR
+1351	tJump	  13
+1353	tLabel	  11
+1355	tPushAddrGlobal	 676
+1357	tWriteStr
+1358	tPushAddrGlobal	 684
+1360	tWriteStr
+1361	tPushAddrGlobal	 689
+1363	tWriteStr
+1364	tWriteCR
+1365	tReturn

@@ -77,7 +77,7 @@ char* nativePc = 0;
 
 // Offset on call stack from rbp to the first parameter
 #define FRAME_PARAMS_OFFSET (2 * sizeof(void*))
-
+#define FPO  FRAME_PARAMS_OFFSET
 
 // Operand stack
 //
@@ -461,6 +461,219 @@ usage( int status )
 {
   printf( "Usage:   jit <file>\n" );
   exit( status );
+}
+
+
+// ----------------------------------------------------------------------------
+
+//
+// Builds up an x86-64 instruction to be emitted.
+//
+class Instr
+{
+public:
+  Instr( char opcode );
+  Instr( char opcode1, char opcode2 );
+
+  // requests the REX.W flag, converting a 32-bit instruction to 64-bit.
+  Instr& w();
+
+  // specifies an opcode extension, which lives in the reg field of the ModR/M byte.
+  Instr& opc( char opcodeExtension );
+
+  // specifies the reg field of ModR/M.
+  Instr& reg( Register* r );
+
+  // specifies an immediate reg (not a memory reference) that goes in the r/m field of ModR/M.
+  // This is used for a second register in instructions that take two immediate registers,
+  // or the single immediate register in instructions that occupy the reg field with an opcode extension.
+  Instr& rmReg( Register* r );
+
+  // Specifies a memory reference, involving a base register and an offset.
+  // The register goes in the r/m field of ModR/M.
+  Instr& mem( Register* base, int offset );
+
+  // specifies a memory reference relative to the address of the instruction following this one.
+  Instr& memRipRelative( char* targetAddr );
+
+  // specifies an immediate 8-bit value.
+  Instr& imm8( char value );
+
+  // specifies an immediate 32-bit value.   For 64-bit instructions, the cpu will sign-extend it.
+  Instr& imm32( int value );
+
+  void emit() const;
+
+private:
+  char _opcode1 = 0;
+  char _opcode2 = 0;
+
+  bool _wide = false;
+  char _opcodeExtension = 0;
+  char* _memRipRelative = nullptr;
+  char _imm8 = 0;
+  int _imm32 = 0;
+  Register* _reg = nullptr;
+  Register* _base = nullptr;
+  int _offset = 0;
+
+  bool _haveOpcode2 = false;
+  bool _haveOpcodeExtension = false;
+  bool _haveMemRipRelative = false;
+  bool _haveImm8 = false;
+  bool _haveImm32 = false;
+  bool _baseIsImmediate = false;
+};
+
+
+Instr::Instr( char opcode )
+  : _opcode1( opcode )
+{}
+
+Instr::Instr( char opcode1, char opcode2 )
+  : _opcode1( opcode1 ), _opcode2( opcode2 ), _haveOpcode2( true )
+{}
+
+
+// requests the REX.W flag, converting a 32-bit instruction to 64-bit.
+Instr&
+Instr::w()
+{
+  _wide = true;
+  return *this;
+}
+
+
+// specifies an opcode extension, which lives in the reg field of the ModR/M byte.
+Instr&
+Instr::opc( char opcodeExtension )
+{
+  assert( !_reg );   // if failed: maybe  you wanted rmReg() for the other call.
+  _opcodeExtension = opcodeExtension;
+  _haveOpcodeExtension = true;
+  return *this;
+}
+
+
+// specifies the reg field of ModR/M.
+Instr&
+Instr::reg( Register* r )
+{
+  assert( !_haveOpcodeExtension );  // if failed: maybe you wanted rmReg()
+  _reg = r;
+  return *this;
+}
+
+
+// specifies an immediate reg (not a memory reference) that goes in the r/m field of ModR/M.
+// This is used for a second register in instructions that take two immediate registers,
+// or the single immediate register in instructions that occupy the reg field with an opcode extension.
+Instr&
+Instr::rmReg( Register* r )
+{
+  _base = r;
+  _baseIsImmediate = true;
+  return *this;
+}
+
+
+// Specifies a memory reference, involving a base register and an offset.
+// The register goes in the r/m field of ModR/M.
+Instr&
+Instr::mem( Register* base, int offset )
+{
+  _base = base;
+  _offset = offset;
+  return *this;
+}
+
+
+// specifies a memory reference relative to the address of the instruction following this one.
+Instr&
+Instr::memRipRelative( char* targetAddr )
+{
+  _memRipRelative = targetAddr;
+  _haveMemRipRelative = true;
+  return *this;
+}
+
+
+// specifies an immediate 8-bit value.
+Instr&
+Instr::imm8( char value )
+{
+  _imm8 = value;
+  _haveImm8 = true;
+  return *this;
+}
+
+
+// specifies an immediate 32-bit value.   For 64-bit instructions, the cpu will sign-extend it.
+Instr&
+Instr::imm32( int value )
+{
+  _imm32 = value;
+  _haveImm32 = true;
+  return *this;
+}
+
+
+void
+Instr::emit() const
+{
+  // optional REX prefix.
+  // This gives access to registers r8-r15, and/or reequests 64-bit data width.
+  emitRex( _wide, _reg, _base );
+
+  // opcode
+  outB( _opcode1 );
+  if ( _haveOpcode2 ) {
+    outB( _opcode2 );
+  }
+
+  // For rip-relative instructions, we'll need the number of bytes between the
+  // Mod/RM byte and the next instruction.  That's just the imm* argument, if any.
+  int immBytes = 0;
+  if ( _haveImm8 ) {
+    immBytes = 1;
+  } else if ( _haveImm32 ) {
+    immBytes = 4;
+  }
+
+  // ModR/M byte and offset
+  if ( _reg || _base || _haveOpcodeExtension || _haveMemRipRelative ) {
+    if ( _haveOpcodeExtension ) {
+      if ( _haveMemRipRelative ) {
+        emitModRM_OpcRMMemRipRelative( _opcodeExtension, _memRipRelative, immBytes );
+      } else if ( _baseIsImmediate ) {
+        emitModRM_OpcRMReg( _opcodeExtension, _base );
+      } else {
+        emitModRM_OpcRMMem( _opcodeExtension, _base, _offset );
+      }
+    } else {
+      if ( _haveMemRipRelative ) {
+        emitModRMMemRipRelative( _reg, _memRipRelative, immBytes );
+      } else if ( _baseIsImmediate ) {
+        emitModRM_RegReg( _reg, _base );
+      } else {
+        emitModRMMem( _reg, _base, _offset );
+      }
+    }
+  }
+
+  // Immediate value
+  if ( _haveImm8 ) {
+    outB( _imm8 );
+  } else if ( _haveImm32 ) {
+    outI( _imm32 );
+  }
+}
+
+
+void
+emit( const Instr& instr )
+{
+  instr.emit();
 }
 
 
@@ -1640,9 +1853,7 @@ emitCallExtern( char* addr )
   outL( (long) addr );
 
   // call [reg]
-  outB( 0xff );
-  emitModRM_OpcRMReg( 2, x._reg );
-
+  emit( Instr( 0xff ).opc( 2 ).rmReg( x._reg ) );
   x.release();
 }
 
@@ -1739,73 +1950,52 @@ emitAdd( const Operand& x, const Operand& y )
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_GlobalI ):
       // add reg_x, [rip + offsetToGlobal]
-      emitRex( false, x._reg, nullptr );
-      outB( 0x03 );
-      emitModRMMemRipRelative( x._reg, &data[y._value], 0 );
+      emit( Instr( 0x03 ).reg( x._reg ).memRipRelative( &data[y._value] ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_LocalI ):
       // add reg_x, [rbp + y.value];
-      emitRex( false, x._reg, regRbp );
-      outB( 0x03 );
-      emitModRMMem( x._reg, regRbp, y._value );
+      emit( Instr( 0x03 ).reg( x._reg ).mem( regRbp, y._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ParamI ):
-      // add reg_x, [rbp + y.value + FRAME_PARAMS_OFFSET]
-      emitRex( false, x._reg, regRbp );
-      outB( 0x03 );
-      emitModRMMem( x._reg, regRbp, y._value + FRAME_PARAMS_OFFSET );
+      // add reg_x, [rbp + y.value + FPO]
+      emit( Instr( 0x03 ).reg( x._reg ).mem( regRbp, y._value + FPO ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ConstI ):
-      emitRex( false, nullptr, x._reg );
-      outB( 0x81 );
-      emitModRM_OpcRMReg( 0, x._reg );
-      outI( y._value );
+      // add reg32, immediate32
+      emit( Instr( 0x81 ).opc( 0 ).rmReg( x._reg ).imm32( y._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_RegI ):
       // add reg_x32, reg_y32
-      emitRex( false, x._reg, y._reg );
-      outB( 0x03 );
-      emitModRM_RegReg( x._reg, regRbp );
+      emit( Instr( 0x03 ).reg( x._reg ).rmReg( y._reg ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_GlobalP ):
       // add reg_x64, [rip + offsetToGlobal]
-      emitRex( true, x._reg, nullptr );
-      outB( 0x03 );
-      emitModRMMemRipRelative( x._reg, &data[y._value], 0 );
+      emit( Instr( 0x03 ).w().reg( x._reg ).memRipRelative( &data[y._value] ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_LocalP ):
       // add reg_x64, [rbp + y.value];
-      emitRex( true, x._reg, regRbp );
-      outB( 0x03 );
-      emitModRMMem( x._reg, regRbp, y._value );
+      emit( Instr( 0x03 ).w().reg( x._reg ).mem( regRbp, y._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ParamP ):
-      // add reg_x64, [rbp + y.value + FRAME_PARAMS_OFFSET]
-      emitRex( true, x._reg, regRbp );
-      outB( 0x03 );
-      emitModRMMem( x._reg, regRbp, y._value + FRAME_PARAMS_OFFSET );
+      // add reg_x64, [rbp + y.value + FPO]
+      emit( Instr( 0x03 ).w().reg( x._reg ).mem( regRbp, y._value + FPO ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ConstI ):
       // add reg64, immediate32 sign-extended to 64 bits
-      emitRex( true, nullptr, x._reg );
-      outB( 0x81 );
-      emitModRM_OpcRMReg( 0, x._reg );
-      outI( y._value );
+      emit( Instr( 0x81 ).w().opc( 0 ).rmReg( x._reg ).imm32( y._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegP ):
       // add x_reg64, y_reg64
-      emitRex( true, y._reg, x._reg );
-      outB( 0x01 );
-      emitModRM_RegReg( y._reg, x._reg );
+      emit( Instr( 0x01 ).w().reg( y._reg ).rmReg( x._reg ) );
       break;
 
     default:
@@ -1845,72 +2035,52 @@ emitSub( const Operand& x, const Operand& y )
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_GlobalI ):
       // sub x_reg32, [rip + offsetToGlobal]
-      emitRex( false, x._reg, nullptr );
-      outB( 0x2b );
-      emitModRMMemRipRelative( x._reg, &data[y._value], 0 );
+      emit( Instr( 0x2b ).reg( x._reg ).memRipRelative( &data[y._value] ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_LocalI ):
       // sub x_reg32, [rbp+offset]
-      emitRex( false, x._reg, regRbp );
-      outB( 0x2b );
-      emitModRMMem( x._reg, regRbp, y._value );
+      emit( Instr( 0x3b ).reg( x._reg ).mem( regRbp, y._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ParamI ):
-      // sub x_reg32, [rbp + offset + FRAME_PARAMS_OFFSET]
-      emitRex( false, x._reg, regRbp );
-      outB( 0x2b );
-      emitModRMMem( x._reg, regRbp, y._value + FRAME_PARAMS_OFFSET );
+      // sub x_reg32, [rbp + offset + FPO]
+      emit( Instr( 0x3b ).reg( x._reg ).mem( regRbp, y._value + FPO ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ConstI ):
-      emitRex( false, nullptr, x._reg );
-      outB( 0x81 );
-      emitModRM_OpcRMReg( 5, x._reg );
-      outI( y._value );
+      // sub reg32, immediate32
+      emit( Instr( 0x81 ).opc( 5 ).rmReg( x._reg ).imm32( y._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_RegI ):
       // sub x_reg32, y_reg32
-      emitRex( false, x._reg, y._reg );
-      outB( 0x2b );
-      emitModRM_RegReg( x._reg, y._reg );
+      emit( Instr( 0x2b ).reg( x._reg ).rmReg( y._reg ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_GlobalP ):
       // sub x_reg64, [rip + offsetToGlobal]
-      emitRex( true, x._reg, nullptr );
-      outB( 0x2b );
-      emitModRMMemRipRelative( x._reg, &data[y._value], 0 );
+      emit( Instr( 0x2b ).w().reg( x._reg ).memRipRelative( &data[y._value] ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_LocalP ):
       // sub x_reg32, [rbp+offset]
-      emitRex( true, x._reg, regRbp );
-      outB( 0x2b );
-      emitModRMMem( x._reg, regRbp, y._value );
+      emit( Instr( 0x2b ).reg( x._reg ).mem( regRbp, y._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ParamP ):
-      // sub x_reg32, [rbp + offset + FRAME_PARAMS_OFFSET]
-      emitRex( true, x._reg, regRbp );
-      outB( 0x2b );
-      emitModRMMem( x._reg, regRbp, y._value + FRAME_PARAMS_OFFSET );
+      // sub x_reg32, [rbp + offset + FPO]
+      emit( Instr( 0x2b ).w().reg( x._reg ).mem( regRbp, y._value + FPO ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ConstI ):
-      emitRex( true, nullptr, x._reg );
-      outB( 0x81 );
-      emitModRM_OpcRMReg( 5, x._reg );
-      outI( y._value );
+      // sub reg64, immediate32 sign-extended to 64 bits
+      emit( Instr( 0x81 ).w().opc( 5 ).rmReg( x._reg ).imm32( y._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegP ):
       // sub x_reg64, y_reg64
-      emitRex( true, x._reg, y._reg );
-      outB( 0x2b );
-      emitModRM_RegReg( x._reg, y._reg );
+      emit( Instr( 0x2b ).w().reg( x._reg ).rmReg( y._reg ) );
       break;
 
     default:
@@ -1929,46 +2099,27 @@ emitMult( const Operand& x, const Operand& y )
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_GlobalI ):
       // imul reg32, [rip + offsetToGlobal]
-      emitRex( false, x._reg, nullptr );
-      // this opcode is two bytes
-      outB( 0x0f );
-      outB( 0xaf );
-      emitModRMMemRipRelative( x._reg, &data[y._value], 0 );
+      emit( Instr( 0x0f, 0xaf ).reg( x._reg ).memRipRelative( &data[y._value] ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_LocalI ):
       // imul reg32, [rbp + y._value]
-      emitRex( false, x._reg, regRbp );
-      // this opcode is two bytes
-      outB( 0x0f );
-      outB( 0xaf );
-      emitModRMMem( x._reg, regRbp, y._value );
+      emit( Instr( 0x0f, 0xaf ).reg( x._reg ).mem( regRbp, y._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ParamI ):
-      // imul reg32, [rbp + y._value + FRAME_PARAMS_OFFSET]
-      emitRex( false, x._reg, regRbp );
-      // this opcode is two bytes
-      outB( 0x0f );
-      outB( 0xaf );
-      emitModRMMem( x._reg, regRbp, y._value + FRAME_PARAMS_OFFSET );
+      // imul reg32, [rbp + y._value + FPO]
+      emit( Instr( 0x0f, 0xaf ).reg( x._reg ).mem( regRbp, y._value + FPO ) );
       break;
  
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ConstI ):
       // imul x_reg32, x_reg32, immediate32   -- i.e. x = x * i
-      emitRex( false, x._reg, x._reg );
-      outB( 0x69 );
-      emitModRM_RegReg( x._reg, x._reg );
-      outI( y._value );
+      emit( Instr( 0x69 ).reg( x._reg ).rmReg( x._reg ).imm32( y._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_RegI ):
       // imul x_reg32, y_reg32
-      emitRex( false, x._reg, y._reg );
-      // this opcode is two bytes
-      outB( 0x0f );
-      outB( 0xaf );
-      emitModRM_RegReg( x._reg, y._reg );
+      emit( Instr( 0x0f, 0xaf ).reg( x._reg ).rmReg( y._reg ) );
       break;
 
     default:
@@ -1995,10 +2146,7 @@ emitShl( const Operand& x, const Operand& y )
     
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ConstI ):
       // shl reg32, immediate8
-      emitRex( false, nullptr, x._reg );
-      outB( 0xc1 );
-      emitModRM_OpcRMReg( 4, x._reg );
-      outB( y._value );
+      emit( Instr( 0xc1 ).opc( 4 ).rmReg( x._reg ).imm8( y._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_RegI ):
@@ -2010,6 +2158,7 @@ emitShl( const Operand& x, const Operand& y )
       fatal( "emitMov: unexpected operands\n" );
   }
 }
+
 
 
 // Compare x and y
@@ -2029,32 +2178,22 @@ emitCmp( const Operand& x, const Operand& y )
 
     case KindPair( jit_Operand_Kind_GlobalI, jit_Operand_Kind_ConstI ):
       // cmp [rip + offsetToGlobal], immediate32
-      emitRex( false, nullptr, nullptr );
-      outB( 0x81 );
-      emitModRM_OpcRMMemRipRelative( 7, &data[x._value], 4 );
-      outI( y._value );
+      emit( Instr( 0x81 ).opc( 7 ).memRipRelative( &data[x._value] ).imm32( y._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_GlobalI, jit_Operand_Kind_RegI ):
       // cmp [rip + offsetToGlobal], reg32
-      emitRex( false, y._reg, nullptr );
-      outB( 0x39 );
-      emitModRMMemRipRelative( y._reg, &data[x._value], 0 );
+      emit( Instr( 0x39 ).reg( y._reg ).memRipRelative( &data[x._value] ) );
       break;
 
     case KindPair( jit_Operand_Kind_GlobalP, jit_Operand_Kind_ConstI ):
       // cmp [rip + offsetToGlobal], immediate32 sign-extended to 64 bits
-      emitRex( true, nullptr, nullptr );
-      outB( 0x81 );
-      emitModRM_OpcRMMemRipRelative( 7, &data[x._value], 4 );
-      outI( y._value );
+      emit( Instr( 0x81 ).w().opc( 7 ).memRipRelative( &data[x._value] ).imm32( y._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_GlobalP, jit_Operand_Kind_RegP ):
       // cmp [rip + offsetToGlobal], reg64
-      emitRex( true, y._reg, nullptr );
-      outB( 0x39 );
-      emitModRMMemRipRelative( y._reg, &data[x._value], 0 );
+      emit( Instr( 0x39 ).w().reg( y._reg ).memRipRelative( &data[x._value] ) );
       break;
 
     case KindPair( jit_Operand_Kind_LocalB, jit_Operand_Kind_ConstI ):
@@ -2063,32 +2202,22 @@ emitCmp( const Operand& x, const Operand& y )
 
     case KindPair( jit_Operand_Kind_LocalI, jit_Operand_Kind_ConstI ):
       // cmp [rbp + x._value], immediate32
-      emitRex( false, nullptr, regRbp );
-      outB( 0x81 );
-      emitModRM_OpcRMMem( 7, regRbp, x._value );
-      outI( y._value );
+      emit( Instr( 0x81 ).opc( 7 ).mem( regRbp, x._value ).imm32( y._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_LocalI, jit_Operand_Kind_RegI ):
       // cmp [rbp + x._value], reg32
-      emitRex( false, y._reg, regRbp );
-      outB( 0x39 );
-      emitModRMMem( y._reg, regRbp, x._value );
+      emit( Instr( 0x39 ).reg( y._reg ).mem( regRbp, x._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_LocalP, jit_Operand_Kind_ConstI ):
       // cmp [rbp + x._value], immediate32 sign-extended to 64 bits
-      emitRex( true, nullptr, regRbp );
-      outB( 0x81 );
-      emitModRM_OpcRMMem( 7, regRbp, x._value );
-      outI( y._value );
+      emit( Instr( 0x81 ).w().opc( 7 ).mem( regRbp, x._value ).imm32( y._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_LocalP, jit_Operand_Kind_RegP ):
       // cmp [rbp + x._value], reg64
-      emitRex( true, y._reg, regRbp );
-      outB( 0x39 );
-      emitModRMMem( y._reg, regRbp, x._value );
+      emit( Instr( 0x39 ).w().reg( y._reg ).mem( regRbp, x._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_ParamB, jit_Operand_Kind_ConstI ):
@@ -2096,33 +2225,23 @@ emitCmp( const Operand& x, const Operand& y )
       toDo( "emitCmp\n" );
 
     case KindPair( jit_Operand_Kind_ParamI, jit_Operand_Kind_ConstI ):
-      // cmp [rbp + x._value + FRAME_PARAMS_OFFSET], immediate32
-      emitRex( false, nullptr, regRbp );
-      outB( 0x81 );
-      emitModRM_OpcRMMem( 7, regRbp, x._value + FRAME_PARAMS_OFFSET );
-      outI( y._value );
+      // cmp [rbp + x._value + FPO], immediate32
+      emit( Instr( 0x81 ).opc( 7 ).mem( regRbp, x._value + FPO ).imm32( y._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_ParamI, jit_Operand_Kind_RegI ):
-      // cmp [rbp + x._value + FRAME_PARAMS_OFFSET], reg32
-      emitRex( false, y._reg, regRbp );
-      outB( 0x39 );
-      emitModRMMem( y._reg, regRbp, x._value + FRAME_PARAMS_OFFSET );
+      // cmp [rbp + x._value + FPO], reg32
+      emit( Instr( 0x39 ).reg( y._reg ).mem( regRbp, x._value + FPO ) );
       break;
 
     case KindPair( jit_Operand_Kind_ParamP, jit_Operand_Kind_ConstI ):
-      // cmp [rbp + x._value + FRAME_PARAMS_OFFSET], immediate32 sign-extended to 64 bits
-      emitRex( true, nullptr, regRbp );
-      outB( 0x81 );
-      emitModRM_OpcRMMem( 7, regRbp, x._value + FRAME_PARAMS_OFFSET );
-      outI( y._value );
+      // cmp [rbp + x._value + FPO], immediate32 sign-extended to 64 bits
+      emit( Instr( 0x81 ).w().opc( 7 ).mem( regRbp, x._value + FPO ).imm32( y._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_ParamP, jit_Operand_Kind_RegP ):
-      // cmp [rbp + x._value + FRAME_PARAMS_OFFSET], reg64
-      emitRex( true, y._reg, regRbp );
-      outB( 0x39 );
-      emitModRMMem( y._reg, regRbp, x._value + FRAME_PARAMS_OFFSET );
+      // cmp [rbp + x._value + FPO], reg64
+      emit( Instr( 0x39 ).w().reg( y._reg ).mem( regRbp, x._value + FPO ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_GlobalB ):
@@ -2134,74 +2253,52 @@ emitCmp( const Operand& x, const Operand& y )
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_GlobalI ):
       // cmp reg32, [rip + offsetToGlobal]
-      emitRex( false, x._reg, nullptr );
-      outB( 0x3b );
-      emitModRMMemRipRelative( x._reg, &data[y._value], 0 );
+      emit( Instr( 0x3b ).reg( x._reg ).memRipRelative( &data[y._value] ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_LocalI ):
       // cmp reg32, [rbp + y.value]
-      emitRex( false, x._reg, regRbp );
-      outB( 0x3b );
-      emitModRMMem( x._reg, regRbp, y._value );
+      emit( Instr( 0x3b ).reg( x._reg ).mem( regRbp, y._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ParamI ):
-      // cmp reg32, [rbp + y.value + FRAME_PARAMS_OFFSET]
-      emitRex( false, x._reg, regRbp );
-      outB( 0x3b );
-      emitModRMMem( x._reg, regRbp, y._value + FRAME_PARAMS_OFFSET );
+      // cmp reg32, [rbp + y.value + FPO]
+      emit( Instr( 0x3b ).reg( x._reg ).mem( regRbp, y._value + FPO ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ConstI ):
       // cmp reg32, immediate32
-      emitRex( false, nullptr, x._reg );
-      outB( 0x81 );
-      emitModRM_OpcRMReg( 7, x._reg );
-      outI( y._value );
+      emit( Instr( 0x81 ).opc( 7 ).rmReg( x._reg ).imm32( y._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_RegI ):
       // cmp x_reg32, y_reg32
-      emitRex( false, x._reg, y._reg );
-      outB( 0x3b );
-      emitModRM_RegReg( x._reg, y._reg );
+      emit( Instr( 0x3b ).reg( x._reg ).rmReg( y._reg ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_GlobalP ):
       // cmp reg64, [rip + offsetToGlobal]
-      emitRex( true, x._reg, nullptr );
-      outB( 0x3b );
-      emitModRMMemRipRelative( x._reg, &data[y._value], 0 );
+      emit( Instr( 0x3b ).w().reg( x._reg ).memRipRelative( &data[y._value] ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_LocalP ):
       // cmp reg64, [rbp + y.value]
-      emitRex( true, x._reg, regRbp );
-      outB( 0x3b );
-      emitModRMMem( x._reg, regRbp, y._value );
+      emit( Instr( 0x3b ).w().reg( x._reg ).mem( regRbp, y._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ParamP ):
-      // cmp reg64, [rbp + y.value + FRAME_PARAMS_OFFSET]
-      emitRex( true, x._reg, regRbp );
-      outB( 0x3b );
-      emitModRMMem( x._reg, regRbp, y._value + FRAME_PARAMS_OFFSET );
+      // cmp reg64, [rbp + y.value + FPO]
+      emit( Instr( 0x3b ).w().reg( x._reg ).mem( regRbp, y._value + FPO ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ConstI ):
       // cmp reg64, immediate32 sign extended to 64 bits
-      emitRex( true, nullptr, x._reg );
-      outB( 0x81 );
-      emitModRM_OpcRMReg( 7, x._reg );
-      outI( y._value );
+      emit( Instr( 0x81 ).w().opc( 7 ).rmReg( x._reg ).imm32( y._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegP ):
       // cmp x_reg64, y_reg64
-      emitRex( true, x._reg, y._reg );
-      outB( 0x3b );
-      emitModRM_RegReg( x._reg, y._reg );
+      emit( Instr( 0x3b ).w().reg( x._reg ).rmReg( y._reg ) );
       break;
 
     default:
