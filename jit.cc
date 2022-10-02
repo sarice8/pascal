@@ -13,16 +13,87 @@ BUGS
 
 I have these problems.
 
-  var B1: boolean;
-  var I1, I2: integer;
-  B1 := I1 < I3;
-  writeln( B1 );
+  - calling convention to standard external code;
+      when do I need to promote boolean param to int?  Not if extern is explicitly bool.
+  - I should support emitMov( int, byte ) e.g. for passing a byte to an extern method taking int,
+      where that should be allowed.  Just need the appropriate movsx instruction.
+  - stack size/align rules (?) e.g. I saw somewhere requires stack aligned on 16 bytes or something?
+  - also I've done no align/padding of allocated vars, or record fields.
 
-  - Reading byte var from B1 is generating mov into bh
-    Seems the encoding is messed up for 8-bit regs.
-    Need to review how to indicate the proper set, including r8-r15.
-    Probably this is affected by not needing byte reg codes for rbp etc.
+  - not yet honoring callee-save or caller-save of registers
+  - have not yet implemented dumping registers into temp, when I run out
+    (or when a required register is in use - though I could move that to a different reg.)
+  - I think there's also a flaw in move-register-to-temp.  The caller has already
+    popped operands off the stack, so when I try to update the contents of operand stack
+    to reflect the new location, it misses those already-popped operands.
+    A chance that those could thus refer to the old location, if they were not also
+    the one passed into the dump-to-temp call.  Maybe solve by not removing from stack
+    until the operation is done.
 
+  - I may have some situations where there are Flags on the expr stack,
+    but the operation using the operand doesn't expect that.
+    In general I'd add operandFlagsToValue() in those places.  But can I find them
+    systematically?  Or do I need to add that everywhere?
+
+
+MISSING LANGUAGE FEATURES
+
+Support reals.
+
+Support other flavors of integer - unsigned int, int64, int8.  (Look up the complete set).
+These need their own tcode operators and jit operand types, e.g. to produce different comparision flags.
+
+Pascal enums and sets.  Enums should come with strlits so they can be printed, I imagine.
+
+Support type casts.
+
+Use proper type checking for method forward declaration vs body declaration.  Type matching rule
+that folks apparently use is that must have the same type declaration, not just the same content of
+the type declaration.
+
+Add missing standard functions like sin().
+
+I'd like to add in some of the graphics functions that I think Turbo Pascal had.
+(What did I use for my old Pente program? Do I still have sources for that?)
+
+Support units, for multiple source files in project.
+
+Be able to access all parent scopes, not just immediate local and global.
+   (Can see these in the parser, but don't have a way to describe the reference,
+   or to actually access them.  Need a pointer chain as a hidden parameter into methods,
+   and follow that up as needed.)
+
+
+OUT OF SCOPE
+
+Not considering Object Pascal extensions at this time.
+Probably ot considering other extensions done by various vendors.
+
+
+ROOM FOR IMPROVEMENT
+
+Move pascal.c to C++, and use vectors instead of fixed-size arrays to remove limits.
+Be able to allocate more code/data memory if needed.
+Know how much static data memory is needed.
+Might be nice to have static allocation of data (currently only does so for string literals).
+
+Some improvements can be done directly on tCode, perhaps with an extra pass prior to jit:
+ - clean up jumps: remove chains of jumps, or jumps-to-here.
+ - no more need for label aliases after that, or multiple labels for the same location.
+ - process constants, including constant conditions, so that can improve the jump cleanup too.
+ - identify and remove unreachable code, after const cleanup.
+   (trick is that it shouldn't be fooled by jumps from within the unreachable region).
+Such a cleanup pass could read tCode1 and produce a simpler tCode2.
+
+Optimizing across statements:
+
+Keep track of when a register is an alias for a particular variable value.
+So reading the variable can instead read the register (as long as the register is not modified,
+or the variable is not modified by somebody else).  This is the sort of thing that can
+fail if optimistic about what pointers might do - but perhaps could clear alias tracking
+whenever assigning to a dereferenced pointer.  Also, could start by always writing through to
+variables, but could even eliminate that if I know there will be another write to the variable
+later before anybody could see it.
 
 */
 
@@ -434,7 +505,8 @@ void emitCmp( const Operand& x, const Operand& y );
 void emitSet( const Operand& x, ConditionFlags flags );
 void emitMov( const Operand& x, const Operand& y );
 
-void emitRex( bool overrideWidth, const Register* operandReg, const Register* baseReg );
+void emitRex( bool wide, const Register* reg, const Register* rmReg,
+              bool reg8 = false, bool rmReg8 = false );
 void emitModRMMem( const Register* operandReg, const Register* baseReg, int offset );
 void emitModRM_OpcRMMem( int opcodeExtension, const Register* baseReg, int offset );
 void emitModRM_OpcRMReg( int opcodeExtension, const Register* rm );
@@ -444,7 +516,7 @@ void emitModRM_OpcRMMemRipRelative( int opcodeExtension, void* globalPtr, int nu
 
 // runtime library methods
 extern void runlibWriteI( int val );
-extern void runlibWriteBool( int val );
+extern void runlibWriteBool( bool val );
 extern void runlibWriteStr( char* ptr );
 extern void runlibWriteP( char* ptr );
 extern void runlibWriteCR();
@@ -503,16 +575,27 @@ public:
   // requests the REX.W flag, converting a 32-bit instruction to 64-bit.
   Instr& w();
 
+  // Indicate that the instruction is using an 8-bit register.
+  // This may necessitate use of a blank REX prefix (to refer to the low byte of rsi/rdi
+  // or rsp/rbp if I want that in the future).
+  Instr& r8();
+
   // specifies an opcode extension, which lives in the reg field of the ModR/M byte.
   Instr& opc( char opcodeExtension );
 
   // specifies the reg field of ModR/M.
   Instr& reg( Register* r );
 
+  // specifies the reg field of ModR/M.  The register is 8 bits (the low 8 bits of reg).
+  Instr& reg8( Register* r );
+
   // specifies an immediate reg (not a memory reference) that goes in the r/m field of ModR/M.
   // This is used for a second register in instructions that take two immediate registers,
   // or the single immediate register in instructions that occupy the reg field with an opcode extension.
   Instr& rmReg( Register* r );
+
+  // specifies an immediate reg in the r/m field of ModR/M.  The register is 8 bits (the low 8 bits).
+  Instr& rmReg8( Register* r );
 
   // Specifies a memory reference, involving a base register and an offset.
   // The register goes in the r/m field of ModR/M.
@@ -540,6 +623,8 @@ private:
   int _imm32 = 0;
   Register* _reg = nullptr;
   Register* _base = nullptr;
+  bool _reg8 = false;
+  bool _rmReg8 = false;
   int _offset = 0;
 
   bool _haveOpcode2 = false;
@@ -590,6 +675,18 @@ Instr::reg( Register* r )
 }
 
 
+// specifies the reg field of ModR/M.  The register is 8 bits (the low 8 bits of reg).
+// (We need to know it's 8-bit, to be able to encode low byte of rsi/rdi via REX prefix.)
+//
+Instr&
+Instr::reg8( Register* r )
+{
+  reg( r );
+  _reg8 = true;
+  return *this;
+}
+
+
 // specifies an immediate reg (not a memory reference) that goes in the r/m field of ModR/M.
 // This is used for a second register in instructions that take two immediate registers,
 // or the single immediate register in instructions that occupy the reg field with an opcode extension.
@@ -598,6 +695,18 @@ Instr::rmReg( Register* r )
 {
   _base = r;
   _baseIsImmediate = true;
+  return *this;
+}
+
+
+// specifies an immediate reg (not a memory reference) that goes in the r/m field of ModR/M.
+// (We need to know it's 8-bit, to be able to encode low byte of rsi/rdi via REX prefix.)
+//
+Instr&
+Instr::rmReg8( Register* r )
+{
+  rmReg( r );
+  _rmReg8 = true;
   return *this;
 }
 
@@ -648,7 +757,7 @@ Instr::emit() const
 {
   // optional REX prefix.
   // This gives access to registers r8-r15, and/or reequests 64-bit data width.
-  emitRex( _wide, _reg, _base );
+  emitRex( _wide, _reg, _base, _reg8, _rmReg8 );
 
   // opcode
   outB( _opcode1 );
@@ -2273,7 +2382,7 @@ emitInc( const Operand& x )
 
     case jit_Operand_Kind_RegB:
       // inc reg8
-      emit( Instr( 0xfe ).opc( 0 ).rmReg( x._reg ) );
+      emit( Instr( 0xfe ).opc( 0 ).rmReg8( x._reg ) );
       break;
 
     case jit_Operand_Kind_RegI:
@@ -2302,7 +2411,7 @@ emitDec( const Operand& x )
 
     case jit_Operand_Kind_RegB:
       // dec reg8
-      emit( Instr( 0xfe ).opc( 1 ).rmReg( x._reg ) );
+      emit( Instr( 0xfe ).opc( 1 ).rmReg8( x._reg ) );
       break;
 
     case jit_Operand_Kind_RegI:
@@ -2479,19 +2588,19 @@ emitSet( const Operand& x, ConditionFlags flags )
       // set<cc> x_reg8
       // Note the set opcode is aligned with the condition codes.
       // Note this instruction is unusual in that the reg field of ModR/M is unused and ignored.
-      emit( Instr( 0x0f, 0x10 + (int)flags ).rmReg( x._reg ) );
+      emit( Instr( 0x0f, 0x10 + (int)flags ).rmReg8( x._reg ) );
       break;
     case jit_Operand_Kind_RegI:
       // set<cc> x_reg8  -- this sets only a byte value
-      emit( Instr( 0x0f, 0x10 + (int)flags ).rmReg( x._reg ) );
+      emit( Instr( 0x0f, 0x10 + (int)flags ).rmReg8( x._reg ) );
       // movsx x_reg32, x_reg8  -- sign extend to 32 bits
-      emit( Instr( 0x0f, 0xbe ).reg( x._reg ).rmReg( x._reg ) );
+      emit( Instr( 0x0f, 0xbe ).reg( x._reg ).rmReg8( x._reg ) );
       break;   
     case jit_Operand_Kind_RegP:
       // set<cc> x_reg8  -- this sets only a byte value
-      emit( Instr( 0x0f, 0x10 + (int)flags ).rmReg( x._reg ) );
+      emit( Instr( 0x0f, 0x10 + (int)flags ).rmReg8( x._reg ) );
       // movsx x_reg64, x_reg8  -- sign extend to 64 bits
-      emit( Instr( 0x0f, 0xbe ).w().reg( x._reg ).rmReg( x._reg ) );
+      emit( Instr( 0x0f, 0xbe ).w().reg( x._reg ).rmReg8( x._reg ) );
       break;
     default:
       fatal( "emitSet: unexpected operands\n" );
@@ -2514,7 +2623,7 @@ emitMov( const Operand& x, const Operand& y )
 
     case KindPair( jit_Operand_Kind_GlobalB, jit_Operand_Kind_RegB ):
       // mov [rip + offsetToGlobal], reg8
-      emit( Instr( 0x88 ).reg( y._reg ).memRipRelative( &data[x._value] ) );
+      emit( Instr( 0x88 ).reg8( y._reg ).memRipRelative( &data[x._value] ) );
       break;
 
     case KindPair( jit_Operand_Kind_GlobalI, jit_Operand_Kind_ConstI ):
@@ -2544,7 +2653,7 @@ emitMov( const Operand& x, const Operand& y )
 
     case KindPair( jit_Operand_Kind_LocalB, jit_Operand_Kind_RegB ):
       // mov [rbp+offset], reg8
-      emit( Instr( 0x88 ).reg( y._reg ).mem( regRbp, x._value ) );
+      emit( Instr( 0x88 ).reg8( y._reg ).mem( regRbp, x._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_LocalI, jit_Operand_Kind_ConstI ):
@@ -2574,7 +2683,7 @@ emitMov( const Operand& x, const Operand& y )
 
     case KindPair( jit_Operand_Kind_ParamB, jit_Operand_Kind_RegB ):
       // mov [rbp + offset + FPO], reg8
-      emit( Instr( 0x88 ).reg( y._reg ).mem( regRbp, x._value + FPO ) );
+      emit( Instr( 0x88 ).reg8( y._reg ).mem( regRbp, x._value + FPO ) );
       break;
 
     case KindPair( jit_Operand_Kind_ParamI, jit_Operand_Kind_ConstI ):
@@ -2607,7 +2716,7 @@ emitMov( const Operand& x, const Operand& y )
 
     case KindPair( jit_Operand_Kind_ActualB, jit_Operand_Kind_RegB ):
       // mov [rsp + offset], reg8
-      emit( Instr( 0x88 ).reg( y._reg ).mem( regRsp, x._value ) );
+      emit( Instr( 0x88 ).reg8( y._reg ).mem( regRsp, x._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_ActualI, jit_Operand_Kind_ConstI ):
@@ -2632,17 +2741,17 @@ emitMov( const Operand& x, const Operand& y )
 
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_GlobalB ):
       // mov reg8, [rip + offsetToGlobal]
-      emit( Instr( 0x8a ).reg( x._reg ).memRipRelative( &data[y._value] ) );
+      emit( Instr( 0x8a ).reg8( x._reg ).memRipRelative( &data[y._value] ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_LocalB ):
       // mov x_reg8, [rbp + y._value]
-      emit( Instr( 0x8a ).reg( x._reg ).mem( regRbp, y._value ) );
+      emit( Instr( 0x8a ).reg8( x._reg ).mem( regRbp, y._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_ParamB ):
       // mov x_reg8, [rbp + y._value + FPO]
-      emit( Instr( 0x8a ).reg( x._reg ).mem( regRbp, y._value + FPO ) );
+      emit( Instr( 0x8a ).reg8( x._reg ).mem( regRbp, y._value + FPO ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_ConstI ):
@@ -2653,19 +2762,19 @@ emitMov( const Operand& x, const Operand& y )
       // and Instr() doesn't know how to do that without a base reg.
       // I can't create an Instr() with a base reg, because that would
       // lead to a ModR/M byte.
-      emitRex( false, nullptr, x._reg );
+      emitRex( false, nullptr, x._reg, false, true );
       outB( 0xb0 | regIdLowBits( x._reg->_nativeId ) );
       outB( y._value );
       break;
 
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_RegB ):
       // mov x_reg8, y_reg8
-      emit( Instr( 0x8a ).reg( x._reg ).rmReg( y._reg ) );
+      emit( Instr( 0x8a ).reg8( x._reg ).rmReg8( y._reg ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_RegP_DerefB ):
       // mov x_reg8, [y_reg64 + offset]
-      emit( Instr( 0x8a ).reg( x._reg ).mem( y._reg, y._value ) );
+      emit( Instr( 0x8a ).reg8( x._reg ).mem( y._reg, y._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_GlobalI ):
@@ -2789,7 +2898,7 @@ emitMov( const Operand& x, const Operand& y )
 
     case KindPair( jit_Operand_Kind_RegP_DerefB, jit_Operand_Kind_RegB ):
       // mov [x_reg64 + offset], y_reg8
-      emit( Instr( 0x88 ).reg( y._reg ).mem( x._reg, x._value ) );
+      emit( Instr( 0x88 ).reg8( y._reg ).mem( x._reg, x._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegP_DerefI, jit_Operand_Kind_ConstI ):
@@ -2828,15 +2937,22 @@ emitMov( const Operand& x, const Operand& y )
 
 // Emit a REX prefix if necessary.
 // overrideWidth is true if we need to change a 32-bit operation to 64-bit.
-// operandReg is the register that will be specified in the instruction's ModRM.reg field (if any).
+// reg is the register that will be specified in the instruction's ModRM.reg field (if any).
 //     The REX.R bit gives access to the extended set of registers there.
-// baseReg is the register that will be specified in the instruction's ModRM.rm field
+// rmReg is the register that will be specified in the instruction's ModRM.rm field
 //     or the SIB.base field (if any).
 //     Or for instuctions without any ModR/M byte, the register specified in the opcode's own reg field.
 //     The REX.B field gives access to extended registers there.
 //     Note that some instructions (e.g. ADD REG, immediate) use the Mod/RM rm field for the register,
 //     because they use the reg field as an opcode extension.   So be sure to pass the register
 //     to this method's "baseReg" in that case.
+// r8 is true if reg is an 8-bit register.
+// rmReg8 is true if rmReg is an 8-bit register.
+//     We need to know the above in order to encode a reference to 8-bit register in the
+//     low byte of rsi/rdi/rsp/rbp.   This is done via the REX prefix, potentially a blank one.
+//     When a REX prefix is used, the encoding refers to the low byte of the 16 registers,
+//     rather than the legacy ah/bh/ch/dh.
+//
 // I'm not using SIB index registers, so far, so don't need the REX.X bit.
 //
 // Here is Intel's rex description, which may be clearer:
@@ -2848,19 +2964,32 @@ emitMov( const Operand& x, const Operand& y )
 //         or it modifies the opcode reg field used for accessing general purpose registers.
 // 
 void
-emitRex( bool overrideWidth, const Register* operandReg, const Register* baseReg )
+emitRex( bool overrideWidth, const Register* reg, const Register* rmReg,
+         bool reg8, bool rmReg8 )
 {
   int rex = 0x40;
   if ( overrideWidth ) {
     rex |= 8;  // REX.W
   }
-  if ( operandReg && operandReg->_nativeId >= 8 ) {
+  if ( reg && reg->_nativeId >= 8 ) {
     rex |= 4;  // REX.R
   }
-  if ( baseReg && baseReg->_nativeId >= 8 ) {
+  if ( rmReg && rmReg->_nativeId >= 8 ) {
     rex |= 1;  // REX.B
   }
   if ( rex != 0x40 ) {
+    outB( rex );
+  } else if ( reg8 && ( reg == regRsi ||
+                        reg == regRdi ||
+                        reg == regRsp ||
+                        reg == regRbp ) ) {
+    // still issue a blank rex
+    outB( rex );
+  } else if ( rmReg8 && ( rmReg == regRsi ||
+                          rmReg == regRdi ||
+                          rmReg == regRsp ||
+                          rmReg == regRbp ) ) {
+    // still issue a blank rex
     outB( rex );
   }
 }
@@ -3192,7 +3321,7 @@ runlibWriteI( int val )
 
 // TO DO: argument type byte or int?
 void
-runlibWriteBool( int val )
+runlibWriteBool( bool val )
 {
   printf( val ? "TRUE" : "FALSE" );
 }
