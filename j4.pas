@@ -10,9 +10,13 @@ var B2: boolean;
 
 begin
 
-  I1 := 0;
-  I2 := 0;
+  I1 := 10;
+  I2 := 2;
   I3 := I1 + I2;
+  I3 := -I3;
+
+  I3 := ( I2 * 2 ) + (I1 / I2) + ( I2 * 2 );
+  writeln( 'I3 = ', I3 );
 
   if I1 = 0 then
     writeln( 'Hello' );

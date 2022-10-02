@@ -53,8 +53,9 @@ the type declaration.
 
 Add missing standard functions like sin().
 
-I'd like to add in some of the graphics functions that I think Turbo Pascal had.
+Maybe add in some of the graphics functions that I think Turbo Pascal had.
 (What did I use for my old Pente program? Do I still have sources for that?)
+Or, at least hook up something like imgui so I can make some new graphical mini game programs.
 
 Support units, for multiple source files in project.
 
@@ -94,6 +95,10 @@ fail if optimistic about what pointers might do - but perhaps could clear alias 
 whenever assigning to a dereferenced pointer.  Also, could start by always writing through to
 variables, but could even eliminate that if I know there will be another write to the variable
 later before anybody could see it.
+
+Operations that work on a register then immediately assign into a variable
+could sometimes directly operate on the variable.
+e.g. ++var  is currently  push addr var, push val var, inc, assign.  But could be inc var.
 
 */
 
@@ -497,7 +502,10 @@ void emitJmp( char* addr );
 void emitJcc( char* addr, ConditionFlags flags );
 void emitAdd( const Operand& x, const Operand& y );
 void emitSub( const Operand& x, const Operand& y );
+void emitNeg( const Operand& x );
 void emitMult( const Operand& x, const Operand& y );
+void emitCdq();
+void emitDiv( const Operand& x, const Operand& y );
 void emitShl( const Operand& x, const Operand& y );
 void emitInc( const Operand& x );
 void emitDec( const Operand& x );
@@ -1061,12 +1069,27 @@ generateCode()
         }
         break;
       case tDivI : {
+          // TO DO: this is the sort of place where my flaw regarding forceAllocate
+          //   would show up.  I need to get x into edx:eax, but forceAllocateReg() after popping
+          //   x and y off the stack would leave x or y out-of-date if they had been in
+          //   an affected register.
+          // To avoid the problem for now, I'll try to get things in place prior to the pop.
+          // Specifically, move x while leaving y still on the stack, so y gets updated if needed.
+          // Still need a solution for other instructions too.
+          Operand x = operandStack[ operandStack.size()-2 ];
+          operandIntoSpecificReg( x, regRax, 4 );
+          forceAllocateReg( regRdx );
           Operand y = operandStack.back();   operandStack.pop_back();
-          Operand x = operandStack.back();   operandStack.pop_back();
-          // The following is dummy code that all needs to be replaced.
-          operandIntoReg( x );
-          tCodeNotImplemented( tCodePc[-1] );
+          operandStack.pop_back();
+          if ( y.isConst() ) {
+            // emitDiv does not accept const y
+            operandIntoReg( y );
+          }
+          // cdq to sign extend from eax to edx::eax
+          emitCdq();
+          emitDiv( x, y );  // leaves quotient in x, remainder in edx
           operandStack.push_back( x );
+          regRdx->release();
           y.release();
         }
         break;
@@ -1123,7 +1146,14 @@ generateCode()
         }
         break;
       case tNegI : {
-          tCodeNotImplemented( tCodePc[-1] );
+          Operand x = operandStack.back();   operandStack.pop_back();
+          if ( doConst && x.isConst() ) {
+            operandStack.emplace_back( x._kind, -x._value );
+          } else {
+            operandIntoReg( x );
+            emitNeg( x );
+            operandStack.push_back( x );
+          }
         }
         break;
       case tNot : {
@@ -1431,6 +1461,8 @@ forceAllocateReg( Register* reg )
 {
   if ( reg->_inUse ) {
     // Dump to temporary.
+    // TO DO: move into another register if available.
+
     // We'll need to scan through the operand stack, since those operands will
     // need to change to refer to the temporary.
     // And, this gives us an opportunity to see how big the temp needs to be.
@@ -1443,7 +1475,9 @@ forceAllocateReg( Register* reg )
         // replace entry in operand stack
         x = newX;
       } else if ( x.isDeref() && x._reg == reg ) {
-        // would need work if this can happen
+        // would need work if this can happen.
+        // e.g. move the dereferenced value into another reg, or maybe the same reg,
+        //   and from there into memory if there wasn't another reg available.
         fatal( "forceAllocateReg: unexpected Deref in operand stack\n" );
       }
     }
@@ -2301,6 +2335,32 @@ emitSub( const Operand& x, const Operand& y )
 }
 
 
+// x = -x
+// x is a register
+//
+void
+emitNeg( const Operand& x )
+{
+  switch ( x._kind ) {
+
+    case jit_Operand_Kind_RegB:
+      emit( Instr( 0xf6 ).opc( 3 ).rmReg8( x._reg ) );
+      break;
+
+    case jit_Operand_Kind_RegI:
+      emit( Instr( 0xf7 ).opc( 3 ).rmReg( x._reg ) );
+      break;
+
+    case jit_Operand_Kind_RegP:
+      emit( Instr( 0xf7 ).w().opc( 3 ).rmReg( x._reg ) );
+      break;
+
+    default:
+      fatal( "emitNeg: unexpected operands\n" );
+  }
+}
+
+
 // x * y
 // x is a register
 //
@@ -2337,6 +2397,55 @@ emitMult( const Operand& x, const Operand& y )
     default:
       toDo( "emitMult\n" );
       break;
+  }
+}
+
+
+// sign-extends eax into edx:eax
+// This is useful prior to idiv.
+// Note this is in the Intel docs on the page for "CWD/CDQ/CQO".
+// On linux, gdb reports this instruction as "cltd".
+//
+void
+emitCdq()
+{
+  outB( 0x99 );
+}
+
+
+// x = x / y
+// x is in eax, and already sign-extended into edx
+// y is a register or memory, not const.
+//
+void
+emitDiv( const Operand& x, const Operand& y )
+{
+  assert( x._reg == regRax );
+
+  switch ( KindPair( x._kind, y._kind ) ) {
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_GlobalI ):
+      // idiv [rip + offsetToGlobal]
+      emit( Instr( 0xf7 ).opc( 7 ).memRipRelative( &data[y._value] ) );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_LocalI ):
+      // idiv [rbp + y._value]
+      emit( Instr( 0xf7 ).opc( 7 ).mem( regRbp, y._value ) );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ParamI ):
+      // idiv [rbp + y._value + FPO]
+      emit( Instr( 0xf7 ).opc( 7 ).mem( regRbp, y._value + FPO ) );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_RegI ):
+      // idiv y_reg32
+      emit( Instr( 0xf7 ).opc( 7 ).rmReg( y._reg ) );
+      break;
+
+    default:
+      fatal( "emitDiv: unexpected operands\n" );
   }
 }
 

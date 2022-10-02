@@ -3,101 +3,123 @@
    3	tLabel	   1
    5	tEnter	   0
    7	tPushAddrGlobal	   8
-   9	tPushConstI	   0
+   9	tPushConstI	  10
   11	tAssignI
   12	tPushAddrGlobal	  12
-  14	tPushConstI	   0
+  14	tPushConstI	   2
   16	tAssignI
   17	tPushAddrGlobal	  16
   19	tPushGlobalI	   8
   21	tPushGlobalI	  12
   23	tAddI
   24	tAssignI
-  25	tPushGlobalI	   8
-  27	tPushConstI	   0
-  29	tEqualI
-  30	tJumpFalse	   2
-  32	tPushAddrGlobal	  22
-  34	tWriteStr
-  35	tWriteCR
-  36	tLabel	   2
-  38	tPushAddrGlobal	  20
-  40	tPushGlobalI	   8
-  42	tPushConstI	   3
-  44	tLessI
-  45	tAssignB
-  46	tPushAddrGlobal	  28
-  48	tWriteStr
-  49	tPushGlobalB	  20
-  51	tWriteBool
-  52	tWriteCR
-  53	tPushAddrGlobal	  20
-  55	tPushGlobalI	   8
-  57	tPushConstI	   3
-  59	tLessI
-  60	tNot
-  61	tAssignB
-  62	tPushAddrGlobal	  34
-  64	tWriteStr
-  65	tPushGlobalB	  20
-  67	tWriteBool
+  25	tPushAddrGlobal	  16
+  27	tPushGlobalI	  16
+  29	tNegI
+  30	tAssignI
+  31	tPushAddrGlobal	  16
+  33	tPushGlobalI	  12
+  35	tPushConstI	   2
+  37	tMultI
+  38	tPushGlobalI	   8
+  40	tPushGlobalI	  12
+  42	tDivI
+  43	tAddI
+  44	tPushGlobalI	  12
+  46	tPushConstI	   2
+  48	tMultI
+  49	tAddI
+  50	tAssignI
+  51	tPushAddrGlobal	  22
+  53	tWriteStr
+  54	tPushGlobalI	  16
+  56	tWriteI
+  57	tWriteCR
+  58	tPushGlobalI	   8
+  60	tPushConstI	   0
+  62	tEqualI
+  63	tJumpFalse	   2
+  65	tPushAddrGlobal	  28
+  67	tWriteStr
   68	tWriteCR
-  69	tPushGlobalI	   8
-  71	tPushConstI	   3
-  73	tLessI
-  74	tJumpFalse	   3
-  76	tLabelAlias	   3	   4
-  79	tPushGlobalI	  12
-  81	tPushConstI	  10
-  83	tGreaterI
-  84	tJumpFalse	   5
-  86	tLabelAlias	   5	   4
-  89	tPushGlobalI	   8
-  91	tPushGlobalI	  12
-  93	tNotEqualI
-  94	tJumpFalse	   6
-  96	tLabelAlias	   6	   4
-  99	tPushAddrGlobal	  16
- 101	tPushConstI	 100
- 103	tAssignI
- 104	tJump	   7
- 106	tLabel	   4
- 108	tPushAddrGlobal	  16
- 110	tPushConstI	 200
- 112	tAssignI
- 113	tLabel	   7
- 115	tLabel	   8
- 117	tPushGlobalI	   8
- 119	tPushConstI	   5
- 121	tLessI
- 122	tJumpFalse	   9
- 124	tPushAddrGlobal	  40
- 126	tWriteStr
- 127	tPushGlobalI	   8
- 129	tWriteI
- 130	tWriteCR
- 131	tPushAddrGlobal	   8
- 133	tPushGlobalI	   8
- 135	tPushConstI	   1
- 137	tAddI
- 138	tAssignI
- 139	tJump	   8
- 141	tLabel	   9
- 143	tLabel	  10
- 145	tPushAddrGlobal	   8
- 147	tPushGlobalI	   8
- 149	tPushConstI	   1
- 151	tSubI
- 152	tAssignI
- 153	tPushAddrGlobal	  46
- 155	tWriteStr
- 156	tPushGlobalI	   8
- 158	tWriteI
- 159	tWriteCR
+  69	tLabel	   2
+  71	tPushAddrGlobal	  20
+  73	tPushGlobalI	   8
+  75	tPushConstI	   3
+  77	tLessI
+  78	tAssignB
+  79	tPushAddrGlobal	  34
+  81	tWriteStr
+  82	tPushGlobalB	  20
+  84	tWriteBool
+  85	tWriteCR
+  86	tPushAddrGlobal	  20
+  88	tPushGlobalI	   8
+  90	tPushConstI	   3
+  92	tLessI
+  93	tNot
+  94	tAssignB
+  95	tPushAddrGlobal	  40
+  97	tWriteStr
+  98	tPushGlobalB	  20
+ 100	tWriteBool
+ 101	tWriteCR
+ 102	tPushGlobalI	   8
+ 104	tPushConstI	   3
+ 106	tLessI
+ 107	tJumpFalse	   3
+ 109	tLabelAlias	   3	   4
+ 112	tPushGlobalI	  12
+ 114	tPushConstI	  10
+ 116	tGreaterI
+ 117	tJumpFalse	   5
+ 119	tLabelAlias	   5	   4
+ 122	tPushGlobalI	   8
+ 124	tPushGlobalI	  12
+ 126	tNotEqualI
+ 127	tJumpFalse	   6
+ 129	tLabelAlias	   6	   4
+ 132	tPushAddrGlobal	  16
+ 134	tPushConstI	 100
+ 136	tAssignI
+ 137	tJump	   7
+ 139	tLabel	   4
+ 141	tPushAddrGlobal	  16
+ 143	tPushConstI	 200
+ 145	tAssignI
+ 146	tLabel	   7
+ 148	tLabel	   8
+ 150	tPushGlobalI	   8
+ 152	tPushConstI	   5
+ 154	tLessI
+ 155	tJumpFalse	   9
+ 157	tPushAddrGlobal	  46
+ 159	tWriteStr
  160	tPushGlobalI	   8
- 162	tPushConstI	   0
- 164	tLessI
- 165	tJumpFalse	  12
- 167	tLabelAlias	  12	  10
- 170	tLabel	  11
- 172	tReturn
+ 162	tWriteI
+ 163	tWriteCR
+ 164	tPushAddrGlobal	   8
+ 166	tPushGlobalI	   8
+ 168	tPushConstI	   1
+ 170	tAddI
+ 171	tAssignI
+ 172	tJump	   8
+ 174	tLabel	   9
+ 176	tLabel	  10
+ 178	tPushAddrGlobal	   8
+ 180	tPushGlobalI	   8
+ 182	tPushConstI	   1
+ 184	tSubI
+ 185	tAssignI
+ 186	tPushAddrGlobal	  52
+ 188	tWriteStr
+ 189	tPushGlobalI	   8
+ 191	tWriteI
+ 192	tWriteCR
+ 193	tPushGlobalI	   8
+ 195	tPushConstI	   0
+ 197	tLessI
+ 198	tJumpFalse	  12
+ 200	tLabelAlias	  12	  10
+ 203	tLabel	  11
+ 205	tReturn
