@@ -539,7 +539,9 @@ NODE_PTR dNode;  // temporary for several mechanisms
     case equal_label :
             ssl_result = (ssl_argv(0,2) == ssl_argv(1,2));
             continue;
-
+    case oMININT :
+            ssl_result = -2147483648;  // 0x80000000
+            continue;
 
     /* Mechanism more_builtins */
 
@@ -817,6 +819,19 @@ NODE_PTR dNode;  // temporary for several mechanisms
             ssl_warning( "  oMsg occurred" );
             ssl_traceback();
             // ssl_print_input_position();
+            continue;
+     case oMsgNode :
+            nodeDumpNodeShort( (NODE_PTR) ssl_param );
+            continue;
+     case oMsgNodeVec : {
+            NODE_VEC_PTR nv = (NODE_VEC_PTR) ssl_param;
+            printf( "NodeVec: size %d:\n", nv->size );
+            for ( int i = 0; i < nv->size; ++i ) {
+              NODE_PTR node = nv->elements[i];
+              nodeDumpNodeShort( node );
+            }
+            printf( "----\n" );
+            }  
             continue;
 
 

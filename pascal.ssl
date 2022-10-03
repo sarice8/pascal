@@ -315,6 +315,7 @@ mechanism math:
     equal_zero (int) >> boolean
     equal_node_type (node_type, node_type) >> boolean     % Want equal_<type> for every type
     equal_label( Label, Label ) >> boolean
+    oMININT >> int    % the minimum 32-bit integer.  necessary because ssl literal ints are currently (silently) short (!)
     ;
 
 mechanism more_builtins:      % These should be built-in SSL operations
@@ -394,6 +395,8 @@ mechanism loop_mech:
 mechanism msg_mech:
    oMsg( int num )             % print message "oMsg <num>"
    oMsgTrace( int num )        % print message "oMsg <num>" followed by ssl traceback
+   oMsgNode( Node node )       % print node
+   oMsgNodeVec( NodeVec vec )  % print node vec
    ;
 
 
@@ -444,12 +447,9 @@ DecVar( Node decl );
 CFToVal( inout Label falseLabel );
 ValToCF( out Label falseLabel );
 
-
-
 % ----------------------------- Declarations ----------------------------
 
 Program:
-   Node progDecl
    Node t
 
    oScopeBegin
@@ -458,8 +458,7 @@ Program:
    @installBuiltIns
 
    % Start by calling the main program routine
-   Label mainLabel
-   mainLabel = oLabelNew
+   Label mainLabel = oLabelNew
 
    .tCall  oEmitLabel( mainLabel )
    .tReturn
@@ -467,7 +466,7 @@ Program:
    pProgram
    pIdent
 
-   progDecl = @newIdent( nProgram, kProgram, LAST_ID )
+   Node progDecl = @newIdent( nProgram, kProgram, LAST_ID )
    oScopeDeclare( progDecl )
 
    [
@@ -539,22 +538,18 @@ BlockStmt( Label labelForBody ):
    @Statement
    .tReturn
 
-   int localSpace
-   localSpace = oNodeGetInt( oScopeCurrent, qSize )
+   int localSpace = oNodeGetInt( oScopeCurrent, qSize )
    oPatch( patchLS, localSpace )
    ;
 
 
 
 ProcDecl:
-   Node decl
-
    pIdent
-   decl = @newIdent( nProc, kProc, LAST_ID )
+   Node decl = @newIdent( nProc, kProc, LAST_ID )
 
    oScopeBegin
-   Node paramScope
-   paramScope = oScopeCurrent
+   Node paramScope = oScopeCurrent
 
    @FormalArgDecl
    oNodeSet( decl, qParams, paramScope )
@@ -572,8 +567,7 @@ ProcDecl:
    oNodeSetBoolean( oScopeCurrent, qAllocDown, true )
    oNodeSet( decl, qChildScope, oScopeCurrent )
 
-   Label label
-   label = oLabelNew
+   Label label = oLabelNew
    @Block( nLocalVar, label )
    oNodeSetLabel( decl, qValue, label )
    oNodeSetBoolean( decl, qAddrDefined, true )
@@ -583,21 +577,18 @@ ProcDecl:
    ';';
 
 FuncDecl:
-   Node decl
-   Node theType
-
    pIdent
-   decl = @newIdent( nFunc, kFunc, LAST_ID )
+   Node decl = @newIdent( nFunc, kFunc, LAST_ID )
 
    oScopeBegin
-   Node paramScope
-   paramScope = oScopeCurrent
+   Node paramScope = oScopeCurrent
 
    @FormalArgDecl
    oNodeSet( decl, qParams, paramScope )
 
    ':'
 
+   Node theType
    @TypeRef( theType )
    oNodeSet( decl, qType, theType )
 
@@ -605,8 +596,7 @@ FuncDecl:
    % which will point to a temporary in the caller's scope.
    % This pointer is essentially a VAR param, but I won't create an nParam for it.
 
-   Node ptrType
-   ptrType = @PointerTypeTo( theType )
+   Node ptrType = @PointerTypeTo( theType )
    oNodeSetInt( decl, qResultOffset, oScopeAllocType( ptrType ) )
 
    ';'
@@ -622,8 +612,7 @@ FuncDecl:
    oNodeSetBoolean( oScopeCurrent, qAllocDown, true )
    oNodeSet( decl, qChildScope, oScopeCurrent )
 
-   Label label
-   label = oLabelNew
+   Label label = oLabelNew
    @Block( nLocalVar, label )
    oNodeSetLabel( decl, qValue, label )
    oNodeSetBoolean( decl, qAddrDefined, true )
@@ -637,11 +626,9 @@ FormalArgDecl:
    [
       | '(' :
          {
-            NodeVec decls
-            decls = oNodeVecNew
+            NodeVec decls = oNodeVecNew
             Node decl
-            boolean isInOut
-            isInOut = false
+            boolean isInOut = false
 
             [
                | pVar : isInOut = true
@@ -670,8 +657,7 @@ FormalArgDecl:
                | * :      allocType = theType
             ]
 
-            int i
-            i = 0
+            int i = 0
             {[ equal( i, oNodeVecSize( decls ) )
                | false :
                   decl = oNodeVecElement( decls, i )
@@ -697,14 +683,12 @@ FormalArgDecl:
 ConstDecl:
    {[
       | pIdent :
-         Node decl
-         decl = @newIdent( nConst, kConst, LAST_ID )
+         Node decl = @newIdent( nConst, kConst, LAST_ID )
          '='
 
          @ConstExpr
          % TO DO: currently ConstExpr leaves int result on oValue stack
-         int val
-         val = oValueTop
+         int val = oValueTop
          oValuePop
          oNodeSetInt( decl, qValue, val )
 
@@ -720,8 +704,7 @@ ConstDecl:
 TypeDecl:
    {[
       | pIdent :
-         Node decl
-         decl = @newIdent( nTypeDecl, kType, LAST_ID )
+         Node decl = @newIdent( nTypeDecl, kType, LAST_ID )
          '='
          Node theType
          @TypeRef( theType )
@@ -735,8 +718,7 @@ TypeDecl:
 VarDecl( node_type varNodeType ):
    {[
       | pIdent :
-         NodeVec decls
-         decls = oNodeVecNew
+         NodeVec decls = oNodeVecNew
          Node decl
          {
             decl = @newIdent( varNodeType, kVar, LAST_ID )
@@ -752,8 +734,7 @@ VarDecl( node_type varNodeType ):
          Node theType
          @TypeRef( theType )
 
-         int i
-         i = 0
+         int i = 0
          {[ equal( i, oNodeVecSize( decls ) )
            | false :
              decl = oNodeVecElement( decls, i )
@@ -780,8 +761,7 @@ VarDecl( node_type varNodeType ):
 TypeRef( out Node resultType ):
    [
       | pIdent :           % previously named type (including intrinsics)
-         Node decl
-         decl = oScopeFindRequire
+         Node decl = oScopeFindRequire
          [ oNodeType( decl )
            | nTypeDecl :
                resultType = oNodeGet( decl, qType )
@@ -799,16 +779,14 @@ TypeRef( out Node resultType ):
          % First, we build a vector of nArray's, each with one subrange as its index type,
          % but without setting the "of" type or size.
 
-         NodeVec dimensions
-         dimensions = oNodeVecNew
+         NodeVec dimensions = oNodeVecNew
 
          {
             % to do: probably should use general subrange parsing, incl minimal size value
             %   In fact, supposed to parse ordinal_type here.  all ordinal types have a static low, high.
             %   Not necessary to be a subrange.
 
-            Node subrange
-            subrange = oNodeNew( nSubrangeType )
+            Node subrange = oNodeNew( nSubrangeType )
             % TO DO: currently assuming subrange of integer
             oNodeSet( subrange, qBaseType, IntegerType )
 
@@ -824,8 +802,7 @@ TypeRef( out Node resultType ):
 
             oTypeAdd( subrange )
 
-            Node a
-            a = oNodeNew( nArrayType )
+            Node a = oNodeNew( nArrayType )
             oNodeSet( a, qIndexType, subrange )
 
             oNodeVecAppend( dimensions, a )
@@ -836,6 +813,7 @@ TypeRef( out Node resultType ):
                | ',' :
             ]
          }
+
          pOf
          Node baseType
          @TypeRef( baseType )
@@ -844,18 +822,16 @@ TypeRef( out Node resultType ):
          % hooking up the 'of' type and calculating the size.
          % At each iteration, baseType is the 'of' type.
 
-         int dim
-         dim = oNodeVecSize( dimensions )
+         int dim = oNodeVecSize( dimensions )
+
          {
              dec(dim)
 
-             Node a
-             a = oNodeVecElement( dimensions, dim )
+             Node a = oNodeVecElement( dimensions, dim )
+
              oNodeSet( a, qBaseType, baseType )
-             Node subrange
-             subrange = oNodeGet( a, qIndexType )
-             int width
-             width = subtract( oNodeGetInt( subrange, qHigh ), oNodeGetInt( subrange, qLow ) )
+             Node subrange = oNodeGet( a, qIndexType )
+             int width = subtract( oNodeGetInt( subrange, qHigh ), oNodeGetInt( subrange, qLow ) )
              inc( width )
              oNodeSetInt( a, qSize, multiply( width, oNodeGetInt( baseType, qSize ) ) )
 
@@ -882,8 +858,7 @@ TypeRef( out Node resultType ):
 
          @VarDecl( nRecordField )
 
-         int size
-         size = oNodeGetInt( oScopeCurrent, qSize )
+         int size = oNodeGetInt( oScopeCurrent, qSize )
          % to do: padding
          [ equal_zero( size )
             | true : #eRecordEmpty
@@ -920,8 +895,7 @@ ConstExpr:
       | pIntLit :
          oValuePush( TOKEN_VALUE )
       | pIdent :
-         Node decl
-         decl = oScopeFindRequire
+         Node decl = oScopeFindRequire
          [ oNodeType( decl )
             | nConst :
                oValuePush( oNodeGetInt( decl, qValue ) )
@@ -982,8 +956,7 @@ ConstExpr:
 % control flow internally for subexpressions).
 %
 Expr:
-   Label falseLabel
-   falseLabel = labelNull
+   Label falseLabel = labelNull
 
    @ExprAllowCF( falseLabel )
    @CFToVal( falseLabel );
@@ -1021,8 +994,7 @@ BooleanExprControlFlow( out Label falseLabel ):
 CFToVal( inout Label falseLabel ):
    [ oTypeSNodeType
       | nBooleanCFType :
-         Label doneLabel
-         doneLabel = oLabelNew
+         Label doneLabel = oLabelNew
          .tPushConstI  oEmitInt( 1 )
          .tJump  oEmitLabel( doneLabel )
          .tLabel  oEmitLabel( falseLabel )
@@ -1152,8 +1124,7 @@ ExprAllowCF( out Label falseLabel ):
 
 
 BoolExprAllowCF( out Label falseLabel ):
-   Label trueLabel
-   trueLabel = labelNull
+   Label trueLabel = labelNull
 
    @BoolTermAllowCF( falseLabel )
    {[
@@ -1209,8 +1180,7 @@ BoolExprAllowCF( out Label falseLabel ):
 
 
 BoolTermAllowCF( out Label falseLabel ):
-   Label overallFalseLabel
-   overallFalseLabel = labelNull
+   Label overallFalseLabel = labelNull
 
    @BoolFactorAllowCF( falseLabel )
    {[
@@ -1241,8 +1211,7 @@ BoolTermAllowCF( out Label falseLabel ):
             | * :
          ]
 
-         Label factorFalseLabel
-         factorFalseLabel = labelNull
+         Label factorFalseLabel = labelNull
          @BoolFactorAllowCF( factorFalseLabel )
 
          [ oTypeSNodeType
@@ -1260,8 +1229,7 @@ BoolTermAllowCF( out Label falseLabel ):
 BoolFactorAllowCF( out Label falseLabel ):
    [
       | pNot :
-         Label factorFalseLabel
-         factorFalseLabel = labelNull
+         Label factorFalseLabel = labelNull
 
          @BoolFactorAllowCF( factorFalseLabel )
          [ oTypeSNodeType
@@ -1348,9 +1316,8 @@ PrimaryAllowCF( out Label falseLabel ):
          oTypeSPush( StringType )
 
       | pIdent :
-         Node decl
+         Node decl = oScopeFindRequire
          Node theType
-         decl = oScopeFindRequire
 
          [ oNodeType( decl )
             | nFunc :
@@ -1378,9 +1345,8 @@ PrimaryAllowCF( out Label falseLabel ):
       | '@' :        % @var -- pointer to var
          pIdent
 
-         Node decl
+         Node decl = oScopeFindRequire
          Node theType
-         decl = oScopeFindRequire
 
          @LValueVar( decl )
 
@@ -1388,8 +1354,7 @@ PrimaryAllowCF( out Label falseLabel ):
          % Replace with ptr-to-<type>.
          theType = oTypeSTop
          oTypeSPop
-         Node ptrType
-         ptrType = @PointerTypeTo( theType )
+         Node ptrType = @PointerTypeTo( theType )
          oTypeSPush( ptrType )
 
       | * :
@@ -1403,8 +1368,7 @@ PrimaryAllowCF( out Label falseLabel ):
 % Leaves the value on the expression stack, and type on the type stack.
 %
 VarExpr( Node decl ):
-   Node theType
-   theType = oNodeGet( decl, qType )
+   Node theType = oNodeGet( decl, qType )
    oTypeSPush( theType )
    [ oTypeSNodeType
       | nIntegerType :
@@ -1515,8 +1479,7 @@ ArraySubscripts:
       ]
 
       % low subscript of this dimension
-      int low
-      low = @OrdinalLow( oNodeGet( oTypeSTop, qIndexType ) )
+      int low = @OrdinalLow( oNodeGet( oTypeSTop, qIndexType ) )
 
       % replace type stack with next dimension, or OF type
       Node baseType
@@ -1534,8 +1497,7 @@ ArraySubscripts:
       ]
 
       % multiply by element size
-      int size
-      size = oNodeGetInt( baseType, qSize )
+      int size = oNodeGetInt( baseType, qSize )
       [ equal( size, 1 )
          | false :
             .tPushConstI oEmitInt( size ) .tMultI
@@ -1558,8 +1520,7 @@ RecordFieldRef:
    ]
    oScopeEnter( oNodeGet( oTypeSTop, qScope ) )
    pIdent
-   Node field
-   field = oScopeFindRequire
+   Node field = oScopeFindRequire
    % oScopeFind searches all open scopes, so make sure we found nRecordField
    % which could only be seen in the local scope we entered above.
    [ oNodeType( field )
@@ -1567,8 +1528,7 @@ RecordFieldRef:
       | * :   #eNotRecordField
    ]
    oScopeEnd
-   int offset
-   offset = oNodeGetInt( field, qValue )
+   int offset = oNodeGetInt( field, qValue )
    [ equal_zero( offset )
       | false :
          .tPushConstI oEmitInt( offset ) .tAddPI
@@ -1590,8 +1550,7 @@ PointerDeref:
    ]
    .tFetchP           % now addr on stack is addr of what we're pointing to
 
-   Node theType
-   theType = oTypeSTop
+   Node theType = oTypeSTop
    oTypeSPop
    oTypeSPush( oNodeGet( theType, qBaseType ) )
    ;
@@ -1617,11 +1576,10 @@ Call( Node method ):
    % If this is a function, we will allocate a temporary
    % in the current scope, to hold the result value.
    % And pass a pointer to that temporary as an extra parameter.
-   boolean isFunc
    Node resultType
    int tempOffset
 
-   isFunc = equal_node_type( oNodeType( method ), nFunc )
+   boolean isFunc = equal_node_type( oNodeType( method ), nFunc )
 
    [ isFunc
       | true :
@@ -1633,14 +1591,11 @@ Call( Node method ):
    ]
    
 
-   Node paramScope
-   paramScope = oNodeGet( method, qParams )
-   int actualsSize
-   actualsSize = oNodeGetInt( paramScope, qSize )
+   Node paramScope = oNodeGet( method, qParams )
+   int actualsSize = oNodeGetInt( paramScope, qSize )
    .tAllocActuals  oEmitInt( actualsSize )
 
-   Node param
-   param = oNodeGet( paramScope, qDecls )
+   Node param = oNodeGet( paramScope, qDecls )
    [
       | '(' :
       
@@ -1650,8 +1605,7 @@ Call( Node method ):
                | * :
             ]
 
-            int offset
-            offset = oNodeGetInt( param, qValue )
+            int offset = oNodeGetInt( param, qValue )
 
             % Assign actual value to spot in actuals space
             .tPushAddrActual oEmitInt( offset )
@@ -1685,8 +1639,7 @@ Call( Node method ):
                              | nPointerType :            .tAssignP
                              | * :
                                  % compound types: copy value into actuals space
-                                 int size
-                                 size = oNodeGetInt( oTypeSTop, qSize )
+                                 int size = oNodeGetInt( oTypeSTop, qSize )
                                  .tCopy  oEmitInt( size )    % multi-word copy
                           ]
             ]
@@ -1756,8 +1709,7 @@ Statement:
 
 
 AssignOrCallStmt:
-   Node decl
-   decl = oScopeFindRequire
+   Node decl = oScopeFindRequire
    [ oNodeType( decl )
       | nProc :                           @Call( decl )
       | nGlobalVar, nLocalVar, nParam :   @AssignStmt( decl )
@@ -1783,8 +1735,7 @@ AssignStmt( Node decl ):
       % compound var assigns; addrs of src, dest on stack
       | nPointerType :            .tAssignP
       | * :
-          int size
-          size = oNodeGetInt( oTypeSTop, qSize )
+          int size = oNodeGetInt( oTypeSTop, qSize )
           .tCopy  oEmitInt( size )    % multi-word copy
    ]
    oTypeSPop
@@ -1816,8 +1767,7 @@ AssignResultStmt( Node funcDecl ):
       % compound var assigns; addrs of src, dest on stack
       | nPointerType :            .tAssignP
       | * :
-          int size
-          size = oNodeGetInt( oTypeSTop, qSize )
+          int size = oNodeGetInt( oTypeSTop, qSize )
           .tCopy  oEmitInt( size )    % multi-word copy
    ]
    oTypeSPop
@@ -1834,8 +1784,7 @@ LValueExpr:
    % At the moment, all lvalue expressions start with a variable name.
    % I think there can also be typecasts, not supported yet.  Check standard syntax.
    pIdent
-   Node decl
-   decl = oScopeFindRequire
+   Node decl = oScopeFindRequire
    [ oNodeType( decl )
       | nGlobalVar, nLocalVar, nParam :
       | * :  #eNotVar
@@ -1885,16 +1834,14 @@ DecVar( Node decl ):
 
 
 IfStmt:
-   Label falseLabel
-   falseLabel = labelNull
+   Label falseLabel = labelNull
 
    @BooleanExprControlFlow( falseLabel )
    pThen
    @Statement
    [
       | pElse :
-         Label doneLabel
-         doneLabel = oLabelNew
+         Label doneLabel = oLabelNew
 
          .tJump  oEmitLabel( doneLabel )
          .tLabel oEmitLabel( falseLabel )
@@ -1909,8 +1856,7 @@ IfStmt:
 ForStmt:
    pIdent
 
-   Node decl
-   decl = oScopeFindRequire
+   Node decl = oScopeFindRequire
    % TO DO: disallow use of a compound variable field.
    %        Could do that by disallowing use of LValueIndexes,
    %        or by double-checking the decl's qType here.
@@ -1923,15 +1869,12 @@ ForStmt:
    @RequireIntPop
    .tAssignI
 
-   Label breakLabel
-   breakLabel = oLabelNew
+   Label breakLabel = oLabelNew
 
-   Label checkLabel
-   checkLabel = oLabelNew
+   Label checkLabel = oLabelNew
    .tJump  oEmitLabel( checkLabel )
 
-   Label continueLabel
-   continueLabel = oLabelNew
+   Label continueLabel = oLabelNew
    .tLabel  oEmitLabel( continueLabel )
    [
       | pTo :
@@ -1960,12 +1903,10 @@ ForStmt:
 
 
 RepeatStmt:
-   Label continueLabel
-   continueLabel = oLabelNew
+   Label continueLabel = oLabelNew
    .tLabel  oEmitLabel( continueLabel )
 
-   Label breakLabel
-   breakLabel = oLabelNew
+   Label breakLabel = oLabelNew
 
    oLoopPush( continueLabel, breakLabel )
    @Statement
@@ -1983,8 +1924,7 @@ RepeatStmt:
 
 
 WhileStmt:
-   Label continueLabel
-   continueLabel = oLabelNew
+   Label continueLabel = oLabelNew
    .tLabel  oEmitLabel( continueLabel )
 
    Label breakLabel
@@ -2067,8 +2007,7 @@ ReadStmt:
 % Pop one of them, leaving only one.
 %
 MatchTypes:
-   node_type nt
-   nt = oTypeSNodeType
+   node_type nt = oTypeSNodeType
    oTypeSPop
    [ equal_node_type( nt, oTypeSNodeType )
       | false :
@@ -2110,8 +2049,7 @@ RequireBool:
 % Create and return a new nType of the given node_type, adding it to the type table.
 %
 newType( node_type nt, int size ) >> Node:
-  Node node
-  node = oNodeNew( nt )
+  Node node = oNodeNew( nt )
   oNodeSetInt( node, qSize, size )
   oTypeAdd( node )
   >> node
@@ -2122,8 +2060,7 @@ newType( node_type nt, int size ) >> Node:
 % Does not add it to any scope.
 %
 newIdent( node_type nt, kind k, int id ) >> Node:
-  Node t
-  t = oNodeNew( nt )
+  Node t = oNodeNew( nt )
   oNodeSetInt( t, qIdent, id )
   >> t
   ;
@@ -2133,8 +2070,7 @@ newIdent( node_type nt, kind k, int id ) >> Node:
 % (Creates a new type if necessary.)
 %
 PointerTypeTo( Node theType ) >> Node:
-   Node ptrType
-   ptrType = oNodeGet( theType, qPointerType )
+   Node ptrType = oNodeGet( theType, qPointerType )
    [ oNodeNull( ptrType )
       | true :
          ptrType = oNodeNew( nPointerType )
@@ -2151,7 +2087,7 @@ PointerTypeTo( Node theType ) >> Node:
 %
 OrdinalLow( Node theType ) >> int:
    [ oNodeType( theType )
-      | nIntegerType :  >> -2147483648
+      | nIntegerType :  >> oMININT    % NOTE ssl literals are limited to 16 bit at the moment, though values are 32 bit ok. So need a mechanism.
       | nBooleanType :  >> 0
       | nCharType :     >> 0
       | nSubrangeType : >> oNodeGetInt( theType, qLow )
