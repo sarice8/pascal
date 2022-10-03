@@ -14,7 +14,11 @@ BUGS
 I have these problems.
 
   - calling convention to standard external code;
-      when do I need to promote boolean param to int?  Not if extern is explicitly bool.
+      - only properly implemented for 1-parameter calls to writeln etc.
+        More work needed for general function parameters and return value etc.
+      - hardcoded for linux.  win64 version not implemented or triggered yet.
+      - when do I need to promote boolean param to int?  Not if extern is explicitly bool.
+
   - I should support emitMov( int, byte ) e.g. for passing a byte to an extern method taking int,
       where that should be allowed.  Just need the appropriate movsx instruction.
   - stack size/align rules (?) e.g. I saw somewhere requires stack aligned on 16 bytes or something?
@@ -35,15 +39,24 @@ I have these problems.
     In general I'd add operandFlagsToValue() in those places.  But can I find them
     systematically?  Or do I need to add that everywhere?
 
+  - Bug in ssl tool: ssl int literals are silently limited to short,
+      which I noticed when using a literal value for min 32-bit integer.
+      Worked around with an operation, but would be nice to advance ssl to int codes and literals,
+      and C++.
 
 MISSING LANGUAGE FEATURES
 
-Support reals.
+real type not implemented.
+char type not implemented.
+file type not implemented.
+enum type not implemented.
+set type not implemented.
+
+boolean variables may not be fully fleshed out, depending on what operators are allowed on them
+(aside from and or not equal not-equal).
 
 Support other flavors of integer - unsigned int, int64, int8.  (Look up the complete set).
 These need their own tcode operators and jit operand types, e.g. to produce different comparision flags.
-
-Pascal enums and sets.  Enums should come with strlits so they can be printed, I imagine.
 
 Support type casts.
 
@@ -54,8 +67,7 @@ the type declaration.
 Add missing standard functions like sin().
 
 Maybe add in some of the graphics functions that I think Turbo Pascal had.
-(What did I use for my old Pente program? Do I still have sources for that?)
-Or, at least hook up something like imgui so I can make some new graphical mini game programs.
+Or, at least some simple modern graphics library, so I can make some mini game/toy programs.
 
 Support units, for multiple source files in project.
 
