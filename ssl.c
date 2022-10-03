@@ -870,6 +870,11 @@ short    dTemp;                            /* multi-purpose */
             ssl_var_stack[ssl_param] = (long) dNode;
             ssl_result = (dNode != NULL);
             continue;
+    case oScopeFindInCurrentScope: {
+                dNode = nodeFindValue_NoErrorChecking( dSS[dSSptr], qDecls, qIdent, ssl_last_id );
+                ssl_result = (long) dNode;
+            }
+            continue;
     case oScopeFindRequire:
             for (dSSlookup = dSSptr; dSSlookup > 0; dSSlookup--)
             {  

@@ -107,6 +107,7 @@
 #define eUndeclaredIdentifier 17
 #define eAliasNotAllowed 18
 #define eCantInitGlobalVarsYet 19
+#define eRedeclaration 20
 #define nINVALID 0
 #define Object 1
 #define nScope 2
@@ -208,10 +209,11 @@
 #define oScopeEnd 67
 #define oScopeDeclare 68
 #define oScopeFind 69
-#define oScopeFindRequire 70
-#define oInstallSystemOperations 71
-#define oInstallSystemTypes 72
-#define oWriteTables 73
+#define oScopeFindInCurrentScope 70
+#define oScopeFindRequire 71
+#define oInstallSystemOperations 72
+#define oInstallSystemTypes 73
+#define oWriteTables 74
 
 #ifdef SSL_INCLUDE_ERR_TABLE
 
@@ -236,8 +238,9 @@ struct ssl_error_table_struct ssl_error_table[] = {
    "eUndeclaredIdentifier", 17,
    "eAliasNotAllowed", 18,
    "eCantInitGlobalVarsYet", 19,
+   "eRedeclaration", 20,
    "", 0
 };
-int ssl_error_table_size = 20;
+int ssl_error_table_size = 21;
 
 #endif // SSL_INCLUDE_ERR_TABLE

@@ -13,8 +13,10 @@ SSL_RT_HEADERS = ${SSL_RT_DIR}/ssl_rt.h \
 SCHEMA_DIR     = $(RELEASE)/schema/1.3
 
 # This SSL compiler used to build this one ...
-#SSL_DIR       = ${RELEASE}/ssl/1.3.1
 SSL_DIR        = ${RELEASE}/ssl/1.3.2
+# if want to build with self, for testing:
+#SSL_DIR        = /home/steve/fun/compilers/ssl_1.3.2/ssl
+
 
 # This is the directory we would export our own build to
 OUR_RELEASE_DIR = $(RELEASE)/ssl/1.3.2

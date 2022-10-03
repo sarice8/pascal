@@ -151,6 +151,7 @@ error:
    eUndeclaredIdentifier
    eAliasNotAllowed
    eCantInitGlobalVarsYet
+   eRedeclaration
    ;
 
 
@@ -288,6 +289,7 @@ mechanism scope_mech:
     oScopeEnd                          % end current scope.  Subsequent declarations will go to parent scope.
     oScopeDeclare (Node)               % declare node in current scope
     oScopeFind (out Node) >> boolean   % find declaration of last accepted identifier
+    oScopeFindInCurrentScope >> Node   % find declaration of last accepted identifier, only in current scope
     oScopeFindRequire (out Node)       % find declaration of last accepted identifier.
                                        % Go into error recovery if not found.
     ;
@@ -579,6 +581,10 @@ DeclareVariables (node_type class, Node t, inout int addr_counter):
         % Assign address to variable
         inc (addr_counter)   oNodeSetInt (i, qAddr, addr_counter)
 
+        [ oNodeNull( oScopeFindInCurrentScope )
+            | false : #eRedeclaration
+            | * :
+        ]
         oScopeDeclare (i)
 
         % optional initialization
@@ -961,6 +967,7 @@ RuleRedefinition (Node r):
 Statement >> boolean:
     Node  i
     Node  t, t2
+    Node  s
 
     [
         | pStrLit:           % input alias
@@ -1013,6 +1020,7 @@ Statement >> boolean:
             .iReturn
 
 	| '{':
+            oScopeBegin( s )
             oPatchPushHere (patchLoop)
             oPatchMark (patchBreak)
 	    {[ @Statement
@@ -1028,6 +1036,7 @@ Statement >> boolean:
                 | false :    oPatchPopFwd (patchBreak)
                 | * :        >
             ]}
+            oScopeEnd
 
 	| '>':
             [ oPatchAnyEntries (patchLoop)
@@ -1236,6 +1245,7 @@ Choice:
     Node   choice_type    % type of expr choice
     Node   t
     Node   i
+    Node   s
     int    val
 
     %  Determine if this is an input choice or a value choice.
@@ -1272,10 +1282,12 @@ Choice:
                 ':'
                 @CopyChoiceTable (num_options)
 
+                oScopeBegin( s )
                 {[ @Statement
                     | true :
                     | *: >
-	        ]}
+                ]}
+                oScopeEnd
                 ']'
 
                 % Finish up
@@ -1315,12 +1327,12 @@ Choice:
         ]
 
         % Code for this option:
-
+        oScopeBegin( s )
         {[ @Statement
             | true:
             | *:  >
         ]}
-
+        oScopeEnd
         [
             | ']' :     % end of choice, no default
                 .iJumpForward
