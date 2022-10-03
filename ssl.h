@@ -1,4 +1,4 @@
-#define SSL_CODE_TABLE_SIZE 4300
+#define SSL_CODE_TABLE_SIZE 4400
 
 #define oJumpForward 0
 #define oJumpBack 1
@@ -106,6 +106,7 @@
 #define eParameterMismatch 16
 #define eUndeclaredIdentifier 17
 #define eAliasNotAllowed 18
+#define eCantInitGlobalVarsYet 19
 #define nINVALID 0
 #define Object 1
 #define nScope 2
@@ -234,8 +235,9 @@ struct ssl_error_table_struct ssl_error_table[] = {
    "eParameterMismatch", 16,
    "eUndeclaredIdentifier", 17,
    "eAliasNotAllowed", 18,
+   "eCantInitGlobalVarsYet", 19,
    "", 0
 };
-int ssl_error_table_size = 19;
+int ssl_error_table_size = 20;
 
 #endif // SSL_INCLUDE_ERR_TABLE

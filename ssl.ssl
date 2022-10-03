@@ -149,7 +149,8 @@ error:
    eReturnTypeMismatch
    eParameterMismatch
    eUndeclaredIdentifier
-    eAliasNotAllowed
+   eAliasNotAllowed
+   eCantInitGlobalVarsYet
    ;
 
 
@@ -579,6 +580,26 @@ DeclareVariables (node_type class, Node t, inout int addr_counter):
         inc (addr_counter)   oNodeSetInt (i, qAddr, addr_counter)
 
         oScopeDeclare (i)
+
+        % optional initialization
+        [ | '=' :
+
+            % Unfortunately I can't allow initialization of global vars yet.
+            % This is only because @SkipGlobals would need to know how to skip the
+            % initialization expression, which is a little hard. It could be implemented
+            % but didn't do it yet.
+            [ class
+                | nGlobal :  #eCantInitGlobalVarsYet
+                | * :
+            ]
+
+            Node tv, t2
+            @Lvalue_HaveIdent(i,tv)
+            .iPushResult
+            @Expr(t2)  @RequireMatchType(tv,t2)
+            .iAssign
+          | * :
+        ]
 
         [ | ',' :
           | * :   >
