@@ -23,7 +23,7 @@ begin
  B2 := false;
  B3 := true;
  B4 := false;
- B1 := B2 = B3 <> B4;   // gives true, for either (B2=B3)<>B4 or B2=(B3<>B4) but expect former
+ B1 := B2 = B3 <> B4;   // gives false, for either (B2=B3)<>B4 or B2=(B3<>B4) but expect former
  writeln( 'B1 = ', B1 );
  I1 := - 3;
 

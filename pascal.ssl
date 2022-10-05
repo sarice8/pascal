@@ -35,14 +35,6 @@ title: 'Pascal Compiler 1.1.5 -- Jan 01 ''90';
 %
 %  MISSING
 %
-%    - Functions. 
-%      Caller allocates a temporary variable for the result.
-%      The params contain an extra hidden VAR parameter, i.e. passing in the temporary by reference.
-%      After the call, the caller pushes a reference to the temporary on the expression stack.
-%      (This would push a scalar value, or the addr of the temporary if a compound type.)
-%
-%    - VAR parameters need work, on caller side and reference side (lhs and rhs).
-%
 %    - Forward declaration of proceudres and functions.
 %      Only one forward declaration should be allowed.
 %      I will overwrite the nMethod info with the final addr and param names when the true body is seen.
@@ -55,8 +47,6 @@ title: 'Pascal Compiler 1.1.5 -- Jan 01 ''90';
 %      
 %    - Consider non-ISO extensions.  e.g. see "Units" e.g. from Turbo Pascal wikipedia page.
 %      Dynamic arrays.  Objects.  But, perhaps stick to my old goal, standard Pascal.
-%
-%    - x86 code generation.
 %
 %
 %  PASCAL DOCS

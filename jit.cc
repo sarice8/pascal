@@ -51,12 +51,16 @@ char type not implemented.
 file type not implemented.
 enum type not implemented.
 set type not implemented.
+unions ( "case" inside record definition )
 
 boolean variables may not be fully fleshed out, depending on what operators are allowed on them
 (aside from and or not equal not-equal).
 
 Support other flavors of integer - unsigned int, int64, int8.  (Look up the complete set).
 These need their own tcode operators and jit operand types, e.g. to produce different comparision flags.
+
+Dynamic memory allocation functions.  Mainly new, dispose (also ReAllocMem).  fpc has a bunch of others
+but not sure how standard: https://www.tutorialspoint.com/pascal/pascal_memory.htm
 
 Support type casts.
 
@@ -1937,6 +1941,15 @@ operandCompare( Operand& x, Operand& y, ConditionFlags flags )
   operandKindAddrIntoReg( x );
   operandKindAddrIntoReg( y );
 
+  // emitCmp doesn't expect flags as input
+  // TO DO: Concern: Could it be too late to do this here.
+  //        We have to convert flags to value prior to any other operation that might touch the flags.
+  //        If I let the operands linger on the stack, that flag status can become obsolete.
+  //        How can I catch such an error, and it is is possible where else should I do the
+  //        lazy conversion to 0/1.
+  operandFlagsToValue( x, 1 );
+  operandFlagsToValue( y, 1 );
+
   // emitCmp doesn't support const in x.
   if ( x.isConst() ) {
     swap( x, y );
@@ -2563,8 +2576,14 @@ emitCmp( const Operand& x, const Operand& y )
   switch ( KindPair( x._kind, y._kind ) ) {
 
     case KindPair( jit_Operand_Kind_GlobalB, jit_Operand_Kind_ConstI ):
+      // cmp [rip + offsetToGlobal], immediate8 (truncated from the given int32)
+      emit( Instr( 0x80 ).opc( 7 ).memRipRelative( &data[x._value] ).imm8( y._value ) );
+      break;
+
     case KindPair( jit_Operand_Kind_GlobalB, jit_Operand_Kind_RegB ):
-      toDo( "emitCmp\n" );
+      // cmp [rip + offsetToGlobal], reg8
+      emit( Instr( 0x38 ).reg( y._reg ).memRipRelative( &data[x._value] ) );
+      break;
 
     case KindPair( jit_Operand_Kind_GlobalI, jit_Operand_Kind_ConstI ):
       // cmp [rip + offsetToGlobal], immediate32
@@ -2587,8 +2606,14 @@ emitCmp( const Operand& x, const Operand& y )
       break;
 
     case KindPair( jit_Operand_Kind_LocalB, jit_Operand_Kind_ConstI ):
+      // cmp [rbp + x._value], immediate8 (truncated from given int32)
+      emit( Instr( 0x80 ).opc( 7 ).mem( regRbp, x._value ).imm8( y._value ) );
+      break;
+
     case KindPair( jit_Operand_Kind_LocalB, jit_Operand_Kind_RegB ):
-      toDo( "emitCmp\n" );
+      // cmp [rbp + x._value], reg8
+      emit( Instr( 0x38 ).reg( y._reg ).mem( regRbp, x._value ) );
+      break;
 
     case KindPair( jit_Operand_Kind_LocalI, jit_Operand_Kind_ConstI ):
       // cmp [rbp + x._value], immediate32
@@ -2611,8 +2636,14 @@ emitCmp( const Operand& x, const Operand& y )
       break;
 
     case KindPair( jit_Operand_Kind_ParamB, jit_Operand_Kind_ConstI ):
+      // cmp [rbp + x._value + FPO], immediate8 (truncated from given int32)
+      emit( Instr( 0x80 ).opc( 7 ).mem( regRbp, x._value + FPO ).imm8( y._value ) );
+      break;
+
     case KindPair( jit_Operand_Kind_ParamB, jit_Operand_Kind_RegB ):
-      toDo( "emitCmp\n" );
+      // cmp [rbp + x._value + FPO], reg8
+      emit( Instr( 0x38 ).reg( y._reg ).mem( regRbp, x._value + FPO ) );
+      break;
 
     case KindPair( jit_Operand_Kind_ParamI, jit_Operand_Kind_ConstI ):
       // cmp [rbp + x._value + FPO], immediate32
@@ -2635,11 +2666,29 @@ emitCmp( const Operand& x, const Operand& y )
       break;
 
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_GlobalB ):
+      // cmp reg8, [rip + offsetToGlobal]
+      emit( Instr( 0x3a ).reg( x._reg ).memRipRelative( &data[y._value] ) );
+      break;
+
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_LocalB ):
+      // cmp reg8, [rbp + y.value]
+      emit( Instr( 0x3a ).reg( x._reg ).mem( regRbp, y._value ) );
+      break;
+
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_ParamB ):
+      // cmp reg8, [rbp + y.value + FPO]
+      emit( Instr( 0x3a ).reg( x._reg ).mem( regRbp, y._value + FPO ) );
+      break;
+
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_ConstI ):
+      // cmp reg8, immediate8 (truncated from given int32 )
+      emit( Instr( 0x80 ).opc( 7 ).rmReg( x._reg ).imm8( y._value ) );
+      break;
+
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_RegB ):
-      toDo( "emitCmp\n" );
+      // cmp x_reg8, y_reg8
+      emit( Instr( 0x3a ).reg( x._reg ).rmReg( y._reg ) );
+      break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_GlobalI ):
       // cmp reg32, [rip + offsetToGlobal]
