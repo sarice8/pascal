@@ -90,6 +90,9 @@ input:
 %  keywords  (built-in types 'integer', 'char', etc, are not keywords,
 %             type constructors 'array', 'record', 'set' are keywords,
 %             pseudo-procedures 'writeln', 'readln' are keywords)
+%
+%             forward/external/name/cdecl appear in method modifiers, in fpc grammar.
+%             I'm making them keywords to simplify parsing, but could reconsider.
 
    pProgram
    pProcedure
@@ -122,7 +125,12 @@ input:
    pWriteln
    pWrite
    pReadln
-   pRead;
+   pRead
+   pForward
+   pExternal
+   pName
+   pCdecl
+   ;
 
 
 output:
@@ -211,6 +219,7 @@ error:
    eNotInALoop
    eRecordEmpty
    eNotCurrentFunction
+   eAlreadyDefined
    ;
 
 include 'pascal_schema.ssl'
@@ -264,10 +273,11 @@ mechanism node_mech:
     oNodeSetInt (Node, node_attribute, int) % set int attribute of node
     oNodeSetBoolean (Node, node_attribute, boolean)
     oNodeSetKind (Node, node_attribute, kind) % set attribute of node  *** MIGHT NOT NEED
-    oNodeSetLabel( Node, node_attribute, Label )
+    oNodeSetLabel( Node, node_attribute, Label )  % set Label attribute of node
     oNodeGet (Node, node_attribute) >> Node    % get Node attribute of node
     oNodeGetInt (Node, node_attribute) >> int  % get int attribute of node
     oNodeGetBoolean (Node, node_attribute) >> boolean  % get int attribute of node
+    oNodeGetLabel (Node, node_attribute) >> Label      % get Label attribute of node
     oNodeNull (Node) >> boolean          % is node null?
     oNodeNext (inout Node)               % advance Node to next in list
     oNodeType (Node) >> node_type        % return node type of node
@@ -323,6 +333,7 @@ mechanism scope_mech:
     oScopeAllocType( Node theType ) >> int   % allocate space for type in current scope, and return its address
     oScopeFind >> Node                   % find declaration of last accepted identifier.  Returns Null if not found.
     oScopeFindRequire >> Node            % find declaration of last accepted identifier.  Error if not found.
+    oScopeFindInCurrentScope >> Node     % find declaration of last accepted identifier, only within the current scope.  Null if not found.
     ;
 
 
@@ -512,7 +523,18 @@ BlockDecls( node_type varNodeType ):
       | pProcedure : @ProcDecl
       | pFunction :  @FuncDecl
       | * :          >
-   ]};
+   ]}
+   @CheckForUndefinedMethods
+   ;
+
+
+% were there any procedures or functions declared in this scope
+% that were never defined?
+CheckForUndefinedMethods:
+   % TO DO
+   % Note: disregard methods marked external
+   ;
+
 
 
 BlockStmt( Label labelForBody ):
@@ -533,10 +555,73 @@ BlockStmt( Label labelForBody ):
    ;
 
 
+% modifers that may appear on a proc/function declaration.
+%
+MethodModifiers( Node decl ):
+   {[
+      | pCdecl :
+         oNodeSetBoolean( decl, qCdecl, true )
+         ';'
+
+      | * : >
+   ]}
+   ;
+
+
+ExternalDecl( Node decl ):
+   oNodeSetBoolean( decl, qExternal, true )
+   % TO DO
+   % Declares a method that resides in an external object file.
+   % Note this is fpc syntax.  I'm not sure about other Pascals.
+   [
+      | pStrLit :
+         % that was the optional library name containing the method.
+         [
+            | pName :
+               pStrLit
+               % that was the optional method name defined in that library,
+               % which might differ from the Pascal name.
+            | * :
+         ]
+      | * :
+   ];
+
 
 ProcDecl:
    pIdent
-   Node decl = @newIdent( nProc, kProc, LAST_ID )
+
+   % If we already have a forward declaration, we'll modify that decl
+   % instead of creating a second symbol table entry.
+   % (Alternatively could delete or hide the old entry.)
+   boolean redeclaring = false
+   Node decl = oScopeFindInCurrentScope
+
+   [ oNodeNull( decl )
+      | true :
+         % first declaration
+         decl = @newIdent( nProc, kProc, LAST_ID )
+         oNodeSetLabel( decl, qValue, oLabelNew )
+
+      | false :
+         % we already have a declaration.
+         % Keep it, and its label.
+         redeclaring = true
+         [ oNodeGetBoolean( decl, qBodyDefined )
+            | true : #eAlreadyDefined
+            | * :
+         ]
+         [ oNodeType( decl )
+            | nProc :
+            | * : #eAlreadyDefined   % wrong kind
+         ]
+         % Move the existing param scope aside, so we can check that the
+         % new one is consistent.  And, the body will want to see the new one
+         % since the names might differ.
+         % TO DO: If qOldParams already set, we have multiple forward decls,
+         % which I believe is supposed to be an error.
+         oNodeSet( decl, qOldParams, oNodeGet( decl, qParams ) )
+         oNodeSet( decl, qParams, Null )
+   ]
 
    oScopeBegin
    Node paramScope = oScopeCurrent
@@ -544,31 +629,87 @@ ProcDecl:
    @FormalArgDecl
    oNodeSet( decl, qParams, paramScope )
    oScopeEnd
-
-   oScopeDeclare( decl )
    ';'
 
-   % Enter the params scope again, so params are visible in body.
-   % TO DO: Perhaps I could mark the scope read-only at this point.
-   oScopeEnter( paramScope )
+   [ redeclaring
+      | false : oScopeDeclare( decl )
+      | true :  % TO DO: check that qParams is consistent with qOldParams
+   ]
 
-   % Start scope for declarations within the proc
-   oScopeBegin
-   oNodeSetBoolean( oScopeCurrent, qAllocDown, true )
-   oNodeSet( decl, qChildScope, oScopeCurrent )
+   @MethodModifiers( decl )
 
-   Label label = oLabelNew
-   @Block( nLocalVar, label )
-   oNodeSetLabel( decl, qValue, label )
-   oNodeSetBoolean( decl, qAddrDefined, true )
-   oScopeEnd
+   % Body may be a statement, "forward", "external".
+   % Note, this syntax is based on FPC, and I'm not sure if other Pascals are similar.
+   % FPC says that forward, external, cdecl, name, etc are not reserved words -
+   % I think this means the user may declare other things with those names, but if so the
+   % original meaning is lost.  I'll make them keywords for simplicity, for now
+   % (just not too happy about "name").
 
-   oScopeEnd  % paramScope
+   [
+      | pForward :
+         % Nothing to do.  We simply won't set qBodyDefined.
+
+      | pExternal : @ExternalDecl( decl )
+
+      | * :
+         % Body statement
+
+         % Enter the params scope again, so params are visible in body.
+         % TO DO: Perhaps I could mark the scope read-only at this point.
+         oScopeEnter( paramScope )
+
+         % Start scope for declarations within the proc
+         oScopeBegin
+         oNodeSetBoolean( oScopeCurrent, qAllocDown, true )
+         oNodeSet( decl, qChildScope, oScopeCurrent )
+
+         Label label = oNodeGetLabel( decl, qValue )
+         @Block( nLocalVar, label )
+         oNodeSetBoolean( decl, qBodyDefined, true )
+         oScopeEnd
+
+         oScopeEnd  % paramScope
+   ]
    ';';
+
 
 FuncDecl:
    pIdent
-   Node decl = @newIdent( nFunc, kFunc, LAST_ID )
+
+   % If we already have a forward declaration, we'll modify that decl
+   % instead of creating a second symbol table entry.
+   % (Alternatively could delete or hide the old entry.)
+   boolean redeclaring = false
+   Node decl = oScopeFindInCurrentScope
+
+   [ oNodeNull( decl )
+      | true :
+         % first declaration
+         decl = @newIdent( nFunc, kFunc, LAST_ID )
+         oNodeSetLabel( decl, qValue, oLabelNew )
+
+      | false :
+         % we already have a declaration.
+         % Keep it, and its label.
+         redeclaring = true
+         [ oNodeGetBoolean( decl, qBodyDefined )
+            | true : #eAlreadyDefined
+            | * :
+         ]
+         [ oNodeType( decl )
+            | nFunc :
+            | * : #eAlreadyDefined   % wrong kind
+         ]
+         % Move the existing param scope and return value aside,
+         % so we can check that the new one is consistent.
+         % And, the body will want to see the new one since the names might differ.
+         % TO DO: If qOldParams already set, we have multiple forward decls,
+         % which I believe is supposed to be an error.
+         oNodeSet( decl, qOldParams, oNodeGet( decl, qParams ) )
+         oNodeSet( decl, qParams, Null )
+         oNodeSet( decl, qOldType, oNodeGet( decl, qType ) )
+         oNodeSet( decl, qType, Null )
+   ]
 
    oScopeBegin
    Node paramScope = oScopeCurrent
@@ -588,27 +729,42 @@ FuncDecl:
 
    Node ptrType = @PointerTypeTo( theType )
    oNodeSetInt( decl, qResultOffset, oScopeAllocType( ptrType ) )
-
+   oScopeEnd
    ';'
 
-   oScopeEnd
-   oScopeDeclare( decl )
+   [ redeclaring
+      | false : oScopeDeclare( decl )
+      | true :  % TO DO: check that qParams is consistent with qOldParams
+                % and qType is consistent with qOldType
+   ]
 
-   % Enter the params scope again, so params are visible in body.
-   % TO DO: Perhaps I could mark the scope read-only at this point.
-   oScopeEnter( paramScope )
+   @MethodModifiers( decl )
 
-   oScopeBegin
-   oNodeSetBoolean( oScopeCurrent, qAllocDown, true )
-   oNodeSet( decl, qChildScope, oScopeCurrent )
+   % Body may be a statement, "forward", "external".
+   [
+      | pForward :
+         % Nothing to do.  We simply won't set qBodyDefined.
 
-   Label label = oLabelNew
-   @Block( nLocalVar, label )
-   oNodeSetLabel( decl, qValue, label )
-   oNodeSetBoolean( decl, qAddrDefined, true )
-   oScopeEnd
+      | pExternal : @ExternalDecl( decl )
 
-   oScopeEnd  % paramScope
+      | * :
+         % Body statement
+
+         % Enter the params scope again, so params are visible in body.
+         % TO DO: Perhaps I could mark the scope read-only at this point.
+         oScopeEnter( paramScope )
+
+         oScopeBegin
+         oNodeSetBoolean( oScopeCurrent, qAllocDown, true )
+         oNodeSet( decl, qChildScope, oScopeCurrent )
+
+         Label label = oNodeGetLabel( decl, qValue )
+         @Block( nLocalVar, label )
+         oNodeSetBoolean( decl, qBodyDefined, true )
+         oScopeEnd
+
+         oScopeEnd  % paramScope
+   ]
    ';';
 
 

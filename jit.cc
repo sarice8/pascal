@@ -19,6 +19,20 @@ I have these problems.
       - hardcoded for linux.  win64 version not implemented or triggered yet.
       - when do I need to promote boolean param to int?  Not if extern is explicitly bool.
 
+      My current plan for extern (native code) functions:
+      t code has my usual pascal calling convention for the parameters and return value.
+      i.e. it copies params into actuals space on the stack.  Only difference is
+      tCallExtern <externMethodIdentifier> rather than tCall <tCodeLabel>.
+      The identifier might be a hardcoded id, or maybe addr of a string literal that jit can look up.
+      Jit will need to find the function definition for the extern, via some other means,
+      given the identifier.
+      Jit will generate code to load the params from the stack (where I put them)
+      into the necessary registers, and vice versa for the return value.
+      It's not the most efficient, but it means the tcode doesn't depend on the platform
+      (which have different calling conventions).  Maybe later I do need some sort of
+      param tcode, that could help make this work better, but this should be an ok start.
+
+
   - I should support emitMov( int, byte ) e.g. for passing a byte to an extern method taking int,
       where that should be allowed.  Just need the appropriate movsx instruction.
   - stack size/align rules (?) e.g. I saw somewhere requires stack aligned on 16 bytes or something?
@@ -64,7 +78,8 @@ but not sure how standard: https://www.tutorialspoint.com/pascal/pascal_memory.h
 
 Support type casts.
 
-Use proper type checking for method forward declaration vs body declaration.  Type matching rule
+Forward declarations of methods.
+And, use proper type checking for method forward declaration vs body declaration.  Type matching rule
 that folks apparently use is that must have the same type declaration, not just the same content of
 the type declaration.
 
@@ -73,7 +88,15 @@ Add missing standard functions like sin().
 Maybe add in some of the graphics functions that I think Turbo Pascal had.
 Or, at least some simple modern graphics library, so I can make some mini game/toy programs.
 
-Support units, for multiple source files in project.
+Support units, for multiple source files in project, and a way to package extern library methods
+e.g. whatever graphical utility I want to make available.
+Note, I should have a way to mark the method with cdecl or similar, to know that I need to use
+the native calling convention, in addition to absolute code address.
+
+If multiple pascal units (as opposed to native units) are used together,
+those units need to be allocated within 2GB of each other so they can access
+the public global variables and methods in my usual way.  This should probably be straightforward.
+
 
 Be able to access all parent scopes, not just immediate local and global.
    (Can see these in the parser, but don't have a way to describe the reference,

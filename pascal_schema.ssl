@@ -44,7 +44,11 @@ type node_attribute:
 	qMainRoutineScope
 	qParams
 	qChildScope
-	qAddrDefined
+	qBodyDefined
+	qExternal
+	qCdecl
+	qOldParams
+	qOldType
 	qResultOffset
 	qInOut
 	qPointerType

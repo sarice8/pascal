@@ -306,6 +306,10 @@ struct ssl_token_table_struct my_keyword_table[] = {
   "write",              pWrite,
   "readln",             pReadln,
   "read",               pRead,
+  "forward",            pForward,
+  "external",           pExternal,
+  "name",               pName,
+  "cdecl",              pCdecl,
 
   NULL,                 0
 };
@@ -429,6 +433,7 @@ NODE_PTR dNode;  // temporary for several mechanisms
             continue;
     case oNodeGetInt:
     case oNodeGetBoolean:
+    case oNodeGetLabel:
             ssl_result = (long) nodeGetValue ((NODE_PTR)ssl_argv(0,2), ssl_argv(1,2));
             continue;
     case oNodeNull:
@@ -634,7 +639,11 @@ NODE_PTR dNode;  // temporary for several mechanisms
                 ssl_error_recovery ();
             }
             continue;
-
+    case oScopeFindInCurrentScope: {
+            dNode = nodeFindValue_NoErrorChecking (dScopeStack[dScopeStackPtr], qDecls, qIdent, ssl_last_id);
+            ssl_result = (long) dNode;
+            continue;
+            }
 
     /* Mechanism type_mech */
 

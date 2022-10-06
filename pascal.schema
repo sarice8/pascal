@@ -40,19 +40,27 @@ nProgram =>
 
 
 % nMethod is a proc or func declaration.
-% qValue is the method address, unless we've only seen a forward declaration
-% in which case qAddrDefined is false.
-%
-% If there's a forward declaration and the body is subsequently seen,
-% we'll update the existing nMethod to contain the final information:
-% storing the address in qValue, and updating the qParams (since the names
-% might differ), and setting qAddrDefined to true.
+% qValue is the label.  It is allocated when the declaration is first seen
+% (including forward declaration).  That lets calls invoke the method
+% before the body is seen.
+% 
+% When the body is seen, qBodyDefined is set to true.
+% A forward declaration followed by an actual body declaration will revise
+% the existing declaration in the symbol table, rather than create a second one.
 %
 nIdent ::= nMethod
 nMethod =>
         qParams:        Node            (nScope)                [Pri,Opt]
         qChildScope:    Node            (nScope)                [Pri,Opt]
-        qAddrDefined:   Boolean1
+        qBodyDefined:   Boolean1
+        qExternal:      Boolean1
+        qCdecl:         Boolean1
+
+        % The next two fields are used when a forward declaration is redefined.
+        % I don't really need to keep them, but don't have a way to cleanly delete nodes yet.
+        qOldParams:     Node            (nScope)                [Pri,Opt]
+        qOldType:       Node            (nType)                 [Pri,Opt]
+
 
 nMethod ::= nProc
 
