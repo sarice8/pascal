@@ -42,7 +42,8 @@ nProgram =>
 % nMethod is a proc or func declaration.
 % qValue is the label.  It is allocated when the declaration is first seen
 % (including forward declaration).  That lets calls invoke the method
-% before the body is seen.
+% before the body is seen.  (For an external method, the calling code will
+% define the label with .tLabelExtern)
 % 
 % When the body is seen, qBodyDefined is set to true.
 % A forward declaration followed by an actual body declaration will revise
@@ -55,6 +56,7 @@ nMethod =>
         qBodyDefined:   Boolean1
         qExternal:      Boolean1
         qCdecl:         Boolean1
+        qCalled:        Boolean1     % has anybody called this method
 
         % The next two fields are used when a forward declaration is redefined.
         % I don't really need to keep them, but don't have a way to cleanly delete nodes yet.

@@ -388,6 +388,35 @@ init_my_operations()
 }
 
 
+// Creates some global data that should appear in the output file.
+// Given a pointer to the data to be stored, and the number of bytes.
+// Returns the address of the data in the output file's global data space.
+// 
+int
+createGlobalData( char* sourceData, int sourceBytes )
+{
+  NODE_PTR globalScope = dScopeStack[1];
+  int numInts = (sourceBytes + 3) / 4;
+  if (dSLptr + numInts + 2 >= dSLsize) ssl_fatal("SL overflow");
+
+  int offset = nodeGetValue( globalScope, qSize );
+  nodeSetValue( globalScope, qSize, offset + sourceBytes );
+
+  // the data currenty resides in the output file's "strlit table"
+  // with the format:
+  //    <addr> <#ints> <int> <int> <int> ...
+
+  dSL[dSLptr++] = offset;
+  dSL[dSLptr++] = numInts;
+  int* intPtr = (int*) sourceData;
+  for (int i = 0; i < numInts; ++i) {
+  dSL[dSLptr++] = *intPtr++;
+  }
+
+  return offset;
+}
+
+
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
 
@@ -763,31 +792,19 @@ NODE_PTR dNode;  // temporary for several mechanisms
             // And with multiple output object files, relocation tables would need to be resolved by
             // a linker.   Leaving all that aside for now.
 
-            NODE_PTR globalScope = dScopeStack[1];
-
-            int size = ssl_token.namelen + 1;  // +1 for '\0'
-            // TO DO: for now, strlit table packs the data into ints, which is confusing.
-            int numInts = (size + 3) / 4;
-            if (dSLptr + numInts + 2 >= dSLsize) ssl_fatal("SL overflow");
-
-            int offset = nodeGetValue( globalScope, qSize );
-            nodeSetValue( globalScope, qSize, offset + size );
-
-            /* push string addr (global data ptr) on value stack */
-            if (++dVSptr==dVSsize) ssl_fatal("VS overflow");
-            dVS[dVSptr] = offset;
-
-            /* save in strlit table: <addr> <words> <data> */
-
-            dSL[dSLptr++] = offset;
-            dSL[dSLptr++] = numInts;
-            int* intPtr = (int*) ssl_strlit_buffer;
-            for (int i = 0; i < numInts; ++i) {
-              dSL[dSLptr++] = *intPtr++;
-            }
-
+            char* sourceStr = ssl_strlit_buffer;
+            int sourceLen = ssl_token.namelen + 1;  // +1 for '\0'
+            ssl_result = createGlobalData( sourceStr, sourceLen );
             continue;
             }
+
+     case oStringAllocLitFromIdent : {
+            char* sourceStr = ssl_get_id_string( ssl_param );
+            int sourceLen = strlen( sourceStr) + 1;  // +1 for '\0'
+            ssl_result = createGlobalData( sourceStr, sourceLen );
+            continue;
+            }
+
 
 
      /* Mechanism loop */

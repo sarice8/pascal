@@ -110,7 +110,20 @@
  177	tAssignI
  178	tCall	   5
  180	tFreeActuals	  16
- 182	tPushAddrGlobal	  94
- 184	tWriteStr
- 185	tWriteCR
- 186	tReturn
+ 182	tLabelExtern	   2	  94
+ 185	tAllocActuals	  12
+ 187	tPushAddrActual	   0
+ 189	tPushConstI	  10
+ 191	tAssignI
+ 192	tPushAddrActual	   4
+ 194	tPushConstI	  15
+ 196	tAssignI
+ 197	tPushAddrActual	   8
+ 199	tPushConstI	 255
+ 201	tAssignI
+ 202	tCallCdecl	   2
+ 204	tFreeActuals	  12
+ 206	tPushAddrGlobal	 103
+ 208	tWriteStr
+ 209	tWriteCR
+ 210	tReturn

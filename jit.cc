@@ -514,10 +514,12 @@ void preserveRegsAcrossCall();
 
 std::unordered_map<int, char*> labels;
 std::unordered_map<int, int> labelAliases;
+std::unordered_map<int, char*> unresolvedExternLabels;
 std::vector< std::pair< int*, int> > patches;
 
 void defineLabel( int label, char* addr );
 void defineLabelAlias( int label, int aliasToLabel );
+void defineLabelExtern( int label, char* name );
 char* findLabel( int label );
 void requestPatch( int* patchAt, int label );
 void makePatches();
@@ -1327,6 +1329,18 @@ generateCode()
           }
         }
         break;
+      case tCallCdecl : {
+          // TO DO
+          int label = *tCodePc++;
+          // TO DO TEMP: assume cdecl is declared as extern,
+          //    and might not be resolved:
+          auto it = unresolvedExternLabels.find( label );
+          if ( it != unresolvedExternLabels.end() ) {
+            toDo( "tCallCdecl: %s is unresolved\n", it->second );
+          }
+          toDo( "tCallCdecl is not implemented yet\n" );
+        }
+        break;
       case tReturn : {
           if ( !currLocalSpaceAddr ) {
             // We have not done tEnter.
@@ -1405,6 +1419,14 @@ generateCode()
           int label = *tCodePc++;
           int aliasToLabel = *tCodePc++;
           defineLabelAlias( label, aliasToLabel );
+        }
+        break;
+      case tLabelExtern : {
+          int label = *tCodePc++;
+          int nameOffset = *tCodePc++;
+          // Note: I need to see this prior to any calls,
+          // but that should happen since this is issued just prior to first call to the method.
+          defineLabelExtern( label, &data[nameOffset] );
         }
         break;
       case tWriteI : {
@@ -1587,6 +1609,12 @@ void
 defineLabelAlias( int label, int aliasToLabel )
 {
   labelAliases[label] = aliasToLabel;
+}
+
+void
+defineLabelExtern( int label, char* name )
+{
+  unresolvedExternLabels[label] = name;
 }
 
 

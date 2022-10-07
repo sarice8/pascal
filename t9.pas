@@ -55,6 +55,9 @@ BEGIN
   proc1( 100, 200, 300, 3 );
   proc1( 400, 500, 600, 2 );
 
+  // extern method test
+  setPixel( 10, 15, 255 );  // TO DO: accept hex numbers   $ffffff
+
   writeln( 'Good bye!' );
 
 END.

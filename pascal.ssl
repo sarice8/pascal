@@ -179,6 +179,7 @@ output:
    tAllocActuals     % <#bytes> - make space on call stack for actual params (adjusting call stack sp)
    tFreeActuals      % <#bytes> - discard space on call stack allocated by tAllocActuals
    tCall             % <label#>
+   tCallCdecl        % <label#> - call a method using native (C) calling convention. Only supported for extern labels.
    tReturn
    tEnter            % <#bytes> - start a stack frame on the call stack, reserving #bytes of local variable space
    tJump             % <label#>
@@ -186,6 +187,7 @@ output:
    tJumpFalse        % <label#>  (pops top of stack, jumps if false)
    tLabel            % <label#> - define label# at the current address
    tLabelAlias       % <label#> <aliasToLabel#> - defines label to be an alias of another label
+   tLabelExtern      % <label#> <offsetToStrLit> - defines label to mean an extern symbol, whose name is in global data
    tWriteI           % for writeln : write integer on tos, pop
    tWriteBool        %  "     "    : write TRUE/FALSE, pop
    tWriteStr         %  "     "    : write string whose addr is on tos, pop
@@ -381,8 +383,10 @@ mechanism value :              % value stack, to calc. const expr's
    oValuePop;
 
 mechanism string :
-   oStringAllocLit;            % alloc data space for strlit, push address
-                               %   on value stack
+   oStringAllocLit >> int      % alloc global space for strlit, return address
+   oStringAllocLitFromIdent( int id ) >> int  % alloc global space for strlit taken from name of ident;
+                                              %  return address
+   ;
 
 % track labels for the loop we're in, if any
 mechanism loop_mech:
@@ -568,23 +572,34 @@ MethodModifiers( Node decl ):
    ;
 
 
+% external method resides in an external object file
+% (or in my system, the built-in runtime library).
+% The method has a label, as usual, which callers will use.
+% But we define that label with .tLabelExtern rather than .tLabel.
+%
+% Note, I'll hold off on issuing the .tLabelExtern until we see that
+% the external method is actually called.  Otherwise we'd fill each output file
+% with all the external method names in my included libraries, which seems dumb.
+%
+% Note this is fpc syntax.  I'm not sure about other Pascals.
+%
 ExternalDecl( Node decl ):
    oNodeSetBoolean( decl, qExternal, true )
-   % TO DO
-   % Declares a method that resides in an external object file.
-   % Note this is fpc syntax.  I'm not sure about other Pascals.
    [
       | pStrLit :
          % that was the optional library name containing the method.
+         % TO DO: I'm currently ignoring this.
          [
             | pName :
                pStrLit
                % that was the optional method name defined in that library,
                % which might differ from the Pascal name.
+               % TO DO: I'm currently ignoring this.
             | * :
          ]
       | * :
-   ];
+   ]
+   ;
 
 
 ProcDecl:
@@ -607,6 +622,10 @@ ProcDecl:
          % Keep it, and its label.
          redeclaring = true
          [ oNodeGetBoolean( decl, qBodyDefined )
+            | true : #eAlreadyDefined
+            | * :
+         ]
+         [ oNodeGetBoolean( decl, qExternal )
             | true : #eAlreadyDefined
             | * :
          ]
@@ -1456,8 +1475,8 @@ PrimaryAllowCF( out Label falseLabel ):
          ')'
 
       | pStrLit :
-         oStringAllocLit     % store in global data, push offset on value stack
-         .tPushAddrGlobal oEmitInt( oValueTop )  oValuePop
+         int addr = oStringAllocLit     % store in global data
+         .tPushAddrGlobal oEmitInt( addr )
          % TO DO: do we need to create a type with the literal's length?
          oTypeSPush( StringType )
 
@@ -1719,6 +1738,21 @@ CoerceType:
 %
 Call( Node method ):
 
+   % Prior to first call, issue extern label for a called method.
+   % I don't want to issue .tLabelExtern for unused methods, that seems inefficient.
+   [ oNodeGetBoolean( method, qExternal )
+      | true :
+         [ oNodeGetBoolean( method, qCalled )
+            | false :
+               % define the label as extern
+               int strAddr = oStringAllocLitFromIdent( oNodeGetInt( method, qIdent ) )
+               .tLabelExtern  @EmitValue( method )  oEmitInt( strAddr )
+            | * :
+         ]
+     | * :
+   ]
+   oNodeSetBoolean( method, qCalled, true )
+
    % If this is a function, we will allocate a temporary
    % in the current scope, to hold the result value.
    % And pass a pointer to that temporary as an extra parameter.
@@ -1819,7 +1853,12 @@ Call( Node method ):
       | * :
    ]
 
-   .tCall   @EmitValue( method )
+   [ oNodeGetBoolean( method, qCdecl )
+      | true :
+         .tCallCdecl  @EmitValue( method )
+      | false :
+         .tCall   @EmitValue( method )
+   ]
 
    [ isFunc
       | true :

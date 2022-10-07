@@ -47,6 +47,7 @@ type node_attribute:
 	qBodyDefined
 	qExternal
 	qCdecl
+	qCalled
 	qOldParams
 	qOldType
 	qResultOffset

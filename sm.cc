@@ -132,6 +132,7 @@ struct instrInfo_s tCodeInstrs[] = {
   { "tAllocActuals", 1 },
   { "tFreeActuals", 1 },
   { "tCall", 1 },
+  { "tCallCdecl", 1 },
   { "tReturn", 0 },
   { "tEnter", 1 },
   { "tJump", 1 },
@@ -139,6 +140,7 @@ struct instrInfo_s tCodeInstrs[] = {
   { "tJumpFalse", 1 },
   { "tLabel", 1 },
   { "tLabelAlias", 2 },
+  { "tLabelExtern", 2 },
   { "tWriteI", 0 },
   { "tWriteBool", 0 },
   { "tWriteStr", 0 },
@@ -455,6 +457,10 @@ walkTable()
               stack[sp] = pc+1;
               pc = findLabel( code[pc] );
               continue;
+       case tCallCdecl :
+              printf( "sm: tCallCdecl not supported yet\n" );
+              pc++;
+              continue;
        case tReturn :
               if (call_fp) {
                 pc = stack[sp--];
@@ -500,6 +506,11 @@ walkTable()
               continue;
        case tLabelAlias :
               // Defines a label alias.  This is a no-op during execution.
+              pc++;
+              pc++;
+              continue;
+       case tLabelExtern :
+              // Defines an extern label.  This is a no-op during execution.
               pc++;
               pc++;
               continue;
