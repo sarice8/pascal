@@ -7,12 +7,26 @@ program test (input, output);
 
 
 // this procedure is declared as an external cdecl procedure.
-// Not fully implemented, can't call yet.
-procedure setPixel( x, y : integer; color : integer ); cdecl; external;
+procedure setPixel( x, y : integer; color : integer ); cdecl; external 'runlib' name 'runlibSetPixel';
 
-// this procedure is never defined.  Should give an error.
+// this procedure is never defined.  Should give an error, at least if we call it.
 procedure neverDefined( x: integer );
   forward;
+
+
+// cdecl method with complex parameter type is not supported yet.
+// On linux this record should be packed in a register.
+type rTwoInts = record
+    i1, i2: integer;   // ASIDE: am I right to require a ; before the end here ??
+  end;
+procedure toughCdecl1( x: rTwoInts ); cdecl; external;
+
+// cdecl method with more complex parameter type is not supported yet.
+// On linux, I think(?) this goes on the stack.
+type rThreeInts = record
+    i1, i2, i3: integer;
+  end;
+procedure toughCdecl2( x: rTwoInts ); cdecl; external;
 
 
 // forward declaration
@@ -49,6 +63,8 @@ procedure proc2( p1, p2 : integer; p3 : integer );
   end;
 
 
+var r1 : rTwoInts;
+
 BEGIN
 
   writeln( 'Proc test:' );
@@ -57,6 +73,12 @@ BEGIN
 
   // extern method test
   setPixel( 10, 15, 255 );  // TO DO: accept hex numbers   $ffffff
+
+  // unsupported cdecl test
+  r1.i1 := 1;
+  r1.i2 := 2;
+  toughCdecl1( r1 );
+
 
   writeln( 'Good bye!' );
 

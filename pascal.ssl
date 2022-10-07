@@ -177,6 +177,7 @@ output:
    tEqualP           % two two pointer values equal? (pop 2, push 1) (true=1)
    tNotEqualP
    tAllocActuals     % <#bytes> - make space on call stack for actual params (adjusting call stack sp)
+   tAllocActualsCdecl  % <#bytes> - starting a call to a cdecl method.  tcode still describes my own calling convention.
    tFreeActuals      % <#bytes> - discard space on call stack allocated by tAllocActuals
    tCall             % <label#>
    tCallCdecl        % <label#> - call a method using native (C) calling convention. Only supported for extern labels.
@@ -595,6 +596,7 @@ ExternalDecl( Node decl ):
                % that was the optional method name defined in that library,
                % which might differ from the Pascal name.
                % TO DO: I'm currently ignoring this.
+               %        Unfortunately my schema system doesn't support string fields yet!
             | * :
          ]
       | * :
@@ -1753,6 +1755,18 @@ Call( Node method ):
    ]
    oNodeSetBoolean( method, qCalled, true )
 
+   % If the method has a cdecl modifier, the back end will need to use the native
+   % calling convention, instead of my own.  But, the convention varies by platform,
+   % so the front end won't assume what it needs.  I'll still generate the normal tcode
+   % that copies values into actuals space on the stack.
+   % However, to help the back end, I will at least use a different instruction for the
+   % allocation of the actuals space, and for the actual call.
+   %
+   % p.s. I only support cdecl on external methods, because I don't have a way
+   % to let my own Pascal methods read params passed in with the cdecl calling convention.
+   %
+   boolean cdecl = oNodeGetBoolean( method, qCdecl )
+
    % If this is a function, we will allocate a temporary
    % in the current scope, to hold the result value.
    % And pass a pointer to that temporary as an extra parameter.
@@ -1773,7 +1787,10 @@ Call( Node method ):
 
    Node paramScope = oNodeGet( method, qParams )
    int actualsSize = oNodeGetInt( paramScope, qSize )
-   .tAllocActuals  oEmitInt( actualsSize )
+   [ cdecl
+      | true : .tAllocActualsCdecl  oEmitInt( actualsSize )
+      | false :  .tAllocActuals  oEmitInt( actualsSize )
+   ]
 
    Node param = oNodeGet( paramScope, qDecls )
    [
@@ -1853,7 +1870,7 @@ Call( Node method ):
       | * :
    ]
 
-   [ oNodeGetBoolean( method, qCdecl )
+   [ cdecl
       | true :
          .tCallCdecl  @EmitValue( method )
       | false :

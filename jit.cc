@@ -530,6 +530,34 @@ int* currLocalSpaceAddr = 0;
 int currLocalSpace = 0;
 
 
+// Tracking info about a call that's being constructed.
+// This is necessary to support the use of the cdecl calling convention
+// if necessary.
+class CallInfo
+{
+public:
+  CallInfo( bool cdecl )
+    : _cdecl( cdecl )
+  {}
+
+  bool _cdecl;
+  // For a cdecl call, these are the operands in actuals space
+  // that should be moved into registers.
+  std::vector<std::pair<Operand, Register*>> _actualsToRegs;
+  // TO DO: track an offset where we should really be
+  //  assigning non-register actuals to.
+  //  For the moment, I don't support non-register params in cdecl.
+  // TO DO: something about return value.
+};
+// We might have calls within actual expressions, so a stack of calls
+// in the process of construction.
+std::vector<CallInfo> callInfos;
+
+void checkForAssignToActual( Operand& lhs, jitOperandKind actualKind );
+void cdeclParamsIntoRegisters();
+
+
+
 // x86 operations
 //
 void emitEnter( int localSpace );
@@ -569,6 +597,7 @@ extern void runlibWriteBool( bool val );
 extern void runlibWriteStr( char* ptr );
 extern void runlibWriteP( char* ptr );
 extern void runlibWriteCR();
+extern void runlibSetPixel( int x, int y, int color );
 
 
 int
@@ -997,6 +1026,11 @@ generateCode()
       case tAssignI : {
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
+
+          // Watching for assignment into actuals space,
+          // to help with cdecl calls.  This assign is not affected.
+          checkForAssignToActual( x, jit_Operand_Kind_ActualI );
+
           // x is a pointer to a value of size 4.
           // Make x refer to the pointed-to value (still usable as target of mov)
           operandDeref( x, 4 );
@@ -1010,6 +1044,11 @@ generateCode()
       case tAssignB : {
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
+
+          // Watching for assignment into actuals space,
+          // to help with cdecl calls.  This assign is not affected.
+          checkForAssignToActual( x, jit_Operand_Kind_ActualB );
+
           // allow for y being flags
           operandFlagsToValue( y, 1 );
           // x is a pointer to a value of size 1.
@@ -1025,6 +1064,11 @@ generateCode()
       case tAssignP : {
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
+
+          // Watching for assignment into actuals space,
+          // to help with cdecl calls.  This assign is not affected.
+          checkForAssignToActual( x, jit_Operand_Kind_ActualP );
+
           // x is a pointer to a value of size 8.
           // Make x refer to the pointed-to value (still usable as target of mov)
           operandDeref( x, 8 );
@@ -1038,6 +1082,17 @@ generateCode()
       case tCopy : {
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
+
+          // Watching for assignment into actuals space,
+          // to help with cdecl calls.
+          // At the moment, we don't support complex param types in cdecl calls
+          // at all.  (see cdeclParamsIntoRegisters.) So error on that.
+          if ( ( x._kind == jit_Operand_Kind_Addr_Actual ) &&
+               ( callInfos.size() > 0 ) &&
+               ( callInfos.back()._cdecl == true ) ) {
+            toDo( "cdecl method with complex parameters is not supported\n" );
+          }
+
           int bytes = *tCodePc++;
           // copy bytes to dest=x from src=y
           // rep movsb needs particular registers.  rdi = dest, rsi = src, ecx = bytes
@@ -1309,6 +1364,14 @@ generateCode()
           int size = *tCodePc++;
           emitSub( Operand( jit_Operand_Kind_RegP, regRsp ),
                    Operand( jit_Operand_Kind_ConstI, size ) );
+          callInfos.emplace_back( false );
+        }
+        break;
+      case tAllocActualsCdecl : {
+          int size = *tCodePc++;
+          emitSub( Operand( jit_Operand_Kind_RegP, regRsp ),
+                   Operand( jit_Operand_Kind_ConstI, size ) );
+          callInfos.emplace_back( true );
         }
         break;
       case tFreeActuals : {
@@ -1327,6 +1390,13 @@ generateCode()
           if ( !addr ) {
             requestPatch( (int*) ( nativePc - 4 ), label );
           }
+
+          // Remove info we tracked starting at alloc actuals.
+          // (The initial call to main doesn't have an alloc actuals,
+          // so doesn't have a callInfos entry.)
+          if ( callInfos.size() > 0 ) {
+            callInfos.pop_back();
+          }
         }
         break;
       case tCallCdecl : {
@@ -1338,7 +1408,22 @@ generateCode()
           if ( it != unresolvedExternLabels.end() ) {
             toDo( "tCallCdecl: %s is unresolved\n", it->second );
           }
-          toDo( "tCallCdecl is not implemented yet\n" );
+          else {
+            // TO DO: preserve in-use registers that are not callee-save.
+            //  But, how does this interact with params?
+            preserveRegsAcrossCall();
+            // Get parameters into registers as necessary for cdecl calling convention.
+            cdeclParamsIntoRegisters();
+            char* addr = findLabel( label );
+            // Assume cdecl calls are always far
+            emitCallExtern( addr );
+            // TO DO: return value
+            if ( !addr ) {
+              // unexpected, this should be known by now.  would need to patch a far call
+              toDo( "patching of a cdecl call\n" );
+            }
+          }
+          callInfos.pop_back();
         }
         break;
       case tReturn : {
@@ -1570,6 +1655,65 @@ preserveRegsAcrossCall()
 }
 
 
+// Check in a tAssign* is assigning to an actual.
+// If so, and we're evaluating params of a cdecl call,
+// note if this should get assigned to a register.
+//
+// At the moment, the assignment into the stack always proceeds,
+// and we'll copy into register later via cdeclParamsIntoRegisters().
+//
+void
+checkForAssignToActual( Operand& x, jitOperandKind actualKind )
+{
+  if ( ( x._kind == jit_Operand_Kind_Addr_Actual ) &&
+        ( callInfos.size() > 0 ) &&
+        ( callInfos.back()._cdecl == true ) ) {
+    CallInfo& ci = callInfos.back();
+    // only supporting cdecl methods that can fit all params in regs
+    assert( ci._actualsToRegs.size() < paramRegs.size() );
+    Operand actualOnStack( actualKind, x._value );
+    Register* reg = paramRegs[ ci._actualsToRegs.size() ];
+    ci._actualsToRegs.push_back( { actualOnStack, reg } );
+  }
+}
+
+
+// Set up a cdecl call, by putting params into registers as necessary.
+//
+// The current approach for cdecl calls is, the tcode contains
+// my normal Pascal calling convention, assigning actuals to stack space
+// in the actuals area.  JIT will notice these assignments, and record the
+// location and type of the parameters that should go in registers,
+// within a CallInfo object.
+// Now, at the time of the call, we will use that recorded information
+// to generate moves from the stack space into the registers.
+//
+// This is obviously not ideal, since it forces everything onto the stack.
+// But, it's simple.  Later I could replace the assign-into-stack
+// with an assign-into-reg directly.  But then I need to watch out for that
+// register getting dumped into a temporary during another actual expression.
+// (Right now I'd have a problem there, because only operands on the operand stack
+// get updated when a register is dumped to a temporary.)
+//
+// One other current limitation is that I can't handle non-register parameters.
+// Complex types are not supported because JIT doesn't see enough type info
+// to decide what registers should be used.   And params beyond the number of
+// calling convention registers are not supported because I'd have to
+// shift the value's location on the stack, and haven't tackled that yet.
+//
+void
+cdeclParamsIntoRegisters()
+{
+  CallInfo& ci = callInfos.back();
+  assert( ci._cdecl == true );
+
+  for ( auto actualToReg : ci._actualsToRegs ) {
+    int paramSize = actualToReg.first.size();
+    operandIntoSpecificReg( actualToReg.first, actualToReg.second, paramSize );
+  }
+}
+
+
 // Allocate a temporary variable of the given byte size (1, 4, 8).
 //
 Operand
@@ -1614,7 +1758,15 @@ defineLabelAlias( int label, int aliasToLabel )
 void
 defineLabelExtern( int label, char* name )
 {
-  unresolvedExternLabels[label] = name;
+  // For now, I have a hardcoded list of available external methods.
+  // Using the Pascal name rather than the (optional) native name,
+  // because I don't support string attributes in the front end symbol table schema yet!
+  // 
+  if ( strcmp( name, "setPixel" ) == 0 ) {
+    labels[label] = (char*) runlibSetPixel;
+  } else {
+    unresolvedExternLabels[label] = name;
+  }
 }
 
 
@@ -1690,6 +1842,7 @@ Operand::size() const
     case jit_Operand_Kind_GlobalB:
     case jit_Operand_Kind_LocalB:
     case jit_Operand_Kind_ParamB:
+    case jit_Operand_Kind_ActualB:
     case jit_Operand_Kind_RegB:
     case jit_Operand_Kind_Flags:
       return 1;
@@ -1697,6 +1850,7 @@ Operand::size() const
     case jit_Operand_Kind_GlobalI:
     case jit_Operand_Kind_LocalI:
     case jit_Operand_Kind_ParamI:
+    case jit_Operand_Kind_ActualI:
     case jit_Operand_Kind_ConstI:
     case jit_Operand_Kind_RegI:
       return 4;
@@ -1704,6 +1858,7 @@ Operand::size() const
     case jit_Operand_Kind_GlobalP:
     case jit_Operand_Kind_LocalP:
     case jit_Operand_Kind_ParamP:
+    case jit_Operand_Kind_ActualP:
     case jit_Operand_Kind_Addr_Global:
     case jit_Operand_Kind_Addr_Local:
     case jit_Operand_Kind_Addr_Param:
@@ -2832,6 +2987,8 @@ emitSet( const Operand& x, ConditionFlags flags )
 // x = y
 // x and y are not both memory references.
 //
+// We support move from actual to reg, to help prepare cdecl calls.
+//
 void
 emitMov( const Operand& x, const Operand& y )
 {
@@ -2975,6 +3132,11 @@ emitMov( const Operand& x, const Operand& y )
       emit( Instr( 0x8a ).reg8( x._reg ).mem( regRbp, y._value + FPO ) );
       break;
 
+    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_ActualB ):
+      // mov x_reg8, [rsp + y._value]
+      emit( Instr( 0x8a ).reg8( x._reg ).mem( regRsp, y._value ) );
+      break;
+
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_ConstI ):
       // mov reg8, immediate8
       // TO DO: confirm that this works correctly for all registers to r15,
@@ -3011,6 +3173,11 @@ emitMov( const Operand& x, const Operand& y )
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ParamI ):
       // mov x_reg32, [rbp + y._value + FPO]
       emit( Instr( 0x8b ).reg( x._reg ).mem( regRbp, y._value + FPO ) );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ActualI ):
+      // mov x_reg32, [rsp + y._value]
+      emit( Instr( 0x8b ).reg( x._reg ).mem( regRsp, y._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ConstI ):
@@ -3060,6 +3227,11 @@ emitMov( const Operand& x, const Operand& y )
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ParamP ):
       // mov reg_x, [rbp + y._value + FPO]
       emit( Instr( 0x8b ).w().reg( x._reg ).mem( regRbp, y._value + FPO ) );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ActualP ):
+      // mov x_reg, [rsp + y._value]
+      emit( Instr( 0x8b ).w().reg( x._reg ).mem( regRsp, y._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_Addr_Global ):
@@ -3565,6 +3737,11 @@ runlibWriteCR()
   printf( "\n" );
 }
 
+void
+runlibSetPixel( int x, int y, int color )
+{
+  printf( "<SetPixel>( %d, %d, %d )\n", x, y, color );
+}
 
 
 // ----------------------------------------------------------------------------

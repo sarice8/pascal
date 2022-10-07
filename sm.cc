@@ -130,6 +130,7 @@ struct instrInfo_s tCodeInstrs[] = {
   { "tEqualP", 0 },
   { "tNotEqualP", 0 },
   { "tAllocActuals", 1 },
+  { "tAllocActualsCdecl", 1 },
   { "tFreeActuals", 1 },
   { "tCall", 1 },
   { "tCallCdecl", 1 },
@@ -446,6 +447,10 @@ walkTable()
               sp--;
               continue;
        case tAllocActuals :
+              call_sp -= code[pc++];
+              if (call_sp < callStackLowerBound) fatal("call stack overflow");
+              continue;
+       case tAllocActualsCdecl :
               call_sp -= code[pc++];
               if (call_sp < callStackLowerBound) fatal("call stack overflow");
               continue;
