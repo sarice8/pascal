@@ -157,6 +157,9 @@ e.g. ++var  is currently  push addr var, push val var, inc, assign.  But could b
 #include <vector>
 #include <unordered_map>
 
+#include <SDL.h>
+//   -- for my graphics api
+
 
 // This is where we get the definitions for tCode,
 // which originate in SSL.
@@ -597,6 +600,9 @@ extern void runlibWriteBool( bool val );
 extern void runlibWriteStr( char* ptr );
 extern void runlibWriteP( char* ptr );
 extern void runlibWriteCR();
+
+extern void grInit();
+extern void grTerm();
 extern void runlibSetPixel( int x, int y, int color );
 
 
@@ -607,7 +613,10 @@ main( int argc, char* argv[] )
   loadTCodeAndAllocNativeCode();
   generateCode();
   protectNativeCode();
+
   executeCode();
+  // do some atexit/cleanup stuff for the generated code:
+  grTerm();
 }
 
 void
@@ -1362,6 +1371,9 @@ generateCode()
         break;
       case tAllocActuals : {
           int size = *tCodePc++;
+          // As noted in finishMethod(), we will bump only by a multiple of 16
+          // to preserve stack alignment
+          size = ((int)((size + 15) / 16 )) * 16;
           emitSub( Operand( jit_Operand_Kind_RegP, regRsp ),
                    Operand( jit_Operand_Kind_ConstI, size ) );
           callInfos.emplace_back( false );
@@ -1369,6 +1381,9 @@ generateCode()
         break;
       case tAllocActualsCdecl : {
           int size = *tCodePc++;
+          // As noted in finishMethod(), we will bump only by a multiple of 16
+          // to preserve stack alignment
+          size = ((int)((size + 15) / 16 )) * 16;
           emitSub( Operand( jit_Operand_Kind_RegP, regRsp ),
                    Operand( jit_Operand_Kind_ConstI, size ) );
           callInfos.emplace_back( true );
@@ -1571,6 +1586,16 @@ void
 finishMethod()
 {
   if ( currLocalSpaceAddr ) {
+
+    // Adjust local space to meet the stack alignment rule of the x64-64 ABI.
+    // (This rule is common to linux64 and windows64).
+    // The stack must be aligned on 16 bytes immediately prior to a call.
+    // The method can thus assume that on its entry, it is aligned at 8 bytes mod 16.
+    // And so the method will need to adjust by another 8 bytes mod 16 before it does
+    // more calls.   I'll do that here, and elsewhere prior to a call I'll ensure that
+    // any additional stack space (my actuals space) is a multiple of 16 bytes.
+    currLocalSpace = ((int)( currLocalSpace / 16 )) * 16 + 8;
+
     *currLocalSpaceAddr = currLocalSpace;
     currLocalSpaceAddr = nullptr;
   }
@@ -3737,10 +3762,91 @@ runlibWriteCR()
   printf( "\n" );
 }
 
+
+// ---------------------------------------------
+// My mini graphics api
+// ---------------------------------------------
+
+bool grInitialized = false;
+SDL_Window* grWindow = nullptr;
+SDL_Renderer* grRenderer = nullptr;
+SDL_Texture* grBuffer = nullptr;  // this is what program will draw into
+uint32_t* grPixels = nullptr;   // or actually this is
+
+int grBufferX = 640;
+int grBufferY = 480;
+int grWindowX = grBufferX * 2;  // scaling up the pixels
+int grWindowY = grBufferY * 2;
+
+
+void
+grInit()
+{
+  if ( grInitialized ) {
+    // maybe should clear screen
+    return;
+  }
+
+  SDL_Init( SDL_INIT_VIDEO );
+  grWindow = SDL_CreateWindow( "Pascal",
+      SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+      grWindowX, grWindowY, 0 );
+  grRenderer = SDL_CreateRenderer( grWindow, -1, 0 );
+  grBuffer = SDL_CreateTexture( grRenderer,
+      SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC,
+      grBufferX, grBufferY );
+  grPixels = new uint32_t[ grBufferX * grBufferY ]; 
+  memset( grPixels, 0, grBufferX * grBufferY * sizeof( uint32_t ) );
+
+  grInitialized = true;
+}
+
+void
+grLazyInit()
+{
+  if ( !grInitialized ) {
+    grInit();
+  }
+}
+
+void
+grTerm()
+{
+  if ( grInitialized ) {
+    // wait until user closes window
+
+    bool quit = false;
+    SDL_Event event;
+
+    while ( !quit ) {
+      SDL_UpdateTexture( grBuffer, nullptr, grPixels, grBufferX * sizeof( uint32_t ) );
+      SDL_RenderClear( grRenderer );
+      SDL_RenderCopy( grRenderer, grBuffer, nullptr, nullptr );
+      SDL_RenderPresent( grRenderer );
+
+      SDL_WaitEvent( &event );
+      switch( event.type ) {
+        case SDL_QUIT:
+          quit = true;
+          break;
+        default:
+          break;
+      }
+    }
+  }
+  delete[] grPixels;
+  SDL_DestroyTexture( grBuffer );
+  SDL_DestroyRenderer( grRenderer );
+  SDL_DestroyWindow( grWindow );
+  SDL_Quit();
+}
+
 void
 runlibSetPixel( int x, int y, int color )
 {
-  printf( "<SetPixel>( %d, %d, %d )\n", x, y, color );
+  grLazyInit();
+  // printf( "<SetPixel>( %d, %d, %d )\n", x, y, color );
+  grPixels[ x + y * grBufferX ] = color;
 }
 
 

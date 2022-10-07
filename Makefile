@@ -20,9 +20,13 @@ DBG_STUBS        = $(DBG_DIR)/obj-$(OSTYPE)/dbgstub.o
 SCHEMA_DIR       = $(RELEASE)/schema/1.3
 
 
+# Graphics library built into back end needs SDL2
+SDL2_CFLAGS = `sdl2-config --cflags`
+SDL2_LIBS = `sdl2-config --libs`
 
-CFLAGS = -g -Werror -DINTEGRATE_SSL_DEBUGGER
-#CFLAGS = -O3 -Werror -DINTEGRATE_SSL_DEBUGGER
+
+CFLAGS = -g -Werror -DINTEGRATE_SSL_DEBUGGER $(SDL2_CFLAGS)
+#CFLAGS = -O3 -Werror -DINTEGRATE_SSL_DEBUGGER $(SDL2_CFLAGS)
 
 OBJDIR = ./obj-$(OSTYPE)
 BINDIR = ./bin-$(OSTYPE)
@@ -78,7 +82,7 @@ $(BACK_EXEC): $(BACK_OBJS) | $(BINDIR)
 	g++ $^ $(BACK_LINK_OBJS) -o $@
 
 $(JIT_EXEC): $(JIT_OBJS) | $(BINDIR)
-	g++ $^ $(JIT_LINK_OBJS) -o $@
+	g++ $^ $(JIT_LINK_OBJS) $(SDL2_LIBS) -o $@
 
 # Include all .d files
 -include $(DEP)
