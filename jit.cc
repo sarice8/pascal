@@ -14,6 +14,7 @@ BUGS
 I have these problems.
 
   - my initial dummy call to main must be breaking stack alignment, by 8 bytes.
+  - not confident that I have the ';' syntax right.
 
 
   - calling convention to standard external code;
@@ -516,6 +517,7 @@ Register* allocateReg();
 void forceAllocateReg( Register* reg );
 Operand allocateTemp( int size );
 void preserveRegsAcrossCall();
+jitOperandKind operandKindReg( int size );
 
 
 std::unordered_map<int, char*> labels;
@@ -553,15 +555,21 @@ public:
   // TO DO: track an offset where we should really be
   //  assigning non-register actuals to.
   //  For the moment, I don't support non-register params in cdecl.
-  // TO DO: something about return value.
+
+  bool _isFunc = false;
+  // If isFunc, this is the location of the temporary in local space
+  // that my tcode expects the return value to be stored in.
+  Operand _returnValue;
 };
+
 // We might have calls within actual expressions, so a stack of calls
 // in the process of construction.
 std::vector<CallInfo> callInfos;
 
-void checkForAssignToActual( Operand& lhs, jitOperandKind actualKind );
+void cdeclCheckForAssignToActual( Operand& lhs, jitOperandKind actualKind );
+void cdeclCheckForFunction( int* tCodePc );
 void cdeclParamsIntoRegisters();
-
+void cdeclSaveReturnValue();
 
 
 // x86 operations
@@ -607,6 +615,7 @@ extern void runlibWriteCR();
 extern void grInit();
 extern void grTerm();
 extern void runlibSetPixel( int x, int y, int color );
+extern int  runlibGetPixel( int x, int y );
 
 
 int
@@ -1041,7 +1050,7 @@ generateCode()
 
           // Watching for assignment into actuals space,
           // to help with cdecl calls.  This assign is not affected.
-          checkForAssignToActual( x, jit_Operand_Kind_ActualI );
+          cdeclCheckForAssignToActual( x, jit_Operand_Kind_ActualI );
 
           // x is a pointer to a value of size 4.
           // Make x refer to the pointed-to value (still usable as target of mov)
@@ -1059,7 +1068,7 @@ generateCode()
 
           // Watching for assignment into actuals space,
           // to help with cdecl calls.  This assign is not affected.
-          checkForAssignToActual( x, jit_Operand_Kind_ActualB );
+          cdeclCheckForAssignToActual( x, jit_Operand_Kind_ActualB );
 
           // allow for y being flags
           operandFlagsToValue( y, 1 );
@@ -1079,7 +1088,7 @@ generateCode()
 
           // Watching for assignment into actuals space,
           // to help with cdecl calls.  This assign is not affected.
-          checkForAssignToActual( x, jit_Operand_Kind_ActualP );
+          cdeclCheckForAssignToActual( x, jit_Operand_Kind_ActualP );
 
           // x is a pointer to a value of size 8.
           // Make x refer to the pointed-to value (still usable as target of mov)
@@ -1102,7 +1111,7 @@ generateCode()
           if ( ( x._kind == jit_Operand_Kind_Addr_Actual ) &&
                ( callInfos.size() > 0 ) &&
                ( callInfos.back()._cdecl == true ) ) {
-            toDo( "cdecl method with complex parameters is not supported\n" );
+            toDo( "cdecl method with complex parameters is not supported yet\n" );
           }
 
           int bytes = *tCodePc++;
@@ -1430,12 +1439,17 @@ generateCode()
             // TO DO: preserve in-use registers that are not callee-save.
             //  But, how does this interact with params?
             preserveRegsAcrossCall();
+            // Detect whether we are calling a function, rather than a procedure.
+            // A function call's tcode will have a push of the result value 
+            // immediately after the call, prior to the tFreeActuals.
+            cdeclCheckForFunction( tCodePc );
             // Get parameters into registers as necessary for cdecl calling convention.
             cdeclParamsIntoRegisters();
             char* addr = findLabel( label );
             // Assume cdecl calls are always far
             emitCallExtern( addr );
-            // TO DO: return value
+            // Deal with function return value, if any
+            cdeclSaveReturnValue();
             if ( !addr ) {
               // unexpected, this should be known by now.  would need to patch a far call
               toDo( "patching of a cdecl call\n" );
@@ -1607,6 +1621,22 @@ finishMethod()
 
 // ----------------------------------------------------------------------------
 
+// Return the operand kind for a register with the given size.
+//
+jitOperandKind
+operandKindReg( int size )
+{
+  switch ( size ) {
+    case 1: return jit_Operand_Kind_RegB;
+    case 4: return jit_Operand_Kind_RegI;
+    case 8: return jit_Operand_Kind_RegP;
+    default:
+      fatal( "operandKindReg: unexpected size %d\n", size );
+      return jit_Operand_Kind_Illegal;
+  }
+}
+
+
 // Provide a register.
 // If all are in use, one will be made available by dumping its value
 // into a temporary.
@@ -1690,8 +1720,10 @@ preserveRegsAcrossCall()
 // At the moment, the assignment into the stack always proceeds,
 // and we'll copy into register later via cdeclParamsIntoRegisters().
 //
+// Note this will pick up a function result's dummy VAR parameter too.
+//
 void
-checkForAssignToActual( Operand& x, jitOperandKind actualKind )
+cdeclCheckForAssignToActual( Operand& x, jitOperandKind actualKind )
 {
   if ( ( x._kind == jit_Operand_Kind_Addr_Actual ) &&
         ( callInfos.size() > 0 ) &&
@@ -1702,6 +1734,63 @@ checkForAssignToActual( Operand& x, jitOperandKind actualKind )
     Operand actualOnStack( actualKind, x._value );
     Register* reg = paramRegs[ ci._actualsToRegs.size() ];
     ci._actualsToRegs.push_back( { actualOnStack, reg } );
+  }
+}
+
+
+// During processing of tCallCdecl.
+// See if we are making a function call, rather than a procedure call.
+// tCodePc is pointing to the instruction after tCallDecl.
+//
+// If it is a function, update the current CallInfo with the location of
+// where the tcode expects the return value to be found.
+// Later, cdeclSaveReturnValue() will store the native return value there
+// so the tcode will work as it expects.
+//
+void
+cdeclCheckForFunction( int* tCodePc )
+{
+  if ( callInfos.empty() || !callInfos.back()._cdecl ) {
+    // not a cdecl call
+    return;
+  }
+  if ( *tCodePc == tFreeActuals ) {
+    // this is a procedure call
+    return;
+  }
+  CallInfo& ci = callInfos.back();
+  
+  // The tcode instruction should be pushing the local space temporary
+  // that it expects the called function to store the return value in.
+  int offset;
+  switch ( *tCodePc ) {
+    case tPushLocalI:
+      ci._isFunc = true;
+      ci._returnValue = Operand( jit_Operand_Kind_LocalI, tCodePc[1] );
+      break;
+    case tPushLocalB:
+      ci._isFunc = true;
+      ci._returnValue = Operand( jit_Operand_Kind_LocalB, tCodePc[1] );
+      break;
+    case tPushLocalP:
+      ci._isFunc = true;
+      ci._returnValue = Operand( jit_Operand_Kind_LocalP, tCodePc[1] );
+      break;
+    case tPushAddrLocal:
+      // complex return value
+      // not supporting in cdec yet.
+      toDo( "cdeclCheckForFunction: complex function return type not supported yet\n" );
+      break;
+    default:
+      fatal( "cdeclCheckForFunction: unexpected instruction after tCallCdecl\n" );
+  }
+
+  if ( ci._isFunc ) {
+    // The last parameter that we thought we saw isn't real
+    // and doesn't need to be provided.
+    // TO DO: when complex return types are supported, this needs to change.
+    assert( !ci._actualsToRegs.empty() );
+    ci._actualsToRegs.pop_back();
   }
 }
 
@@ -1740,6 +1829,28 @@ cdeclParamsIntoRegisters()
     operandIntoSpecificReg( actualToReg.first, actualToReg.second, paramSize );
   }
 }
+
+// Following a cdecl function call,
+// store the native return value into the local temporary that
+// tcode expects to find it in.
+// This isn't efficient but it is simple.  Following the approach of params,
+// we are converting between what the native calling convention does
+// and my own tcode calling convetion.
+//
+void
+cdeclSaveReturnValue()
+{
+  CallInfo& ci = callInfos.back();
+  assert( ci._cdecl == true );
+
+  if ( ci._isFunc ) {
+    // For all my currently supported cases,
+    // the cdecl return value is in rax
+    Operand cdeclResult( operandKindReg( ci._returnValue.size() ), regRax );
+    emitMov( ci._returnValue, cdeclResult );
+  }  
+}
+
 
 
 // Allocate a temporary variable of the given byte size (1, 4, 8).
@@ -1792,6 +1903,8 @@ defineLabelExtern( int label, char* name )
   // 
   if ( strcmp( name, "setPixel" ) == 0 ) {
     labels[label] = (char*) runlibSetPixel;
+  } else if ( strcmp( name, "getPixel" ) == 0 ) {
+    labels[label] = (char*) runlibGetPixel;
   } else {
     unresolvedExternLabels[label] = name;
   }
@@ -3857,8 +3970,14 @@ void
 runlibSetPixel( int x, int y, int color )
 {
   grLazyInit();
-  // printf( "<SetPixel>( %d, %d, %d )\n", x, y, color );
   grPixels[ x + y * grBufferX ] = color;
+}
+
+int
+runlibGetPixel( int x, int y )
+{
+  grLazyInit();
+  return grPixels[ x + y * grBufferX ];
 }
 
 

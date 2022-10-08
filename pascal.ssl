@@ -1881,8 +1881,15 @@ Call( Node method ):
       | true :
          % push return value from temp
          oTypeSPush( resultType )
-         .tPushAddrLocal  oEmitInt( tempOffset )
-         @FetchVar
+
+         [ oTypeSNodeType
+            | nIntegerType :   .tPushLocalI  oEmitInt( tempOffset )
+            | nBooleanType :   .tPushLocalB  oEmitInt( tempOffset )
+            | nCharType, nStringType, nFileType : #eNotImplemented
+            | nPointerType :   .tPushLocalP  oEmitInt( tempOffset )
+            | * :              % compound type: push address
+                               .tPushAddrLocal  oEmitInt( tempOffset )
+         ]
       | * :
    ]
    
