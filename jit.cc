@@ -13,6 +13,9 @@ BUGS
 
 I have these problems.
 
+  - my initial dummy call to main must be breaking stack alignment, by 8 bytes.
+
+
   - calling convention to standard external code;
       - only properly implemented for 1-parameter calls to writeln etc.
         More work needed for general function parameters and return value etc.
@@ -2542,12 +2545,12 @@ emitSub( const Operand& x, const Operand& y )
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_LocalI ):
       // sub x_reg32, [rbp+offset]
-      emit( Instr( 0x3b ).reg( x._reg ).mem( regRbp, y._value ) );
+      emit( Instr( 0x2b ).reg( x._reg ).mem( regRbp, y._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ParamI ):
       // sub x_reg32, [rbp + offset + FPO]
-      emit( Instr( 0x3b ).reg( x._reg ).mem( regRbp, y._value + FPO ) );
+      emit( Instr( 0x2b ).reg( x._reg ).mem( regRbp, y._value + FPO ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ConstI ):
@@ -3763,9 +3766,9 @@ runlibWriteCR()
 }
 
 
-// ---------------------------------------------
-// My mini graphics api
-// ---------------------------------------------
+// ----------------------------------------------
+// My mini graphics api, with SDL2 under the hood
+// ----------------------------------------------
 
 bool grInitialized = false;
 SDL_Window* grWindow = nullptr;
@@ -3773,10 +3776,11 @@ SDL_Renderer* grRenderer = nullptr;
 SDL_Texture* grBuffer = nullptr;  // this is what program will draw into
 uint32_t* grPixels = nullptr;   // or actually this is
 
-int grBufferX = 640;
-int grBufferY = 480;
-int grWindowX = grBufferX * 2;  // scaling up the pixels
-int grWindowY = grBufferY * 2;
+int grBufferX = 320;
+int grBufferY = 240;
+int grScale = 4;  // scaling up the pixels, from buffer to screen
+int grWindowX = grBufferX * grScale;
+int grWindowY = grBufferY * grScale;
 
 
 void
@@ -3820,8 +3824,16 @@ grTerm()
 
     while ( !quit ) {
       SDL_UpdateTexture( grBuffer, nullptr, grPixels, grBufferX * sizeof( uint32_t ) );
-      SDL_RenderClear( grRenderer );
-      SDL_RenderCopy( grRenderer, grBuffer, nullptr, nullptr );
+      // fill the renderer with the current drawing color.  probably I don't need.
+      // SDL_RenderClear( grRenderer );
+
+      // copy entire grBuffer to grRenderer, scaling to fit.
+      // srcRect == null indicates entire texture.
+      // destRect == null indicates entire rendering target. 
+      SDL_Rect* srcRect = nullptr;
+      SDL_Rect* destRect = nullptr;
+      SDL_RenderCopy( grRenderer, grBuffer, srcRect, destRect );
+      // show the renderer's updates on the screen
       SDL_RenderPresent( grRenderer );
 
       SDL_WaitEvent( &event );

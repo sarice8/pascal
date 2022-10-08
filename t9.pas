@@ -9,6 +9,10 @@ program test (input, output);
 // this procedure is declared as an external cdecl procedure.
 procedure setPixel( x, y : integer; color : integer ); cdecl; external 'runlib' name 'runlibSetPixel';
 
+
+// ----------------------------------------------------------------
+
+
 // this procedure is never defined.  Should give an error, at least if we call it.
 procedure neverDefined( x: integer );
   forward;
@@ -63,7 +67,104 @@ procedure proc2( p1, p2 : integer; p3 : integer );
   end;
 
 
+// Draw a line. Bresenham's algorithm, only needs integer math.
+// https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm
+//
+// The basic description of the algorithm is for a line going down to the right,
+// with slope < 1 (x difference is greater than y difference).
+// For such a line there's only one pixel per x coordinate.
+// The wikipedia page it shows the full solution for all lines,
+// using two helper methods DrawLineLow and DrawLineHigh.
+//
+//
+procedure DrawLineLow( x0, y0, x1, y1 : integer; color : integer );
+    var dx, dy, yi, D, x, y : integer;
+  begin
+    dx := x1 - x0;
+    dy := y1 - y0;
+    yi := 1;
+    if dy < 0 then
+      begin
+        yi := -1;
+        dy := -dy;
+      end;
+    D := 2*dy - dx;
+    y := y0;
+
+    for x := x0 to x1 do
+      begin
+        setPixel( x, y, color );
+        if D > 0 then
+          begin
+            y := y + yi;
+            D := D + 2*( dy - dx );
+          end
+        else
+          begin
+            D := D + 2*dy;
+          end
+      end
+  end;
+
+
+procedure DrawLineHigh( x0, y0, x1, y1 : integer; color : integer );
+    var dx, dy, xi, D, x, y : integer;
+  begin
+    dx := x1 - x0;
+    dy := y1 - y0;
+    xi := 1;
+    if dx < 0 then
+      begin
+        xi := -1;
+        dx := -dx;
+      end;
+    D := 2*dx - dy;
+    x := x0;
+
+    for y := y0 to y1 do
+      begin
+        setPixel( x, y, color );
+        if D > 0 then
+          begin
+            x := x + xi;
+            D := D + 2*( dx - dy );
+          end
+        else
+          begin
+            D := D + 2*dx;
+          end
+      end
+  end;
+
+function abs( x : integer ) : integer;
+  begin
+    if x >= 0 then
+      abs := x
+    else
+      abs := -x;
+  end;
+
+// public entry point
+//
+procedure Draw( x0, y0, x1, y1 : integer; color : integer );
+  begin
+    if abs( y1 - y0 ) < abs( x1 - x0 ) then
+      if x0 > x1 then
+        DrawLineLow( x1, y1, x0, y0, color )
+      else
+        DrawLineLow( x0, y0, x1, y1, color )
+    else
+      if y0 > y1 then
+        DrawLineHigh( x1, y1, x0, y0, color )
+      else
+        DrawLineHigh( x0, y0, x1, y1, color );
+  end;
+
+
+
 var r1 : rTwoInts;
+var x : integer;
+var color : integer;
 
 BEGIN
 
@@ -71,8 +172,18 @@ BEGIN
   proc1( 100, 200, 300, 3 );
   proc1( 400, 500, 600, 2 );
 
+  // TO DO: accept hex numbers   $ffffff
+  // color := 255;
+  color := 255*256*256 + 0*256 + 255;
+
   // extern method test
-  setPixel( 10, 15, 255 );  // TO DO: accept hex numbers   $ffffff
+  for x := 10 to 20 do
+    begin
+      setPixel( x * 2, 15, color );
+    end;
+
+  Draw( 20, 20, 80, 20, color );
+  Draw( 20, 20, 40, 30, color );
 
   // unsupported cdecl test
   r1.i1 := 1;
