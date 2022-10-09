@@ -1374,12 +1374,12 @@
 2607:                .tJump  oEmitLabel( trueLabel )
 2615:             | nBooleanType :
 2617:                @ValToCF( falseLabel )
-                     % We might be true here. If so, jump ahead to done
+                     % We are true here. Jump ahead to done
 2624:                [ equal_label( trueLabel, labelNull )
 2634:                   | true :  trueLabel = oLabelNew
 2640:                   | * :
 2645:                ]
-2645:                .tJumpTrue  oEmitLabel( trueLabel )
+2645:                .tJump  oEmitLabel( trueLabel )
 2653:             | * : #eNotBoolean
 2662:          ]
 2662:          oTypeSPop
@@ -4120,7 +4120,7 @@ Generated code:
 2640: oJumpForward 2645
 2642: Choice Lookup Table
            1   2635
-2645: oEmit 46
+2645: oEmit 45
 2647: oGetLocal 1
 2649: oPushResult
 2650: oEmitLabel

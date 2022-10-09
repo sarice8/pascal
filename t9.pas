@@ -276,7 +276,11 @@ var color2 : integer;
 var r : integer;
 var c : integer;
 
-var fstep, fx, fy, loopCount : integer;
+var fstep, fx, fy, dx, dy, loopCount : integer;
+
+// TO DO: support initialization
+// var delayMs : integer = 3;
+var delayMs : integer;
 
 procedure DrawFace( fx, fy, color, color2 : integer );
   begin
@@ -317,26 +321,24 @@ BEGIN
   // Draw( 20, 20, 80, 20, color );
   // Draw( 20, 20, 40, 30, color );
 
-  for loopCount := 1 to 3 do
+  fx := 50;
+  fy := 50;
+  dx := 2;
+  dy := 2;
+  delayMs := 3;
+
+  for loopCount := 1 to 2000 do
     begin
-      for fstep := 50 to 250 do
-        begin
-          fx := fstep * 1;
-          fy := 50;
-          clearScreen;
-          DrawFace( fx, fy, color, color2 );    
-          updateScreen;
-          Delay( 4 );
-        end;
-      for fstep := 250 downto 50 do
-        begin
-          fx := fstep * 1;
-          fy := 50;
-          clearScreen;
-          DrawFace( fx, fy, color, color2 );    
-          updateScreen;
-          Delay( 4 );
-        end;
+      fx := fx + dx;
+      if ( fx < 50 ) or ( fx > 250 ) then
+        dx := dx * -1;
+      fy := fy + dy;
+      if ( fy < 50 ) or ( fy > 150 ) then
+        dy := dy * -1;
+
+      clearScreen;
+      DrawFace( fx, fy, color, color2 );
+      Delay( delayMs );
     end;
 
 

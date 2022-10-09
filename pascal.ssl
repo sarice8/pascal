@@ -1312,12 +1312,12 @@ BoolExprAllowCF( out Label falseLabel ):
                .tJump  oEmitLabel( trueLabel )
             | nBooleanType :
                @ValToCF( falseLabel )
-               % We might be true here. If so, jump ahead to done
+               % We are true here. Jump ahead to done
                [ equal_label( trueLabel, labelNull )
                   | true :  trueLabel = oLabelNew
                   | * :
                ]
-               .tJumpTrue  oEmitLabel( trueLabel )
+               .tJump  oEmitLabel( trueLabel )
             | * : #eNotBoolean
          ]
          oTypeSPop

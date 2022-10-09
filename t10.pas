@@ -1,30 +1,39 @@
 
 // looking for a bug in jit
 
+
 {
-   jumps on wrong boolean condition
+  23    tPushGlobalI       8
+  25    tPushConstI       50
+  27    tLessI
+  28    tJumpFalse         2
 
-  18	tPushGlobalB	   8
-  20	tNot
-  21	tJumpFalse	   2
+  30    tJumpTrue          3
 
-   0x7ffff6b1b027:	cmpb   $0x0,0x3fda(%rip)        # 0x7ffff6b1f008
-   0x7ffff6b1b02e:	sete   %al
-   0x7ffff6b1b031:	cmp    $0x0,%al
-   0x7ffff6b1b034:	jne    0x7ffff6b1b059
+  32    tLabel     2
+  34    tPushGlobalI       8
+  36    tPushConstI      250
+  38    tGreaterI
+  39    tJumpFalse         4
 
+  41    tLabel     3
+  43    tPushAddrGlobal   16  "A"
+  45    tWriteStr
+  46    tWriteCR
+  47    tLabel     4
 }
 
 
 program test (input, output);
 
-  var x : boolean;
+  var fx, dx : integer;
 begin
   
-  x := false;
+  fx := 50;
+  dx := 2;
 
-  if not x then
-    writeln( 'Ok' );
+  if ( fx < 50 ) or ( fx > 250 ) then
+    writeln( 'A' );
 
-  writeln( 'Done' );
+  writeln( 'B' );
 end.
