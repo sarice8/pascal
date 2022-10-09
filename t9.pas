@@ -227,16 +227,25 @@ procedure DrawCircle( xc, yc, r, color : integer );
 const FloodFillScreenX = 320;
 const FloodFillScreenY = 240;
 
+// Visited buffer.
+// This could be an array of bit, that I clear on every call.
+// I've used an array of boolean, that I clear on every call.
+// To speed that up, I'm using an array of integer, and bump the "visited" value on
+// every call.  I only need to clear the array at the start, and whenever the visited value
+// wraps around.
+//
 // TO DO: I'm not accepting const expr in the typedef
 // var floodFillVisited: array[ 0..FloodFillScreenY-1, 0..FloodFillScreenX-1 ] of boolean;
-var floodFillVisited: array[ 0..239, 0..319 ] of boolean;
+var floodFillVisited: array[ 0..239, 0..319 ] of integer;
+var floodFillVisitedCode : integer; // = -1
 
 procedure FloodFillLow( x, y, fillColor, borderColor : integer );
   begin
-    if ( not floodFillVisited[y, x] ) and ( getPixel( x, y ) <> borderColor ) then
+    if ( floodFillVisited[y, x] <> floodFillVisitedCode ) and
+       ( getPixel( x, y ) <> borderColor ) then
       begin
         setPixel( x, y, fillColor );
-        floodFillVisited[y, x] := true;
+        floodFillVisited[y, x] := floodFillVisitedCode;
         if y + 1 < FloodFillScreenY then
           FloodFillLow( x, y + 1, fillColor, borderColor );
         if y - 1 >= 0 then
@@ -251,10 +260,15 @@ procedure FloodFillLow( x, y, fillColor, borderColor : integer );
 procedure FloodFill( x, y, fillColor, borderColor : integer );
     var i, j : integer;
   begin
-    // clear visisted array.  should have a memset.
-    for j := 0 to FloodFillScreenY-1 do
-      for i := 0 to FloodFillScreenX-1 do
-        floodFillVisited[j, i] := false;
+    // periodically clear visisted array.  should have a memset.
+    floodFillVisitedCode := floodFillVisitedCode + 1;
+    if floodFillVisitedCode = 0 then
+      begin
+        for j := 0 to FloodFillScreenY-1 do
+          for i := 0 to FloodFillScreenX-1 do
+            floodFillVisited[j, i] := 0;
+        floodFillVisitedCode := 1;
+      end;
 
     FloodFillLow( x, y, fillColor, borderColor );
   end;
@@ -300,6 +314,9 @@ procedure DrawFace( fx, fy, color, color2 : integer );
   end;
 
 BEGIN
+
+  // this initialization should be done on variable declaration
+  floodFillVisitedCode := -1;
 
   writeln( 'Proc test:' );
   proc1( 100, 200, 300, 3 );

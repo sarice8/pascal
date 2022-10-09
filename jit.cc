@@ -66,7 +66,11 @@ I have these problems.
 MISSING LANGUAGE FEATURES
 
 real type not implemented.
-char type not implemented.
+char and byte types not implemented.
+   - note both of these are unsigned, so I need careful handling of extension to int.
+     Currently all my 1-byte operations would sign-extend to int.
+   - note char and byte are not assignment compatible, but can convert between them with
+     chr(byte) and ord(char).   Literal one-character string is type char.
 file type not implemented.
 enum type not implemented.
 set type not implemented.

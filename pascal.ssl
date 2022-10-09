@@ -28,18 +28,13 @@ title: 'Pascal Compiler 1.1.5 -- Jan 01 ''90';
 %       When a pointer type is declared, a field in the TT entry of the
 %       type pointed to will be set to indicate the TT entry of the pointer
 %       to that type (0 means none defined yet).  When evaluating the
-%       expression ^x, the type in that field in the entry for the type of x
+%       expression @x, the type in that field in the entry for the type of x
 %       will be used (unless it's 0, in which case a new TT entry will be
 %       created).
 %
 %
 %  MISSING
 %
-%    - Forward declaration of proceudres and functions.
-%      Only one forward declaration should be allowed.
-%      I will overwrite the nMethod info with the final addr and param names when the true body is seen.
-%      If a call is made to a foward declared method, add the forward decl node & Here to patch table.
-% 
 %    - procedure and function declarations may be nested within other procs/funcs!
 %      They are allowed to see locals within those parent scopes.
 %      Pass a hidden parameter to nested methods, to follow up to parent scopes as needed.
@@ -87,7 +82,7 @@ input:
    pEof
    pInvalid
 
-%  keywords  (built-in types 'integer', 'char', etc, are not keywords,
+%  keywords  (built-in types 'integer', 'byte', 'char', etc, are not keywords,
 %             type constructors 'array', 'record', 'set' are keywords,
 %             pseudo-procedures 'writeln', 'readln' are keywords)
 %
