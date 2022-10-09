@@ -619,8 +619,11 @@ extern void runlibWriteCR();
 
 extern void grInit();
 extern void grTerm();
+extern void runlibClearScreen();
+extern void runlibUpdateScreen();
 extern void runlibSetPixel( int x, int y, int color );
 extern int  runlibGetPixel( int x, int y );
+extern void runlibDelay( int milliseconds );
 
 
 int
@@ -1947,10 +1950,16 @@ defineLabelExtern( int label, char* name )
   // Using the Pascal name rather than the (optional) native name,
   // because I don't support string attributes in the front end symbol table schema yet!
   // 
-  if ( strcmp( name, "setPixel" ) == 0 ) {
+  if ( strcmp( name, "clearScreen" ) == 0 ) {
+    labels[label] = (char*) runlibClearScreen;
+  } else if ( strcmp( name, "updateScreen" ) == 0 ) {
+    labels[label] = (char*) runlibUpdateScreen;
+  } else if ( strcmp( name, "setPixel" ) == 0 ) {
     labels[label] = (char*) runlibSetPixel;
   } else if ( strcmp( name, "getPixel" ) == 0 ) {
     labels[label] = (char*) runlibGetPixel;
+  } else if ( strcmp( name, "delay" ) == 0 ) {
+    labels[label] = (char*) runlibDelay;
   } else {
     unresolvedExternLabels[label] = name;
   }
@@ -3934,6 +3943,7 @@ SDL_Window* grWindow = nullptr;
 SDL_Renderer* grRenderer = nullptr;
 SDL_Texture* grBuffer = nullptr;  // this is what program will draw into
 uint32_t* grPixels = nullptr;   // or actually this is
+bool grPixelsPending = false;
 
 int grBufferX = 320;
 int grBufferY = 240;
@@ -3958,9 +3968,9 @@ grInit()
   grBuffer = SDL_CreateTexture( grRenderer,
       SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC,
       grBufferX, grBufferY );
-  grPixels = new uint32_t[ grBufferX * grBufferY ]; 
+  grPixels = new uint32_t[ grBufferX * grBufferY ];
   memset( grPixels, 0, grBufferX * grBufferY * sizeof( uint32_t ) );
-
+  grPixelsPending = true;
   grInitialized = true;
 }
 
@@ -3982,18 +3992,7 @@ grTerm()
     SDL_Event event;
 
     while ( !quit ) {
-      SDL_UpdateTexture( grBuffer, nullptr, grPixels, grBufferX * sizeof( uint32_t ) );
-      // fill the renderer with the current drawing color.  probably I don't need.
-      // SDL_RenderClear( grRenderer );
-
-      // copy entire grBuffer to grRenderer, scaling to fit.
-      // srcRect == null indicates entire texture.
-      // destRect == null indicates entire rendering target. 
-      SDL_Rect* srcRect = nullptr;
-      SDL_Rect* destRect = nullptr;
-      SDL_RenderCopy( grRenderer, grBuffer, srcRect, destRect );
-      // show the renderer's updates on the screen
-      SDL_RenderPresent( grRenderer );
+      runlibUpdateScreen();
 
       SDL_WaitEvent( &event );
       switch( event.type ) {
@@ -4013,10 +4012,40 @@ grTerm()
 }
 
 void
+runlibClearScreen()
+{
+  grLazyInit();
+  memset( grPixels, 0, grBufferX * grBufferY * sizeof( uint32_t ) );
+  grPixelsPending = true;
+}
+
+void
+runlibUpdateScreen()
+{
+  if ( grPixelsPending ) {
+    SDL_UpdateTexture( grBuffer, nullptr, grPixels, grBufferX * sizeof( uint32_t ) );
+    // fill the renderer with the current drawing color.  probably I don't need.
+    // SDL_RenderClear( grRenderer );
+
+    // copy entire grBuffer to grRenderer, scaling to fit.
+    // srcRect == null indicates entire texture.
+    // destRect == null indicates entire rendering target. 
+    SDL_Rect* srcRect = nullptr;
+    SDL_Rect* destRect = nullptr;
+    SDL_RenderCopy( grRenderer, grBuffer, srcRect, destRect );
+    // show the renderer's updates on the screen
+    SDL_RenderPresent( grRenderer );
+
+    grPixelsPending = false;
+  }
+}
+
+void
 runlibSetPixel( int x, int y, int color )
 {
   grLazyInit();
   grPixels[ x + y * grBufferX ] = color;
+  grPixelsPending = true;
 }
 
 int
@@ -4026,6 +4055,13 @@ runlibGetPixel( int x, int y )
   return grPixels[ x + y * grBufferX ];
 }
 
+void
+runlibDelay( int milliseconds )
+{
+  // Do this under the hood, in case there's anything new to show
+  runlibUpdateScreen();
+  SDL_Delay( milliseconds );
+}
 
 // ----------------------------------------------------------------------------
 

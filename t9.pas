@@ -6,11 +6,22 @@
 program test (input, output);
 
 
-// this procedure is declared as an external cdecl procedure.
+// ----------------------------------------------------------------
+// Graphics methods in native code (runtime library)
+// These are declared as cdecl external.
+
+// Erase the graphics buffer.
+procedure clearScreen; cdecl; external;
+
+// Show any updates in the graphics buffer to the screen.
+// (This is also done under the hood by Delay and read.)
+procedure updateScreen; cdecl; external;
+
 // Set a pixel
 procedure setPixel( x, y : integer; color : integer ); cdecl; external 'runlib' name 'runlibSetPixel';
 // Get the color of a pixel
 function getPixel( x, y : integer ) : integer; cdecl; external;
+procedure delay( milliseconds : integer ); cdecl; external;
 
 
 // ----------------------------------------------------------------
@@ -265,6 +276,25 @@ var color2 : integer;
 var r : integer;
 var c : integer;
 
+var fstep, fx, fy, loopCount : integer;
+
+procedure DrawFace( fx, fy, color, color2 : integer );
+  begin
+    DrawCircle( fx, fy, 30, color );
+    FloodFill( fx, fy, color2, color );
+
+    DrawCircle( fx-15, fy-10, 7, color );
+    FloodFill( fx-15, fy-10, 0, color );
+    DrawCircle( fx+15, fy-10, 7, color );
+    FloodFill( fx+15, fy-10, 0, color );
+
+    Draw( fx-15, fy+10, fx+15, fy+10, color );
+    Draw( fx-15, fy+10, fx-10, fy+15, color );
+    Draw( fx-10, fy+15, fx+10, fy+15, color );
+    Draw( fx+10, fy+15, fx+15, fy+10, color );
+    FloodFill( fx, fy+11, 0, color );
+  end;
+
 BEGIN
 
   writeln( 'Proc test:' );
@@ -287,21 +317,28 @@ BEGIN
   // Draw( 20, 20, 80, 20, color );
   // Draw( 20, 20, 40, 30, color );
 
-  DrawCircle( 50, 50, 30, color );
-  // for r := 30 downto 1 do
-  //  DrawCircle( 50, 50, r, color );
-  FloodFill( 50, 50, color2, color );
+  for loopCount := 1 to 3 do
+    begin
+      for fstep := 50 to 250 do
+        begin
+          fx := fstep * 1;
+          fy := 50;
+          clearScreen;
+          DrawFace( fx, fy, color, color2 );    
+          updateScreen;
+          Delay( 4 );
+        end;
+      for fstep := 250 downto 50 do
+        begin
+          fx := fstep * 1;
+          fy := 50;
+          clearScreen;
+          DrawFace( fx, fy, color, color2 );    
+          updateScreen;
+          Delay( 4 );
+        end;
+    end;
 
-  DrawCircle( 35, 40, 7, color );
-  FloodFill( 35, 40, 0, color );
-  DrawCircle( 65, 40, 7, color );
-  FloodFill( 65, 40, 0, color );
-
-  Draw( 35, 60, 65, 60, color );
-  Draw( 35, 60, 40, 65, color );
-  Draw( 40, 65, 60, 65, color );
-  Draw( 60, 65, 65, 60, color );
-  FloodFill( 50, 61, 0, color );
 
   c := GetPixel( 19, 20 );
   writeln( 'GetPixel(19,20) = ', c );
