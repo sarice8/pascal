@@ -204,12 +204,64 @@ procedure DrawCircle( xc, yc, r, color : integer );
       end;
   end;
 
+
+// Flood fill
+// https://en.wikipedia.org/wiki/Flood_fill
+//
+// Using 4-way (rather than 8-way) so it doesn't leak through diagonal lines.
+// Starting with simple recursive solution.
+// Using a visited array, so we can one day support pattern fill too.
+// The visited array needs a bit per screen pixel, so declaring as a global array
+// in case it's too big for the stack.
+const FloodFillScreenX = 320;
+const FloodFillScreenY = 240;
+
+// TO DO: I'm not accepting const expr in the typedef
+// var floodFillVisited: array[ 0..FloodFillScreenY-1, 0..FloodFillScreenX-1 ] of boolean;
+var floodFillVisited: array[ 0..239, 0..319 ] of boolean;
+
+procedure FloodFillLow( x, y, fillColor, borderColor : integer );
+  begin
+    if ( not floodFillVisited[y, x] ) and ( getPixel( x, y ) <> borderColor ) then
+      begin
+        setPixel( x, y, fillColor );
+        floodFillVisited[y, x] := true;
+        if y + 1 < FloodFillScreenY then
+          FloodFillLow( x, y + 1, fillColor, borderColor );
+        if y - 1 >= 0 then
+          FloodFillLow( x, y - 1, fillColor, borderColor );
+        if x - 1 >= 0 then
+          FloodFillLow( x - 1, y, fillColor, borderColor );
+        if x + 1 < FloodFillScreenX then
+          FloodFillLow( x + 1, y, fillColor, borderColor );
+      end;    
+  end;
+
+procedure FloodFill( x, y, fillColor, borderColor : integer );
+    var i, j : integer;
+  begin
+    // clear visisted array.  should have a memset.
+    for j := 0 to FloodFillScreenY-1 do
+      for i := 0 to FloodFillScreenX-1 do
+        floodFillVisited[j, i] := false;
+
+    FloodFillLow( x, y, fillColor, borderColor );
+  end;
+
+
 // --------------------
+
+// Return a color value
+function rgb( r, g, b : integer ) : integer;
+  begin
+    rgb := r*256*256 + g*256 + b;
+  end;
 
 
 var r1 : rTwoInts;
 var x : integer;
 var color : integer;
+var color2 : integer;
 var r : integer;
 var c : integer;
 
@@ -220,22 +272,36 @@ BEGIN
   proc1( 400, 500, 600, 2 );
 
   // TO DO: accept hex numbers   $ffffff
-  // color := 255;
-  color := 255*256*256 + 0*256 + 255;
+  // color := rgb( 255, 0, 255 );
+  color := rgb( 50, 128, 255 );
+  color2 := rgb( 255, 255, 128 );
 
   // extern method test
+  {
   for x := 10 to 20 do
     begin
       setPixel( x * 2, 15, color );
     end;
+  }
 
-  Draw( 20, 20, 80, 20, color );
-  Draw( 20, 20, 40, 30, color );
+  // Draw( 20, 20, 80, 20, color );
+  // Draw( 20, 20, 40, 30, color );
 
   DrawCircle( 50, 50, 30, color );
+  // for r := 30 downto 1 do
+  //  DrawCircle( 50, 50, r, color );
+  FloodFill( 50, 50, color2, color );
 
-  for r := 30 downto 1 do
-    DrawCircle( 50, 50, r, color );
+  DrawCircle( 35, 40, 7, color );
+  FloodFill( 35, 40, 0, color );
+  DrawCircle( 65, 40, 7, color );
+  FloodFill( 65, 40, 0, color );
+
+  Draw( 35, 60, 65, 60, color );
+  Draw( 35, 60, 40, 65, color );
+  Draw( 40, 65, 60, 65, color );
+  Draw( 60, 65, 65, 60, color );
+  FloodFill( 50, 61, 0, color );
 
   c := GetPixel( 19, 20 );
   writeln( 'GetPixel(19,20) = ', c );

@@ -232,6 +232,11 @@ main( int argc, char* argv[] )
   sp = 0;
   call_sp = &data[dataSize] - PTR_SIZE;
 
+  // Emulate an initial tCall, with return address 0.
+  // When we execute the tReturn to 0, walkTable will exit.
+  // NOTE tCall currently pushes return addr on stack rather than callStack
+  stack[sp] = 0;
+
   walkTable();
 
   printf(".Done\n");
@@ -467,16 +472,17 @@ walkTable()
               pc++;
               continue;
        case tReturn :
-              if (call_fp) {
-                pc = stack[sp--];
-                // unwind tEnter
-                call_sp = call_fp;
-                call_fp = *(char**)(call_fp);
-                call_sp += PTR_SIZE;
-                call_sp += PTR_SIZE;;  // TO DO: remove when iCall pushes return address on call stack
-                continue;
-              } else
-                return;            /* done program table */
+              assert( call_fp );
+              pc = stack[sp--];
+              // unwind tEnter
+              call_sp = call_fp;
+              call_fp = *(char**)(call_fp);
+              call_sp += PTR_SIZE;
+              call_sp += PTR_SIZE;;  // TO DO: remove when iCall pushes return address on call stack
+              if ( pc == 0 ) {       //
+                return;              // done program table (driver pushed return addr 0)
+              }
+              continue;
        case tEnter :       
               // Start a stack frame, on entry to a proc/func.
               //  TO DO: ideally tCall/tReturn would record return addr on call stack, for clarity

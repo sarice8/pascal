@@ -13,9 +13,10 @@ BUGS
 
 I have these problems.
 
-  - my initial dummy call to main must be breaking stack alignment, by 8 bytes.
-  - not confident that I have the ';' syntax right.
+  - my tcode file doesn't say how much static data space it needs.
+  - not allowing const expression in array bound definition
 
+  - not confident that I have the ';' syntax right.
 
   - calling convention to standard external code;
       - only properly implemented for 1-parameter calls to writeln etc.
@@ -71,6 +72,9 @@ enum type not implemented.
 set type not implemented.
 unions ( "case" inside record definition )
 
+goto / label
+exit[(value)] - an extension to leave a procedure / function (with optional return value) / program.
+
 boolean variables may not be fully fleshed out, depending on what operators are allowed on them
 (aside from and or not equal not-equal).
 
@@ -82,8 +86,7 @@ but not sure how standard: https://www.tutorialspoint.com/pascal/pascal_memory.h
 
 Support type casts.
 
-Forward declarations of methods.
-And, use proper type checking for method forward declaration vs body declaration.  Type matching rule
+Proper type checking for method forward declaration vs body declaration.  Type matching rule
 that folks apparently use is that must have the same type declaration, not just the same content of
 the type declaration.
 
@@ -193,6 +196,8 @@ void toDo( const char* msg, ... );
 
 
 char* filename = 0;
+bool optionListing = true;
+FILE* listingFile = nullptr;
 
 int* tCode = 0;
 int  tCodeLen = 0;
@@ -206,7 +211,7 @@ int  tCodeLen = 0;
 //
 // Static data is allocated near code, so we can use rip-relative addressing.
 //
-#define dataSize 100000
+#define dataSize 1000000
 char* data = 0;
 
 
@@ -622,10 +627,23 @@ int
 main( int argc, char* argv[] )
 {
   parseArgs( argc, argv );
+
+  if ( optionListing ) {
+    std::string listingFilename( filename );
+    listingFilename.append( ".lst" );
+    listingFile = fopen( listingFilename.c_str(), "w" );
+    if ( !listingFile ) {
+      printf(" jit can't open listing file %s\n", listingFilename.c_str() );
+    }
+  }
   loadTCodeAndAllocNativeCode();
   generateCode();
   protectNativeCode();
 
+  if ( listingFile ) {
+    fclose( listingFile );
+    listingFile = nullptr;
+  }
   executeCode();
   // do some atexit/cleanup stuff for the generated code:
   grTerm();
@@ -635,17 +653,23 @@ void
 parseArgs( int argc, char* argv[] )
 {
   int arg = 1;
-  while ( arg < argc ) {
-    if ( strcmp( argv[arg], "-h" ) == 0 ) {
+  for ( ; arg < argc; ++arg ) {
+    char* astr = argv[arg];
+    if ( strcmp( astr, "-h" ) == 0 ) {
       usage( 0 );
-    } else if ( argv[arg][0] == '-' ) {
+    } else if ( strcmp( astr, "-l" ) == 0 ) {
+      optionListing = true;
+    } else if ( astr[0] == '-' ) {
       usage( 1 );
     } else {
       break;
     }
-    ++arg;
   }
-  if ( arg != argc-1 ) {
+  if ( arg == argc ) {
+    printf( "Error: missing filename\n" );
+    usage( 1 );
+  } else if ( arg != argc-1 ) {
+    printf( "Error: only one filename allowed\n" );
     usage( 1 );
   }
   filename = argv[arg];
@@ -655,7 +679,8 @@ parseArgs( int argc, char* argv[] )
 void
 usage( int status )
 {
-  printf( "Usage:   jit <file>\n" );
+  printf( "Usage:   jit [-l] <file>\n" );
+  printf( "  -l : create listing\n" );
   exit( status );
 }
 
@@ -1288,6 +1313,7 @@ generateCode()
             x.release();
             // Oh, but subsequent expr instructions might not be prepared to see Flags yet.
             // I might be obligated to produce 0/1 for now.
+            // TO DO: try to leave as flags, because this is easily followed by conditional jmp
             operandFlagsToValue( result, 1 );
             operandStack.push_back( result );
           }
@@ -1385,9 +1411,11 @@ generateCode()
           int size = *tCodePc++;
           // As noted in finishMethod(), we will bump only by a multiple of 16
           // to preserve stack alignment
-          size = ((int)((size + 15) / 16 )) * 16;
-          emitSub( Operand( jit_Operand_Kind_RegP, regRsp ),
-                   Operand( jit_Operand_Kind_ConstI, size ) );
+          size = ( size + 15 ) & 0xfffffff0;
+          if ( size ) {
+            emitSub( Operand( jit_Operand_Kind_RegP, regRsp ),
+                    Operand( jit_Operand_Kind_ConstI, size ) );
+          }
           callInfos.emplace_back( false );
         }
         break;
@@ -1395,16 +1423,23 @@ generateCode()
           int size = *tCodePc++;
           // As noted in finishMethod(), we will bump only by a multiple of 16
           // to preserve stack alignment
-          size = ((int)((size + 15) / 16 )) * 16;
-          emitSub( Operand( jit_Operand_Kind_RegP, regRsp ),
-                   Operand( jit_Operand_Kind_ConstI, size ) );
+          size = ( size + 15 ) & 0xfffffff0;
+          if ( size ) {
+            emitSub( Operand( jit_Operand_Kind_RegP, regRsp ),
+                    Operand( jit_Operand_Kind_ConstI, size ) );
+          }
           callInfos.emplace_back( true );
         }
         break;
       case tFreeActuals : {
           int size = *tCodePc++;
-          emitAdd( Operand( jit_Operand_Kind_RegP, regRsp ),
-                   Operand( jit_Operand_Kind_ConstI, size ) );
+          // As noted in finishMethod(), we will bump only by a multiple of 16
+          // to preserve stack alignment
+          size = ( size + 15 ) & 0xfffffff0;
+          if ( size ) {
+            emitAdd( Operand( jit_Operand_Kind_RegP, regRsp ),
+                    Operand( jit_Operand_Kind_ConstI, size ) );
+          }
         }
         break;
       case tCall : {
@@ -1499,7 +1534,7 @@ generateCode()
             Operand c( jit_Operand_Kind_ConstI, 0 );
             Operand cmpOp = operandCompare( x, c, FlagNE );
             // conditional jump
-            emitJccToLabel( label, FlagE );
+            emitJccToLabel( label, cmpOp._flags );
           }
           x.release();
         }
@@ -1519,11 +1554,11 @@ generateCode()
             negateConditionFlag( flags );
             emitJccToLabel( label, flags );
           } else {
-            // x <> 0
+            // x == 0
             Operand c( jit_Operand_Kind_ConstI, 0 );
-            Operand cmpOp = operandCompare( x, c, FlagNE );
+            Operand cmpOp = operandCompare( x, c, FlagE );
             // conditional jump
-            emitJccToLabel( label, FlagNE );
+            emitJccToLabel( label, cmpOp._flags );
           }
           x.release();
         }
@@ -1605,13 +1640,20 @@ finishMethod()
   if ( currLocalSpaceAddr ) {
 
     // Adjust local space to meet the stack alignment rule of the x64-64 ABI.
-    // (This rule is common to linux64 and windows64).
+    // This rule is common to linux64 and windows64:
     // The stack must be aligned on 16 bytes immediately prior to a call.
-    // The method can thus assume that on its entry, it is aligned at 8 bytes mod 16.
-    // And so the method will need to adjust by another 8 bytes mod 16 before it does
-    // more calls.   I'll do that here, and elsewhere prior to a call I'll ensure that
-    // any additional stack space (my actuals space) is a multiple of 16 bytes.
-    currLocalSpace = ((int)( currLocalSpace / 16 )) * 16 + 8;
+    // Therefore, a method may assume that on entry, rsp is 8 bytes off of 16-byte
+    // alignment (due to the return address pushed on the stack).
+    //
+    // Methods may rely on that alignment e.g. when dumping vector registers
+    // to the stack.  So it must be honored or weird crashes may occur
+    // (and I've seen this when calling the SDL library).
+    //
+    // In our case, we are patching the local space allocated by tEnter (emitEnter),
+    // which has -also- pushed rbp.  So we must ensure that the local space is
+    // a multiple of 16.  We'll also need to ensure that tAllocActuals adjusts by
+    // a multiple of 16 too.
+    currLocalSpace = ( currLocalSpace + 15 ) & 0xfffffff0;
 
     *currLocalSpaceAddr = currLocalSpace;
     currLocalSpaceAddr = nullptr;
@@ -1883,6 +1925,10 @@ void
 defineLabel( int label, char* addr )
 {
   labels[label] = addr;
+
+  if ( listingFile ) {
+    fprintf( listingFile, "%p\tLabel %d\n", addr, label );
+  }
 }
 
 // Define the given label to be an alias of another label aliasToLabel
@@ -3427,7 +3473,7 @@ emitMov( const Operand& x, const Operand& y )
 
     case KindPair( jit_Operand_Kind_RegP_DerefB, jit_Operand_Kind_ConstI ):
       // mov [reg64+offset], immediate8
-      emit( Instr( 0xc6 ).opc( 0 ).mem( x._reg, x._value ).imm32( y._value ) );
+      emit( Instr( 0xc6 ).opc( 0 ).mem( x._reg, x._value ).imm8( y._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegP_DerefB, jit_Operand_Kind_RegB ):

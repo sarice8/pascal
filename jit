@@ -1,4 +1,4 @@
 #!/bin/sh
 
-./bin-${OSTYPE}/jit $1
+./bin-${OSTYPE}/jit $*
 

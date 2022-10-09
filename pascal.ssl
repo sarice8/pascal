@@ -118,7 +118,6 @@ input:
    pUntil
    pContinue
    pBreak
-   pReturn
    pAnd
    pOr
    pNot
@@ -463,10 +462,17 @@ Program:
 
    @installBuiltIns
 
-   % Start by calling the main program routine
+   % Start by calling the main program routine.
+
+   % This dummy call to main needs to look like a normal method itself,
+   % so jit can align the stack properly.  So we need .tEnter,
+   % and .tAllocActuals / .tFreeActuals.
+   .tEnter  oEmitInt( 0 )
    Label mainLabel = oLabelNew
 
+   .tAllocActuals  oEmitInt( 0 )
    .tCall  oEmitLabel( mainLabel )
+   .tFreeActuals  oEmitInt( 0 )
    .tReturn
 
    pProgram
