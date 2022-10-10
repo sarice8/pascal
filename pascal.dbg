@@ -1,4 +1,4 @@
-2374
+2381
 -1
 -1
 -1
@@ -86,7 +86,6 @@
 2
 2
 2
-2
 -1
 -1
 -1
@@ -242,6 +241,10 @@
 2
 2
 2
+-1
+2
+2
+2
 2
 2
 2
@@ -270,6 +273,8 @@
 -1
 -1
 -1
+2
+2
 2
 2
 2
@@ -1801,118 +1806,115 @@
 -1
 4216
 4229
-4229
+4239
+4239
 -1
-4231
-4231
-4238
 4241
-4246
+4241
+4248
+4251
+4256
 -1
-4246
+4256
 -1
 -1
-4259
-4267
+4269
+4277
 -1
-4280
 4290
+4300
 -1
 -1
 -1
-4291
--1
--1
--1
--1
--1
--1
-4293
--1
-4295
--1
-4297
 4301
 -1
 -1
 -1
+-1
+-1
+-1
 4303
+-1
 4305
-4308
-4312
-4316
-4320
 -1
-4335
-4347
-4355
-4355
-4363
+4307
+4311
 -1
-4364
-4370
-4377
+-1
+-1
+4313
+4315
+4318
+4322
+4326
+4330
+-1
+4345
+4357
+4365
+4365
+4373
+-1
+4374
 4380
-4382
--1
 4390
-4392
+4397
+4400
+4402
 -1
-4394
+4410
+4412
 -1
-4396
-4401
--1
-4401
-4408
-4411
-4416
+4414
 -1
 4416
-4419
+4421
 -1
-4420
-4435
-4443
-4445
-4450
+4421
+4428
+4431
+4436
 -1
-4450
-4453
-4454
+4436
+4439
+-1
+4440
+4455
 4463
 4465
+4470
+-1
+4470
+4473
 4474
--1
-4482
+4483
 4485
--1
-4486
--1
-4492
 4494
-4503
-4513
-4517
-4527
-4542
-4550
-4550
-4555
 -1
-4555
-4564
+4502
+4505
 -1
+4506
 -1
--1
--1
-4564
-4566
-4566
+4512
+4514
+4523
+4533
+4537
+4547
+4562
 4570
-4574
-4578
-4582
+4570
+4575
+-1
+4575
+4584
+-1
+-1
+-1
+-1
+4584
+4586
 4586
 4590
 4594
@@ -1921,73 +1923,78 @@
 4606
 4610
 4614
-4641
+4618
+4622
+4626
+4630
+4634
+4661
 -1
 -1
-4642
-4644
-4649
-4656
+4662
 4664
-4673
-4682
-4697
+4669
+4676
+4684
+4693
+4702
+4717
 -1
 -1
 -1
 -1
-4698
--1
-4700
--1
-4707
-4709
-4711
-4713
-4715
 4718
-4722
+-1
+4720
+-1
+4727
+4729
+4731
+4733
+4735
+4738
+4742
 -1
 -1
-4726
-4730
-4745
-4757
+4746
+4750
 4765
-4765
-4767
--1
--1
--1
--1
--1
-4767
--1
-4769
+4777
 4785
-4788
-4793
+4785
+4787
 -1
 -1
-4793
+-1
+-1
+-1
+4787
+-1
+4789
+4805
 4808
--1
-4821
-4823
-4825
-4827
-4829
-4832
-4836
+4813
 -1
 -1
-4840
-4844
-4859
-4871
+4813
+4828
+-1
+4841
+4843
+4845
+4847
+4849
+4852
+4856
+-1
+-1
+4860
+4864
 4879
-4879
-4881
+4891
+4899
+4899
+4901
 -1
 -1
 -1
@@ -1996,17 +2003,17 @@
 -1
 -1
 -1
-4881
+4901
 -1
 -1
-4883
-4885
-4890
-4897
-4898
-4909
-4909
+4903
+4905
+4910
 4917
+4918
+4929
+4929
+4937
 -1
 -1
 -1
@@ -2014,521 +2021,523 @@
 -1
 -1
 -1
-4917
-4919
-4926
-4936
-4947
-4949
-4959
-4960
+4937
+4939
+4946
+4956
+4967
 4969
-4983
-4983
-4994
+4979
+4980
+4989
+5003
+5003
+5014
 -1
-4994
-5007
-5010
--1
--1
-5010
-5012
-5019
-5021
-5028
-5029
-5031
--1
-5034
-5036
-5043
-5045
-5052
-5053
-5055
+5014
+5027
+5030
 -1
 -1
-5058
-5060
+5030
+5032
+5039
+5041
+5048
+5049
+5051
 -1
-5066
+5054
+5056
+5063
+5065
+5072
 5073
 5075
-5077
-5077
-5079
--1
-5084
-5092
-5100
-5102
--1
-5110
-5115
-5123
 -1
 -1
-5124
-5126
+5078
+5080
 -1
-5128
+5086
+5093
+5095
+5097
+5097
+5099
 -1
+5104
+5112
+5120
+5122
 -1
+5130
+5135
+5143
 -1
-5133
-5140
--1
-5142
 -1
 5144
 5146
+-1
 5148
 -1
-5150
 -1
-5155
+-1
+5153
 5160
 -1
+5162
+-1
+5164
+5166
 5168
-5173
-5181
-5181
-5183
-5190
-5198
-5206
-5208
+-1
+5170
+-1
+5175
+5180
+-1
+5188
+5193
+5201
+5201
+5203
 5210
-5212
-5220
-5222
-5229
-5237
-5245
-5247
+5218
+5226
+5228
+5230
+5232
+5240
+5242
 5249
-5251
-5259
+5257
+5265
 5267
-5276
-5278
-5280
-5288
+5269
+5271
+5279
+5287
 5296
--1
--1
 5298
 5300
-5305
+5308
+5316
 -1
-5313
 -1
 5318
-5327
-5329
-5329
-5331
+5320
+5325
+-1
 5333
-5335
-5335
-5342
-5356
-5358
-5368
+-1
+5338
+5347
+5349
+5349
+5351
+5353
+5355
+5355
+5362
 5376
--1
--1
 5378
-5380
-5385
+5388
+5396
 -1
-5393
-5393
 -1
+5398
 5400
-5409
-5411
+5405
+-1
 5413
-5421
+5413
+-1
+5420
 5429
--1
--1
 5431
 5433
-5442
-5443
-5445
-5447
-5454
+5441
+5449
 -1
 -1
+5451
+5453
+5462
 5463
 5465
+5467
 5474
-5475
-5477
-5479
-5486
 -1
 -1
+5483
+5485
+5494
 5495
 5497
 5499
-5499
-5503
-5507
+5506
 -1
 -1
-5518
-5520
-5522
--1
--1
-5525
+5515
+5517
+5519
+5519
+5523
 5527
-5527
-5529
-5529
-5531
-5533
-5536
+-1
+-1
+5538
 5540
-5544
-5548
-5552
-5569
-5569
-5570
-5570
-5574
-5576
-5584
-5586
-5591
+5542
 -1
 -1
-5592
--1
-5595
--1
-5595
--1
-5598
--1
--1
--1
--1
--1
--1
--1
-5598
-5600
-5605
+5545
+5547
+5547
+5549
+5549
+5551
+5553
+5556
+5560
+5564
+5568
+5572
+5589
+5589
+5590
+5590
+5594
+5596
+5604
 5606
+5611
+-1
+-1
+5612
+-1
 5615
-5616
+-1
+5615
+-1
 5618
-5623
 -1
 -1
 -1
 -1
 -1
-5624
+-1
+-1
+5618
+5620
+5625
 5626
-5628
-5629
+5635
 5636
-5636
--1
 5638
-5640
-5642
 5643
-5650
 -1
-5651
-5653
-5655
+-1
+-1
+-1
+-1
+5644
+5646
+5648
+5649
 5656
-5663
-5663
+5656
 -1
-5665
-5667
-5669
+5658
+5660
+5662
+5663
 5670
-5677
 -1
+5671
+5673
+5675
+5676
+5683
+5683
 -1
--1
--1
-5678
-5680
+5685
+5687
+5689
 5690
-5702
-5708
-5712
+5697
+-1
+-1
+-1
+-1
+5698
+5700
+5710
+5722
+5728
+5732
 -1
 -1
 -1
 -1
 -1
-5712
-5714
-5724
-5736
-5740
+5732
+5734
+5744
+5756
+5760
 -1
 -1
 -1
 -1
 -1
-5740
-5742
-5755
+5760
 5762
-5763
-5773
-5785
-5797
-5803
-5815
-5820
-5820
+5775
+5782
+5783
+5793
+5805
+5817
+5823
+5835
+5840
+5840
 -1
 -1
 -1
 -1
-5824
-5826
-5833
-5836
-5841
+5844
 5846
-5858
-5871
-5874
--1
--1
--1
--1
--1
--1
--1
--1
-5875
-5877
--1
--1
+5853
+5856
+5861
+5866
+5878
 5891
--1
--1
-5893
-5907
-5921
-5935
-5949
-5963
+5894
 -1
 -1
 -1
 -1
-5977
--1
-5977
-5993
-6005
--1
-6011
-6027
-6039
--1
-6045
-6061
-6073
--1
-6079
-6095
-6107
--1
-6113
-6129
-6141
 -1
 -1
 -1
-6147
-6163
-6175
-6187
 -1
-6193
-6209
-6221
-6233
+5895
+5897
 -1
-6240
 -1
-6240
+5911
+-1
+-1
+5913
+5927
+5941
+5955
+5969
+5983
+-1
+-1
+-1
+-1
+5997
+-1
+5997
+6013
+6025
+-1
+6031
+6047
+6059
+-1
+6065
+6081
+6093
+-1
+6099
+6115
+6127
+-1
+6133
+6149
+6161
+-1
+-1
+-1
+6167
+6183
+6195
+6207
+-1
+6213
+6229
+6241
+6253
+-1
+6260
+-1
+6260
 -1
 28 int nType
 29 token nType
 171 node_type nType
 201 node_attribute nType
 226 Node nType
-228 NodeVec nType
-230 boolean nType
-233 kind nType
-241 typ nType
-253 Label nType
-511 globalScope nGlobal 226 1
-512 FileType nGlobal 226 2
-513 IntegerType nGlobal 226 3
-514 BooleanType nGlobal 226 4
-515 BooleanCFType nGlobal 226 5
-516 CharType nGlobal 226 6
-517 StringType nGlobal 226 7
-518 Block nRule 204
-520 varNodeType nInParam 171 2
-521 labelForBody nInParam 253 1
-523 BlockDecls nRule 221
-525 varNodeType nInParam 171 1
-526 BlockStmt nRule 271
-528 labelForBody nInParam 253 1
-703 patchLS nLocal 28 1
-704 localSpace nLocal 28 2
-529 VarDecl nRule 1364
-531 varNodeType nInParam 171 1
-532 newType nRule 5678
-534 nt nInParam 171 2
-535 size nInParam 28 1
-1194 node nLocal 226 1
-537 newIdent nRule 5712
-539 nt nInParam 171 3
-540 k nInParam 233 2
-542 id nInParam 28 1
-1196 t nLocal 226 1
-543 EmitValue nRule 5875
-545 decl nInParam 226 1
-546 TypeRef nRule 1505
-548 resultType nOutParam 226 1
-549 PointerTypeTo nRule 5740
-551 theType nInParam 226 1
-1198 ptrType nLocal 226 1
-552 OrdinalLow nRule 5824
-554 theType nInParam 226 1
-555 AssignStmt nRule 4698
-557 decl nInParam 226 1
-558 BooleanExprControlFlow nRule 2063
-560 falseLabel nOutParam 253 1
-561 ExprAllowCF nRule 2201
-563 falseLabel nOutParam 253 1
-564 BoolExprAllowCF nRule 2566
-566 falseLabel nOutParam 253 1
-887 trueLabel nLocal 253 1
-567 BoolTermAllowCF nRule 2746
-569 falseLabel nOutParam 253 1
-904 overallFalseLabel nLocal 253 1
-570 BoolFactorAllowCF nRule 2884
-572 falseLabel nOutParam 253 1
-573 ArithExprAllowCF nRule 2951
-575 falseLabel nOutParam 253 1
-576 TermAllowCF nRule 3002
-578 falseLabel nOutParam 253 1
-579 FactorAllowCF nRule 3053
-581 falseLabel nOutParam 253 1
-582 PrimaryAllowCF nRule 3094
-584 falseLabel nOutParam 253 1
-585 VarExpr nRule 3298
-587 decl nInParam 226 1
-960 theType nLocal 226 1
-588 LValueVar nRule 4917
-590 decl nInParam 226 1
-591 IncVar nRule 5010
-593 decl nInParam 226 1
-594 DecVar nRule 5034
-596 decl nInParam 226 1
-597 CFToVal nRule 2101
-599 falseLabel nInOutParam 253 1
-600 ValToCF nRule 2170
-602 falseLabel nOutParam 253 1
-603 Program nRule 2
-686 t nLocal 226 1
-687 mainLabel nLocal 253 2
-689 progDecl nLocal 226 3
-605 CheckForUndefinedMethods nRule 268
-607 MethodModifiers nRule 316
-609 decl nInParam 226 1
-610 ExternalDecl nRule 344
-612 decl nInParam 226 1
-613 ProcDecl nRule 375
-716 redeclaring nLocal 230 1
-717 decl nLocal 226 2
-727 paramScope nLocal 226 3
-615 FuncDecl nRule 660
-735 redeclaring nLocal 230 1
-736 decl nLocal 226 2
-744 paramScope nLocal 226 3
-745 theType nLocal 226 4
-746 ptrType nLocal 226 5
-617 FormalArgDecl nRule 1006
-619 ConstDecl nRule 1233
-621 TypeDecl nRule 1305
-623 ConstExpr nRule 1974
-625 Expr nRule 2040
-845 falseLabel nLocal 253 1
-627 FetchVar nRule 3677
-629 LValueIndexes nRule 3712
-631 ArraySubscripts nRule 3740
-633 RecordFieldRef nRule 3883
-1019 field nLocal 226 1
-1022 offset nLocal 28 2
-635 PointerDeref nRule 3981
-1029 theType nLocal 226 1
-637 CoerceType nRule 4015
-639 Call nRule 4020
-641 method nInParam 226 1
-1037 cdecl nLocal 230 2
-1038 resultType nLocal 226 3
-1040 tempOffset nLocal 28 4
-1041 isFunc nLocal 230 5
-1044 paramScope nLocal 226 6
-1045 actualsSize nLocal 28 7
-1048 param nLocal 226 8
-642 Statement nRule 4564
-644 AssignOrCallStmt nRule 4642
-1093 decl nLocal 226 1
-646 AssignResultStmt nRule 4767
-648 funcDecl nInParam 226 1
-649 LValueExpr nRule 4881
-1115 decl nLocal 226 1
-651 IfStmt nRule 5058
-1128 falseLabel nLocal 253 1
-653 ForStmt nRule 5124
-1133 decl nLocal 226 1
-1134 breakLabel nLocal 253 2
-1136 checkLabel nLocal 253 3
-1137 continueLabel nLocal 253 4
-655 RepeatStmt nRule 5298
-1141 continueLabel nLocal 253 1
-1142 breakLabel nLocal 253 2
-657 WhileStmt nRule 5378
-1149 continueLabel nLocal 253 1
-1150 breakLabel nLocal 253 2
-659 ContinueStmt nRule 5431
-661 BreakStmt nRule 5463
-663 BeginStmt nRule 5495
-665 WritelnStmt nRule 5518
-667 WriteStmt nRule 5525
-669 ReadlnStmt nRule 5592
-671 ReadStmt nRule 5595
-673 MatchTypes nRule 5598
-1178 nt nLocal 171 1
-675 RequireIntPop nRule 5624
-677 RequireInt nRule 5638
-679 RequireBoolPop nRule 5651
-681 RequireBool nRule 5665
-683 installBuiltIns nRule 5891
-1209 t nLocal 226 1
+228 NodeIter nType
+230 NodeVec nType
+232 boolean nType
+235 kind nType
+243 typ nType
+255 Label nType
+521 globalScope nGlobal 226 1
+522 FileType nGlobal 226 2
+523 IntegerType nGlobal 226 3
+524 BooleanType nGlobal 226 4
+525 BooleanCFType nGlobal 226 5
+526 CharType nGlobal 226 6
+527 StringType nGlobal 226 7
+528 Block nRule 204
+530 varNodeType nInParam 171 2
+531 labelForBody nInParam 255 1
+533 BlockDecls nRule 221
+535 varNodeType nInParam 171 1
+536 BlockStmt nRule 271
+538 labelForBody nInParam 255 1
+713 patchLS nLocal 28 1
+714 localSpace nLocal 28 2
+539 VarDecl nRule 1364
+541 varNodeType nInParam 171 1
+542 newType nRule 5698
+544 nt nInParam 171 2
+545 size nInParam 28 1
+1205 node nLocal 226 1
+547 newIdent nRule 5732
+549 nt nInParam 171 3
+550 k nInParam 235 2
+552 id nInParam 28 1
+1207 t nLocal 226 1
+553 EmitValue nRule 5895
+555 decl nInParam 226 1
+556 TypeRef nRule 1505
+558 resultType nOutParam 226 1
+559 PointerTypeTo nRule 5760
+561 theType nInParam 226 1
+1209 ptrType nLocal 226 1
+562 OrdinalLow nRule 5844
+564 theType nInParam 226 1
+565 AssignStmt nRule 4718
+567 decl nInParam 226 1
+568 BooleanExprControlFlow nRule 2063
+570 falseLabel nOutParam 255 1
+571 ExprAllowCF nRule 2201
+573 falseLabel nOutParam 255 1
+574 BoolExprAllowCF nRule 2566
+576 falseLabel nOutParam 255 1
+897 trueLabel nLocal 255 1
+577 BoolTermAllowCF nRule 2746
+579 falseLabel nOutParam 255 1
+914 overallFalseLabel nLocal 255 1
+580 BoolFactorAllowCF nRule 2884
+582 falseLabel nOutParam 255 1
+583 ArithExprAllowCF nRule 2951
+585 falseLabel nOutParam 255 1
+586 TermAllowCF nRule 3002
+588 falseLabel nOutParam 255 1
+589 FactorAllowCF nRule 3053
+591 falseLabel nOutParam 255 1
+592 PrimaryAllowCF nRule 3094
+594 falseLabel nOutParam 255 1
+595 VarExpr nRule 3298
+597 decl nInParam 226 1
+970 theType nLocal 226 1
+598 LValueVar nRule 4937
+600 decl nInParam 226 1
+601 IncVar nRule 5030
+603 decl nInParam 226 1
+604 DecVar nRule 5054
+606 decl nInParam 226 1
+607 CFToVal nRule 2101
+609 falseLabel nInOutParam 255 1
+610 ValToCF nRule 2170
+612 falseLabel nOutParam 255 1
+613 Program nRule 2
+696 t nLocal 226 1
+697 mainLabel nLocal 255 2
+699 progDecl nLocal 226 3
+615 CheckForUndefinedMethods nRule 268
+617 MethodModifiers nRule 316
+619 decl nInParam 226 1
+620 ExternalDecl nRule 344
+622 decl nInParam 226 1
+623 ProcDecl nRule 375
+726 redeclaring nLocal 232 1
+727 decl nLocal 226 2
+737 paramScope nLocal 226 3
+625 FuncDecl nRule 660
+745 redeclaring nLocal 232 1
+746 decl nLocal 226 2
+754 paramScope nLocal 226 3
+755 theType nLocal 226 4
+756 ptrType nLocal 226 5
+627 FormalArgDecl nRule 1006
+629 ConstDecl nRule 1233
+631 TypeDecl nRule 1305
+633 ConstExpr nRule 1974
+635 Expr nRule 2040
+855 falseLabel nLocal 255 1
+637 FetchVar nRule 3677
+639 LValueIndexes nRule 3712
+641 ArraySubscripts nRule 3740
+643 RecordFieldRef nRule 3883
+1029 field nLocal 226 1
+1032 offset nLocal 28 2
+645 PointerDeref nRule 3981
+1039 theType nLocal 226 1
+647 CoerceType nRule 4015
+649 Call nRule 4020
+651 method nInParam 226 1
+1047 cdecl nLocal 232 2
+1048 resultType nLocal 226 3
+1050 tempOffset nLocal 28 4
+1051 isFunc nLocal 232 5
+1054 paramScope nLocal 226 6
+1055 actualsSize nLocal 28 7
+1058 paramIter nLocal 228 8
+1059 param nLocal 226 9
+652 Statement nRule 4584
+654 AssignOrCallStmt nRule 4662
+1104 decl nLocal 226 1
+656 AssignResultStmt nRule 4787
+658 funcDecl nInParam 226 1
+659 LValueExpr nRule 4901
+1126 decl nLocal 226 1
+661 IfStmt nRule 5078
+1139 falseLabel nLocal 255 1
+663 ForStmt nRule 5144
+1144 decl nLocal 226 1
+1145 breakLabel nLocal 255 2
+1147 checkLabel nLocal 255 3
+1148 continueLabel nLocal 255 4
+665 RepeatStmt nRule 5318
+1152 continueLabel nLocal 255 1
+1153 breakLabel nLocal 255 2
+667 WhileStmt nRule 5398
+1160 continueLabel nLocal 255 1
+1161 breakLabel nLocal 255 2
+669 ContinueStmt nRule 5451
+671 BreakStmt nRule 5483
+673 BeginStmt nRule 5515
+675 WritelnStmt nRule 5538
+677 WriteStmt nRule 5545
+679 ReadlnStmt nRule 5612
+681 ReadStmt nRule 5615
+683 MatchTypes nRule 5618
+1189 nt nLocal 171 1
+685 RequireIntPop nRule 5644
+687 RequireInt nRule 5658
+689 RequireBoolPop nRule 5671
+691 RequireBool nRule 5685
+693 installBuiltIns nRule 5911
+1220 t nLocal 226 1

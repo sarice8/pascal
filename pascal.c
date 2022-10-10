@@ -23,7 +23,7 @@
 #include "ssl_rt.h"
 
 // Schema database access functions
-#include "node.h"
+#include "schema_db.h"
 
 // Optionally integrate SSL debugger
 #ifdef INTEGRATE_SSL_DEBUGGER
@@ -95,19 +95,19 @@ int   w_here;                      /* Output position */
 
 // scope stack
 #define dScopeStackSize 40
-NODE_PTR        dScopeStack[dScopeStackSize];
+Node            dScopeStack[dScopeStackSize];
 int             dScopeStackPtr;
 
 
 // Type table, owns nType nodes.
 // TO DO: make all of these tables dynamic size.
 #define dTypeTableSize 50
-NODE_PTR dTypeTable[dTypeTableSize];
+Node dTypeTable[dTypeTableSize];
 int dTypeTablePtr;
 
 // Type stack
 #define dTypeStackSize 50
-NODE_PTR dTypeStack[dTypeStackSize];
+Node dTypeStack[dTypeStackSize];
 int dTypeStackPtr;
 
 #define dCSsize 30
@@ -120,11 +120,11 @@ int dVS[dVSsize], dVSptr;        /* value stack */
 int dSL[dSLsize], dSLptr;        /* string literal table */
 
 
-// A dynamic vector of NODE_PTR's
+// A dynamic vector of Node's
 typedef struct NodeVecStruct {
   int size;
   int capacity;
-  NODE_PTR*  elements;
+  Node*  elements;
 } NodeVec, *NODE_VEC_PTR;
 
 int labelCount;
@@ -153,24 +153,24 @@ dump_int( void* variable, void* udata )
 void
 dump_node_short( void* variable, void* udata )
 {
-  NODE_PTR node_ptr = *((NODE_PTR*)variable);
+  Node node_ptr = *((Node*)variable);
   // double-dereference, because debugger calls us with a pointer to the variable,
   // not the value of the variable.
-  nodeDumpNodeShort( node_ptr );
+  DumpNodeShort( node_ptr );
 }
 
 void
 dump_node_stack_short( void* variable, void* udata )
 {
   int top = *(int*) udata;
-  NODE_PTR* stack = (NODE_PTR*) variable;
+  Node* stack = (Node*) variable;
   for ( int i = top; i > 0; --i ) {
-    nodeDumpNodeShort( stack[i] );
+    DumpNodeShort( stack[i] );
   }
 }
 
 //
-// NODE_PTR dTypeStack[dTypeStackSize];
+// Node dTypeStack[dTypeStackSize];
 // int dTypeStackPtr;
 
 
@@ -263,6 +263,8 @@ main( int argc, char* argv[] )
 
   close_my_files();
 
+  SCH_Term();
+  
   if (status != 0) {
     exit( -1 );
   }
@@ -377,8 +379,8 @@ init_my_operations()
 {
   w_here = 0;
 
-  // Initialize node package (schema runtime module)
-  nodeInit();
+  // Initialize schema package (schema runtime module)
+  SCH_Init();
 
   labelCount = 0;
 
@@ -394,12 +396,12 @@ init_my_operations()
 int
 createGlobalData( char* sourceData, int sourceBytes )
 {
-  NODE_PTR globalScope = dScopeStack[1];
+  Node globalScope = dScopeStack[1];
   int numInts = (sourceBytes + 3) / 4;
   if (dSLptr + numInts + 2 >= dSLsize) ssl_fatal("SL overflow");
 
-  int offset = nodeGetValue( globalScope, qSize );
-  nodeSetValue( globalScope, qSize, offset + sourceBytes );
+  int offset = GetValue( globalScope, qSize );
+  SetValue( globalScope, qSize, offset + sourceBytes );
 
   // the data currenty resides in the output file's "strlit table"
   // with the format:
@@ -416,10 +418,49 @@ createGlobalData( char* sourceData, int sourceBytes )
 }
 
 
+// Given a list (in the listOwner node, as attribute listAttr).
+// Find the Node within the list where findAttr has value findValue.
+// This is a slow linear search.
+// This api was in schema 1.3 but not schema 1.4, so adding here for now.
+// Should replace this lookup with a map.
+//
+Node
+nodeFindValue_NoErrorChecking( Node listOwner, int listAttr, int findAttr, long findValue )
+{
+  List list = GetAttr( listOwner, listAttr );
+  if ( !list ) {
+    return NULL;
+  }
+  for ( Item it = FirstItem( list ); it; it = NextItem( it ) ) {
+    Node node = Value( it );
+    if ( GetValue( node, findAttr ) == findValue ) {
+      return node;
+    }
+  }
+  return NULL;
+}
+
+// This is a schema method expected by the debugger, that was present in schema 1.3
+// but not schema 1.4.   Partly a placeholder for now, the old one showed the whole subtree.
+//
+extern void nodeDumpTreeNum( long nodeNum );
+
+void
+nodeDumpTreeNum( long nodeNum )
+{
+  Node node = SCH_LookupNode( nodeNum );
+  if ( !node ) {
+    printf( "Can't find node %ld\n", nodeNum );
+  } else {
+    DumpNodeLong( node );
+  }
+}
+
+
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
 
-NODE_PTR dNode;  // temporary for several mechanisms
+Node dNode;  // temporary for several mechanisms
 
 
 #include "ssl_begin.h"
@@ -445,38 +486,61 @@ NODE_PTR dNode;  // temporary for several mechanisms
     /* Mechanism node_mech */
 
     case oNodeNew:      /* (node_type) -- create node */
-            ssl_result = (long) nodeNew (ssl_param);
+            ssl_result = (long) NewNode (ssl_param);
             continue;
     case oNodeSet:
-            nodeLink ((NODE_PTR)ssl_argv(0,3), ssl_argv(1,3), (NODE_PTR)ssl_argv(2,3));
+            SetAttr ((Node)ssl_argv(0,3), ssl_argv(1,3), (Node)ssl_argv(2,3));
             continue;
     case oNodeSetInt:
     case oNodeSetBoolean:
     case oNodeSetKind:
     case oNodeSetLabel:
-            nodeSetValue ((NODE_PTR)ssl_argv(0,3), ssl_argv(1,3), ssl_argv(2,3));
+            SetValue ((Node)ssl_argv(0,3), ssl_argv(1,3), ssl_argv(2,3));
             continue;
     case oNodeGet:
-            ssl_result = (long) nodeGet ((NODE_PTR)ssl_argv(0,2), ssl_argv(1,2));
+            ssl_result = (long) GetAttr ((Node)ssl_argv(0,2), ssl_argv(1,2));
             continue;
     case oNodeGetInt:
     case oNodeGetBoolean:
     case oNodeGetLabel:
-            ssl_result = (long) nodeGetValue ((NODE_PTR)ssl_argv(0,2), ssl_argv(1,2));
+            ssl_result = (long) GetValue ((Node)ssl_argv(0,2), ssl_argv(1,2));
             continue;
     case oNodeNull:
-            ssl_result = ((NODE_PTR)ssl_param == NULL);
+            ssl_result = ((Node)ssl_param == NULL);
             continue;
-    case oNodeNext:
-            ssl_var_stack[ssl_param] = (long) nodeNext((NODE_PTR)ssl_var_stack[ssl_param]);
+    case oNodeGetIter: {
+            List list = GetAttr((Node)ssl_argv(0,2), ssl_argv(1,2));
+            if ( !list ) {
+              ssl_result = 0;
+            } else {
+              ssl_result = (long) FirstItem( list );
+            }
             continue;
+            }
+    case oNodeIterValue: {
+            Item item = (Item)ssl_param;
+            if ( item == NULL ) {
+              ssl_result = 0;
+            } else {
+              ssl_result = (long) Value( item );
+            }
+            continue;
+            }
+    case oNodeIterNext: {
+            Item item = (Item) ssl_var_stack[ssl_param];
+            if ( item != NULL ) {
+              item = NextItem( item );
+              ssl_var_stack[ssl_param] = (long) item;
+            }
+            continue;
+            }
     case oNodeType:
             // SARICE TEST: allow for Null, returning type nINVALID.
-            //   Maybe nodeType should allow this.
-            if ((NODE_PTR)ssl_param == NULL) {
+            //   Maybe Kind should allow this.
+            if ((Node)ssl_param == NULL) {
               ssl_result = nINVALID;
             } else {
-              ssl_result = nodeType((NODE_PTR)ssl_param);
+              ssl_result = Kind((Node)ssl_param);
             }
             continue;
     case oNodeEqual:
@@ -490,8 +554,8 @@ NODE_PTR dNode;  // temporary for several mechanisms
             NODE_VEC_PTR nv = (NODE_VEC_PTR) malloc( sizeof( NodeVec ) );
             nv->size = 0;
             nv->capacity = 4;
-            nv->elements = (NODE_PTR*) malloc( nv->capacity * sizeof( NODE_PTR ) );
-            memset( nv->elements, nv->capacity * sizeof( NODE_PTR ), 0 );
+            nv->elements = (Node*) malloc( nv->capacity * sizeof( Node ) );
+            memset( nv->elements, nv->capacity * sizeof( Node ), 0 );
             ssl_result = (long) nv;
             continue;
             }
@@ -503,12 +567,12 @@ NODE_PTR dNode;  // temporary for several mechanisms
             }
     case oNodeVecAppend: {
             NODE_VEC_PTR nv = (NODE_VEC_PTR) ssl_argv(0,2);
-            NODE_PTR n = (NODE_PTR) ssl_argv(1,2);
+            Node n = (Node) ssl_argv(1,2);
             if ( nv->size == nv->capacity ) {
               int new_capacity = nv->capacity * 2;
-              nv->elements = realloc( nv->elements, new_capacity * sizeof( NODE_PTR ) );
+              nv->elements = realloc( nv->elements, new_capacity * sizeof( Node ) );
               memset( &(nv->elements[nv->capacity]),
-                      (new_capacity - nv->capacity) * sizeof( NODE_PTR ),
+                      (new_capacity - nv->capacity) * sizeof( Node ),
                       0 );
               nv->capacity = new_capacity;
             }
@@ -589,13 +653,15 @@ NODE_PTR dNode;  // temporary for several mechanisms
     /* Mechanism scope_mech */
 
     case oScopeBegin:
-            dNode = nodeNew (nScope);
+            dNode = NewNode (nScope);
             if (++dScopeStackPtr == dScopeStackSize) ssl_fatal ("Scope Stack overflow");
+            // schema 1.4 needs our help to create empty list attribute.  A bit unfriendly.
+            SetAttr( dNode, qDecls, NewList(nDeclaration) );
             dScopeStack[dScopeStackPtr] = dNode;
             continue;
     case oScopeEnter:
             if (++dScopeStackPtr == dScopeStackSize) ssl_fatal ("Scope Stack overflow");
-            dScopeStack[dScopeStackPtr] = (NODE_PTR) ssl_param;
+            dScopeStack[dScopeStackPtr] = (Node) ssl_param;
             continue;
     case oScopeEnd:
             ssl_assert (dScopeStackPtr >= 1);
@@ -605,41 +671,42 @@ NODE_PTR dNode;  // temporary for several mechanisms
             ssl_assert (dScopeStackPtr >= 1);
             ssl_result = (long) dScopeStack[dScopeStackPtr];
             continue;
-    case oScopeDeclare:
+    case oScopeDeclare: {
             ssl_assert (dScopeStackPtr >= 1);
-            nodeAppend (dScopeStack[dScopeStackPtr], qDecls, (NODE_PTR)ssl_param);
+            AddLast( GetAttr( dScopeStack[dScopeStackPtr], qDecls ), (Node)ssl_param );
             continue;
+            }
     case oScopeDeclareAlloc: {
             ssl_assert (dScopeStackPtr >= 1);
-            NODE_PTR scope = dScopeStack[dScopeStackPtr];
-            NODE_PTR node = (NODE_PTR)ssl_param;
-            nodeAppend (scope, qDecls, node);
-            NODE_PTR theType = nodeGet( node, qType );
+            Node scope = dScopeStack[dScopeStackPtr];
+            Node node = (Node)ssl_param;
+            AddLast( GetAttr( scope, qDecls ), node );
+            Node theType = GetAttr( node, qType );
             ssl_assert( theType != NULL );
-            int size = nodeGetValue( theType, qSize );
-            long offset = nodeGetValue( scope, qSize );
-            if ( nodeGetValue( scope, qAllocDown ) ) {
-              nodeSetValue( node, qValue, -offset - size );
-              nodeSetValue( scope, qSize, offset + size );
+            int size = GetValue( theType, qSize );
+            long offset = GetValue( scope, qSize );
+            if ( GetValue( scope, qAllocDown ) ) {
+              SetValue( node, qValue, -offset - size );
+              SetValue( scope, qSize, offset + size );
             } else {
-              nodeSetValue( node, qValue, offset );
-              nodeSetValue( scope, qSize, offset + size );
+              SetValue( node, qValue, offset );
+              SetValue( scope, qSize, offset + size );
             }
             continue;
             }
     case oScopeAllocType: {
             ssl_assert (dScopeStackPtr >= 1);
-            NODE_PTR scope = dScopeStack[dScopeStackPtr];
-            NODE_PTR theType = (NODE_PTR)ssl_param;
+            Node scope = dScopeStack[dScopeStackPtr];
+            Node theType = (Node)ssl_param;
             ssl_assert( theType != NULL );
-            int size = nodeGetValue( theType, qSize );
-            long offset = nodeGetValue( scope, qSize );
-            if ( nodeGetValue( scope, qAllocDown ) ) {
+            int size = GetValue( theType, qSize );
+            long offset = GetValue( scope, qSize );
+            if ( GetValue( scope, qAllocDown ) ) {
               ssl_result = -offset - size;
-              nodeSetValue( scope, qSize, offset + size );
+              SetValue( scope, qSize, offset + size );
             } else {
               ssl_result = offset;
-              nodeSetValue( scope, qSize, offset + size );
+              SetValue( scope, qSize, offset + size );
             }
             continue;
             }
@@ -677,7 +744,7 @@ NODE_PTR dNode;  // temporary for several mechanisms
 
     case oTypeAdd:
             if (++dTypeTablePtr==dTypeTableSize) ssl_fatal("Type Table overflow");
-            dTypeTable[dTypeTablePtr] = (NODE_PTR) ssl_param;
+            dTypeTable[dTypeTablePtr] = (Node) ssl_param;
             continue;
 
 
@@ -685,7 +752,7 @@ NODE_PTR dNode;  // temporary for several mechanisms
 
     case oTypeSPush:
             if (++dTypeStackPtr==dTypeStackSize) ssl_fatal("Type Stack overflow");
-            dTypeStack[dTypeStackPtr] = (NODE_PTR) ssl_param;
+            dTypeStack[dTypeStackPtr] = (Node) ssl_param;
             continue;
     case oTypeSPop:
             ssl_assert( dTypeStackPtr > 0 );
@@ -697,14 +764,14 @@ NODE_PTR dNode;  // temporary for several mechanisms
             continue;
     case oTypeSNodeType: {
             ssl_assert( dTypeStackPtr > 0 );
-            NODE_PTR t = dTypeStack[dTypeStackPtr];
+            Node t = dTypeStack[dTypeStackPtr];
             // Skip past subranges, to the underlying base type.
             // If a caller wants the raw type including subranges, they can examine
             // the top node themselves using oTypeSTop.
-            while ( nodeType(t) == nSubrangeType ) {
-              t = nodeGet( t, qBaseType );
+            while ( Kind(t) == nSubrangeType ) {
+              t = GetAttr( t, qBaseType );
             }
-            ssl_result = nodeType( t );
+            ssl_result = Kind( t );
             continue;
             }
 
@@ -846,14 +913,14 @@ NODE_PTR dNode;  // temporary for several mechanisms
             // ssl_print_input_position();
             continue;
      case oMsgNode :
-            nodeDumpNodeShort( (NODE_PTR) ssl_param );
+            DumpNodeShort( (Node) ssl_param );
             continue;
      case oMsgNodeVec : {
             NODE_VEC_PTR nv = (NODE_VEC_PTR) ssl_param;
             printf( "NodeVec: size %d:\n", nv->size );
             for ( int i = 0; i < nv->size; ++i ) {
-              NODE_PTR node = nv->elements[i];
-              nodeDumpNodeShort( node );
+              Node node = nv->elements[i];
+              DumpNodeShort( node );
             }
             printf( "----\n" );
             }  

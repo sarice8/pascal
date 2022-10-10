@@ -635,691 +635,715 @@
 1066	tEnter	   4
 1068	tPushAddrGlobal	  92
 1070	tPushParamI	   4
-1072	tPushConstI	 320
+1072	tPushConstI	1280
 1074	tMultI
 1075	tAddPI
 1076	tPushParamI	   0
-1078	tAddPI
-1079	tFetchB
-1080	tNot
-1081	tJumpFalse	  44
-1083	tLabelAlias	  44	  45
-1086	tLabelExtern	   5	76892
-1089	tAllocActualsCdecl	  16
-1091	tPushAddrActual	   0
-1093	tPushParamI	   0
-1095	tAssignI
-1096	tPushAddrActual	   4
-1098	tPushParamI	   4
+1078	tPushConstI	   4
+1080	tMultI
+1081	tAddPI
+1082	tFetchI
+1083	tPushGlobalI	307292
+1085	tNotEqualI
+1086	tJumpFalse	  44
+1088	tLabelAlias	  44	  45
+1091	tLabelExtern	   5	307296
+1094	tAllocActualsCdecl	  16
+1096	tPushAddrActual	   0
+1098	tPushParamI	   0
 1100	tAssignI
-1101	tPushAddrActual	   8
-1103	tPushAddrLocal	  -4
-1105	tAssignP
-1106	tCallCdecl	   5
-1108	tPushLocalI	  -4
-1110	tFreeActuals	  16
-1112	tPushParamI	  12
-1114	tNotEqualI
-1115	tJumpFalse	  46
-1117	tLabelAlias	  46	  45
-1120	tAllocActualsCdecl	  12
-1122	tPushAddrActual	   0
-1124	tPushParamI	   0
-1126	tAssignI
-1127	tPushAddrActual	   4
-1129	tPushParamI	   4
+1101	tPushAddrActual	   4
+1103	tPushParamI	   4
+1105	tAssignI
+1106	tPushAddrActual	   8
+1108	tPushAddrLocal	  -4
+1110	tAssignP
+1111	tCallCdecl	   5
+1113	tPushLocalI	  -4
+1115	tFreeActuals	  16
+1117	tPushParamI	  12
+1119	tNotEqualI
+1120	tJumpFalse	  46
+1122	tLabelAlias	  46	  45
+1125	tAllocActualsCdecl	  12
+1127	tPushAddrActual	   0
+1129	tPushParamI	   0
 1131	tAssignI
-1132	tPushAddrActual	   8
-1134	tPushParamI	   8
+1132	tPushAddrActual	   4
+1134	tPushParamI	   4
 1136	tAssignI
-1137	tCallCdecl	   4
-1139	tFreeActuals	  12
-1141	tPushAddrGlobal	  92
-1143	tPushParamI	   4
-1145	tPushConstI	 320
-1147	tMultI
-1148	tAddPI
-1149	tPushParamI	   0
-1151	tAddPI
-1152	tPushConstI	   1
-1154	tAssignB
-1155	tPushParamI	   4
-1157	tPushConstI	   1
-1159	tAddI
-1160	tPushConstI	 240
-1162	tLessI
-1163	tJumpFalse	  47
-1165	tAllocActuals	  16
-1167	tPushAddrActual	   0
-1169	tPushParamI	   0
-1171	tAssignI
-1172	tPushAddrActual	   4
-1174	tPushParamI	   4
-1176	tPushConstI	   1
-1178	tAddI
+1137	tPushAddrActual	   8
+1139	tPushParamI	   8
+1141	tAssignI
+1142	tCallCdecl	   4
+1144	tFreeActuals	  12
+1146	tPushAddrGlobal	  92
+1148	tPushParamI	   4
+1150	tPushConstI	1280
+1152	tMultI
+1153	tAddPI
+1154	tPushParamI	   0
+1156	tPushConstI	   4
+1158	tMultI
+1159	tAddPI
+1160	tPushGlobalI	307292
+1162	tAssignI
+1163	tPushParamI	   4
+1165	tPushConstI	   1
+1167	tAddI
+1168	tPushConstI	 240
+1170	tLessI
+1171	tJumpFalse	  47
+1173	tAllocActuals	  16
+1175	tPushAddrActual	   0
+1177	tPushParamI	   0
 1179	tAssignI
-1180	tPushAddrActual	   8
-1182	tPushParamI	   8
-1184	tAssignI
-1185	tPushAddrActual	  12
-1187	tPushParamI	  12
-1189	tAssignI
-1190	tCall	  43
-1192	tFreeActuals	  16
-1194	tLabel	  47
-1196	tPushParamI	   4
-1198	tPushConstI	   1
-1200	tSubI
-1201	tPushConstI	   0
-1203	tGreaterEqualI
-1204	tJumpFalse	  48
-1206	tAllocActuals	  16
-1208	tPushAddrActual	   0
-1210	tPushParamI	   0
-1212	tAssignI
-1213	tPushAddrActual	   4
-1215	tPushParamI	   4
-1217	tPushConstI	   1
-1219	tSubI
+1180	tPushAddrActual	   4
+1182	tPushParamI	   4
+1184	tPushConstI	   1
+1186	tAddI
+1187	tAssignI
+1188	tPushAddrActual	   8
+1190	tPushParamI	   8
+1192	tAssignI
+1193	tPushAddrActual	  12
+1195	tPushParamI	  12
+1197	tAssignI
+1198	tCall	  43
+1200	tFreeActuals	  16
+1202	tLabel	  47
+1204	tPushParamI	   4
+1206	tPushConstI	   1
+1208	tSubI
+1209	tPushConstI	   0
+1211	tGreaterEqualI
+1212	tJumpFalse	  48
+1214	tAllocActuals	  16
+1216	tPushAddrActual	   0
+1218	tPushParamI	   0
 1220	tAssignI
-1221	tPushAddrActual	   8
-1223	tPushParamI	   8
-1225	tAssignI
-1226	tPushAddrActual	  12
-1228	tPushParamI	  12
-1230	tAssignI
-1231	tCall	  43
-1233	tFreeActuals	  16
-1235	tLabel	  48
-1237	tPushParamI	   0
-1239	tPushConstI	   1
-1241	tSubI
-1242	tPushConstI	   0
-1244	tGreaterEqualI
-1245	tJumpFalse	  49
-1247	tAllocActuals	  16
-1249	tPushAddrActual	   0
-1251	tPushParamI	   0
-1253	tPushConstI	   1
-1255	tSubI
-1256	tAssignI
-1257	tPushAddrActual	   4
-1259	tPushParamI	   4
-1261	tAssignI
-1262	tPushAddrActual	   8
-1264	tPushParamI	   8
-1266	tAssignI
-1267	tPushAddrActual	  12
-1269	tPushParamI	  12
-1271	tAssignI
-1272	tCall	  43
-1274	tFreeActuals	  16
-1276	tLabel	  49
-1278	tPushParamI	   0
-1280	tPushConstI	   1
-1282	tAddI
-1283	tPushConstI	 320
-1285	tLessI
-1286	tJumpFalse	  50
-1288	tAllocActuals	  16
-1290	tPushAddrActual	   0
-1292	tPushParamI	   0
-1294	tPushConstI	   1
-1296	tAddI
-1297	tAssignI
-1298	tPushAddrActual	   4
-1300	tPushParamI	   4
-1302	tAssignI
-1303	tPushAddrActual	   8
-1305	tPushParamI	   8
-1307	tAssignI
-1308	tPushAddrActual	  12
-1310	tPushParamI	  12
-1312	tAssignI
-1313	tCall	  43
-1315	tFreeActuals	  16
-1317	tLabel	  50
-1319	tLabel	  45
-1321	tReturn
-1322	tLabel	  51
-1324	tEnter	   8
-1326	tPushAddrLocal	  -8
-1328	tPushConstI	   0
-1330	tAssignI
-1331	tJump	  53
-1333	tLabel	  54
-1335	tPushAddrLocal	  -8
-1337	tPushLocalI	  -8
-1339	tIncI
-1340	tAssignI
-1341	tLabel	  53
-1343	tPushLocalI	  -8
-1345	tPushConstI	 240
-1347	tPushConstI	   1
-1349	tSubI
-1350	tGreaterI
-1351	tJumpTrue	  52
-1353	tPushAddrLocal	  -4
-1355	tPushConstI	   0
-1357	tAssignI
-1358	tJump	  56
-1360	tLabel	  57
-1362	tPushAddrLocal	  -4
-1364	tPushLocalI	  -4
-1366	tIncI
-1367	tAssignI
-1368	tLabel	  56
-1370	tPushLocalI	  -4
-1372	tPushConstI	 320
-1374	tPushConstI	   1
-1376	tSubI
-1377	tGreaterI
-1378	tJumpTrue	  55
-1380	tPushAddrGlobal	  92
-1382	tPushLocalI	  -8
-1384	tPushConstI	 320
-1386	tMultI
-1387	tAddPI
-1388	tPushLocalI	  -4
-1390	tAddPI
-1391	tPushConstI	   0
-1393	tAssignB
-1394	tJump	  57
-1396	tLabel	  55
-1398	tJump	  54
-1400	tLabel	  52
-1402	tAllocActuals	  16
-1404	tPushAddrActual	   0
-1406	tPushParamI	   0
-1408	tAssignI
-1409	tPushAddrActual	   4
-1411	tPushParamI	   4
-1413	tAssignI
-1414	tPushAddrActual	   8
-1416	tPushParamI	   8
-1418	tAssignI
-1419	tPushAddrActual	  12
-1421	tPushParamI	  12
-1423	tAssignI
-1424	tCall	  43
-1426	tFreeActuals	  16
-1428	tReturn
-1429	tLabel	  58
-1431	tEnter	   0
-1433	tPushParamP	  12
-1435	tPushParamI	   0
-1437	tPushConstI	 256
-1439	tMultI
-1440	tPushConstI	 256
-1442	tMultI
-1443	tPushParamI	   4
-1445	tPushConstI	 256
-1447	tMultI
-1448	tAddI
+1221	tPushAddrActual	   4
+1223	tPushParamI	   4
+1225	tPushConstI	   1
+1227	tSubI
+1228	tAssignI
+1229	tPushAddrActual	   8
+1231	tPushParamI	   8
+1233	tAssignI
+1234	tPushAddrActual	  12
+1236	tPushParamI	  12
+1238	tAssignI
+1239	tCall	  43
+1241	tFreeActuals	  16
+1243	tLabel	  48
+1245	tPushParamI	   0
+1247	tPushConstI	   1
+1249	tSubI
+1250	tPushConstI	   0
+1252	tGreaterEqualI
+1253	tJumpFalse	  49
+1255	tAllocActuals	  16
+1257	tPushAddrActual	   0
+1259	tPushParamI	   0
+1261	tPushConstI	   1
+1263	tSubI
+1264	tAssignI
+1265	tPushAddrActual	   4
+1267	tPushParamI	   4
+1269	tAssignI
+1270	tPushAddrActual	   8
+1272	tPushParamI	   8
+1274	tAssignI
+1275	tPushAddrActual	  12
+1277	tPushParamI	  12
+1279	tAssignI
+1280	tCall	  43
+1282	tFreeActuals	  16
+1284	tLabel	  49
+1286	tPushParamI	   0
+1288	tPushConstI	   1
+1290	tAddI
+1291	tPushConstI	 320
+1293	tLessI
+1294	tJumpFalse	  50
+1296	tAllocActuals	  16
+1298	tPushAddrActual	   0
+1300	tPushParamI	   0
+1302	tPushConstI	   1
+1304	tAddI
+1305	tAssignI
+1306	tPushAddrActual	   4
+1308	tPushParamI	   4
+1310	tAssignI
+1311	tPushAddrActual	   8
+1313	tPushParamI	   8
+1315	tAssignI
+1316	tPushAddrActual	  12
+1318	tPushParamI	  12
+1320	tAssignI
+1321	tCall	  43
+1323	tFreeActuals	  16
+1325	tLabel	  50
+1327	tLabel	  45
+1329	tReturn
+1330	tLabel	  51
+1332	tEnter	   8
+1334	tPushAddrGlobal	307292
+1336	tPushGlobalI	307292
+1338	tPushConstI	   1
+1340	tAddI
+1341	tAssignI
+1342	tPushGlobalI	307292
+1344	tPushConstI	   0
+1346	tEqualI
+1347	tJumpFalse	  52
+1349	tPushAddrLocal	  -8
+1351	tPushConstI	   0
+1353	tAssignI
+1354	tJump	  54
+1356	tLabel	  55
+1358	tPushAddrLocal	  -8
+1360	tPushLocalI	  -8
+1362	tIncI
+1363	tAssignI
+1364	tLabel	  54
+1366	tPushLocalI	  -8
+1368	tPushConstI	 240
+1370	tPushConstI	   1
+1372	tSubI
+1373	tGreaterI
+1374	tJumpTrue	  53
+1376	tPushAddrLocal	  -4
+1378	tPushConstI	   0
+1380	tAssignI
+1381	tJump	  57
+1383	tLabel	  58
+1385	tPushAddrLocal	  -4
+1387	tPushLocalI	  -4
+1389	tIncI
+1390	tAssignI
+1391	tLabel	  57
+1393	tPushLocalI	  -4
+1395	tPushConstI	 320
+1397	tPushConstI	   1
+1399	tSubI
+1400	tGreaterI
+1401	tJumpTrue	  56
+1403	tPushAddrGlobal	  92
+1405	tPushLocalI	  -8
+1407	tPushConstI	1280
+1409	tMultI
+1410	tAddPI
+1411	tPushLocalI	  -4
+1413	tPushConstI	   4
+1415	tMultI
+1416	tAddPI
+1417	tPushConstI	   0
+1419	tAssignI
+1420	tJump	  58
+1422	tLabel	  56
+1424	tJump	  55
+1426	tLabel	  53
+1428	tPushAddrGlobal	307292
+1430	tPushConstI	   1
+1432	tAssignI
+1433	tLabel	  52
+1435	tAllocActuals	  16
+1437	tPushAddrActual	   0
+1439	tPushParamI	   0
+1441	tAssignI
+1442	tPushAddrActual	   4
+1444	tPushParamI	   4
+1446	tAssignI
+1447	tPushAddrActual	   8
 1449	tPushParamI	   8
-1451	tAddI
-1452	tAssignI
-1453	tReturn
-1454	tLabel	  59
-1456	tEnter	   0
-1458	tAllocActuals	  16
-1460	tPushAddrActual	   0
-1462	tPushParamI	   0
-1464	tAssignI
-1465	tPushAddrActual	   4
-1467	tPushParamI	   4
-1469	tAssignI
-1470	tPushAddrActual	   8
-1472	tPushConstI	  30
-1474	tAssignI
-1475	tPushAddrActual	  12
-1477	tPushParamI	   8
-1479	tAssignI
-1480	tCall	  38
-1482	tFreeActuals	  16
-1484	tAllocActuals	  16
-1486	tPushAddrActual	   0
-1488	tPushParamI	   0
-1490	tAssignI
-1491	tPushAddrActual	   4
-1493	tPushParamI	   4
-1495	tAssignI
-1496	tPushAddrActual	   8
-1498	tPushParamI	  12
-1500	tAssignI
-1501	tPushAddrActual	  12
-1503	tPushParamI	   8
-1505	tAssignI
-1506	tCall	  51
-1508	tFreeActuals	  16
-1510	tAllocActuals	  16
-1512	tPushAddrActual	   0
-1514	tPushParamI	   0
-1516	tPushConstI	  15
-1518	tSubI
-1519	tAssignI
-1520	tPushAddrActual	   4
-1522	tPushParamI	   4
-1524	tPushConstI	  10
-1526	tSubI
-1527	tAssignI
-1528	tPushAddrActual	   8
-1530	tPushConstI	   7
-1532	tAssignI
-1533	tPushAddrActual	  12
-1535	tPushParamI	   8
-1537	tAssignI
-1538	tCall	  38
-1540	tFreeActuals	  16
-1542	tAllocActuals	  16
-1544	tPushAddrActual	   0
-1546	tPushParamI	   0
-1548	tPushConstI	  15
-1550	tSubI
-1551	tAssignI
-1552	tPushAddrActual	   4
-1554	tPushParamI	   4
-1556	tPushConstI	  10
-1558	tSubI
-1559	tAssignI
-1560	tPushAddrActual	   8
-1562	tPushConstI	   0
-1564	tAssignI
-1565	tPushAddrActual	  12
-1567	tPushParamI	   8
-1569	tAssignI
-1570	tCall	  51
-1572	tFreeActuals	  16
-1574	tAllocActuals	  16
-1576	tPushAddrActual	   0
-1578	tPushParamI	   0
-1580	tPushConstI	  15
-1582	tAddI
-1583	tAssignI
-1584	tPushAddrActual	   4
-1586	tPushParamI	   4
-1588	tPushConstI	  10
-1590	tSubI
-1591	tAssignI
-1592	tPushAddrActual	   8
-1594	tPushConstI	   7
-1596	tAssignI
-1597	tPushAddrActual	  12
-1599	tPushParamI	   8
-1601	tAssignI
-1602	tCall	  38
-1604	tFreeActuals	  16
-1606	tAllocActuals	  16
-1608	tPushAddrActual	   0
-1610	tPushParamI	   0
-1612	tPushConstI	  15
-1614	tAddI
-1615	tAssignI
-1616	tPushAddrActual	   4
-1618	tPushParamI	   4
-1620	tPushConstI	  10
-1622	tSubI
-1623	tAssignI
-1624	tPushAddrActual	   8
-1626	tPushConstI	   0
-1628	tAssignI
-1629	tPushAddrActual	  12
-1631	tPushParamI	   8
-1633	tAssignI
-1634	tCall	  51
-1636	tFreeActuals	  16
-1638	tAllocActuals	  20
-1640	tPushAddrActual	   0
-1642	tPushParamI	   0
-1644	tPushConstI	  15
-1646	tSubI
-1647	tAssignI
-1648	tPushAddrActual	   4
-1650	tPushParamI	   4
-1652	tPushConstI	  10
-1654	tAddI
-1655	tAssignI
-1656	tPushAddrActual	   8
-1658	tPushParamI	   0
-1660	tPushConstI	  15
-1662	tAddI
-1663	tAssignI
-1664	tPushAddrActual	  12
-1666	tPushParamI	   4
-1668	tPushConstI	  10
-1670	tAddI
-1671	tAssignI
-1672	tPushAddrActual	  16
-1674	tPushParamI	   8
-1676	tAssignI
-1677	tCall	  30
-1679	tFreeActuals	  20
-1681	tAllocActuals	  20
-1683	tPushAddrActual	   0
-1685	tPushParamI	   0
-1687	tPushConstI	  15
-1689	tSubI
-1690	tAssignI
-1691	tPushAddrActual	   4
-1693	tPushParamI	   4
-1695	tPushConstI	  10
-1697	tAddI
-1698	tAssignI
-1699	tPushAddrActual	   8
-1701	tPushParamI	   0
-1703	tPushConstI	  10
-1705	tSubI
-1706	tAssignI
-1707	tPushAddrActual	  12
-1709	tPushParamI	   4
-1711	tPushConstI	  15
-1713	tAddI
-1714	tAssignI
-1715	tPushAddrActual	  16
-1717	tPushParamI	   8
-1719	tAssignI
-1720	tCall	  30
-1722	tFreeActuals	  20
-1724	tAllocActuals	  20
-1726	tPushAddrActual	   0
-1728	tPushParamI	   0
-1730	tPushConstI	  10
-1732	tSubI
-1733	tAssignI
-1734	tPushAddrActual	   4
-1736	tPushParamI	   4
-1738	tPushConstI	  15
-1740	tAddI
-1741	tAssignI
-1742	tPushAddrActual	   8
-1744	tPushParamI	   0
-1746	tPushConstI	  10
-1748	tAddI
-1749	tAssignI
-1750	tPushAddrActual	  12
-1752	tPushParamI	   4
-1754	tPushConstI	  15
-1756	tAddI
-1757	tAssignI
-1758	tPushAddrActual	  16
-1760	tPushParamI	   8
-1762	tAssignI
-1763	tCall	  30
-1765	tFreeActuals	  20
-1767	tAllocActuals	  20
-1769	tPushAddrActual	   0
-1771	tPushParamI	   0
-1773	tPushConstI	  10
-1775	tAddI
-1776	tAssignI
-1777	tPushAddrActual	   4
-1779	tPushParamI	   4
-1781	tPushConstI	  15
-1783	tAddI
-1784	tAssignI
-1785	tPushAddrActual	   8
-1787	tPushParamI	   0
-1789	tPushConstI	  15
-1791	tAddI
-1792	tAssignI
-1793	tPushAddrActual	  12
-1795	tPushParamI	   4
-1797	tPushConstI	  10
-1799	tAddI
-1800	tAssignI
-1801	tPushAddrActual	  16
-1803	tPushParamI	   8
-1805	tAssignI
-1806	tCall	  30
-1808	tFreeActuals	  20
-1810	tAllocActuals	  16
-1812	tPushAddrActual	   0
-1814	tPushParamI	   0
-1816	tAssignI
-1817	tPushAddrActual	   4
-1819	tPushParamI	   4
-1821	tPushConstI	  11
-1823	tAddI
-1824	tAssignI
-1825	tPushAddrActual	   8
-1827	tPushConstI	   0
-1829	tAssignI
-1830	tPushAddrActual	  12
-1832	tPushParamI	   8
-1834	tAssignI
-1835	tCall	  51
-1837	tFreeActuals	  16
-1839	tReturn
-1840	tLabel	   1
-1842	tEnter	  16
-1844	tPushAddrGlobal	76957
-1846	tWriteStr
-1847	tWriteCR
-1848	tAllocActuals	  16
-1850	tPushAddrActual	   0
-1852	tPushConstI	 100
-1854	tAssignI
-1855	tPushAddrActual	   4
-1857	tPushConstI	 200
-1859	tAssignI
-1860	tPushAddrActual	   8
-1862	tPushConstI	 300
-1864	tAssignI
-1865	tPushAddrActual	  12
-1867	tPushConstI	   3
-1869	tAssignI
-1870	tCall	  11
-1872	tFreeActuals	  16
-1874	tAllocActuals	  16
-1876	tPushAddrActual	   0
-1878	tPushConstI	 400
-1880	tAssignI
-1881	tPushAddrActual	   4
-1883	tPushConstI	 500
-1885	tAssignI
-1886	tPushAddrActual	   8
-1888	tPushConstI	 600
-1890	tAssignI
-1891	tPushAddrActual	  12
-1893	tPushConstI	   2
-1895	tAssignI
-1896	tCall	  11
-1898	tFreeActuals	  16
-1900	tPushAddrGlobal	76913
-1902	tAllocActuals	  20
-1904	tPushAddrActual	   0
-1906	tPushConstI	  50
+1451	tAssignI
+1452	tPushAddrActual	  12
+1454	tPushParamI	  12
+1456	tAssignI
+1457	tCall	  43
+1459	tFreeActuals	  16
+1461	tReturn
+1462	tLabel	  59
+1464	tEnter	   0
+1466	tPushParamP	  12
+1468	tPushParamI	   0
+1470	tPushConstI	 256
+1472	tMultI
+1473	tPushConstI	 256
+1475	tMultI
+1476	tPushParamI	   4
+1478	tPushConstI	 256
+1480	tMultI
+1481	tAddI
+1482	tPushParamI	   8
+1484	tAddI
+1485	tAssignI
+1486	tReturn
+1487	tLabel	  60
+1489	tEnter	   0
+1491	tAllocActuals	  16
+1493	tPushAddrActual	   0
+1495	tPushParamI	   0
+1497	tAssignI
+1498	tPushAddrActual	   4
+1500	tPushParamI	   4
+1502	tAssignI
+1503	tPushAddrActual	   8
+1505	tPushConstI	  30
+1507	tAssignI
+1508	tPushAddrActual	  12
+1510	tPushParamI	   8
+1512	tAssignI
+1513	tCall	  38
+1515	tFreeActuals	  16
+1517	tAllocActuals	  16
+1519	tPushAddrActual	   0
+1521	tPushParamI	   0
+1523	tAssignI
+1524	tPushAddrActual	   4
+1526	tPushParamI	   4
+1528	tAssignI
+1529	tPushAddrActual	   8
+1531	tPushParamI	  12
+1533	tAssignI
+1534	tPushAddrActual	  12
+1536	tPushParamI	   8
+1538	tAssignI
+1539	tCall	  51
+1541	tFreeActuals	  16
+1543	tAllocActuals	  16
+1545	tPushAddrActual	   0
+1547	tPushParamI	   0
+1549	tPushConstI	  15
+1551	tSubI
+1552	tAssignI
+1553	tPushAddrActual	   4
+1555	tPushParamI	   4
+1557	tPushConstI	  10
+1559	tSubI
+1560	tAssignI
+1561	tPushAddrActual	   8
+1563	tPushConstI	   7
+1565	tAssignI
+1566	tPushAddrActual	  12
+1568	tPushParamI	   8
+1570	tAssignI
+1571	tCall	  38
+1573	tFreeActuals	  16
+1575	tAllocActuals	  16
+1577	tPushAddrActual	   0
+1579	tPushParamI	   0
+1581	tPushConstI	  15
+1583	tSubI
+1584	tAssignI
+1585	tPushAddrActual	   4
+1587	tPushParamI	   4
+1589	tPushConstI	  10
+1591	tSubI
+1592	tAssignI
+1593	tPushAddrActual	   8
+1595	tPushConstI	   0
+1597	tAssignI
+1598	tPushAddrActual	  12
+1600	tPushParamI	   8
+1602	tAssignI
+1603	tCall	  51
+1605	tFreeActuals	  16
+1607	tAllocActuals	  16
+1609	tPushAddrActual	   0
+1611	tPushParamI	   0
+1613	tPushConstI	  15
+1615	tAddI
+1616	tAssignI
+1617	tPushAddrActual	   4
+1619	tPushParamI	   4
+1621	tPushConstI	  10
+1623	tSubI
+1624	tAssignI
+1625	tPushAddrActual	   8
+1627	tPushConstI	   7
+1629	tAssignI
+1630	tPushAddrActual	  12
+1632	tPushParamI	   8
+1634	tAssignI
+1635	tCall	  38
+1637	tFreeActuals	  16
+1639	tAllocActuals	  16
+1641	tPushAddrActual	   0
+1643	tPushParamI	   0
+1645	tPushConstI	  15
+1647	tAddI
+1648	tAssignI
+1649	tPushAddrActual	   4
+1651	tPushParamI	   4
+1653	tPushConstI	  10
+1655	tSubI
+1656	tAssignI
+1657	tPushAddrActual	   8
+1659	tPushConstI	   0
+1661	tAssignI
+1662	tPushAddrActual	  12
+1664	tPushParamI	   8
+1666	tAssignI
+1667	tCall	  51
+1669	tFreeActuals	  16
+1671	tAllocActuals	  20
+1673	tPushAddrActual	   0
+1675	tPushParamI	   0
+1677	tPushConstI	  15
+1679	tSubI
+1680	tAssignI
+1681	tPushAddrActual	   4
+1683	tPushParamI	   4
+1685	tPushConstI	  10
+1687	tAddI
+1688	tAssignI
+1689	tPushAddrActual	   8
+1691	tPushParamI	   0
+1693	tPushConstI	  15
+1695	tAddI
+1696	tAssignI
+1697	tPushAddrActual	  12
+1699	tPushParamI	   4
+1701	tPushConstI	  10
+1703	tAddI
+1704	tAssignI
+1705	tPushAddrActual	  16
+1707	tPushParamI	   8
+1709	tAssignI
+1710	tCall	  30
+1712	tFreeActuals	  20
+1714	tAllocActuals	  20
+1716	tPushAddrActual	   0
+1718	tPushParamI	   0
+1720	tPushConstI	  15
+1722	tSubI
+1723	tAssignI
+1724	tPushAddrActual	   4
+1726	tPushParamI	   4
+1728	tPushConstI	  10
+1730	tAddI
+1731	tAssignI
+1732	tPushAddrActual	   8
+1734	tPushParamI	   0
+1736	tPushConstI	  10
+1738	tSubI
+1739	tAssignI
+1740	tPushAddrActual	  12
+1742	tPushParamI	   4
+1744	tPushConstI	  15
+1746	tAddI
+1747	tAssignI
+1748	tPushAddrActual	  16
+1750	tPushParamI	   8
+1752	tAssignI
+1753	tCall	  30
+1755	tFreeActuals	  20
+1757	tAllocActuals	  20
+1759	tPushAddrActual	   0
+1761	tPushParamI	   0
+1763	tPushConstI	  10
+1765	tSubI
+1766	tAssignI
+1767	tPushAddrActual	   4
+1769	tPushParamI	   4
+1771	tPushConstI	  15
+1773	tAddI
+1774	tAssignI
+1775	tPushAddrActual	   8
+1777	tPushParamI	   0
+1779	tPushConstI	  10
+1781	tAddI
+1782	tAssignI
+1783	tPushAddrActual	  12
+1785	tPushParamI	   4
+1787	tPushConstI	  15
+1789	tAddI
+1790	tAssignI
+1791	tPushAddrActual	  16
+1793	tPushParamI	   8
+1795	tAssignI
+1796	tCall	  30
+1798	tFreeActuals	  20
+1800	tAllocActuals	  20
+1802	tPushAddrActual	   0
+1804	tPushParamI	   0
+1806	tPushConstI	  10
+1808	tAddI
+1809	tAssignI
+1810	tPushAddrActual	   4
+1812	tPushParamI	   4
+1814	tPushConstI	  15
+1816	tAddI
+1817	tAssignI
+1818	tPushAddrActual	   8
+1820	tPushParamI	   0
+1822	tPushConstI	  15
+1824	tAddI
+1825	tAssignI
+1826	tPushAddrActual	  12
+1828	tPushParamI	   4
+1830	tPushConstI	  10
+1832	tAddI
+1833	tAssignI
+1834	tPushAddrActual	  16
+1836	tPushParamI	   8
+1838	tAssignI
+1839	tCall	  30
+1841	tFreeActuals	  20
+1843	tAllocActuals	  16
+1845	tPushAddrActual	   0
+1847	tPushParamI	   0
+1849	tAssignI
+1850	tPushAddrActual	   4
+1852	tPushParamI	   4
+1854	tPushConstI	  11
+1856	tAddI
+1857	tAssignI
+1858	tPushAddrActual	   8
+1860	tPushConstI	   0
+1862	tAssignI
+1863	tPushAddrActual	  12
+1865	tPushParamI	   8
+1867	tAssignI
+1868	tCall	  51
+1870	tFreeActuals	  16
+1872	tReturn
+1873	tLabel	   1
+1875	tEnter	  16
+1877	tPushAddrGlobal	307292
+1879	tPushConstI	   1
+1881	tNegI
+1882	tAssignI
+1883	tPushAddrGlobal	307361
+1885	tWriteStr
+1886	tWriteCR
+1887	tAllocActuals	  16
+1889	tPushAddrActual	   0
+1891	tPushConstI	 100
+1893	tAssignI
+1894	tPushAddrActual	   4
+1896	tPushConstI	 200
+1898	tAssignI
+1899	tPushAddrActual	   8
+1901	tPushConstI	 300
+1903	tAssignI
+1904	tPushAddrActual	  12
+1906	tPushConstI	   3
 1908	tAssignI
-1909	tPushAddrActual	   4
-1911	tPushConstI	 128
-1913	tAssignI
-1914	tPushAddrActual	   8
-1916	tPushConstI	 255
-1918	tAssignI
-1919	tPushAddrActual	  12
-1921	tPushAddrLocal	  -4
-1923	tAssignP
-1924	tCall	  58
-1926	tPushLocalI	  -4
-1928	tFreeActuals	  20
-1930	tAssignI
-1931	tPushAddrGlobal	76917
-1933	tAllocActuals	  20
-1935	tPushAddrActual	   0
-1937	tPushConstI	 255
-1939	tAssignI
-1940	tPushAddrActual	   4
-1942	tPushConstI	 255
-1944	tAssignI
-1945	tPushAddrActual	   8
-1947	tPushConstI	 128
-1949	tAssignI
-1950	tPushAddrActual	  12
-1952	tPushAddrLocal	  -8
-1954	tAssignP
-1955	tCall	  58
-1957	tPushLocalI	  -8
-1959	tFreeActuals	  20
-1961	tAssignI
-1962	tPushAddrGlobal	76933
-1964	tPushConstI	  50
-1966	tAssignI
-1967	tPushAddrGlobal	76937
-1969	tPushConstI	  50
-1971	tAssignI
-1972	tPushAddrGlobal	76941
-1974	tPushConstI	   2
-1976	tAssignI
-1977	tPushAddrGlobal	76945
-1979	tPushConstI	   2
-1981	tAssignI
-1982	tPushAddrGlobal	76953
-1984	tPushConstI	   3
-1986	tAssignI
-1987	tPushAddrGlobal	76949
-1989	tPushConstI	   1
-1991	tAssignI
-1992	tJump	  61
-1994	tLabel	  62
-1996	tPushAddrGlobal	76949
-1998	tPushGlobalI	76949
-2000	tIncI
-2001	tAssignI
-2002	tLabel	  61
-2004	tPushGlobalI	76949
-2006	tPushConstI	2000
-2008	tGreaterI
-2009	tJumpTrue	  60
-2011	tPushAddrGlobal	76933
-2013	tPushGlobalI	76933
-2015	tPushGlobalI	76941
-2017	tAddI
-2018	tAssignI
-2019	tPushGlobalI	76933
-2021	tPushConstI	  50
-2023	tLessI
-2024	tJumpFalse	  63
-2026	tJump	  64
-2028	tLabel	  63
-2030	tPushGlobalI	76933
-2032	tPushConstI	 250
-2034	tGreaterI
-2035	tJumpFalse	  65
-2037	tLabel	  64
-2039	tPushAddrGlobal	76941
-2041	tPushGlobalI	76941
-2043	tPushConstI	   1
-2045	tNegI
-2046	tMultI
-2047	tAssignI
-2048	tLabel	  65
-2050	tPushAddrGlobal	76937
-2052	tPushGlobalI	76937
-2054	tPushGlobalI	76945
+1909	tCall	  11
+1911	tFreeActuals	  16
+1913	tAllocActuals	  16
+1915	tPushAddrActual	   0
+1917	tPushConstI	 400
+1919	tAssignI
+1920	tPushAddrActual	   4
+1922	tPushConstI	 500
+1924	tAssignI
+1925	tPushAddrActual	   8
+1927	tPushConstI	 600
+1929	tAssignI
+1930	tPushAddrActual	  12
+1932	tPushConstI	   2
+1934	tAssignI
+1935	tCall	  11
+1937	tFreeActuals	  16
+1939	tPushAddrGlobal	307317
+1941	tAllocActuals	  20
+1943	tPushAddrActual	   0
+1945	tPushConstI	  50
+1947	tAssignI
+1948	tPushAddrActual	   4
+1950	tPushConstI	 128
+1952	tAssignI
+1953	tPushAddrActual	   8
+1955	tPushConstI	 255
+1957	tAssignI
+1958	tPushAddrActual	  12
+1960	tPushAddrLocal	  -4
+1962	tAssignP
+1963	tCall	  59
+1965	tPushLocalI	  -4
+1967	tFreeActuals	  20
+1969	tAssignI
+1970	tPushAddrGlobal	307321
+1972	tAllocActuals	  20
+1974	tPushAddrActual	   0
+1976	tPushConstI	 255
+1978	tAssignI
+1979	tPushAddrActual	   4
+1981	tPushConstI	 255
+1983	tAssignI
+1984	tPushAddrActual	   8
+1986	tPushConstI	 128
+1988	tAssignI
+1989	tPushAddrActual	  12
+1991	tPushAddrLocal	  -8
+1993	tAssignP
+1994	tCall	  59
+1996	tPushLocalI	  -8
+1998	tFreeActuals	  20
+2000	tAssignI
+2001	tPushAddrGlobal	307337
+2003	tPushConstI	  50
+2005	tAssignI
+2006	tPushAddrGlobal	307341
+2008	tPushConstI	  50
+2010	tAssignI
+2011	tPushAddrGlobal	307345
+2013	tPushConstI	   2
+2015	tAssignI
+2016	tPushAddrGlobal	307349
+2018	tPushConstI	   2
+2020	tAssignI
+2021	tPushAddrGlobal	307357
+2023	tPushConstI	   3
+2025	tAssignI
+2026	tPushAddrGlobal	307353
+2028	tPushConstI	   1
+2030	tAssignI
+2031	tJump	  62
+2033	tLabel	  63
+2035	tPushAddrGlobal	307353
+2037	tPushGlobalI	307353
+2039	tIncI
+2040	tAssignI
+2041	tLabel	  62
+2043	tPushGlobalI	307353
+2045	tPushConstI	2000
+2047	tGreaterI
+2048	tJumpTrue	  61
+2050	tPushAddrGlobal	307337
+2052	tPushGlobalI	307337
+2054	tPushGlobalI	307345
 2056	tAddI
 2057	tAssignI
-2058	tPushGlobalI	76937
+2058	tPushGlobalI	307337
 2060	tPushConstI	  50
 2062	tLessI
-2063	tJumpFalse	  66
-2065	tJump	  67
-2067	tLabel	  66
-2069	tPushGlobalI	76937
-2071	tPushConstI	 150
+2063	tJumpFalse	  64
+2065	tJump	  65
+2067	tLabel	  64
+2069	tPushGlobalI	307337
+2071	tPushConstI	 250
 2073	tGreaterI
-2074	tJumpFalse	  68
-2076	tLabel	  67
-2078	tPushAddrGlobal	76945
-2080	tPushGlobalI	76945
+2074	tJumpFalse	  66
+2076	tLabel	  65
+2078	tPushAddrGlobal	307345
+2080	tPushGlobalI	307345
 2082	tPushConstI	   1
 2084	tNegI
 2085	tMultI
 2086	tAssignI
-2087	tLabel	  68
-2089	tLabelExtern	   2	76968
-2092	tAllocActualsCdecl	   0
-2094	tCallCdecl	   2
-2096	tFreeActuals	   0
-2098	tAllocActuals	  16
-2100	tPushAddrActual	   0
-2102	tPushGlobalI	76933
-2104	tAssignI
-2105	tPushAddrActual	   4
-2107	tPushGlobalI	76937
-2109	tAssignI
-2110	tPushAddrActual	   8
-2112	tPushGlobalI	76913
-2114	tAssignI
-2115	tPushAddrActual	  12
-2117	tPushGlobalI	76917
-2119	tAssignI
-2120	tCall	  59
-2122	tFreeActuals	  16
-2124	tLabelExtern	   6	76980
-2127	tAllocActualsCdecl	   4
-2129	tPushAddrActual	   0
-2131	tPushGlobalI	76953
-2133	tAssignI
-2134	tCallCdecl	   6
-2136	tFreeActuals	   4
-2138	tJump	  62
-2140	tLabel	  60
-2142	tPushAddrGlobal	76925
-2144	tAllocActualsCdecl	  16
-2146	tPushAddrActual	   0
-2148	tPushConstI	  19
-2150	tAssignI
-2151	tPushAddrActual	   4
-2153	tPushConstI	  20
-2155	tAssignI
-2156	tPushAddrActual	   8
-2158	tPushAddrLocal	 -12
-2160	tAssignP
-2161	tCallCdecl	   5
-2163	tPushLocalI	 -12
-2165	tFreeActuals	  16
-2167	tAssignI
-2168	tPushAddrGlobal	76986
-2170	tWriteStr
-2171	tPushGlobalI	76925
-2173	tWriteI
-2174	tWriteCR
-2175	tPushAddrGlobal	76925
-2177	tAllocActualsCdecl	  16
-2179	tPushAddrActual	   0
-2181	tPushConstI	  20
-2183	tAssignI
-2184	tPushAddrActual	   4
-2186	tPushConstI	  20
-2188	tAssignI
-2189	tPushAddrActual	   8
-2191	tPushAddrLocal	 -16
-2193	tAssignP
-2194	tCallCdecl	   5
-2196	tPushLocalI	 -16
-2198	tFreeActuals	  16
-2200	tAssignI
-2201	tPushAddrGlobal	77005
-2203	tWriteStr
-2204	tPushGlobalI	76925
-2206	tWriteI
-2207	tWriteCR
-2208	tPushAddrGlobal	76901
-2210	tPushConstI	   1
-2212	tAssignI
-2213	tPushAddrGlobal	76901
-2215	tPushConstI	   4
-2217	tAddPI
-2218	tPushConstI	   2
-2220	tAssignI
-2221	tLabelExtern	   8	77024
-2224	tAllocActualsCdecl	   8
-2226	tPushAddrActual	   0
-2228	tPushAddrGlobal	76901
-2230	tCopy	   8
-2232	tCallCdecl	   8
-2234	tFreeActuals	   8
-2236	tPushAddrGlobal	77036
-2238	tWriteStr
-2239	tWriteCR
-2240	tReturn
+2087	tLabel	  66
+2089	tPushAddrGlobal	307341
+2091	tPushGlobalI	307341
+2093	tPushGlobalI	307349
+2095	tAddI
+2096	tAssignI
+2097	tPushGlobalI	307341
+2099	tPushConstI	  50
+2101	tLessI
+2102	tJumpFalse	  67
+2104	tJump	  68
+2106	tLabel	  67
+2108	tPushGlobalI	307341
+2110	tPushConstI	 150
+2112	tGreaterI
+2113	tJumpFalse	  69
+2115	tLabel	  68
+2117	tPushAddrGlobal	307349
+2119	tPushGlobalI	307349
+2121	tPushConstI	   1
+2123	tNegI
+2124	tMultI
+2125	tAssignI
+2126	tLabel	  69
+2128	tLabelExtern	   2	307372
+2131	tAllocActualsCdecl	   0
+2133	tCallCdecl	   2
+2135	tFreeActuals	   0
+2137	tAllocActuals	  16
+2139	tPushAddrActual	   0
+2141	tPushGlobalI	307337
+2143	tAssignI
+2144	tPushAddrActual	   4
+2146	tPushGlobalI	307341
+2148	tAssignI
+2149	tPushAddrActual	   8
+2151	tPushGlobalI	307317
+2153	tAssignI
+2154	tPushAddrActual	  12
+2156	tPushGlobalI	307321
+2158	tAssignI
+2159	tCall	  60
+2161	tFreeActuals	  16
+2163	tLabelExtern	   6	307384
+2166	tAllocActualsCdecl	   4
+2168	tPushAddrActual	   0
+2170	tPushGlobalI	307357
+2172	tAssignI
+2173	tCallCdecl	   6
+2175	tFreeActuals	   4
+2177	tJump	  63
+2179	tLabel	  61
+2181	tPushAddrGlobal	307329
+2183	tAllocActualsCdecl	  16
+2185	tPushAddrActual	   0
+2187	tPushConstI	  19
+2189	tAssignI
+2190	tPushAddrActual	   4
+2192	tPushConstI	  20
+2194	tAssignI
+2195	tPushAddrActual	   8
+2197	tPushAddrLocal	 -12
+2199	tAssignP
+2200	tCallCdecl	   5
+2202	tPushLocalI	 -12
+2204	tFreeActuals	  16
+2206	tAssignI
+2207	tPushAddrGlobal	307390
+2209	tWriteStr
+2210	tPushGlobalI	307329
+2212	tWriteI
+2213	tWriteCR
+2214	tPushAddrGlobal	307329
+2216	tAllocActualsCdecl	  16
+2218	tPushAddrActual	   0
+2220	tPushConstI	  20
+2222	tAssignI
+2223	tPushAddrActual	   4
+2225	tPushConstI	  20
+2227	tAssignI
+2228	tPushAddrActual	   8
+2230	tPushAddrLocal	 -16
+2232	tAssignP
+2233	tCallCdecl	   5
+2235	tPushLocalI	 -16
+2237	tFreeActuals	  16
+2239	tAssignI
+2240	tPushAddrGlobal	307409
+2242	tWriteStr
+2243	tPushGlobalI	307329
+2245	tWriteI
+2246	tWriteCR
+2247	tPushAddrGlobal	307305
+2249	tPushConstI	   1
+2251	tAssignI
+2252	tPushAddrGlobal	307305
+2254	tPushConstI	   4
+2256	tAddPI
+2257	tPushConstI	   2
+2259	tAssignI
+2260	tLabelExtern	   8	307428
+2263	tAllocActualsCdecl	   8
+2265	tPushAddrActual	   0
+2267	tPushAddrGlobal	307305
+2269	tCopy	   8
+2271	tCallCdecl	   8
+2273	tFreeActuals	   8
+2275	tPushAddrGlobal	307440
+2277	tWriteStr
+2278	tWriteCR
+2279	tReturn

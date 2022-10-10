@@ -15,9 +15,8 @@ DBG_DIR          = $(RELEASE)/debug/1.3.0
 DBG_OBJS         = $(DBG_DIR)/obj-$(OSTYPE)/debug.o
 DBG_STUBS        = $(DBG_DIR)/obj-$(OSTYPE)/dbgstub.o
 
-# debug wants schema, apparently (even if I'm not using it yet here)
-# And note, schema can only link if we have at least an empty schema defined for this application!
-SCHEMA_DIR       = $(RELEASE)/schema/1.3
+#SCHEMA_DIR       = $(RELEASE)/schema/1.3
+SCHEMA_DIR       = $(RELEASE)/schema/1.4
 
 
 # Graphics library built into back end needs SDL2
@@ -47,7 +46,7 @@ BACK_OBJS = $(BACK_SRCS:%.cc=$(OBJDIR)/%.o)
 JIT_OBJS = $(JIT_SRCS:%.cc=$(OBJDIR)/%.o)
 
 FRONT_LINK_OBJS = \
-  $(SCHEMA_DIR)/obj-$(OSTYPE)/node.o \
+  $(SCHEMA_DIR)/obj-$(OSTYPE)/schema_db.o \
   $(SSL_RT_DIR)/obj-$(OSTYPE)/ssl_rt.o \
   $(SSL_RT_DIR)/obj-$(OSTYPE)/ssl_scan.o \
 

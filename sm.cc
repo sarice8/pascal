@@ -53,7 +53,7 @@ long stack[stackMax],sp;
 
 
 // good grief, can't hardcode these
-#define dataSize 100000
+#define dataSize 500000
 char data[dataSize];         /* Data memory */
 
 

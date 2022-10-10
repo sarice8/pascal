@@ -43,6 +43,10 @@ title: 'Pascal Compiler 1.1.5 -- Jan 01 ''90';
 %    - Consider non-ISO extensions.  e.g. see "Units" e.g. from Turbo Pascal wikipedia page.
 %      Dynamic arrays.  Objects.  But, perhaps stick to my old goal, standard Pascal.
 %
+%    - variable initialization.
+%      The code should execute on entry to the scope.  I probably need multiple tcode streams,
+%      because there may be nested methods between the variables being initialized
+%      and the block statement of the scope.
 %
 %  PASCAL DOCS
 %      Here's some handy language material:
@@ -222,12 +226,16 @@ error:
 include 'pascal_schema.ssl'
 
 type Node:     % A pointer to a node in the schema database (symbol database)
-    Null = 0
-    ;
+   Null = 0
+   ;
+
+type NodeIter:   % An iterator over nodes in a list, in the schema database
+   NullIter = 0
+   ;
 
 type NodeVec:  % A pointer to a vector of Node.  See mechanism node_vec_mech
-    NullVec = 0
-    ;
+   NullVec = 0
+   ;
 
 type boolean:
    false    = 0
@@ -276,7 +284,9 @@ mechanism node_mech:
     oNodeGetBoolean (Node, node_attribute) >> boolean  % get int attribute of node
     oNodeGetLabel (Node, node_attribute) >> Label      % get Label attribute of node
     oNodeNull (Node) >> boolean          % is node null?
-    oNodeNext (inout Node)               % advance Node to next in list
+    oNodeGetIter (Node, node_attribute) >> NodeIter   % get an iterator over nodes in a List attribute
+    oNodeIterValue (NodeIter) >> Node             % the node that iter is referring to (NodeNull if no more nodes)
+    oNodeIterNext (inout NodeIter)                 % advance iterator through list
     oNodeType (Node) >> node_type        % return node type of node
     oNodeEqual (Node, Node) >> boolean   % compare two nodes for equality
                                          % (i.e. same node, not just same contents)
@@ -1793,7 +1803,8 @@ Call( Node method ):
       | false :  .tAllocActuals  oEmitInt( actualsSize )
    ]
 
-   Node param = oNodeGet( paramScope, qDecls )
+   NodeIter paramIter = oNodeGetIter( paramScope, qDecls )
+   Node param = oNodeIterValue( paramIter )
    [
       | '(' :
       
@@ -1843,7 +1854,8 @@ Call( Node method ):
             ]
             oTypeSPop
 
-            oNodeNext( param )
+            oNodeIterNext( paramIter )
+            param = oNodeIterValue( paramIter )
             [ oNodeNull( param )
                | true :  >
                | false :
