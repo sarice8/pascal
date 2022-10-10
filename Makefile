@@ -1,7 +1,10 @@
 
 # Needs snapshot of schema compiler version 1.4/boot2 (or current version 1.4) to build this one
 RELEASE          = /home/steve/fun/compilers/release_images
-SCHEMA_DIR       = ${RELEASE}/schema/1.4
+
+#SCHEMA_DIR       = ${RELEASE}/schema/1.4
+# To build with self:
+SCHEMA_DIR       = .
 
 # Generic SSL runtime module
 SSL_RT_DIR       = ${RELEASE}/ssl_rt/2.0

@@ -339,7 +339,7 @@ init_my_operations ()
               SetqText (dNode, "nINVALID");
               SetqAttrs (dNode, NewList(nAttr));
               SetqDerived (dNode, NewList(nClass));
-              AddLast (qClassTree(SchemaRoot), dNode);
+              AddLast (GetqClassTree(SchemaRoot), dNode);
               NumClasses++;
 
               dTemp = ssl_add_id ("Object", pIDENTIFIER);   /* Add to ident table */
@@ -348,7 +348,7 @@ init_my_operations ()
               SetqText (dNode, "Object");
               SetqAttrs (dNode, NewList(nAttr));
               SetqDerived (dNode, NewList(nClass));
-              AddLast (qClassTree(SchemaRoot), dNode);
+              AddLast (GetqClassTree(SchemaRoot), dNode);
               NumClasses++;
 
               dTemp = ssl_add_id ("qINVALID", pIDENTIFIER);   /* Add to ident table */
@@ -356,25 +356,25 @@ init_my_operations ()
               SetqIdent (dNode, dTemp);
               SetqText (dNode, "qINVALID");
               SetqCode (dNode, NumAttrSyms);
-              AddLast (qAttrSyms(SchemaRoot), dNode);
+              AddLast (GetqAttrSyms(SchemaRoot), dNode);
               NumAttrSyms++;
 
               continue;
        case oFindClass :
-              CurrentClass = w_find_class (qClassTree(SchemaRoot), (long) ssl_last_id);
+              CurrentClass = w_find_class (GetqClassTree(SchemaRoot), (long) ssl_last_id);
               if (CurrentClass == NULL)
                   ssl_fatal("Undefined class");
               continue;
        case oDeriveClass :
               /* Verify class not already defined */
-              if (w_find_class (qClassTree(SchemaRoot), (long) ssl_last_id) != NULL)
+              if (w_find_class (GetqClassTree(SchemaRoot), (long) ssl_last_id) != NULL)
                   ssl_fatal("Multiply defined class");
               dNode = NewNode (nClass);
               SetqIdent (dNode, ssl_last_id);
               SetqText (dNode, ssl_last_id_text);
               SetqAttrs (dNode, NewList(nAttr));
               SetqDerived (dNode, NewList(nClass));
-              AddLast (qDerived(CurrentClass), dNode);
+              AddLast (GetqDerived(CurrentClass), dNode);
               NumClasses++;
               continue;
        case oThisClassWillGetAttrs :
@@ -391,8 +391,8 @@ init_my_operations ()
        /* mechanism Attr */
 
        case oCreateAttrSym :
-              for (dItem = FirstItem(qAttrSyms(SchemaRoot)); dItem != NULL; dItem = NextItem(dItem))
-                  if (qIdent(Value(dItem)) == ssl_last_id)
+              for (dItem = FirstItem(GetqAttrSyms(SchemaRoot)); dItem != NULL; dItem = NextItem(dItem))
+                  if (GetqIdent(Value(dItem)) == ssl_last_id)
                       break;
               if (dItem == NULL)
               {
@@ -401,7 +401,7 @@ init_my_operations ()
                   SetqText (dNode, ssl_last_id_text);
                   SetqCode (dNode, NumAttrSyms);
                   SetqType (dNode, type_INVALID);   /* Type not yet set */
-                  dItem = AddLast (qAttrSyms(SchemaRoot), dNode);
+                  dItem = AddLast (GetqAttrSyms(SchemaRoot), dNode);
                   NumAttrSyms++;
               }
               CurrentAttrSym = Value(dItem);
@@ -409,18 +409,18 @@ init_my_operations ()
        case oCreateAttr :
               CurrentAttr = NewNode (nAttr);
               SetqAttrSym (CurrentAttr, CurrentAttrSym);
-              AddLast (qAttrs(GetsAttrsClass), CurrentAttr);
+              AddLast (GetqAttrs(GetsAttrsClass), CurrentAttr);
               continue;
        case oAttrType :
-              dNode = qAttrSym(CurrentAttr);
-              if ((qType(dNode) != type_INVALID) && (qType(dNode) != ssl_param))
+              dNode = GetqAttrSym(CurrentAttr);
+              if ((GetqType(dNode) != type_INVALID) && (GetqType(dNode) != ssl_param))
               {
                   printf ("Inconsistent attribute type\n");
               }
               SetqType (dNode, ssl_param);
               continue;
        case oAttrTag :
-              dLong = qTags(CurrentAttr);
+              dLong = GetqTags(CurrentAttr);
               SetqTags (CurrentAttr, (dLong | ssl_param));
               continue;
 
@@ -449,10 +449,10 @@ long                    ident;
     {
         root = Value(I);
 
-        if (qIdent(root) == ident)
+        if (GetqIdent(root) == ident)
             return (root);
 
-        derived = qDerived (root);
+        derived = GetqDerived (root);
         find_in_derived = w_find_class (derived, ident);
         if (find_in_derived != NULL)
             return (find_in_derived);
@@ -485,17 +485,17 @@ w_dump_table ()
     fprintf (f_ssl_out, "\n%% Generated automatically by schema\n\n");
 
     fprintf (f_ssl_out, "type node_type:\n");
-    FOR_EACH_ITEM (I, qAllClasses(SchemaRoot))
+    FOR_EACH_ITEM (I, GetqAllClasses(SchemaRoot))
     {
-        fprintf (f_ssl_out, "\t%s\n", ssl_get_id_string(qIdent(Value(I))));
+        fprintf (f_ssl_out, "\t%s\n", ssl_get_id_string(GetqIdent(Value(I))));
     }
 
     fprintf (f_ssl_out, "\t;\n\n");
 
     fprintf (f_ssl_out, "type node_attribute:\n");
-    FOR_EACH_ITEM (I, qAttrSyms(SchemaRoot))
+    FOR_EACH_ITEM (I, GetqAttrSyms(SchemaRoot))
     {
-        fprintf (f_ssl_out, "\tT_%s\n", ssl_get_id_string(qIdent(Value(I))));
+        fprintf (f_ssl_out, "\t%s\n", ssl_get_id_string(GetqIdent(Value(I))));
     }
 
     fprintf (f_ssl_out, "\t;\n\n");
@@ -531,7 +531,7 @@ w_dump_table ()
 
     fprintf (f_out, "static short dAttributeOffset [%ld][%ld] = {\n", NumClasses, NumAttrSyms);
 
-    w_dump_c_attr_offsets (qClassTree(SchemaRoot), attr_offsets, next_offset,
+    w_dump_c_attr_offsets (GetqClassTree(SchemaRoot), attr_offsets, next_offset,
                            &current_class_code, obj_sizes);
     fprintf (f_out, "};\n\n");
 
@@ -542,7 +542,7 @@ w_dump_table ()
     for (a = 0; a < NumAttrSyms; a++)
         attr_tags[a] = 0;
 
-    w_dump_c_attr_tags (qClassTree(SchemaRoot), attr_tags);
+    w_dump_c_attr_tags (GetqClassTree(SchemaRoot), attr_tags);
 
     fprintf (f_out, "};\n\n");
 
@@ -551,7 +551,7 @@ w_dump_table ()
 
     fprintf (f_out, "static short dClassIsA [%ld][%ld] = {\n", NumClasses, NumClasses);
 
-    w_dump_c_class_isa (qClassTree(SchemaRoot), &current_class_code, obj_isa);
+    w_dump_c_class_isa (GetqClassTree(SchemaRoot), &current_class_code, obj_isa);
     fprintf (f_out, "};\n\n");
 
 
@@ -569,9 +569,9 @@ w_dump_table ()
     fprintf (f_out, "int   dObjects = %ld;\n", NumClasses);
     fprintf (f_out, "char *dObjectName [%ld] = {\n", NumClasses);
 
-    FOR_EACH_ITEM (I, qAllClasses(SchemaRoot))
+    FOR_EACH_ITEM (I, GetqAllClasses(SchemaRoot))
     {
-        fprintf (f_out, "\t\"%s\",\n", ssl_get_id_string(qIdent(Value(I))));
+        fprintf (f_out, "\t\"%s\",\n", ssl_get_id_string(GetqIdent(Value(I))));
     }
 
     fprintf (f_out, "};\n\n");
@@ -579,14 +579,14 @@ w_dump_table ()
     fprintf (f_out, "int   dAttributes = %ld;\n", NumAttrSyms);
     fprintf (f_out, "char *dAttributeName [%ld] = {\n", NumAttrSyms);
 
-    FOR_EACH_ITEM (I, qAttrSyms(SchemaRoot))
+    FOR_EACH_ITEM (I, GetqAttrSyms(SchemaRoot))
     {
-        fprintf (f_out, "\t\"%s\",\n", ssl_get_id_string(qIdent(Value(I))));
+        fprintf (f_out, "\t\"%s\",\n", ssl_get_id_string(GetqIdent(Value(I))));
     }
 
     fprintf (f_out, "};\n\n");
 
-    w_dump_c_attr_types (qAttrSyms(SchemaRoot));
+    w_dump_c_attr_types (GetqAttrSyms(SchemaRoot));
 
     fprintf (f_out, "\n/* Public Functions */\n\n");
 
@@ -633,7 +633,7 @@ w_create_all_classes_list ()
 
     L = NewList (nClass);
 
-    w_create_all_classes_sub (qClassTree(SchemaRoot), L);
+    w_create_all_classes_sub (GetqClassTree(SchemaRoot), L);
 
     SetqAllClasses (SchemaRoot, L);
 }
@@ -649,7 +649,7 @@ w_create_all_classes_sub ( List class_tree, List L )
     {
         N = Value(I);
         AddLast (L, N);
-        w_create_all_classes_sub (qDerived(N), L);
+        w_create_all_classes_sub (GetqDerived(N), L);
     }
 }
 
@@ -684,9 +684,9 @@ w_dump_c_attr_offsets ( List class_tree, short* parent_offsets, short parent_nex
 
         /* Add attributes to this class */
 
-        for (AttrI = FirstItem(qAttrs(N)); AttrI != NULL; AttrI = NextItem(AttrI))
+        for (AttrI = FirstItem(GetqAttrs(N)); AttrI != NULL; AttrI = NextItem(AttrI))
         {
-            attr_code = qCode(qAttrSym(Value(AttrI)));
+            attr_code = GetqCode(GetqAttrSym(Value(AttrI)));
             attr_offsets[attr_code] = next_offset;
             // SARICE 9/27/2021: 
             // Padding for worst case, not optimized for type.
@@ -708,9 +708,9 @@ w_dump_c_attr_offsets ( List class_tree, short* parent_offsets, short parent_nex
 
         /* Now derive any other classes from this class */
 
-        if (!IsEmpty(qDerived(N)))
+        if (!IsEmpty(GetqDerived(N)))
         {
-            w_dump_c_attr_offsets (qDerived(N), attr_offsets, next_offset,
+            w_dump_c_attr_offsets (GetqDerived(N), attr_offsets, next_offset,
                                    class_code_ptr, obj_sizes);
         }
     }
@@ -742,8 +742,8 @@ w_dump_c_attr_types   ( List attr_syms )
     {
         N = Value(I);
 
-        attr_code = qCode(N);
-        attr_types[attr_code] = qType(N);
+        attr_code = GetqCode(N);
+        attr_types[attr_code] = GetqType(N);
     }
 
     /* Print to file */
@@ -787,10 +787,10 @@ w_dump_c_attr_tags    ( List class_tree, short* parent_attr_tags )
 
         /* Add attributes to this class */
 
-        for (AttrI = FirstItem(qAttrs(N)); AttrI != NULL; AttrI = NextItem(AttrI))
+        for (AttrI = FirstItem(GetqAttrs(N)); AttrI != NULL; AttrI = NextItem(AttrI))
         {
-            attr_code = qCode(qAttrSym(Value(AttrI)));
-            attr_tags[attr_code] = qTags(Value(AttrI));
+            attr_code = GetqCode(GetqAttrSym(Value(AttrI)));
+            attr_tags[attr_code] = GetqTags(Value(AttrI));
         }
 
         /* Print to file */
@@ -804,9 +804,9 @@ w_dump_c_attr_tags    ( List class_tree, short* parent_attr_tags )
 
         /* Now derive any other classes from this class */
 
-        if (!IsEmpty(qDerived(N)))
+        if (!IsEmpty(GetqDerived(N)))
         {
-            w_dump_c_attr_tags (qDerived(N), attr_tags);
+            w_dump_c_attr_tags (GetqDerived(N), attr_tags);
         }
     }
 
@@ -850,9 +850,9 @@ w_dump_c_class_isa ( List class_tree, int* class_code_ptr, char* parent_obj_isa 
 
         /* Now derive any other classes from this class */
 
-        if (!IsEmpty(qDerived(N)))
+        if (!IsEmpty(GetqDerived(N)))
         {
-            w_dump_c_class_isa (qDerived(N), class_code_ptr, obj_isa);
+            w_dump_c_class_isa (GetqDerived(N), class_code_ptr, obj_isa);
         }
     }
 
@@ -881,17 +881,17 @@ w_dump_h_macros ()
     fprintf (f_h_out, "#ifndef Object\n");
 
     fprintf (f_h_out, "typedef enum {\n");
-    FOR_EACH_ITEM (I, qAllClasses(SchemaRoot))
+    FOR_EACH_ITEM (I, GetqAllClasses(SchemaRoot))
     {
-        fprintf (f_h_out, "    %s,\n", ssl_get_id_string(qIdent(Value(I))));
+        fprintf (f_h_out, "    %s,\n", ssl_get_id_string(GetqIdent(Value(I))));
     }
     fprintf (f_h_out, "} ObjectType;\n");
 
     fprintf (f_h_out, "\n");
     fprintf (f_h_out, "typedef enum {\n");
-    FOR_EACH_ITEM (I, qAttrSyms(SchemaRoot))
+    FOR_EACH_ITEM (I, GetqAttrSyms(SchemaRoot))
     {
-        fprintf (f_h_out, "    T_%s,\n", ssl_get_id_string(qIdent(Value(I))));
+        fprintf (f_h_out, "    %s,\n", ssl_get_id_string(GetqIdent(Value(I))));
     }
     fprintf (f_h_out, "} AttrCode;\n");
 
@@ -905,57 +905,57 @@ w_dump_h_macros ()
     // That can't compile anymore.   At a minimum, add typecasts here for integer types.
     // Better would be to have different GetAttr/SetAttr methods per aType.
 
-    FOR_EACH_ITEM (I, qAttrSyms(SchemaRoot))
+    FOR_EACH_ITEM (I, GetqAttrSyms(SchemaRoot))
     {
         N = Value(I);
         // SARICE temp fix 9/29/2021 - typecasts for non-pointer types, as noted above
         //         Will need to include <stdint.h>
-        switch (qType(N)) {
+        switch (GetqType(N)) {
           case type_Boolean1:
           case type_Character1:
           case type_Integer4:
-            fprintf (f_h_out, "#define %s(N)\t\t(%s)\t(intptr_t) GetAttr(T_%s, N)\n",
-                     ssl_get_id_string(qIdent(N)),
-                     SCH_GetTypeName(qType(N)),
-                     ssl_get_id_string(qIdent(N)));
+            fprintf (f_h_out, "#define Get%s(N)\t\t(%s)\t(intptr_t) GetAttr(N, %s)\n",
+                     ssl_get_id_string(GetqIdent(N)),
+                     SCH_GetTypeName(GetqType(N)),
+                     ssl_get_id_string(GetqIdent(N)));
             break;
           default:
-            fprintf (f_h_out, "#define %s(N)\t\t(%s)\tGetAttr(T_%s, N)\n",
-                     ssl_get_id_string(qIdent(N)),
-                     SCH_GetTypeName(qType(N)),
-                     ssl_get_id_string(qIdent(N)));
+            fprintf (f_h_out, "#define Get%s(N)\t\t(%s)\tGetAttr(N, %s)\n",
+                     ssl_get_id_string(GetqIdent(N)),
+                     SCH_GetTypeName(GetqType(N)),
+                     ssl_get_id_string(GetqIdent(N)));
             break;
         }
     }
 
     fprintf (f_h_out, "\n");
-    FOR_EACH_ITEM (I, qAttrSyms(SchemaRoot))
+    FOR_EACH_ITEM (I, GetqAttrSyms(SchemaRoot))
     {
         N = Value(I);
         // SARICE temp fix 9/29/2021 - typecasts for non-pointer types, as noted above
-        switch (qType(N)) {
+        switch (GetqType(N)) {
           case type_Boolean1:
           case type_Character1:
           case type_Integer4:
-            fprintf (f_h_out, "#define Set%s(N,V)\t\tSetAttr(T_%s, N, (void*)(intptr_t)(V))\n",
-                     ssl_get_id_string(qIdent(N)),
-                     ssl_get_id_string(qIdent(N)));
+            fprintf (f_h_out, "#define Set%s(N,V)\t\tSetAttr(N, %s, (void*)(intptr_t)(V))\n",
+                     ssl_get_id_string(GetqIdent(N)),
+                     ssl_get_id_string(GetqIdent(N)));
             break;
           default:
-            fprintf (f_h_out, "#define Set%s(N,V)\t\tSetAttr(T_%s, N, V)\n",
-                     ssl_get_id_string(qIdent(N)),
-                     ssl_get_id_string(qIdent(N)));
+            fprintf (f_h_out, "#define Set%s(N,V)\t\tSetAttr(N, %s, V)\n",
+                     ssl_get_id_string(GetqIdent(N)),
+                     ssl_get_id_string(GetqIdent(N)));
             break;
         }
     }
 
     fprintf (f_h_out, "\n");
-    FOR_EACH_ITEM (I, qAllClasses(SchemaRoot))
+    FOR_EACH_ITEM (I, GetqAllClasses(SchemaRoot))
     {
         N = Value(I);
         fprintf (f_h_out, "#define New%s()\t\tNewNode(%s)\n",
-                 ssl_get_id_string (qIdent(N)),
-                 ssl_get_id_string (qIdent(N)));
+                 ssl_get_id_string (GetqIdent(N)),
+                 ssl_get_id_string (GetqIdent(N)));
     }
 
     fprintf (f_h_out, "\n");

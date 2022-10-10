@@ -147,8 +147,10 @@ Node     NewNode  ( int object_type );
 int      Kind     ( Node N );
 Boolean1 IsA      ( int object_type_1, int object_type_2 );
 Boolean1 IsNull   ( Node N );
-void     SetAttr  ( int attr_code, Node node, void* value );
-void*    GetAttr  ( int attr_code, Node node );
+void     SetAttr  ( Node node, int attr_code, void* value );
+void     SetValue ( Node node, int attr_code, long value );
+void*    GetAttr  ( Node node, int attr_code );
+long     GetValue ( Node node, int attr_code );
 void     FreeNode ( Node N, Boolean1 recurse );
 
 /*

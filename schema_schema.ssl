@@ -12,18 +12,18 @@ type node_type:
 	;
 
 type node_attribute:
-	T_qINVALID
-	T_qClassTree
-	T_qAttrSyms
-	T_qAllClasses
-	T_qIdent
-	T_qText
-	T_qCode
-	T_qAttrs
-	T_qDerived
-	T_qAttrSym
-	T_qConstraint
-	T_qTags
-	T_qType
+	qINVALID
+	qClassTree
+	qAttrSyms
+	qAllClasses
+	qIdent
+	qText
+	qCode
+	qAttrs
+	qDerived
+	qAttrSym
+	qConstraint
+	qTags
+	qType
 	;
 

@@ -88,19 +88,19 @@
    2: 	;
       
    2: type node_attribute:
-   2: 	T_qINVALID
-   2: 	T_qClassTree
-   2: 	T_qAttrSyms
-   2: 	T_qAllClasses
-   2: 	T_qIdent
-   2: 	T_qText
-   2: 	T_qCode
-   2: 	T_qAttrs
-   2: 	T_qDerived
-   2: 	T_qAttrSym
-   2: 	T_qConstraint
-   2: 	T_qTags
-   2: 	T_qType
+   2: 	qINVALID
+   2: 	qClassTree
+   2: 	qAttrSyms
+   2: 	qAllClasses
+   2: 	qIdent
+   2: 	qText
+   2: 	qCode
+   2: 	qAttrs
+   2: 	qDerived
+   2: 	qAttrSym
+   2: 	qConstraint
+   2: 	qTags
+   2: 	qType
    2: 	;
       
       

@@ -136,7 +136,7 @@ int             object_type;
     Node         N;
     NodeLookup   nl;
 
-    size = sizeof(struct SCH_NodeStruct) - 4 + dObjectSize[object_type];
+    size = sizeof(struct SCH_NodeStruct) - sizeof(long) + dObjectSize[object_type];
     N = (Node) malloc (size);
     if (N == NULL) return (NULL);
 
@@ -175,10 +175,9 @@ Node                N;
     return (N == NULL);
 }
 
-void   SetAttr (attr_code, N, value)
-int             attr_code;
-Node            N;
-void           *value;
+
+void
+SetAttr( Node N, int attr_code, void* value )
 {
     void      **attr_ptr;
     SCH_VERIFY_NODE (N,);
@@ -205,9 +204,20 @@ void           *value;
     *attr_ptr = value;
 }
 
-void  *GetAttr (attr_code, N)
-int             attr_code;
-Node            N;
+
+// Set a non-pointer value
+//
+void
+SetValue( Node N, int attr_code, long value )
+{
+    void      **attr_ptr;
+    attr_ptr = SCH_GetAttrPtr (N, attr_code);
+    *(long*)attr_ptr = value;
+}
+
+
+void*
+GetAttr( Node N, int attr_code )
 {
     void  **attr_ptr;
     void   *value;
@@ -218,6 +228,17 @@ Node            N;
 
     return (value);
 }
+
+
+// Get a non-pointer value
+//
+long
+GetValue( Node N, int attr_code )
+{
+    void  **attr_ptr = SCH_GetAttrPtr (N, attr_code);
+    return *(long*)attr_ptr;
+}
+
 
 void   FreeNode (N, recurse)
 Node             N;
@@ -1080,7 +1101,7 @@ FILE                   *fp;
                  * For now, record the original number rather than a pointer.
                  * Later we'll go through and patch all these.
                  * Record the number shifted left | 1, to distinguish it from a
-                 * Node pointer (which will always be an address, a multiple of 4)
+                 * Node pointer (which will always be an address, a multiple of 4 or 8)
                  */
                 *(long*)attr_ptr = (orig_num << 1) | 1;
                 break;
