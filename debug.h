@@ -18,7 +18,7 @@ typedef struct dbg_variables_struct {
     char  *name;    /* Name of variable for debug user */
     char  *address; /* Location of variable */
     char  *udata;   /* User data passed to display func */
-    void (*display_method)( char*, char* );  /* display func */
+    void (*display_method)( void*, void* );  /* display func */
 } dbg_variables;
  
 

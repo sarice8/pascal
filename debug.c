@@ -118,7 +118,7 @@ struct dbg_breakpoint_struct {
     short      pc;         /* address of breakpoint */
     short      code;       /* normal code at that address */
     int        line;       /* stop at <line> if line != -1 */
-    char      *in_rule;    /* stop in <rule> if rule name != NULL */
+    const char* in_rule;   /* stop in <rule> if rule name != NULL */
     int        input_line; /* stop at i<line> if line != -1 */
 };
 
@@ -1103,7 +1103,6 @@ void
 display_context_vars ( short pc, long fp, int show_globals, char* var_name )
 {
     int    symbol;
-    char  *rule;
     long   value;
     char  *type_name;
     char  *symbol_name;
@@ -1137,7 +1136,7 @@ display_context_vars ( short pc, long fp, int show_globals, char* var_name )
 
     /*  First, find rule symbol.  Param/local symbols follow it in table.  */
 
-    rule = ssl_rule_name(pc);
+    const char* rule = ssl_rule_name(pc);
     for (symbol = 1; symbol <= dbg_symbol_table_last; symbol++)
     {
         if ((dbg_symbol_table[symbol].class == DBG_SYMBOL_CLASS_rule) &&
