@@ -1683,71 +1683,71 @@
 372 value nInOutParam 28 3
 374 str_alias_allowed nInParam 145 2
 375 t nInParam 153 1
-563 p nLocal 153 1
-564 t2 nLocal 153 2
+595 p nLocal 153 1
+596 t2 nLocal 153 2
 376 OperationDefinition nRule 1252
-588 op nLocal 153 1
-589 s nLocal 153 2
-591 t nLocal 153 3
+678 op nLocal 153 1
+679 s nLocal 153 2
+681 t nLocal 153 3
 378 RuleSectionDefinition nRule 1367
-593 i nLocal 153 1
+687 i nLocal 153 1
 380 RuleBodyDefinition nRule 1593
 382 r nInParam 153 1
-601 s nLocal 153 1
+713 s nLocal 153 1
 383 RuleRedefinition nRule 1677
 385 r nInParam 153 1
-603 s nLocal 153 1
-604 p nLocal 153 2
-606 t nLocal 153 3
-607 t2 nLocal 153 4
+718 s nLocal 153 1
+719 p nLocal 153 2
+721 t nLocal 153 3
+722 t2 nLocal 153 4
 386 Statement nRule 1814
-609 i nLocal 153 1
-610 t nLocal 153 2
-612 t2 nLocal 153 3
-613 s nLocal 153 4
+732 i nLocal 153 1
+733 t nLocal 153 2
+735 t2 nLocal 153 3
+736 s nLocal 153 4
 388 CallOperation nRule 2200
 390 o nInParam 153 1
-615 num_params nLocal 28 1
+767 num_params nLocal 28 1
 391 ActualParams nRule 2247
 393 r nInParam 153 1
-617 num_params nLocal 28 1
-618 param_scope nLocal 153 2
-620 p nLocal 153 3
-621 t nLocal 153 4
-622 t2 nLocal 153 5
+771 num_params nLocal 28 1
+772 param_scope nLocal 153 2
+774 p nLocal 153 3
+775 t nLocal 153 4
+776 t2 nLocal 153 5
 394 CallRule nRule 2405
 396 r nInParam 153 1
-624 num_params nLocal 28 1
+785 num_params nLocal 28 1
 397 CallUndefinedRule nRule 2501
-626 r nLocal 153 1
-627 s nLocal 153 2
-629 t nLocal 153 3
-630 p nLocal 153 4
-631 id nLocal 28 5
-632 num_params nLocal 28 6
-633 addr nLocal 28 7
+791 r nLocal 153 1
+792 s nLocal 153 2
+794 t nLocal 153 3
+795 p nLocal 153 4
+796 id nLocal 28 5
+797 num_params nLocal 28 6
+798 addr nLocal 28 7
 399 Assignment nRule 2749
 401 i nInParam 153 1
-635 t nLocal 153 1
-636 t2 nLocal 153 2
+810 t nLocal 153 1
+811 t2 nLocal 153 2
 402 CopyChoiceTable nRule 3088
 404 num_options nInParam 28 1
 405 Expr nRule 3270
 407 t nOutParam 153 1
-653 i nLocal 153 1
+865 i nLocal 153 1
 408 Lvalue nRule 3566
 410 t nOutParam 153 1
-655 i nLocal 153 1
+888 i nLocal 153 1
 411 Lvalue_HaveIdent nRule 3639
 413 i nInParam 153 2
 414 t nOutParam 153 1
 416 Const nRule 3731
 418 t nOutParam 153 1
-658 i nLocal 153 1
-659 val nLocal 28 2
+902 i nLocal 153 1
+903 val nLocal 28 2
 419 IntConst nRule 3850
-662 t nLocal 153 1
-663 i nLocal 28 2
+910 t nLocal 153 1
+911 i nLocal 28 2
 421 LookupType nRule 3874
 423 i nOutParam 153 1
 424 LookupInput nRule 3890
@@ -1795,24 +1795,22 @@
 490 SkipSection nRule 244
 492 Title nRule 259
 494 Input nRule 269
-550 next_value nLocal 28 1
+574 next_value nLocal 28 1
 496 Output nRule 298
-552 next_value nLocal 28 1
+576 next_value nLocal 28 1
 498 Error nRule 327
 500 Type nRule 350
-555 t nLocal 153 1
-556 next_value nLocal 28 2
+579 t nLocal 153 1
+580 next_value nLocal 28 2
 502 Include nRule 433
 504 Mechanism nRule 439
-560 m nLocal 153 1
+586 m nLocal 153 1
 506 Rules nRule 488
 508 DeclareVariables nRule 657
 510 class nInParam 113 3
 511 t nInParam 153 2
 513 addr_counter nInOutParam 28 1
-567 i nLocal 153 1
-568 tv nLocal 153 2
-570 t2 nLocal 153 3
+612 i nLocal 153 1
 514 DeclareGlobals nRule 793
 516 t nInParam 153 1
 517 DeclareLocals nRule 809
@@ -1820,33 +1818,33 @@
 520 SkipGlobals nRule 825
 522 FormalParamDefinition nRule 841
 524 scope nInParam 153 1
-575 num_params nLocal 28 1
-576 dir nLocal 113 2
-578 p nLocal 153 3
-579 t nLocal 153 4
+632 num_params nLocal 28 1
+633 dir nLocal 113 2
+635 p nLocal 153 3
+636 t nLocal 153 4
 525 FormalParamRedefinition nRule 1030
 527 scope nInParam 153 1
-581 p nLocal 153 1
-582 dir nLocal 113 2
-584 dir2 nLocal 113 3
-585 t nLocal 153 4
-586 t2 nLocal 153 5
+652 p nLocal 153 1
+653 dir nLocal 113 2
+655 dir2 nLocal 113 3
+656 t nLocal 153 4
+657 t2 nLocal 153 5
 528 SkipRule nRule 1455
 530 RuleDefinition nRule 1470
-596 r nLocal 153 1
-597 s nLocal 153 2
-599 t nLocal 153 3
+702 r nLocal 153 1
+703 s nLocal 153 2
+705 t nLocal 153 3
 532 Choice nRule 2785
-639 num_options nLocal 28 1
-640 choice_kind nLocal 155 2
-642 choice_type nLocal 153 3
-643 t nLocal 153 4
-644 i nLocal 153 5
-645 s nLocal 153 6
-646 val nLocal 28 7
+814 num_options nLocal 28 1
+815 choice_kind nLocal 155 2
+817 choice_type nLocal 153 3
+818 t nLocal 153 4
+819 i nLocal 153 5
+820 s nLocal 153 6
+821 val nLocal 28 7
 534 FixChoiceExits nRule 3132
 536 FixForwardCalls nRule 3158
 538 VerifyAllRulesDeclared nRule 3184
-651 n nLocal 153 1
+856 n nLocal 153 1
 540 RequireMatchTokenType nRule 4197
 542 t nInParam 153 1

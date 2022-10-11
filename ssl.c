@@ -1003,7 +1003,7 @@ w_dump_tables()
     short             count;
     struct rule_addr
     {
-        char      *name;
+        const char *name;
         short      addr;
         struct rule_addr *next;
     };
@@ -1235,7 +1235,7 @@ list_generated_code ()
     short  op;
     short  arg;
     int    has_arg;
-    char  *get_op_name ();
+    const char  *get_op_name ();
 
     /*  keep track of when next choice table is coming up  */
     short  choice_table [dPatchCTAsize], choice_table_sp;
@@ -1334,7 +1334,7 @@ list_generated_code ()
 }
 
 
-char *get_op_name (op)
+const char *get_op_name (op)
 short               op;
 {
     NODE_PTR    node_ptr;
