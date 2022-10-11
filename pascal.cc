@@ -19,6 +19,13 @@
 #include <dos.h>
 #endif // AMIGA
 
+#include <string>
+#include <vector>
+#include <unordered_map>
+
+
+// This part of the toolchain is still in C
+extern "C" {
 // SSL Runtime module definitions
 #include "ssl_rt.h"
 
@@ -31,6 +38,9 @@
 #define DEBUG_INFO_FILE      "pascal.dbg"
 #define PROGRAM_LISTING_FILE "pascal.lst"
 #endif
+
+}  // extern "C"
+
 
 // SSL definitions generated for this program
 #define  SSL_INCLUDE_ERR_TABLE
@@ -48,8 +58,6 @@
    Table walker variables start with 'w_'.
    Semantic operations start with 'o'.
    Corresponding data structures start with 'd'.
-
-   The output buffer is w_outTable (pointer=w_here).
 
    A token is read and screened when oInput, oInputAny, or oInputChoice
    is encountered.  When an id is accepted, set ssl_last_id to its id #.
@@ -86,9 +94,18 @@ void t_printToken();
 void t_dumpTables();
 
 
-#define w_outTableSize 5000
-int   w_outTable[w_outTableSize];  /* Emit into this table */
-int   w_here;                      /* Output position */
+int   w_here;  // obsolete.  TO DO: remove
+
+// A t-code output stream.
+// We have one main 'default' stream, and other temporary ones that are copied into the default stream.
+typedef std::vector<int> CodeStream;
+// Schema doesn't support client pointers yet, so the SSL/schema refers to code streams by integer id,
+// thanks to this table.  id 0 is unused; id 1 is the default stream.
+std::vector<CodeStream*> codeStreams;
+// We can temporarily change the curernt code stream
+std::vector<int> codeStreamStack;
+CodeStream* currentCodeStream = nullptr;
+
 
 /*************** Variables for semantic mechanisms ***************/
 
@@ -377,6 +394,14 @@ init_my_scanner()
 void
 init_my_operations()
 {
+  // Set up default code stream
+  codeStreams.push_back( nullptr );
+  codeStreams.push_back( new CodeStream() );
+
+  codeStreamStack.push_back( 1 );
+  currentCodeStream = codeStreams[1];
+
+  // unused, but mentioned in debug table so leaving in for now.
   w_here = 0;
 
   // Initialize schema package (schema runtime module)
@@ -394,7 +419,7 @@ init_my_operations()
 // Returns the address of the data in the output file's global data space.
 // 
 int
-createGlobalData( char* sourceData, int sourceBytes )
+createGlobalData( const char* sourceData, int sourceBytes )
 {
   Node globalScope = dScopeStack[1];
   int numInts = (sourceBytes + 3) / 4;
@@ -409,7 +434,7 @@ createGlobalData( char* sourceData, int sourceBytes )
 
   dSL[dSLptr++] = offset;
   dSL[dSLptr++] = numInts;
-  int* intPtr = (int*) sourceData;
+  const int* intPtr = (const int*) sourceData;
   for (int i = 0; i < numInts; ++i) {
   dSL[dSLptr++] = *intPtr++;
   }
@@ -427,7 +452,7 @@ createGlobalData( char* sourceData, int sourceBytes )
 Node
 nodeFindValue_NoErrorChecking( Node listOwner, int listAttr, int findAttr, long findValue )
 {
-  List list = GetAttr( listOwner, listAttr );
+  List list = (List) GetAttr( listOwner, listAttr );
   if ( !list ) {
     return NULL;
   }
@@ -443,7 +468,7 @@ nodeFindValue_NoErrorChecking( Node listOwner, int listAttr, int findAttr, long 
 // This is a schema method expected by the debugger, that was present in schema 1.3
 // but not schema 1.4.   Partly a placeholder for now, the old one showed the whole subtree.
 //
-extern void nodeDumpTreeNum( long nodeNum );
+extern "C" void nodeDumpTreeNum( long nodeNum );
 
 void
 nodeDumpTreeNum( long nodeNum )
@@ -468,15 +493,11 @@ Node dNode;  // temporary for several mechanisms
     // built-in Emit operation is handled by application
 
     case oEmit : {
-            if (w_here >= w_outTableSize) {
-              ssl_fatal( "output table overflow" );
-            }
-
             int outToken = ssl_code_table[ssl_pc++];
             switch (outToken) {
-              case tSpace :      w_outTable[w_here++] = 0;
+              case tSpace :      currentCodeStream->push_back( 0 );
                                  break;
-              default :          w_outTable[w_here++] = outToken;
+              default :          currentCodeStream->push_back( outToken );
                                  break;
             }
             continue;
@@ -495,6 +516,7 @@ Node dNode;  // temporary for several mechanisms
     case oNodeSetBoolean:
     case oNodeSetKind:
     case oNodeSetLabel:
+    case oNodeSetCode:
             SetValue ((Node)ssl_argv(0,3), ssl_argv(1,3), ssl_argv(2,3));
             continue;
     case oNodeGet:
@@ -503,13 +525,14 @@ Node dNode;  // temporary for several mechanisms
     case oNodeGetInt:
     case oNodeGetBoolean:
     case oNodeGetLabel:
+    case oNodeGetCode:
             ssl_result = (long) GetValue ((Node)ssl_argv(0,2), ssl_argv(1,2));
             continue;
     case oNodeNull:
             ssl_result = ((Node)ssl_param == NULL);
             continue;
     case oNodeGetIter: {
-            List list = GetAttr((Node)ssl_argv(0,2), ssl_argv(1,2));
+            List list = (List) GetAttr((Node)ssl_argv(0,2), ssl_argv(1,2));
             if ( !list ) {
               ssl_result = 0;
             } else {
@@ -570,7 +593,7 @@ Node dNode;  // temporary for several mechanisms
             Node n = (Node) ssl_argv(1,2);
             if ( nv->size == nv->capacity ) {
               int new_capacity = nv->capacity * 2;
-              nv->elements = realloc( nv->elements, new_capacity * sizeof( Node ) );
+              nv->elements = (Node*) realloc( nv->elements, new_capacity * sizeof( Node ) );
               memset( &(nv->elements[nv->capacity]),
                       (new_capacity - nv->capacity) * sizeof( Node ),
                       0 );
@@ -594,16 +617,31 @@ Node dNode;  // temporary for several mechanisms
     /* Mechanism emit_mech */
 
     case oEmitInt :
-            w_outTable[w_here++] = ssl_param;
+            currentCodeStream->push_back( ssl_param );
             continue;
     case oEmitLabel :
-            w_outTable[w_here++] = ssl_param;
+            currentCodeStream->push_back( ssl_param );
+            continue;
+    case oEmitCode : {
+            CodeStream* code = codeStreams[ssl_param];
+            if ( code ) {
+              currentCodeStream->insert( currentCodeStream->end(),
+                                         code->begin(), code->end() );
+              // blank out the code stream, but don't delete it.
+              // I'll leave that cleanup to the owner of codeStreams, for now.
+              code->clear();
+            }
+            }
             continue;
     case Here :
-            ssl_result = w_here;
+            // This operation is only valid in the default code stream
+            ssl_assert( currentCodeStream == codeStreams[1] );
+            ssl_result = (*currentCodeStream).size();
             continue;
     case oPatch :
-            w_outTable[ssl_argv(0,2)] = ssl_argv(1,2);
+            // This operation is only valid in the default code stream
+            ssl_assert( currentCodeStream == codeStreams[1] );
+            (*currentCodeStream)[ssl_argv(0,2)] = ssl_argv(1,2);
             continue;
 
 
@@ -673,15 +711,15 @@ Node dNode;  // temporary for several mechanisms
             continue;
     case oScopeDeclare: {
             ssl_assert (dScopeStackPtr >= 1);
-            AddLast( GetAttr( dScopeStack[dScopeStackPtr], qDecls ), (Node)ssl_param );
+            AddLast( (List) GetAttr( dScopeStack[dScopeStackPtr], qDecls ), (Node)ssl_param );
             continue;
             }
     case oScopeDeclareAlloc: {
             ssl_assert (dScopeStackPtr >= 1);
             Node scope = dScopeStack[dScopeStackPtr];
             Node node = (Node)ssl_param;
-            AddLast( GetAttr( scope, qDecls ), node );
-            Node theType = GetAttr( node, qType );
+            AddLast( (List) GetAttr( scope, qDecls ), node );
+            Node theType = (Node) GetAttr( node, qType );
             ssl_assert( theType != NULL );
             int size = GetValue( theType, qSize );
             long offset = GetValue( scope, qSize );
@@ -769,7 +807,7 @@ Node dNode;  // temporary for several mechanisms
             // If a caller wants the raw type including subranges, they can examine
             // the top node themselves using oTypeSTop.
             while ( Kind(t) == nSubrangeType ) {
-              t = GetAttr( t, qBaseType );
+              t = (Node) GetAttr( t, qBaseType );
             }
             ssl_result = Kind( t );
             continue;
@@ -807,6 +845,24 @@ Node dNode;  // temporary for several mechanisms
             ssl_result = ++labelCount;
             continue;
 
+
+     /* Mechanism code_mech */
+
+     case oCodeNew :
+            ssl_result = (intptr_t) new CodeStream;
+            continue;
+    case oCodePush : {
+            CodeStream* code = codeStreams[ssl_param];
+            ssl_assert( code != nullptr );
+            codeStreamStack.push_back( ssl_param );
+            currentCodeStream = code;
+            }
+            continue;
+    case oCodePop : {
+            codeStreamStack.pop_back();
+            currentCodeStream = codeStreams[codeStreamStack.back()];
+            }
+            continue;
 
      /* Mechanism count */
 
@@ -865,7 +921,7 @@ Node dNode;  // temporary for several mechanisms
             }
 
      case oStringAllocLitFromIdent : {
-            char* sourceStr = ssl_get_id_string( ssl_param );
+            const char* sourceStr = ssl_get_id_string( ssl_param );
             int sourceLen = strlen( sourceStr) + 1;  // +1 for '\0'
             ssl_result = createGlobalData( sourceStr, sourceLen );
             continue;
@@ -990,23 +1046,27 @@ t_printToken()
 void
 t_dumpTables()
 {
-  short i,col;
   printf("\nWriting Files...\n");
 
   /* code segment */
-  fprintf(t_out,"%d\n",w_here);
-  col = 0;
-  for (i=0; i<w_here; i++) {
-    fprintf(t_out,"%6d ",w_outTable[i]);
-    if ((++col % 10) == 0)
-      fprintf(t_out,"\n");
+  // Only the default code stream is written.   Any others should have been
+  // assembled into the default stream already.
+
+  fprintf( t_out, "%lu\n", currentCodeStream->size() );
+  int col = 0;
+  for ( int x : *currentCodeStream ) {
+    fprintf( t_out, "%6d ", x );
+    if ( ( ++col % 10 ) == 0 ) {
+      fprintf( t_out, "\n" );
+    }
   }
 
   /* string literals table */
-  for (i=0; i<dSLptr; i++) {
-    fprintf(t_out,"%6d ",dSL[i]);
-    if ((++col % 10) == 0)
+  for ( int i = 0; i < dSLptr; ++i ) {
+    fprintf( t_out, "%6d ", dSL[i] );
+    if ( ( ++col % 10 ) == 0 ) {
       fprintf(t_out,"\n");
+    }
   }
 }
 

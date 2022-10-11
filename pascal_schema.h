@@ -41,6 +41,7 @@ typedef enum {
     qDecls,
     qSize,
     qAllocDown,
+    qInitCode,
     qIdent,
     qType,
     qValue,
@@ -68,6 +69,7 @@ typedef enum {
 #define GetqDecls(N)		(List)	GetAttr(N, qDecls)
 #define GetqSize(N)		(Integer4)	(intptr_t) GetAttr(N, qSize)
 #define GetqAllocDown(N)		(Boolean1)	(intptr_t) GetAttr(N, qAllocDown)
+#define GetqInitCode(N)		(Integer4)	(intptr_t) GetAttr(N, qInitCode)
 #define GetqIdent(N)		(Integer4)	(intptr_t) GetAttr(N, qIdent)
 #define GetqType(N)		(Node)	GetAttr(N, qType)
 #define GetqValue(N)		(Integer4)	(intptr_t) GetAttr(N, qValue)
@@ -93,6 +95,7 @@ typedef enum {
 #define SetqDecls(N,V)		SetAttr(N, qDecls, V)
 #define SetqSize(N,V)		SetAttr(N, qSize, (void*)(intptr_t)(V))
 #define SetqAllocDown(N,V)		SetAttr(N, qAllocDown, (void*)(intptr_t)(V))
+#define SetqInitCode(N,V)		SetAttr(N, qInitCode, (void*)(intptr_t)(V))
 #define SetqIdent(N,V)		SetAttr(N, qIdent, (void*)(intptr_t)(V))
 #define SetqType(N,V)		SetAttr(N, qType, V)
 #define SetqValue(N,V)		SetAttr(N, qValue, (void*)(intptr_t)(V))

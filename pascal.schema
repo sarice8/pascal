@@ -17,6 +17,7 @@ nScope =>
         qDecls:         List            (nDeclaration)          [Pri,Opt]
         qSize:          Integer4        % space required by declared variables
         qAllocDown:     Boolean1        % allocate from -1 downto -size
+        qInitCode:      Integer4        % id of code stream to initialize scope's vars
 
 Object ::= nDeclaration
 

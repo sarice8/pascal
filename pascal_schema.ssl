@@ -38,6 +38,7 @@ type node_attribute:
 	qDecls
 	qSize
 	qAllocDown
+	qInitCode
 	qIdent
 	qType
 	qValue

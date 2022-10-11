@@ -266,7 +266,13 @@ type typ:
    tySet;
 
 type Label:
-   labelNull;
+   labelNull = 0;
+
+% An output code stream.
+type Code:
+   codeNull = 0
+   codeDefault = 1
+   ;
 
 
 % Some general schema node operations.
@@ -279,10 +285,12 @@ mechanism node_mech:
     oNodeSetBoolean (Node, node_attribute, boolean)
     oNodeSetKind (Node, node_attribute, kind) % set attribute of node  *** MIGHT NOT NEED
     oNodeSetLabel( Node, node_attribute, Label )  % set Label attribute of node
+    oNodeSetCode( Node, node_attribute, Code )    % set Code attribute of node
     oNodeGet (Node, node_attribute) >> Node    % get Node attribute of node
     oNodeGetInt (Node, node_attribute) >> int  % get int attribute of node
     oNodeGetBoolean (Node, node_attribute) >> boolean  % get int attribute of node
     oNodeGetLabel (Node, node_attribute) >> Label      % get Label attribute of node
+    oNodeGetCode (Node, node_attribute) >> Code        % get code stream attribute of node
     oNodeNull (Node) >> boolean          % is node null?
     oNodeGetIter (Node, node_attribute) >> NodeIter   % get an iterator over nodes in a List attribute
     oNodeIterValue (NodeIter) >> Node             % the node that iter is referring to (NodeNull if no more nodes)
@@ -308,8 +316,11 @@ mechanism node_vec_mech:
 mechanism emit_mech:
     oEmitInt( int )              % emit int into the generated code
     oEmitLabel( Label )
+    oEmitCode( Code )            % append a code stream to the current code stream
     Here >> int                  % current address in the generated code
+                                 %   (only usable in the default code stream)
     oPatch( int addr, int val )  % patch an int into address in the generated code
+                                 %   (only usable in the default code stream)
     ;
 
 mechanism math:
@@ -343,7 +354,6 @@ mechanism scope_mech:
     oScopeFindInCurrentScope >> Node     % find declaration of last accepted identifier, only within the current scope.  Null if not found.
     ;
 
-
 mechanism type_mech:
     oTypeAdd( Node node )     % add the given nType to the type table
     ;
@@ -372,6 +382,13 @@ mechanism id_mech:
 mechanism label_mech:
    oLabelNew >> Label
    ;
+
+mechanism code_mech:
+   oCodeNew >> Code         % create a new empty code stream
+   oCodePush( Code )        % change the current output code stream to the given one
+   oCodePop                 % restore the current code stream to the previous one
+   ;
+
 
 mechanism count :
    oCountPush(int)          % start a new counter, with initial value
@@ -562,6 +579,11 @@ BlockStmt( Label labelForBody ):
 
    int patchLS
    .tEnter  patchLS = Here  .tSpace
+
+   % insert any code for initialization of this scope's variables
+   Code initCode = oNodeGetCode( oScopeCurrent, qInitCode )
+   oEmitCode( initCode )
+   oNodeSetCode( oScopeCurrent, qInitCode, codeNull )
 
    @Statement
    .tReturn
