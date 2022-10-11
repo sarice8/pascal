@@ -221,6 +221,7 @@ error:
    eRecordEmpty
    eNotCurrentFunction
    eAlreadyDefined
+   eOnlyOneVarCanBeInitialized
    ;
 
 include 'pascal_schema.ssl'
@@ -333,6 +334,7 @@ mechanism math:
     equal_zero (int) >> boolean
     equal_node_type (node_type, node_type) >> boolean     % Want equal_<type> for every type
     equal_label( Label, Label ) >> boolean
+    equal_code( Code, Code ) >> boolean
     oMININT >> int    % the minimum 32-bit integer.  necessary because ssl literal ints are currently (silently) short (!)
     ;
 
@@ -445,7 +447,7 @@ Node    StringType
 
 Block( node_type varNodeType, Label labelForBody );
 BlockDecls( node_type varNodeType );
-BlockStmt( Label labelForBody );
+BlockStmt( Label labelForBody, Node varScope );
 VarDecl( node_type varNodeType );
 newType( node_type nt, int size ) >> Node;
 newIdent( node_type nt, kind k, int id ) >> Node;
@@ -526,6 +528,7 @@ Program:
    @BlockDecls( nGlobalVar )
 
    % a new scope just for temporaries in the main routine
+   Node varScope = oScopeCurrent
    oScopeBegin
    oNodeSetBoolean( oScopeCurrent, qAllocDown, true )
    oNodeSet( progDecl, qMainRoutineScope, oScopeCurrent )
@@ -533,7 +536,7 @@ Program:
    % The block statement includes a stack frame, and enter/return,
    % even for the main routine.
    % That will be necessary for temporaries allocated in the main routine.
-   @BlockStmt( mainLabel )
+   @BlockStmt( mainLabel, varScope )
 
    oScopeEnd   % main routine scope
 
@@ -544,7 +547,7 @@ Program:
 
 Block( node_type varNodeType, Label labelForBody ):
    @BlockDecls( varNodeType )
-   @BlockStmt( labelForBody )
+   @BlockStmt( labelForBody, oScopeCurrent )
    ;
 
 
@@ -570,7 +573,10 @@ CheckForUndefinedMethods:
 
 
 
-BlockStmt( Label labelForBody ):
+% Given the scope of vars in this block.
+% Usually it's the current scope, but it's a bit different for the main statement.
+%
+BlockStmt( Label labelForBody, Node varScope ):
    .tLabel  oEmitLabel( labelForBody )
 
    % Proc, func, and main routine all start with tEnter
@@ -581,7 +587,7 @@ BlockStmt( Label labelForBody ):
    .tEnter  patchLS = Here  .tSpace
 
    % insert any code for initialization of this scope's variables
-   Code initCode = oNodeGetCode( oScopeCurrent, qInitCode )
+   Code initCode = oNodeGetCode( varScope, qInitCode )
    oEmitCode( initCode )
    oNodeSetCode( oScopeCurrent, qInitCode, codeNull )
 
@@ -604,6 +610,21 @@ MethodModifiers( Node decl ):
       | * : >
    ]}
    ;
+
+
+% We need an initCode code stream for the current scope.
+% Create it if not present yet.  Return it.
+% (This will be used for variable initialization.)
+%
+GetOrCreateInitCode >> Code:
+   Code initCode = oNodeGetCode( oScopeCurrent, qInitCode )
+   [ equal_code( initCode, codeNull )
+      | true :
+         initCode = oCodeNew
+         oNodeSetCode( oScopeCurrent, qInitCode, initCode )
+      | * :
+   ]
+   >> initCode;
 
 
 % external method resides in an external object file
@@ -936,14 +957,35 @@ VarDecl( node_type varNodeType ):
 
          int i = 0
          {[ equal( i, oNodeVecSize( decls ) )
-           | false :
-             decl = oNodeVecElement( decls, i )
-             oNodeSet( decl, qType, theType )
-             oScopeDeclareAlloc( decl )
-             inc( i )
+            | false :
+               decl = oNodeVecElement( decls, i )
+               oNodeSet( decl, qType, theType )
+               oScopeDeclareAlloc( decl )
+               inc( i )
             | * :
               >
          ]}
+
+         % optional initialization
+         [
+            | '=' :
+               [ oNodeVecSize( decls )
+                  | 1 :
+                  | * :  #eOnlyOneVarCanBeInitialized
+               ]
+
+               % we need an initCode stream for this scope
+               Code initCode = @GetOrCreateInitCode
+               oCodePush( initCode )
+               % generate assignment in initCode stream
+               @LValueVar( decl )
+               @Expr
+               @MatchTypes
+               @Assign
+               oCodePop
+             
+            | * :
+         ]
 
          oNodeVecDelete( decls )
          ';'
@@ -1967,10 +2009,19 @@ AssignOrCallStmt:
 AssignStmt( Node decl ):
 
    @LValueVar( decl )
-
    ':=' 
    @Expr
    @MatchTypes
+   @Assign
+   ;
+
+
+% Performs a raw assignment.
+% Given lvalue 2nd on stack, and expr value top of stack,
+% and type of both of these on the type stack,
+% perform the assignment and pop the type off the type stack.
+%
+Assign:
    [ oTypeSNodeType
       | nIntegerType :            .tAssignI
       | nBooleanType :            .tAssignB
@@ -1984,7 +2035,6 @@ AssignStmt( Node decl ):
    ]
    oTypeSPop
    ;
-
 
 % Given nFunc for the just-accepted identifier on the left hand side.
 % Parse an assignment that represents assignment of the function result.

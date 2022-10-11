@@ -1,39 +1,15 @@
 
-// looking for a bug in jit
+// trying var init
 
-
-{
-  23    tPushGlobalI       8
-  25    tPushConstI       50
-  27    tLessI
-  28    tJumpFalse         2
-
-  30    tJumpTrue          3
-
-  32    tLabel     2
-  34    tPushGlobalI       8
-  36    tPushConstI      250
-  38    tGreaterI
-  39    tJumpFalse         4
-
-  41    tLabel     3
-  43    tPushAddrGlobal   16  "A"
-  45    tWriteStr
-  46    tWriteCR
-  47    tLabel     4
-}
 
 
 program test (input, output);
 
-  var fx, dx : integer;
+  // can't have an initial value if more than one var (according to fpc)
+  // var x1, x2 : integer = 1;
+  var x1 : integer = 1;
+      x2 : integer = 2;
 begin
   
-  fx := 50;
-  dx := 2;
-
-  if ( fx < 50 ) or ( fx > 250 ) then
-    writeln( 'A' );
-
-  writeln( 'B' );
+  writeln( 'x1=', x1, ' x2=', x2 );
 end.

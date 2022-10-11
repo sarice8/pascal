@@ -237,7 +237,7 @@ const FloodFillScreenY = 240;
 // TO DO: I'm not accepting const expr in the typedef
 // var floodFillVisited: array[ 0..FloodFillScreenY-1, 0..FloodFillScreenX-1 ] of boolean;
 var floodFillVisited: array[ 0..239, 0..319 ] of integer;
-var floodFillVisitedCode : integer; // = -1
+var floodFillVisitedCode : integer = -1;
 
 procedure FloodFillLow( x, y, fillColor, borderColor : integer );
   begin
@@ -314,9 +314,6 @@ procedure DrawFace( fx, fy, color, color2 : integer );
   end;
 
 BEGIN
-
-  // this initialization should be done on variable declaration
-  floodFillVisitedCode := -1;
 
   writeln( 'Proc test:' );
   proc1( 100, 200, 300, 3 );
