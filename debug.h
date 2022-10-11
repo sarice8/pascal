@@ -15,9 +15,9 @@
 #endif // AMIGA
 
 typedef struct dbg_variables_struct {
-    char  *name;    /* Name of variable for debug user */
-    char  *address; /* Location of variable */
-    char  *udata;   /* User data passed to display func */
+    const char* name;    /* Name of variable for debug user */
+    char  *address;      /* Location of variable */
+    char  *udata;        /* User data passed to display func */
     void (*display_method)( void*, void* );  /* display func */
 } dbg_variables;
  
@@ -29,7 +29,7 @@ typedef struct dbg_variables_struct {
  */
 #define DBG_TYPE_DISPLAY  ((char *)0x1)
 
-void dbg_init ( char* debug_data_file, char* source_filename, char* input_filename,
+void dbg_init ( const char* debug_data_file, const char* source_filename, const char* input_filename,
                 short break_opcode, dbg_variables* debug_variables );
 int dbg_command( char* command );
 void dbg_hit_breakpoint();
@@ -42,11 +42,11 @@ void dbg_walkTable();
  *  Don't really want to put this interface in ssltool, since that's also just one implementation
  *  of the debugger (and also isn't migrated yet).  Should be renamed.
  */
-void ssltool_init( int argc, char** argv, char* source_filename, char* input_filename );
+void ssltool_init( int argc, char** argv, const char* source_filename, const char* input_filename );
 void ssltool_at_line( int line );
 void ssltool_at_input_position( int line, int col );
-void ssltool_execution_status( char* status_string );
-void ssltool_restart_input_window( char* input_filename );
+void ssltool_execution_status( const char* status_string );
+void ssltool_restart_input_window( const char* input_filename );
 void ssltool_main_loop();
 
 // Internal

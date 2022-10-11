@@ -139,7 +139,7 @@ local long     display_var_fp;
 // Forward declarations
 
 local void display_source_for_pc ( short pc );
-local void display_context_vars ( short pc, long fp, int show_globals, char* var_name );
+local void display_context_vars ( short pc, long fp, int show_globals, const char* var_name );
 local void display_value ( char* type_name, char* symbol_name, long value );
 
 int dbg_run ();
@@ -152,14 +152,14 @@ void dbg_hit_input_breakpoint ();
 void dbg_execution_complete();
 int dbg_find_line ( int pc );
 void dbg_read_symbol_table ( FILE* fp );
-void dbgui_init ( char* source_filename, char* input_filename );
-void dbgui_restart ( char* input_filename );
+void dbgui_init ( const char* source_filename, const char* input_filename );
+void dbgui_restart ( const char* input_filename );
 void dbgui_main_loop ();
-void dbgui_create_debug_window ( char* source_filename, char* input_filename );
-void dbgui_restart_input_window ( char* input_filename );
+void dbgui_create_debug_window ( const char* source_filename, const char* input_filename );
+void dbgui_restart_input_window ( const char* input_filename );
 void dbgui_at_line ( short line );
 void dbgui_at_input_position ( int line, int col );
-void dbgui_execution_status ( char* status_string );
+void dbgui_execution_status ( const char* status_string );
 
 
 /*
@@ -181,7 +181,7 @@ void dbgui_execution_status ( char* status_string );
 */
 
 void
-dbg_init ( char* debug_data_file, char* source_filename, char* input_filename,
+dbg_init ( const char* debug_data_file, const char* source_filename, const char* input_filename,
            short break_opcode, dbg_variables* debug_variables )
 {
     FILE      *fp;
@@ -901,7 +901,7 @@ dbg_walkTable()
 /*  Bring up windows, init cmdline, callbacks, etc  */
 
 void
-dbgui_init ( char* source_filename, char* input_filename )
+dbgui_init ( const char* source_filename, const char* input_filename )
 {
     dbgui_create_debug_window(source_filename, input_filename);
 }
@@ -909,7 +909,7 @@ dbgui_init ( char* source_filename, char* input_filename )
 
 /*  Rerun same program with a (possibly) new input file */
 void
-dbgui_restart ( char* input_filename )
+dbgui_restart ( const char* input_filename )
 {
     dbgui_restart_input_window(input_filename);
 }
@@ -948,7 +948,7 @@ cmdline_main_loop ()
 
 
 void
-dbgui_create_debug_window ( char* source_filename, char* input_filename )
+dbgui_create_debug_window ( const char* source_filename, const char* input_filename )
 {
     int   my_argc = 1;         /* Hardcode these for now */
     static char *my_argv[] = { "ssltool", NULL };
@@ -961,7 +961,7 @@ dbgui_create_debug_window ( char* source_filename, char* input_filename )
 /* Restart input window with (possibly) new file */
 
 void
-dbgui_restart_input_window ( char* input_filename )
+dbgui_restart_input_window ( const char* input_filename )
 {
     ssltool_restart_input_window (input_filename);
 }
@@ -988,7 +988,7 @@ dbgui_at_input_position ( int line, int col )
 
 
 void
-dbgui_execution_status ( char* status_string )
+dbgui_execution_status ( const char* status_string )
 {
     ssltool_execution_status (status_string);
 }
@@ -1100,7 +1100,7 @@ display_value ( char* type_name, char* symbol_name, long value )
  * will be displayed.
  */
 void
-display_context_vars ( short pc, long fp, int show_globals, char* var_name )
+display_context_vars ( short pc, long fp, int show_globals, const char* var_name )
 {
     int    symbol;
     long   value;

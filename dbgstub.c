@@ -44,7 +44,7 @@ static char sccsid[] = "%W% %G% %U% %P%";
 */
 
 void
-ssltool_init( int argc, char** argv, char* source_filename, char* input_filename )
+ssltool_init( int argc, char** argv, const char* source_filename, const char* input_filename )
 {
 }
 
@@ -64,13 +64,13 @@ ssltool_at_input_position ( int line, int col )
 
 
 void
-ssltool_execution_status ( char* status_string )
+ssltool_execution_status ( const char* status_string )
 {
 }
 
 
 void
-ssltool_restart_input_window ( char* input_filename )
+ssltool_restart_input_window ( const char* input_filename )
 {
 }
 
