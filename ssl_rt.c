@@ -211,7 +211,7 @@ ssl_set_debug ( int debug_flag )
  */
 
 void
-ssl_set_debug_info ( char* debug_file, char* program_file, int break_code, dbg_variables* debug_variables )
+ssl_set_debug_info ( const char* debug_file, const char* program_file, int break_code, dbg_variables* debug_variables )
 {
     strcpy (ssl_debug_file, debug_file);
     strcpy (ssl_program_file, program_file);
@@ -224,7 +224,7 @@ ssl_set_debug_info ( char* debug_file, char* program_file, int break_code, dbg_v
  *  Takes effect at next ssl_restart()
  */
 void
-ssl_set_input_filename ( char* input_filename )
+ssl_set_input_filename ( const char* input_filename )
 {
     strcpy (ssl_input_filename, input_filename);
 }
@@ -360,7 +360,7 @@ ssl_cleanup()
  */
 
 int
-ssl_load_program ( char* program_filename )
+ssl_load_program ( const char* program_filename )
 {
     FILE   *program_file;
     int     entries;
@@ -507,7 +507,7 @@ ssl_validate_version ()
 /*  ------------------- Can be called from semantic operations ----------- */
 
 void
-ssl_fatal ( char* msg )
+ssl_fatal ( const char* msg )
 {
     char tmpbuf[256];
 
@@ -550,7 +550,7 @@ ssl_print_input_position ()
 
 
 void
-ssl_error ( char* msg )
+ssl_error ( const char* msg )
 {
     ssl_error_count++;
 
@@ -562,7 +562,7 @@ ssl_error ( char* msg )
 
 
 void
-ssl_warning ( char* msg )
+ssl_warning ( const char* msg )
 {
     ssl_print_input_position ();
     printf ("%s on line %d\n", msg, ssl_token.lineNumber);
@@ -590,7 +590,7 @@ ssl_print_token()
 
 /*  ------------------- For use by debugger ------------------- */
 
-char*
+const char*
 ssl_rule_name ( short pc )
 {
     short    i;
@@ -605,7 +605,7 @@ ssl_rule_name ( short pc )
 
 
 short
-ssl_rule_addr ( char* name )
+ssl_rule_addr ( const char* name )
 {
     short    i;
 

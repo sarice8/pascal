@@ -52,7 +52,7 @@ extern char   ssl_runtime_vrs [];
 
 struct ssl_rule_table_struct
 {
-    char  *name;
+    const char  *name;
     short  addr;
 };
 extern  struct ssl_rule_table_struct ssl_rule_table [];
@@ -60,7 +60,7 @@ extern  int    ssl_rule_table_size;
 
 struct ssl_error_table_struct
 {
-    char  *msg;
+    const char  *msg;
     short  val;
 };
 extern  struct ssl_error_table_struct ssl_error_table [];
@@ -72,7 +72,7 @@ extern  int    ssl_error_table_size;
 /*  Used to define keywords and operators  */
 struct ssl_token_table_struct
 {
-    char  *name;
+    const char  *name;
     short  code;
 };
 
@@ -114,7 +114,7 @@ void ssl_init ();
  *
  *  Returns 0 on success.
  */
-int ssl_load_program ( char* program_filename );
+int ssl_load_program ( const char* program_filename );
 
 /*
  *  Turn debugger on/off, any time during run.
@@ -132,14 +132,14 @@ void ssl_set_debug ( int debug_flag );
  */
 // Defined in debug.h - clean up
 typedef struct dbg_variables_struct dbg_variables;
-void ssl_set_debug_info ( char* debug_file, char* program_file,
+void ssl_set_debug_info ( const char* debug_file, const char* program_file,
                          int break_code, dbg_variables* debug_variables );
 
 /*
  *  Provide the application's input file.
  *  Takes effect at the next ssl_run_program() or ssl_restart().
  */
-void ssl_set_input_filename ( char* input_filename );
+void ssl_set_input_filename ( const char* input_filename );
 
 /*
  *  Determine whether the scanner is case sensitive when matching
@@ -196,7 +196,7 @@ void ssl_scanner_init_comment( const char* start_str, const char* end_str );
 /*
  *  Include another source file
  */
-void ssl_include_filename ( char* filename );
+void ssl_include_filename ( const char* filename );
 
 
 /*
@@ -239,7 +239,7 @@ int ssl_run_program ();
 /*
  *  Report a fatal message and abort.
  */
-void ssl_fatal ( char* msg );
+void ssl_fatal ( const char* msg );
 
 /*
  *  Abort.
@@ -250,7 +250,7 @@ void ssl_abort ();
  *  Report an error message, increment the error count, and
  *  continue normally (without entering error recovery mode).
  */
-void ssl_error ( char* msg );
+void ssl_error ( const char* msg );
 
 /*
  *  Abort if assertion fails.
@@ -265,12 +265,12 @@ void ssl_error ( char* msg );
  *  Code is the token code (typically pIDENTIFIER).
  *  Returns the identifier value.
  */
-short ssl_add_id ( char* name, short code );
+short ssl_add_id ( const char* name, short code );
 
 /*
  *  Return the name of a given identifier.
  */
-char* ssl_get_id_string ( long id );
+const char* ssl_get_id_string ( long id );
 
 /*
  *  Return the current line, col in the input source.
@@ -292,17 +292,17 @@ int  ssl_restart ();
 void ssl_cleanup ();
 int ssl_walkTable();
 
-char* ssl_rule_name ( short addr );
-short ssl_rule_addr ( char* name );
+const char* ssl_rule_name ( short addr );
+short ssl_rule_addr ( const char* name );
 
 /*  In scanner */
-char* ssl_get_code_name ( short code );
+const char* ssl_get_code_name ( short code );
 void ssl_accept_token ();
 
 /*  Used by ssl_begin.h  */
 void ssl_error_signal( short error_code );
-void ssl_warning( char* msg );
-void ssl_error( char* msg );
+void ssl_warning( const char* msg );
+void ssl_error( const char* msg );
 void ssl_assert_fun( int expr, int line_num );
 
 /*  For debugging  */
@@ -389,7 +389,7 @@ extern char  ssl_last_id_text [];
 #define ssl_id_table_size      4000
 struct ssl_id_table_struct
 {
-    char  *name;
+    const char  *name;
     short  namelen;
     short  code;
 };
