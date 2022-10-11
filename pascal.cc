@@ -848,8 +848,15 @@ Node dNode;  // temporary for several mechanisms
 
      /* Mechanism code_mech */
 
-     case oCodeNew :
-            ssl_result = (intptr_t) new CodeStream;
+     case oCodeNew : {
+            CodeStream* code = new CodeStream;
+            // For now, SSL/schema don't directly use CodeStream*.
+            // They use integer id's.  That's because schema doesn't support
+            // client pointers yet.
+            int codeId = codeStreams.size();
+            codeStreams.push_back( code );
+            ssl_result = codeId;
+            }
             continue;
     case oCodePush : {
             CodeStream* code = codeStreams[ssl_param];
