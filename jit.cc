@@ -18,25 +18,20 @@ I have these problems.
 
   - not confident that I have the ';' syntax right.
 
-  - calling convention to standard external code;
-      - only properly implemented for 1-parameter calls to writeln etc.
-        More work needed for general function parameters and return value etc.
+  - calling convention to standard external code.
+      - only properly implemented for calls whose params fit in registers.  No complex types.
       - hardcoded for linux.  win64 version not implemented or triggered yet.
-      - when do I need to promote boolean param to int?  Not if extern is explicitly bool.
+      - Stack-based params need to be aligned to 8-byte slots.
 
-      My current plan for extern (native code) functions:
-      t code has my usual pascal calling convention for the parameters and return value.
+      My current approach for calling cdecl (native code) functions:
+      tCode has my usual pascal calling convention for the parameters and return value.
       i.e. it copies params into actuals space on the stack.  Only difference is
-      tCallExtern <externMethodIdentifier> rather than tCall <tCodeLabel>.
-      The identifier might be a hardcoded id, or maybe addr of a string literal that jit can look up.
-      Jit will need to find the function definition for the extern, via some other means,
-      given the identifier.
+      tCallCdecl <extern label> rather than tCall <label>.
       Jit will generate code to load the params from the stack (where I put them)
       into the necessary registers, and vice versa for the return value.
       It's not the most efficient, but it means the tcode doesn't depend on the platform
       (which have different calling conventions).  Maybe later I do need some sort of
-      param tcode, that could help make this work better, but this should be an ok start.
-
+      param tcode, that could help make this work better, but this is ok to start with.
 
   - I should support emitMov( int, byte ) e.g. for passing a byte to an extern method taking int,
       where that should be allowed.  Just need the appropriate movsx instruction.
@@ -75,6 +70,7 @@ file type not implemented.
 enum type not implemented.
 set type not implemented.
 unions ( "case" inside record definition )
+case statement
 
 goto / label
 exit[(value)] - an extension to leave a procedure / function (with optional return value) / program.
@@ -628,6 +624,7 @@ extern void runlibUpdateScreen();
 extern void runlibSetPixel( int x, int y, int color );
 extern int  runlibGetPixel( int x, int y );
 extern void runlibDelay( int milliseconds );
+extern int  runlibWaitKey();
 
 
 // For now, I have a hardcoded list of available external methods.
@@ -638,6 +635,7 @@ std::unordered_map<std::string, void*> runlibMethods = {
   { "runlibSetPixel", (void*) runlibSetPixel },
   { "runlibGetPixel", (void*) runlibGetPixel },
   { "runlibDelay", (void*) runlibDelay },
+  { "runlibWaitKey", (void*) runlibWaitKey },
 };
 
 
@@ -4066,6 +4064,38 @@ runlibDelay( int milliseconds )
   runlibUpdateScreen();
   SDL_Delay( milliseconds );
 }
+
+// Waits for a key to be pressed.
+// Returns the SDL_Keycode of the key that was hit.
+// (That's a slightly more generic form of scancode.)
+//
+// Note, the SDL graphical window needs to be in focus,
+// not the terminal window.  I'm not sure if SDL keyboard events
+// can be used without a graphical window.
+//
+int
+runlibWaitKey()
+{
+  // uses SDL, so need at least SDL_Init
+  grLazyInit();
+  // Also before we wait, bring the screen up-to-date, similar to runlibDelay().
+  runlibUpdateScreen();
+
+  SDL_Event event;
+  while ( true ) {
+    SDL_WaitEvent( &event );
+
+    if ( event.type == SDL_KEYDOWN ) {
+      // Maybe: ignore if event.key.repeat != 0 because that's a repeat
+      // "Note: if you are looking for translated character input,
+      //   see the SDL_TEXTINPUT event."
+      // SDL_Scancode = event.key.keysym.scancode;
+      SDL_Keycode sym = event.key.keysym.sym; // SDL virtual key code
+      return (int) sym;
+    }
+  }
+}
+
 
 // ----------------------------------------------------------------------------
 

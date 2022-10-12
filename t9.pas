@@ -23,6 +23,9 @@ procedure setPixel( x, y : integer; color : integer ); cdecl; external 'runlib' 
 function getPixel( x, y : integer ) : integer; cdecl; external 'runlib' name 'runlibGetPixel';
 procedure delay( milliseconds : integer ); cdecl; external 'runlib' name 'runlibDelay';
 
+// Wait for a key, and return its scan code.  Scan codes defined by SDL2.
+// TO DO: should return both ascii char and scan code.
+function waitKey : integer; cdecl; external 'runlib' name 'runlibWaitKey';
 
 // ----------------------------------------------------------------
 
@@ -284,11 +287,12 @@ function rgb( r, g, b : integer ) : integer;
 
 
 var r1 : rTwoInts;
-var x : integer;
-var color : integer;
-var color2 : integer;
-var r : integer;
-var c : integer;
+    x : integer;
+    color : integer;
+    color2 : integer;
+    r : integer;
+    c : integer;
+    sc : integer;
 
 var fstep, fx, fy, dx, dy, loopCount : integer;
 
@@ -334,6 +338,10 @@ BEGIN
 
   // Draw( 20, 20, 80, 20, color );
   // Draw( 20, 20, 40, 30, color );
+
+  writeln( 'Hit a key to begin ...' );
+  sc := waitKey;
+  writeln( '  sc = ', sc );
 
   fx := 50;
   fy := 50;
