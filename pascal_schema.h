@@ -50,6 +50,7 @@ typedef enum {
     qChildScope,
     qBodyDefined,
     qExternal,
+    qExternalName,
     qCdecl,
     qCalled,
     qOldParams,
@@ -78,6 +79,7 @@ typedef enum {
 #define GetqChildScope(N)		(Node)	GetAttr(N, qChildScope)
 #define GetqBodyDefined(N)		(Boolean1)	(intptr_t) GetAttr(N, qBodyDefined)
 #define GetqExternal(N)		(Boolean1)	(intptr_t) GetAttr(N, qExternal)
+#define GetqExternalName(N)		(StringN)	GetAttr(N, qExternalName)
 #define GetqCdecl(N)		(Boolean1)	(intptr_t) GetAttr(N, qCdecl)
 #define GetqCalled(N)		(Boolean1)	(intptr_t) GetAttr(N, qCalled)
 #define GetqOldParams(N)		(Node)	GetAttr(N, qOldParams)
@@ -104,6 +106,7 @@ typedef enum {
 #define SetqChildScope(N,V)		SetAttr(N, qChildScope, V)
 #define SetqBodyDefined(N,V)		SetAttr(N, qBodyDefined, (void*)(intptr_t)(V))
 #define SetqExternal(N,V)		SetAttr(N, qExternal, (void*)(intptr_t)(V))
+#define SetqExternalName(N,V)		SetAttr(N, qExternalName, V)
 #define SetqCdecl(N,V)		SetAttr(N, qCdecl, (void*)(intptr_t)(V))
 #define SetqCalled(N,V)		SetAttr(N, qCalled, (void*)(intptr_t)(V))
 #define SetqOldParams(N,V)		SetAttr(N, qOldParams, V)

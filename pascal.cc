@@ -512,6 +512,9 @@ Node dNode;  // temporary for several mechanisms
     case oNodeSet:
             SetAttr ((Node)ssl_argv(0,3), ssl_argv(1,3), (Node)ssl_argv(2,3));
             continue;
+    case oNodeSetString:
+            SetAttr ((Node)ssl_argv(0,3), ssl_argv(1,3), (void*)ssl_argv(2,3));
+            continue;
     case oNodeSetInt:
     case oNodeSetBoolean:
     case oNodeSetKind:
@@ -520,6 +523,9 @@ Node dNode;  // temporary for several mechanisms
             SetValue ((Node)ssl_argv(0,3), ssl_argv(1,3), ssl_argv(2,3));
             continue;
     case oNodeGet:
+            ssl_result = (long) GetAttr ((Node)ssl_argv(0,2), ssl_argv(1,2));
+            continue;
+    case oNodeGetString:
             ssl_result = (long) GetAttr ((Node)ssl_argv(0,2), ssl_argv(1,2));
             continue;
     case oNodeGetInt:
@@ -668,6 +674,13 @@ Node dNode;  // temporary for several mechanisms
     case equal_zero :
             ssl_result = (ssl_param == 0);
             continue;
+    case equal_string : {
+            const char* str1 = (const char*) ssl_argv(0,2);
+            const char* str2 = (const char*) ssl_argv(1,2);
+            ssl_result = ( str1 == nullptr && str2 == nullptr ) ||
+                         ( str1 != nullptr && str2 != nullptr && strcmp( str1, str2 ) == 0 );
+            continue;
+            }
     case equal_node_type :
             ssl_result = (ssl_argv(0,2) == ssl_argv(1,2));
             continue;
@@ -688,6 +701,12 @@ Node dNode;  // temporary for several mechanisms
             continue;
     case LAST_ID :
             ssl_result = ssl_last_id;
+            continue;
+    case ID_STRING :
+            ssl_result = (long) ssl_get_id_string( ssl_param );
+            continue;
+    case CURRENT_STRLIT :
+            ssl_result = (long) ssl_strlit_buffer;
             continue;
 
 
@@ -923,20 +942,13 @@ Node dNode;  // temporary for several mechanisms
             // since I don't know on the first pass how big each section will be.
             // And with multiple output object files, relocation tables would need to be resolved by
             // a linker.   Leaving all that aside for now.
-
-            char* sourceStr = ssl_strlit_buffer;
-            int sourceLen = ssl_token.namelen + 1;  // +1 for '\0'
+            //  char* sourceStr = ssl_strlit_buffer;
+            // int sourceLen = ssl_token.namelen + 1;  // +1 for '\0'
+            const char* sourceStr = (const char*) ssl_param;
+            int sourceLen = strlen( sourceStr ) + 1;  // +1 for '\0'
             ssl_result = createGlobalData( sourceStr, sourceLen );
             continue;
             }
-
-     case oStringAllocLitFromIdent : {
-            const char* sourceStr = ssl_get_id_string( ssl_param );
-            int sourceLen = strlen( sourceStr) + 1;  // +1 for '\0'
-            ssl_result = createGlobalData( sourceStr, sourceLen );
-            continue;
-            }
-
 
 
      /* Mechanism loop */

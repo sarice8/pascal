@@ -56,6 +56,7 @@ nMethod =>
         qChildScope:    Node            (nScope)                [Pri,Opt]
         qBodyDefined:   Boolean1
         qExternal:      Boolean1
+        qExternalName:  StringN
         qCdecl:         Boolean1
         qCalled:        Boolean1     % has anybody called this method
 

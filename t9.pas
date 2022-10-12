@@ -11,17 +11,17 @@ program test (input, output);
 // These are declared as cdecl external.
 
 // Erase the graphics buffer.
-procedure clearScreen; cdecl; external;
+procedure clearScreen; cdecl; external 'runlib' name 'runlibClearScreen';
 
 // Show any updates in the graphics buffer to the screen.
 // (This is also done under the hood by Delay and read.)
-procedure updateScreen; cdecl; external;
+procedure updateScreen; cdecl; external 'runlib' name 'runlibUpdateScreen';
 
 // Set a pixel
 procedure setPixel( x, y : integer; color : integer ); cdecl; external 'runlib' name 'runlibSetPixel';
 // Get the color of a pixel
-function getPixel( x, y : integer ) : integer; cdecl; external;
-procedure delay( milliseconds : integer ); cdecl; external;
+function getPixel( x, y : integer ) : integer; cdecl; external 'runlib' name 'runlibGetPixel';
+procedure delay( milliseconds : integer ); cdecl; external 'runlib' name 'runlibDelay';
 
 
 // ----------------------------------------------------------------

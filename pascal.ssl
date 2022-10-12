@@ -275,6 +275,11 @@ type Code:
    codeDefault = 1
    ;
 
+% A string
+type String:
+   stringNull = 0
+   ;
+
 
 % Some general schema node operations.
 % node_type and node_attribute are defined in generated file pascal_schema.ssl included above.
@@ -282,12 +287,14 @@ type Code:
 mechanism node_mech:
     oNodeNew (node_type) >> Node         % create new node
     oNodeSet (Node, node_attribute, Node)   % set Node attribute of node
+    oNodeSetString (Node, node_attribute, String)
     oNodeSetInt (Node, node_attribute, int) % set int attribute of node
     oNodeSetBoolean (Node, node_attribute, boolean)
     oNodeSetKind (Node, node_attribute, kind) % set attribute of node  *** MIGHT NOT NEED
     oNodeSetLabel( Node, node_attribute, Label )  % set Label attribute of node
     oNodeSetCode( Node, node_attribute, Code )    % set Code attribute of node
     oNodeGet (Node, node_attribute) >> Node    % get Node attribute of node
+    oNodeGetString (Node, node_attribute) >> String
     oNodeGetInt (Node, node_attribute) >> int  % get int attribute of node
     oNodeGetBoolean (Node, node_attribute) >> boolean  % get int attribute of node
     oNodeGetLabel (Node, node_attribute) >> Label      % get Label attribute of node
@@ -332,6 +339,7 @@ mechanism math:
     multiply( int x, int y ) >> int     % x * y
     equal( int x, int y ) >> boolean
     equal_zero (int) >> boolean
+    equal_string( String, String ) >> boolean
     equal_node_type (node_type, node_type) >> boolean     % Want equal_<type> for every type
     equal_label( Label, Label ) >> boolean
     equal_code( Code, Code ) >> boolean
@@ -341,6 +349,8 @@ mechanism math:
 mechanism more_builtins:      % These should be built-in SSL operations
     TOKEN_VALUE >> int        % value of just accepted token, e.g. IntLit token
     LAST_ID >> int            % id number of last accepted identifier
+    ID_STRING( int id ) >> String       % text name of identifier with given id
+    CURRENT_STRLIT >> String            % text value of just-accepted string literal
     ;
 
 mechanism scope_mech:
@@ -407,9 +417,7 @@ mechanism value :              % value stack, to calc. const expr's
    oValuePop;
 
 mechanism string :
-   oStringAllocLit >> int      % alloc global space for strlit, return address
-   oStringAllocLitFromIdent( int id ) >> int  % alloc global space for strlit taken from name of ident;
-                                              %  return address
+   oStringAllocLit( String ) >> int      % alloc global space for strlit, return address
    ;
 
 % track labels for the loop we're in, if any
@@ -649,8 +657,7 @@ ExternalDecl( Node decl ):
                pStrLit
                % that was the optional method name defined in that library,
                % which might differ from the Pascal name.
-               % TO DO: I'm currently ignoring this.
-               %        Unfortunately my schema system doesn't support string fields yet!
+               oNodeSetString( decl, qExternalName, CURRENT_STRLIT )
             | * :
          ]
       | * :
@@ -1552,7 +1559,7 @@ PrimaryAllowCF( out Label falseLabel ):
          ')'
 
       | pStrLit :
-         int addr = oStringAllocLit     % store in global data
+         int addr = oStringAllocLit( CURRENT_STRLIT )     % store in global data
          .tPushAddrGlobal oEmitInt( addr )
          % TO DO: do we need to create a type with the literal's length?
          oTypeSPush( StringType )
@@ -1809,6 +1816,22 @@ CoerceType:
    ;
 
 
+% Called on first use of an extern method
+%
+DefineExternLabel( Node method ):
+   % The extern name might be given explicitly, otherwise the pascal method name.
+   int strAddr
+   String externalName = oNodeGetString( method, qExternalName )
+   [ equal_string( externalName, stringNull )
+      | true :
+         strAddr = oStringAllocLit( ID_STRING( oNodeGetInt( method, qIdent ) ) )
+      | false :
+         strAddr = oStringAllocLit( externalName )
+   ]
+   .tLabelExtern  @EmitValue( method )  oEmitInt( strAddr )
+   ;
+
+
 % Parse a call, given an nProc or nFunc for the just-accepted identifier.
 % If a func, this will also generate the code to push the return value on the expr stack,
 % and push the return type on the type stack.
@@ -1821,9 +1844,8 @@ Call( Node method ):
       | true :
          [ oNodeGetBoolean( method, qCalled )
             | false :
-               % define the label as extern
-               int strAddr = oStringAllocLitFromIdent( oNodeGetInt( method, qIdent ) )
-               .tLabelExtern  @EmitValue( method )  oEmitInt( strAddr )
+               % define the extern label on first use
+               @DefineExternLabel( method )
             | * :
          ]
      | * :

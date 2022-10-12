@@ -630,6 +630,17 @@ extern int  runlibGetPixel( int x, int y );
 extern void runlibDelay( int milliseconds );
 
 
+// For now, I have a hardcoded list of available external methods.
+//
+std::unordered_map<std::string, void*> runlibMethods = {
+  { "runlibClearScreen", (void*) runlibClearScreen },
+  { "runlibUpdateScreen", (void*) runlibUpdateScreen },
+  { "runlibSetPixel", (void*) runlibSetPixel },
+  { "runlibGetPixel", (void*) runlibGetPixel },
+  { "runlibDelay", (void*) runlibDelay },
+};
+
+
 int
 main( int argc, char* argv[] )
 {
@@ -1950,20 +1961,9 @@ defineLabelAlias( int label, int aliasToLabel )
 void
 defineLabelExtern( int label, char* name )
 {
-  // For now, I have a hardcoded list of available external methods.
-  // Using the Pascal name rather than the (optional) native name,
-  // because I don't support string attributes in the front end symbol table schema yet!
-  // 
-  if ( strcmp( name, "clearScreen" ) == 0 ) {
-    labels[label] = (char*) runlibClearScreen;
-  } else if ( strcmp( name, "updateScreen" ) == 0 ) {
-    labels[label] = (char*) runlibUpdateScreen;
-  } else if ( strcmp( name, "setPixel" ) == 0 ) {
-    labels[label] = (char*) runlibSetPixel;
-  } else if ( strcmp( name, "getPixel" ) == 0 ) {
-    labels[label] = (char*) runlibGetPixel;
-  } else if ( strcmp( name, "delay" ) == 0 ) {
-    labels[label] = (char*) runlibDelay;
+  auto it = runlibMethods.find( std::string(name) );
+  if ( it != runlibMethods.end() ) {
+    labels[label] = (char*) it->second;
   } else {
     unresolvedExternLabels[label] = name;
   }

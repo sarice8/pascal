@@ -47,6 +47,7 @@ type node_attribute:
 	qChildScope
 	qBodyDefined
 	qExternal
+	qExternalName
 	qCdecl
 	qCalled
 	qOldParams
