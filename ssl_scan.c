@@ -43,18 +43,18 @@ char    ssl_line_buffer [ssl_line_size];
 char    ssl_strlit_buffer [SSL_STRLIT_SIZE+1];
 
 struct  ssl_id_table_struct ssl_id_table [ssl_id_table_size];
-short   ssl_id_table_next;
+int     ssl_id_table_next;
 
 
 #define ssl_id_buffer_size     5000        /* identifier string space       */
 char   *ssl_id_buffer;                     /* Multiple buffers may be allocated */
-short   ssl_id_buffer_next;
+int     ssl_id_buffer_next;
 
 
-short  ssl_line_number;
+int    ssl_line_number;
 char   ssl_line_listed;
 
-short  ssl_last_id;                     /* last accepted identifier      */
+int    ssl_last_id;                     /* last accepted identifier      */
 char   ssl_last_id_text [SSL_NAME_SIZE+1];
 
 
@@ -77,7 +77,7 @@ static char   s_blank  [256];
 static char   s_id_start[256];
 static char   s_id_cont [256];
 static char   s_digit  [256];
-static short  s_punct  [256];
+static int    s_punct  [256];
 static char   s_punct_multi [256];
 static char   s_potential_comment_start[256];
 
@@ -234,8 +234,7 @@ ssl_reset_input ()
 
 
 void
-ssl_include_filename (include_filename)
-char                 *include_filename;
+ssl_include_filename( const char* include_filename )
 {
     if (s_including_file)
         ssl_fatal ("Nested includes are not yet supported");
@@ -309,7 +308,7 @@ void
 ssl_get_next_token ()
 {
     char        *p;
-    short        lit;
+    int          lit;
     int          i;
     int          longest_match_idx;
     int          longest_match_len;
@@ -576,9 +575,7 @@ s_hit_eof ()
 /* Used by debugger: get current input file position */
 
 void
-ssl_get_input_position (line_ptr, col_ptr)
-short                  *line_ptr;
-short                  *col_ptr;
+ssl_get_input_position (int* line_ptr, int* col_ptr)
 {
     if (ssl_token.accepted == 0)
     {
@@ -610,11 +607,10 @@ short                  *col_ptr;
 *****************************************************************************
 */
 
-short ssl_add_id (name, code)
-char          *name;
-short          code;
+int
+ssl_add_id( const char* name, int code )
 {
-    short          namelen;
+    int          namelen;
 
     if (ssl_id_table_next >= ssl_id_table_size)
         ssl_fatal("id table overflow");
@@ -657,8 +653,9 @@ short          code;
 void
 s_lookup_id ()
 {
-    short              i;
-    register char     *a, *b;
+    int i;
+    const char* a;
+    const char* b;
 
     if (ssl_case_sensitive)
     {
@@ -707,11 +704,11 @@ s_lookup_id ()
 
 /*  return description of token code  */
 
-char*
-ssl_get_code_name ( short code )
+const char*
+ssl_get_code_name ( int code )
 {
     static char   buffer [50];
-    char         *p;
+    const char*   p;
     int           i;
 
     p = NULL;
@@ -764,8 +761,8 @@ ssl_get_code_name ( short code )
 }
 
 
-char *ssl_get_id_string (id)
-long id;
+const char*
+ssl_get_id_string( long id )
 {
     if (id > 0)
         return (ssl_id_table [id].name);

@@ -65,7 +65,7 @@ static char sccsid[] = "%W% %G% %U% %P%";
  *                                     SSL compiler */
  *     or
  *         #include "program.h"
- *         short ssl_code_table [SSL_CODE_TABLE_SIZE];  /* Application defines table space */
+ *         int  ssl_code_table [SSL_CODE_TABLE_SIZE];  /* Application defines table space */
  *         int   ssl_code_table_size = SSL_CODE_TABLE_SIZE;
  *         char  ssl_title_string [256];                /*   and space for title. */
  *         char  ssl_runtime_vrs  [256];                /*   and space for runtime version. */
@@ -117,19 +117,19 @@ jmp_buf  ssl_fatal_jmp_buf;
 /* Defined in ssl_rt.h for now */
 /* #define  ssl_stackSize    200 */
 
-short    ssl_stack [ssl_stackSize];       /* Call stack */
-short    ssl_sp;
+int      ssl_stack [ssl_stackSize];       /* Call stack */
+int      ssl_sp;
 
 long     ssl_var_stack [ssl_var_stackSize];  /* Variable stack */
 long     ssl_var_sp;                      /* Var stack sp */
 long     ssl_var_fp;                      /* Var stack frame pointer, used by Rule calls */
 
-short    ssl_pc;                          /* program counter                */
-short    ssl_tmp;                         /* used for error recovery        */
+int      ssl_pc;                          /* program counter                */
+int      ssl_tmp;                         /* used for error recovery        */
 long     ssl_result;                      /* value from oSetResult          */
-short    ssl_choice_options;              /* number of choice options       */
+int      ssl_choice_options;              /* number of choice options       */
 char     ssl_error_buffer[256];           /* err message construction area  */
-short    ssl_error_count;                 /* number of err signals emitted  */
+int      ssl_error_count;                 /* number of err signals emitted  */
 int      ssl_walking;                     /* currently in walker            */
 FILE    *ssl_src_file;                    /* application's input file       */
 
@@ -142,8 +142,8 @@ int      ssl_case_sensitive;              /* scanner is case sensitive      */
 void   (*ssl_listing_callback)();         /* func provided to list source   */
 void   (*ssl_init_operations_callback)(); /* func provided to init operations */
 
-short    ssl_recovery_token;              /* synch token for error recovery */
-short    ssl_eof_token;                   /* EOF token for error recovery   */
+int      ssl_recovery_token;              /* synch token for error recovery */
+int      ssl_eof_token;                   /* EOF token for error recovery   */
 
 
 /*  Information for the debugger  */
@@ -252,7 +252,7 @@ ssl_set_init_operations_callback ( void (*init_operations_callback)() )
 
 
 void
-ssl_set_recovery_token ( short recovery_token )
+ssl_set_recovery_token ( int recovery_token )
 {
     ssl_recovery_token = recovery_token;
 }
@@ -418,9 +418,9 @@ ssl_load_program ( const char* program_filename )
 /*  ------------ Internal functions to support execution ------------- */
 
 void
-ssl_error_signal ( short error_code )
+ssl_error_signal ( int error_code )
 {
-    short i;
+    int i;
 
     i = error_code;
     if (ssl_error_table[i].val != i)
@@ -449,7 +449,7 @@ ssl_assert_fun ( int expr, int line_num )
 void
 ssl_traceback()
 {
-    short i;
+    int i;
 
     printf("SSL Traceback:\n");
     printf("%d\t%s\n", ssl_pc, ssl_rule_name(ssl_pc));
@@ -534,7 +534,7 @@ void
 ssl_print_input_position ()
 {
   char *p,spaceBuf[256];
-  short col;
+  int col;
 
   printf("%s",ssl_line_buffer);
   for (p = spaceBuf, col = 0; col < ssl_token.colNumber; col++)
@@ -591,9 +591,9 @@ ssl_print_token()
 /*  ------------------- For use by debugger ------------------- */
 
 const char*
-ssl_rule_name ( short pc )
+ssl_rule_name ( int pc )
 {
-    short    i;
+    int    i;
 
     for (i = 1; i < ssl_rule_table_size; i++)
     {
@@ -604,10 +604,10 @@ ssl_rule_name ( short pc )
 }
 
 
-short
+int
 ssl_rule_addr ( const char* name )
 {
-    short    i;
+    int    i;
 
     for (i = 0; i < ssl_rule_table_size; i++)
     {
@@ -615,7 +615,7 @@ ssl_rule_addr ( const char* name )
             return (ssl_rule_table[i].addr);
     }
     printf ("Unknown rule name: '%s'\n", name);
-    return ((short) -1);
+    return -1;
 }
 
 

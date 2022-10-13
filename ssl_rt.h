@@ -45,7 +45,7 @@ static char sccsid[] = "%W% %G% %U% %P%";
  * --------------------------------------------------------------------------
  */
 
-extern short  ssl_code_table [];
+extern int    ssl_code_table [];
 extern int    ssl_code_table_size;
 extern char   ssl_title_string [];
 extern char   ssl_runtime_vrs [];
@@ -53,7 +53,7 @@ extern char   ssl_runtime_vrs [];
 struct ssl_rule_table_struct
 {
     const char  *name;
-    short  addr;
+    int    addr;
 };
 extern  struct ssl_rule_table_struct ssl_rule_table [];
 extern  int    ssl_rule_table_size;
@@ -61,7 +61,7 @@ extern  int    ssl_rule_table_size;
 struct ssl_error_table_struct
 {
     const char  *msg;
-    short  val;
+    int    val;
 };
 extern  struct ssl_error_table_struct ssl_error_table [];
 extern  int    ssl_error_table_size;
@@ -73,18 +73,18 @@ extern  int    ssl_error_table_size;
 struct ssl_token_table_struct
 {
     const char  *name;
-    short  code;
+    int    code;
 };
 
 /*  Used to define special token codes  */
 struct ssl_special_codes_struct
 {
-    short  invalid;    /* invalid token */
-    short  eof;        /* end of file */
-    short  ident;      /* identifier */
-    short  intlit;     /* integer literal */
-    short  strlit;     /* string literal */
-    short  reallit;    /* float literal */
+    int    invalid;    /* invalid token */
+    int    eof;        /* end of file */
+    int    ident;      /* identifier */
+    int    intlit;     /* integer literal */
+    int    strlit;     /* string literal */
+    int    reallit;    /* float literal */
 };
 
 /*
@@ -105,7 +105,7 @@ void ssl_init ();
  *
  *  The application must define the table variable in its own file:
  *
- *  short ssl_code_table [SSL_CODE_TABLE_SIZE + (some margin for growth) ];
+ *  int   ssl_code_table [SSL_CODE_TABLE_SIZE + (some margin for growth) ];
  *  int   ssl_code_table_size;   -- will be set to actual size
  *  char  ssl_title_string [256];
  *  char  ssl_runtime_vrs [256];
@@ -172,7 +172,7 @@ void ssl_set_init_operations_callback ( void (*init_operations_callback)() );
  *  Set the synchronization token used in error recovery
  *  (for example, pSemicolon)
  */
-void ssl_set_recovery_token ( short recovery_token );
+void ssl_set_recovery_token ( int recovery_token );
 
 
 /*
@@ -265,7 +265,7 @@ void ssl_error ( const char* msg );
  *  Code is the token code (typically pIDENTIFIER).
  *  Returns the identifier value.
  */
-short ssl_add_id ( const char* name, short code );
+int ssl_add_id ( const char* name, int code );
 
 /*
  *  Return the name of a given identifier.
@@ -276,7 +276,7 @@ const char* ssl_get_id_string ( long id );
  *  Return the current line, col in the input source.
  *  (Used by the debugger)
  */
-void ssl_get_input_position ( short* line_ptr, short* col_ptr );
+void ssl_get_input_position ( int* line_ptr, int* col_ptr );
 
 /*
  * --------------------------------------------------------------------------
@@ -292,15 +292,15 @@ int  ssl_restart ();
 void ssl_cleanup ();
 int ssl_walkTable();
 
-const char* ssl_rule_name ( short addr );
-short ssl_rule_addr ( const char* name );
+const char* ssl_rule_name ( int addr );
+int ssl_rule_addr ( const char* name );
 
 /*  In scanner */
-const char* ssl_get_code_name ( short code );
+const char* ssl_get_code_name ( int code );
 void ssl_accept_token ();
 
 /*  Used by ssl_begin.h  */
-void ssl_error_signal( short error_code );
+void ssl_error_signal( int error_code );
 void ssl_warning( const char* msg );
 void ssl_error( const char* msg );
 void ssl_assert_fun( int expr, int line_num );
@@ -320,20 +320,20 @@ void ssl_print_input_position();
 
 /*  --- ssl_rt ---  */
 
-extern short    ssl_recovery_token;
-extern short    ssl_eof_token;
+extern int      ssl_recovery_token;
+extern int      ssl_eof_token;
 
 extern char     ssl_input_filename [];
 extern int      ssl_debug;
 
-extern short    ssl_pc;
-extern short    ssl_tmp;
-extern short    ssl_choice_options;
+extern int      ssl_pc;
+extern int      ssl_tmp;
+extern int      ssl_choice_options;
 extern char     ssl_error_buffer[];
 extern int      ssl_walking;
 
-extern short    ssl_sp;
-extern short    ssl_stack [];
+extern int      ssl_sp;
+extern int      ssl_stack [];
 #define         ssl_stackSize  200     /* Need to define elsewhere */
 
 extern long     ssl_var_stack [];
@@ -342,7 +342,7 @@ extern long     ssl_var_fp;
 extern long     ssl_result;
 #define         ssl_var_stackSize 5000   /* Define elsewhere */
 
-extern short    ssl_error_count;
+extern int      ssl_error_count;
 
 /*  Should set this in ssl_rt.c to avoid need for <setjmp.h> in application */
 #include <setjmp.h>
@@ -365,11 +365,11 @@ struct ssl_token_struct
 {
     char  accepted;
     char  name[SSL_NAME_SIZE+1];
-    short namelen;
-    short val;       /* id #, int lit, etc */
-    short code;      /* input token code (pIdent, pIntLit, etc) */
-    short lineNumber;
-    short colNumber;
+    int   namelen;
+    int   val;       /* id #, int lit, etc */
+    int   code;      /* input token code (pIdent, pIntLit, etc) */
+    int   lineNumber;
+    int   colNumber;
 };
 extern struct ssl_token_struct    ssl_token;
 
@@ -380,20 +380,20 @@ void ssl_restart_scanner();
 void ssl_get_next_token();
 #define ssl_get_token()  { if (ssl_token.accepted) ssl_get_next_token(); }
 
-extern short ssl_line_number;  /* Current line of scanner */
+extern int   ssl_line_number;  /* Current line of scanner */
 extern char  ssl_line_listed;  /* Should be walker var, not scanner */
 
-extern short ssl_last_id;      /* Should be walker var, not scanner */
+extern int   ssl_last_id;      /* Should be walker var, not scanner */
 extern char  ssl_last_id_text [];
 
 #define ssl_id_table_size      4000
 struct ssl_id_table_struct
 {
     const char  *name;
-    short  namelen;
-    short  code;
+    int    namelen;
+    int    code;
 };
 extern struct ssl_id_table_struct ssl_id_table[];
-extern short  ssl_id_table_next;
+extern int    ssl_id_table_next;
 
 #endif
