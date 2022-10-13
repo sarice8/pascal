@@ -27,6 +27,15 @@ procedure delay( milliseconds : integer ); cdecl; external 'runlib' name 'runlib
 // TO DO: should return both ascii char and scan code.
 function waitKey : integer; cdecl; external 'runlib' name 'runlibWaitKey';
 
+// Key codes that could be returned by waitKey
+const KEY_RIGHT = 1073741903;
+const KEY_LEFT = 1073741904;
+const KEY_DOWN = 1073741905;
+const KEY_UP = 1073741906;
+const KEY_ENTER = 13;
+const KEY_ESC = 27;
+const KEY_SPACE = 32;
+
 // ----------------------------------------------------------------
 
 
