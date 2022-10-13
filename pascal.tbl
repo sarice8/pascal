@@ -3,7 +3,7 @@
 char ssl_title_string[] = "Pascal Compiler 1.1.5 -- Jan 01 '90";
 char ssl_runtime_vrs[]  = "RT 2.0 - Variable stack - 08/27/93";
 
-short ssl_code_table[] = {
+int ssl_code_table[] = {
 	15, 8, 16, 4, 71, 23, 1, 12, 74, 24, 7, 6127, 4, 44, 9, 0, 
 	12, 50, 13, 1, 22, 2, 12, 93, 24, 4, 38, 9, 0, 12, 50, 13, 
 	1, 4, 41, 19, 2, 12, 51, 13, 1, 4, 40, 9, 0, 12, 50, 13, 
