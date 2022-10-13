@@ -339,6 +339,7 @@ mechanism math:
     multiply( int x, int y ) >> int     % x * y
     equal( int x, int y ) >> boolean
     equal_zero (int) >> boolean
+    equal_node( Node, Node ) >> boolean
     equal_string( String, String ) >> boolean
     equal_node_type (node_type, node_type) >> boolean     % Want equal_<type> for every type
     equal_label( Label, Label ) >> boolean
@@ -442,6 +443,7 @@ rules
 % ----------------------------- Global Variables ----------------------------
 
 Node    globalScope            % global nScope
+Node    mainRoutineScope       % scope for temporaries in main routine
 
 % built-in nTypes
 Node    FileType
@@ -533,18 +535,24 @@ Program:
    ]
    ';'
 
-   @BlockDecls( nGlobalVar )
-
-   % a new scope just for temporaries in the main routine
-   Node varScope = oScopeCurrent
+   % A new scope just for temporaries in the main routine
+   % Create it up front, in case it's needed by variable initialization exprs.
+   % But we won't stay in it here.
    oScopeBegin
+   mainRoutineScope = oScopeCurrent
    oNodeSetBoolean( oScopeCurrent, qAllocDown, true )
    oNodeSet( progDecl, qMainRoutineScope, oScopeCurrent )
+   oScopeEnd
+
+   @BlockDecls( nGlobalVar )
+
+
+   oScopeEnter( mainRoutineScope )
 
    % The block statement includes a stack frame, and enter/return,
    % even for the main routine.
    % That will be necessary for temporaries allocated in the main routine.
-   @BlockStmt( mainLabel, varScope )
+   @BlockStmt( mainLabel, globalScope )
 
    oScopeEnd   % main routine scope
 
@@ -984,11 +992,29 @@ VarDecl( node_type varNodeType ):
                % we need an initCode stream for this scope
                Code initCode = @GetOrCreateInitCode
                oCodePush( initCode )
+
+               % currently the global level has two scopes:
+               % the one for declarations e.g. vars and methods,
+               % and a second one for temporaries needed by the main block stmt.
+               % During evaluation of the init expr, we need to be in the 2nd scope
+               % in case the expression requires temporaries
+               % (so the temporaries get allocated in the right scope).
+               % TO DO: Maybe I should make the global scope the special case, instead.
+               boolean changedScope = false
+               [ equal_node( oScopeCurrent, globalScope )
+                  | true : oScopeEnter( mainRoutineScope )
+                           changedScope = true
+                  | * :
+               ]
                % generate assignment in initCode stream
                @LValueVar( decl )
                @Expr
                @MatchTypes
                @Assign
+               [ changedScope
+                  | true : oScopeEnd
+                  | * :
+               ]
                oCodePop
              
             | * :

@@ -249,20 +249,12 @@ function rgb( r, g, b : integer ) : integer;
 
 // Using these color values, rather than hardcoded 1 2 3
 // Not sure what the original colors were.  Look it up.
-// var color0 : integer = rgb( 0, 0, 0 );
-// var color1 : integer = rgb( 255, 255, 0 );
-// var color2 : integer = rgb( 0, 255, 255 );
-// var color3 : integer = rgb( 255, 128, 128 );
-//// I don't really have a color map mode, so this needs work
-// var colorReverse : integer = rgb( 255, 0, 0 );
-
-// I seem to have a bug when calling a function from initialization.
-// Do init in main instead.
-var color0 : integer;
-var color1 : integer;
-var color2 : integer;
-var color3 : integer;
-var colorReverse : integer;
+var color0 : integer = rgb( 0, 0, 0 );
+var color1 : integer = rgb( 255, 255, 0 );
+var color2 : integer = rgb( 0, 255, 255 );
+var color3 : integer = rgb( 255, 128, 128 );
+// I don't really have a color map mode, so this needs work
+var colorReverse : integer = rgb( 255, 0, 0 );
 
 
 
@@ -582,12 +574,6 @@ BEGIN   { Main }
     dy[5] := 1;
     dy[6] := 1;
     dy[7] := 1;
-
-    color0 := rgb( 0, 0, 0 );
-    color1 := rgb( 255, 255, 0 );
-    color2 := rgb( 0, 255, 255 );
-    color3 := rgb( 255, 128, 128 );
-    colorReverse := rgb( 255, 0, 0 );
 
     // ----------------------------------------------------
 

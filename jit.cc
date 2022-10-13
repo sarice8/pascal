@@ -13,6 +13,15 @@ BUGS
 
 I have these problems.
 
+  - function call in global variable initialization is crashing,
+    on assignment to the return value space (which should be a temporary in calling scope).
+    It's executed after we do tEnter so the parent should have a decent stack frame
+    and temporaries.  Oh, maybe I didn't bump the required temp space for that scope correctly.
+    In fact, I think the issue is that I generated the function call before I really started
+    the scope for temporaries (even though the code is inserted after the tEnter).
+    So the temporary did -not- get allocated.  I need to have the scope created earlier,
+    and toggle into it during the init expression evaluation.
+
   - my tcode file doesn't say how much static data space it needs.
   - not allowing const expression in array bound definition
 

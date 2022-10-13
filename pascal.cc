@@ -674,6 +674,9 @@ Node dNode;  // temporary for several mechanisms
     case equal_zero :
             ssl_result = (ssl_param == 0);
             continue;
+    case equal_node :
+            ssl_result = (ssl_argv(0,2) == ssl_argv(1,2));
+            continue;
     case equal_string : {
             const char* str1 = (const char*) ssl_argv(0,2);
             const char* str2 = (const char*) ssl_argv(1,2);
