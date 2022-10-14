@@ -35,6 +35,7 @@ type node_type:
 
 type node_attribute:
 	qINVALID
+	qLevel
 	qDecls
 	qSize
 	qAllocDown

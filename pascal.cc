@@ -720,6 +720,7 @@ Node dNode;  // temporary for several mechanisms
             if (++dScopeStackPtr == dScopeStackSize) ssl_fatal ("Scope Stack overflow");
             // schema 1.4 needs our help to create empty list attribute.  A bit unfriendly.
             SetAttr( dNode, qDecls, NewList(nDeclaration) );
+            SetValue( dNode, qLevel, ssl_param );
             dScopeStack[dScopeStackPtr] = dNode;
             continue;
     case oScopeEnter:

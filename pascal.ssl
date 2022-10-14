@@ -355,7 +355,8 @@ mechanism more_builtins:      % These should be built-in SSL operations
     ;
 
 mechanism scope_mech:
-    oScopeBegin                          % create a new scope. Subsequent declarations will go here.
+    oScopeBegin( int level )             % create a new scope. Subsequent declarations will go here.
+                                         %  level = static scope depth (0 = globals)
     oScopeEnter( Node scope )            % enter an existing scope.
     oScopeEnd                            % end current scope. Subsequent declarations will go to previous scope.
     oScopeCurrent >> Node                % returns current scope
@@ -491,7 +492,7 @@ ValToCF( out Label falseLabel );
 Program:
    Node t
 
-   oScopeBegin
+   oScopeBegin( 0 )
    globalScope = oScopeCurrent
 
    @installBuiltIns
@@ -538,7 +539,7 @@ Program:
    % A new scope just for temporaries in the main routine
    % Create it up front, in case it's needed by variable initialization exprs.
    % But we won't stay in it here.
-   oScopeBegin
+   oScopeBegin( 0 )
    mainRoutineScope = oScopeCurrent
    oNodeSetBoolean( oScopeCurrent, qAllocDown, true )
    oNodeSet( progDecl, qMainRoutineScope, oScopeCurrent )
@@ -713,7 +714,9 @@ ProcDecl:
          oNodeSet( decl, qParams, Null )
    ]
 
-   oScopeBegin
+   int level = oNodeGetInt( oScopeCurrent, qLevel )
+   inc( level )
+   oScopeBegin( level )
    Node paramScope = oScopeCurrent
 
    @FormalArgDecl
@@ -749,7 +752,7 @@ ProcDecl:
          oScopeEnter( paramScope )
 
          % Start scope for declarations within the proc
-         oScopeBegin
+         oScopeBegin( level )
          oNodeSetBoolean( oScopeCurrent, qAllocDown, true )
          oNodeSet( decl, qChildScope, oScopeCurrent )
 
@@ -801,7 +804,9 @@ FuncDecl:
          oNodeSet( decl, qType, Null )
    ]
 
-   oScopeBegin
+   int level = oNodeGetInt( oScopeCurrent, qLevel )
+   inc( level )
+   oScopeBegin( level )
    Node paramScope = oScopeCurrent
 
    @FormalArgDecl
@@ -844,7 +849,7 @@ FuncDecl:
          % TO DO: Perhaps I could mark the scope read-only at this point.
          oScopeEnter( paramScope )
 
-         oScopeBegin
+         oScopeBegin( level )
          oNodeSetBoolean( oScopeCurrent, qAllocDown, true )
          oNodeSet( decl, qChildScope, oScopeCurrent )
 
@@ -1129,7 +1134,7 @@ TypeRef( out Node resultType ):
 
       | pRecord :
          resultType = oNodeNew( nRecordType )
-         oScopeBegin
+         oScopeBegin( -1 )    % level is meaningless here
 
          @VarDecl( nRecordField )
 

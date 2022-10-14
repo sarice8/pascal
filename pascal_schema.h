@@ -38,6 +38,7 @@ typedef enum {
 
 typedef enum {
     qINVALID,
+    qLevel,
     qDecls,
     qSize,
     qAllocDown,
@@ -67,6 +68,7 @@ typedef enum {
 #endif /* Object */
 
 #define GetqINVALID(N)		(Integer4)	GetAttr(N, qINVALID)
+#define GetqLevel(N)		(Integer4)	(intptr_t) GetAttr(N, qLevel)
 #define GetqDecls(N)		(List)	GetAttr(N, qDecls)
 #define GetqSize(N)		(Integer4)	(intptr_t) GetAttr(N, qSize)
 #define GetqAllocDown(N)		(Boolean1)	(intptr_t) GetAttr(N, qAllocDown)
@@ -94,6 +96,7 @@ typedef enum {
 #define GetqScope(N)		(Node)	GetAttr(N, qScope)
 
 #define SetqINVALID(N,V)		SetAttr(N, qINVALID, V)
+#define SetqLevel(N,V)		SetAttr(N, qLevel, (void*)(intptr_t)(V))
 #define SetqDecls(N,V)		SetAttr(N, qDecls, V)
 #define SetqSize(N,V)		SetAttr(N, qSize, (void*)(intptr_t)(V))
 #define SetqAllocDown(N,V)		SetAttr(N, qAllocDown, (void*)(intptr_t)(V))
