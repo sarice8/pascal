@@ -1,4 +1,4 @@
-#define SSL_CODE_TABLE_SIZE 7100
+#define SSL_CODE_TABLE_SIZE 7200
 
 #define oJumpForward 0
 #define oJumpBack 1
@@ -175,6 +175,7 @@
 #define eNotCurrentFunction 20
 #define eAlreadyDefined 21
 #define eOnlyOneVarCanBeInitialized 22
+#define eExternalMethodCannotBeNested 23
 #define nINVALID 0
 #define Object 1
 #define nScope 2
@@ -301,55 +302,56 @@
 #define equal_node_type 64
 #define equal_label 65
 #define equal_code 66
-#define oMININT 67
-#define TOKEN_VALUE 68
-#define LAST_ID 69
-#define ID_STRING 70
-#define CURRENT_STRLIT 71
-#define oScopeBegin 72
-#define oScopeEnter 73
-#define oScopeEnd 74
-#define oScopeCurrent 75
-#define oScopeDeclare 76
-#define oScopeDeclareAlloc 77
-#define oScopeAllocType 78
-#define oScopeFind 79
-#define oScopeFindRequire 80
-#define oScopeFindInCurrentScope 81
-#define oTypeAdd 82
-#define oTypeSPush 83
-#define oTypeSPop 84
-#define oTypeSTop 85
-#define oTypeSNodeType 86
-#define oIdAdd_File 87
-#define oIdAdd_Integer 88
-#define oIdAdd_Boolean 89
-#define oIdAdd_Char 90
-#define oIdAdd_String 91
-#define oIdAdd_True 92
-#define oIdAdd_False 93
-#define oLabelNew 94
-#define oCodeNew 95
-#define oCodePush 96
-#define oCodePop 97
-#define oCountPush 98
-#define oCountInc 99
-#define oCountDec 100
-#define oCountIsZero 101
-#define oCountPop 102
-#define oValuePush 103
-#define oValueNegate 104
-#define oValueTop 105
-#define oValuePop 106
-#define oStringAllocLit 107
-#define oLoopPush 108
-#define oLoopContinueLabel 109
-#define oLoopBreakLabel 110
-#define oLoopPop 111
-#define oMsg 112
-#define oMsgTrace 113
-#define oMsgNode 114
-#define oMsgNodeVec 115
+#define greater 67
+#define oMININT 68
+#define TOKEN_VALUE 69
+#define LAST_ID 70
+#define ID_STRING 71
+#define CURRENT_STRLIT 72
+#define oScopeBegin 73
+#define oScopeEnter 74
+#define oScopeEnd 75
+#define oScopeCurrent 76
+#define oScopeDeclare 77
+#define oScopeDeclareAlloc 78
+#define oScopeAllocType 79
+#define oScopeFind 80
+#define oScopeFindRequire 81
+#define oScopeFindInCurrentScope 82
+#define oTypeAdd 83
+#define oTypeSPush 84
+#define oTypeSPop 85
+#define oTypeSTop 86
+#define oTypeSNodeType 87
+#define oIdAdd_File 88
+#define oIdAdd_Integer 89
+#define oIdAdd_Boolean 90
+#define oIdAdd_Char 91
+#define oIdAdd_String 92
+#define oIdAdd_True 93
+#define oIdAdd_False 94
+#define oLabelNew 95
+#define oCodeNew 96
+#define oCodePush 97
+#define oCodePop 98
+#define oCountPush 99
+#define oCountInc 100
+#define oCountDec 101
+#define oCountIsZero 102
+#define oCountPop 103
+#define oValuePush 104
+#define oValueNegate 105
+#define oValueTop 106
+#define oValuePop 107
+#define oStringAllocLit 108
+#define oLoopPush 109
+#define oLoopContinueLabel 110
+#define oLoopBreakLabel 111
+#define oLoopPop 112
+#define oMsg 113
+#define oMsgTrace 114
+#define oMsgNode 115
+#define oMsgNodeVec 116
 
 #ifdef SSL_INCLUDE_ERR_TABLE
 
@@ -377,8 +379,9 @@ struct ssl_error_table_struct ssl_error_table[] = {
    "eNotCurrentFunction", 20,
    "eAlreadyDefined", 21,
    "eOnlyOneVarCanBeInitialized", 22,
+   "eExternalMethodCannotBeNested", 23,
    "", 0
 };
-int ssl_error_table_size = 23;
+int ssl_error_table_size = 24;
 
 #endif // SSL_INCLUDE_ERR_TABLE

@@ -229,6 +229,7 @@ error:
    eNotCurrentFunction
    eAlreadyDefined
    eOnlyOneVarCanBeInitialized
+   eExternalMethodCannotBeNested
    ;
 
 include 'pascal_schema.ssl'
@@ -351,7 +352,8 @@ mechanism math:
     equal_node_type (node_type, node_type) >> boolean     % Want equal_<type> for every type
     equal_label( Label, Label ) >> boolean
     equal_code( Code, Code ) >> boolean
-    oMININT >> int    % the minimum 32-bit integer.  necessary because ssl literal ints are currently (silently) short (!)
+    greater( int x, int y ) >> boolean
+    oMININT >> int    % the minimum 32-bit integer.
     ;
 
 mechanism more_builtins:      % These should be built-in SSL operations
@@ -663,6 +665,10 @@ GetOrCreateInitCode >> Code:
 % Note this is fpc syntax.  I'm not sure about other Pascals.
 %
 ExternalDecl( Node decl ):
+   [ equal_zero( oNodeGetInt( oNodeGet( decl, qParentScope ), qLevel ) )
+      | false :  #eExternalMethodCannotBeNested
+      | * :
+   ]
    oNodeSetBoolean( decl, qExternal, true )
    [
       | pStrLit :
@@ -722,9 +728,19 @@ ProcDecl:
    ]
 
    int level = oNodeGetInt( oScopeCurrent, qLevel )
+   boolean nested = greater( level, 0 )
    inc( level )
    oScopeBegin( level )
    Node paramScope = oScopeCurrent
+
+   % A nested method has a hidden first param for the parent static scope.
+   % This won't appear in the param decls list, just reserve space for it.
+   % It's first so the static chain is always at a fixed offset from the frame pointer.
+   [ nested
+      | true :
+         oScopeAllocType( @PointerTypeTo( IntegerType ) )   % arbitrary ptr type
+      | * :
+   ]
 
    @FormalArgDecl
    oNodeSet( decl, qParams, paramScope )
@@ -812,9 +828,19 @@ FuncDecl:
    ]
 
    int level = oNodeGetInt( oScopeCurrent, qLevel )
+   boolean nested = greater( level, 0 )
    inc( level )
    oScopeBegin( level )
    Node paramScope = oScopeCurrent
+
+   % A nested method has a hidden first param for the parent static scope.
+   % This won't appear in the param decls list, just reserve space for it.
+   % It's first so the static chain is always at a fixed offset from the frame pointer.
+   [ nested
+      | true :
+         oScopeAllocType( @PointerTypeTo( IntegerType ) )   % arbitrary ptr type
+      | * :
+   ]
 
    @FormalArgDecl
    oNodeSet( decl, qParams, paramScope )
@@ -2489,14 +2515,13 @@ PointerTypeTo( Node theType ) >> Node:
 %
 OrdinalLow( Node theType ) >> int:
    [ oNodeType( theType )
-      | nIntegerType :  >> oMININT    % NOTE ssl literals are limited to 16 bit at the moment, though values are 32 bit ok. So need a mechanism.
+      | nIntegerType :  >> oMININT
       | nBooleanType :  >> 0
       | nCharType :     >> 0
       | nSubrangeType : >> oNodeGetInt( theType, qLow )
       | * :             #eNotOrdinalType
                         >> 0
    ];
-
 
 
 % Emit the value in a declaration.

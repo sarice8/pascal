@@ -9,7 +9,10 @@ program test (input, output);
   // var x1, x2 : integer = 1;
   var x1 : integer = 1;
       x2 : integer = 2;
+  var a : array[1..3] of integer;
 begin
   
+  a[2] := 5;
+
   writeln( 'x1=', x1, ' x2=', x2 );
 end.

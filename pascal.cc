@@ -693,6 +693,9 @@ Node dNode;  // temporary for several mechanisms
     case equal_code :
             ssl_result = (ssl_argv(0,2) == ssl_argv(1,2));
             continue;
+    case greater :
+            ssl_result = (ssl_argv(0,2) > ssl_argv(1,2));
+            continue;
     case oMININT :
             ssl_result = -2147483648;  // 0x80000000
             continue;

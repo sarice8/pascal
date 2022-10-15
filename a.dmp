@@ -39,14 +39,14 @@
   62	tPushGlobalI	   8
   64	tWriteI
   65	tWriteCR
-  66	tAllocActuals	   4
-  68	tPushAddrActual	   0
+  66	tAllocActuals	  12
+  68	tPushAddrActual	   8
   70	tPushLocalI	  -4
   72	tPushConstI	   1
   74	tAddI
   75	tAssignI
   76	tCall	   3
-  78	tFreeActuals	   4
+  78	tFreeActuals	  12
   80	tReturn
   81	tLabel	   1
   83	tEnter	   0
