@@ -317,14 +317,8 @@ int regIdHighBit( int nativeId ) { return nativeId >> 3; }
 //   are passed in registers, left to right:  rdi, rsi, rdx, rcx, r8, r9.
 //   Floating point args are passed in xmm0 - xmm7.
 //   See https://stackoverflow.com/questions/2535989/what-are-the-calling-conventions-for-unix-linux-system-calls-and-user-space-f
-// TO DO: Am I really seeing this in my linux programs?
-//   If not, make sure I'm compiling for 64-bit.
-// Windows x64 calling convention is different.  Ugh.
-// These might depend on an off-by-default fastcall pragma or compiler switch.
-// BUT, must be a standard for library calls and extern methods!
-
 // Microsoft describes Windows x64 calling convention ("__fastcall"):
-// https://learn.microsoft.com/en-us/cpp/build/x64-software-conventions?view=msvc-170&viewFallbackFrom=vs-2017
+//   https://learn.microsoft.com/en-us/cpp/build/x64-software-conventions?view=msvc-170&viewFallbackFrom=vs-2017
 
 
 Register* regRax = new Register( "rax", 0, false, false );
@@ -333,8 +327,8 @@ Register* regRdx = new Register( "rdx", 2, false, false );
 Register* regRbx = new Register( "rbx", 3, true, true );
 Register* regRsp = new Register( "rsp", 4, false, false );
 Register* regRbp = new Register( "rbp", 5, true, true );
-Register* regRsi = new Register( "rsi", 6, false, true );   // "Function arg #2 in 64-bit linux"
-Register* regRdi = new Register( "rdi", 7, false, true );   // "Function arg #1 in 64-bit linux"
+Register* regRsi = new Register( "rsi", 6, false, true );
+Register* regRdi = new Register( "rdi", 7, false, true );
 Register* regR8  = new Register( "r8", 8, false, false );
 Register* regR9  = new Register( "r9", 9, false, false );
 Register* regR10 = new Register( "r10", 10, false, false );
@@ -347,6 +341,10 @@ Register* regR15 = new Register( "r15", 15, true, true );
 
 // General purpose registers, in the order we prefer to allocate them.
 //
+// regR10 is reserved for pointer to parent static scope, in a nested method.
+// This is the conventional register for a static scope link in x86-64.
+// (In non-nested methods I could use it, but I won't for simplicity.)
+//
 Register* registers[] = {
   regRax,
   regRcx,
@@ -354,7 +352,6 @@ Register* registers[] = {
   regRdx,
   regR8,
   regR9,
-  regR10,
   regR11,
   regR12,
   regR13,

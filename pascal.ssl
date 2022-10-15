@@ -138,18 +138,25 @@ output:
    tPushGlobalI      % <ptr> - push int value read from ptr
    tPushGlobalB      % <ptr> - push byte value read from ptr
    tPushGlobalP      % <ptr> - push ptr value read from ptr
-   tPushLocalI       % <offset> - push int value read from local var
-   tPushLocalB       % <offset> - push byte value read from local var
-   tPushLocalP       % <offset> - push ptr value read from local var
-   tPushParamI       % <offset> - push int value read from local var
-   tPushParamB       % <offset> - push byte value read from local var
-   tPushParamP       % <offset> - push ptr value read from local var
-
+   tPushLocalI       % <offset> - push int value read from local var in current scope
+   tPushLocalB       % <offset> - push byte value read from local var in current scope
+   tPushLocalP       % <offset> - push ptr value read from local var in current scope
+   tPushParamI       % <offset> - push int value read from param in current scope
+   tPushParamB       % <offset> - push byte value read from param in current scope
+   tPushParamP       % <offset> - push ptr value read from param in current scope
+   tPushUpLocalI     % <uplevels> <offset> - push int value read from local var in a parent static scope
+   tPushUpLocalB     % <uplevels> <offset> - push byte value read from local var in a parent static scope
+   tPushUpLocalP     % <uplevels> <offset> - push ptr value read from local var in a parent static scope
+   tPushUpParamI     % <uplevels> <offset> - push int value read from param in a parent static scope
+   tPushUpParamB     % <uplevels> <offset> - push byte value read from param in a parent static scope
+   tPushUpParamP     % <uplevels> <offset> - push ptr value read from param in a parent static scope
    tPushConstI       % <int> - push int value on stack (NOTE, used for BOOLEAN too)
    tPushAddrGlobal   % <offset> - push ptr to global var (same as tPushConstP)
    tPushAddrLocal    % <offset> - push ptr to local var
    tPushAddrParam    % <offset> - push ptr to formal param (used by method to see its param)
    tPushAddrActual   % <offset> - push ptr to actual param, in actuals space (used by caller)
+   tPushAddrUpLocal  % <uplevels> <offset> - push ptr to local var in a parent static scope
+   tPushAddrUpParam  % <uplevels> <offset> - push ptr to formal param in a parent static scope
    tFetchI           % pop ptr from stack, and push int value it points to
    tFetchB           %    "      "      "     "     byte  "   "    "
    tFetchP           %    "      "      "     "     ptr   "   "    "   
@@ -1649,31 +1656,57 @@ PrimaryAllowCF( out Label falseLabel ):
 %
 VarExpr( Node decl ):
    Node theType = oNodeGet( decl, qType )
+   % how many levels up the static scope? Will ignore for globals.
+   Node declScope = oNodeGet( decl, qParentScope )
+   int uplevels = subtract( oNodeGetInt( oScopeCurrent, qLevel ), oNodeGetInt( declScope, qLevel ) )
+
    oTypeSPush( theType )
    [ oTypeSNodeType
       | nIntegerType :
          [ oNodeType( decl )
-            | nGlobalVar :   .tPushGlobalI @EmitValue( decl )
-            | nLocalVar :    .tPushLocalI @EmitValue( decl )
+            | nGlobalVar :   .tPushGlobalI  @EmitValue( decl )
+            | nLocalVar :
+               [ equal_zero( uplevels )
+                  | true :  .tPushLocalI  @EmitValue( decl )
+                  | * :     .tPushUpLocalI  oEmitInt( uplevels )  @EmitValue( decl )
+               ]
             | nParam :
                [ oNodeGetBoolean( decl, qInOut )
                   | true :    % VAR param points to the var.  Auto dereference.
-                              .tPushParamP @EmitValue( decl )
-                              .tFetchI
-                  | * :       .tPushParamI @EmitValue( decl )
+                     [ equal_zero( uplevels )
+                        | true :  .tPushParamP  @EmitValue( decl )
+                        | * :     .tPushUpParamP  oEmitInt( uplevels )  @EmitValue( decl )
+                     ]
+                     .tFetchI
+                  | * :
+                     [ equal_zero( uplevels )
+                        | true :  .tPushParamI  @EmitValue( decl )
+                        | * :     .tPushUpParamI  oEmitInt( uplevels )  @EmitValue( decl )
+                     ]
                ]
          ]
 
       | nBooleanType :
          [ oNodeType( decl )
-            | nGlobalVar :   .tPushGlobalB @EmitValue( decl )
-            | nLocalVar :    .tPushLocalB @EmitValue( decl )
+            | nGlobalVar :   .tPushGlobalB  @EmitValue( decl )
+            | nLocalVar :
+               [ equal_zero( uplevels )
+                  | true :  .tPushLocalB  @EmitValue( decl )
+                  | * :     .tPushUpLocalB  oEmitInt( uplevels )  @EmitValue( decl )
+               ]
             | nParam :
                [ oNodeGetBoolean( decl, qInOut )
-                  | true :    % VAR param points to the var.  Auto derefernce.
-                              .tPushParamP @EmitValue( decl )
-                              .tFetchB
-                  | * :       .tPushParamB @EmitValue( decl )
+                  | true :    % VAR param points to the var.  Auto dereference.
+                     [ equal_zero( uplevels )
+                        | true :  .tPushParamP  @EmitValue( decl )
+                        | * :     .tPushUpParamP  oEmitInt( uplevels )  @EmitValue( decl )
+                     ]
+                     .tFetchB
+                  | * :
+                     [ equal_zero( uplevels )
+                        | true :  .tPushParamB  @EmitValue( decl )
+                        | * :     .tPushUpParamB  oEmitInt( uplevels )  @EmitValue( decl )
+                     ]
                ]
          ]
 
@@ -1683,13 +1716,24 @@ VarExpr( Node decl ):
       | nPointerType :
          [ oNodeType( decl )
             | nGlobalVar :   .tPushGlobalP @EmitValue( decl )
-            | nLocalVar :    .tPushLocalP @EmitValue( decl )
+            | nLocalVar :
+               [ equal_zero( uplevels )
+                  | true :  .tPushLocalP  @EmitValue( decl )
+                  | * :     .tPushUpLocalP  oEmitInt( uplevels )  @EmitValue( decl )
+               ]
             | nParam :
                [ oNodeGetBoolean( decl, qInOut )
-                  | true :    % VAR param points to the var.  Auto derefernce.
-                              .tPushParamP @EmitValue( decl )
-                              .tFetchP
-                  | * :       .tPushParamP @EmitValue( decl )
+                  | true :    % VAR param points to the var.  Auto dereference.
+                     [ equal_zero( uplevels )
+                        | true :  .tPushParamP  @EmitValue( decl )
+                        | * :     .tPushUpParamP  oEmitInt( uplevels )  @EmitValue( decl )
+                     ]
+                     .tFetchP
+                  | * :
+                     [ equal_zero( uplevels )
+                        | true :  .tPushParamP  @EmitValue( decl )
+                        | * :     .tPushUpParamP  oEmitInt( uplevels )  @EmitValue( decl )
+                     ]
                ]
          ]
          [
@@ -1706,12 +1750,23 @@ VarExpr( Node decl ):
          % first, push addr of start of var
          [ oNodeType( decl )
             | nGlobalVar :   .tPushAddrGlobal @EmitValue( decl )
-            | nLocalVar :    .tPushAddrLocal @EmitValue( decl )
+            | nLocalVar :
+               [ equal_zero( uplevels )
+                  | true :  .tPushAddrLocal  @EmitValue( decl )
+                  | * :     .tPushAddrUpLocal  oEmitInt( uplevels )  @EmitValue( decl )
+               ]
             | nParam :
                [ oNodeGetBoolean( decl, qInOut )
-                  | true :    % VAR param points to the var.  Auto derefernce.
-                              .tPushParamP @EmitValue( decl )
-                  | * :       .tPushAddrParam @EmitValue( decl )
+                  | true :    % VAR param points to the var.  Auto dereference.
+                     [ equal_zero( uplevels )
+                        | true :  .tPushParamP  @EmitValue( decl )
+                        | * :     .tPushUpParamP  oEmitInt( uplevels )  @EmitValue( decl )
+                     ]
+                  | * :
+                     [ equal_zero( uplevels )
+                        | true :  .tPushAddrParam  @EmitValue( decl )
+                        | * :     .tPushAddrUpParam  oEmitInt( uplevels )  @EmitValue( decl )
+                     ]
                ]
          ]
          % modify addr for subscripts, field references, etc

@@ -737,23 +737,27 @@ Node dNode;  // temporary for several mechanisms
             continue;
     case oScopeDeclare: {
             ssl_assert (dScopeStackPtr >= 1);
-            AddLast( (List) GetAttr( dScopeStack[dScopeStackPtr], qDecls ), (Node)ssl_param );
+            Node scope = dScopeStack[dScopeStackPtr];
+            Node decl = (Node) ssl_param;
+            SetAttr( decl, qParentScope, scope );
+            AddLast( (List) GetAttr( scope, qDecls ), decl );
             continue;
             }
     case oScopeDeclareAlloc: {
             ssl_assert (dScopeStackPtr >= 1);
             Node scope = dScopeStack[dScopeStackPtr];
-            Node node = (Node)ssl_param;
-            AddLast( (List) GetAttr( scope, qDecls ), node );
-            Node theType = (Node) GetAttr( node, qType );
+            Node decl = (Node)ssl_param;
+            SetAttr( decl, qParentScope, scope );
+            AddLast( (List) GetAttr( scope, qDecls ), decl );
+            Node theType = (Node) GetAttr( decl, qType );
             ssl_assert( theType != NULL );
             int size = GetValue( theType, qSize );
             long offset = GetValue( scope, qSize );
             if ( GetValue( scope, qAllocDown ) ) {
-              SetValue( node, qValue, -offset - size );
+              SetValue( decl, qValue, -offset - size );
               SetValue( scope, qSize, offset + size );
             } else {
-              SetValue( node, qValue, offset );
+              SetValue( decl, qValue, offset );
               SetValue( scope, qSize, offset + size );
             }
             continue;

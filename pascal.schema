@@ -21,6 +21,8 @@ nScope =>
         qInitCode:      Integer4        % id of code stream to initialize scope's vars
 
 Object ::= nDeclaration
+nDeclaration =>
+        qParentScope:   Node            (nScope)                [Alt]
 
 
 % TO DO: not sure why I had both nDeclaration and nIdent

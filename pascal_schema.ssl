@@ -40,6 +40,7 @@ type node_attribute:
 	qSize
 	qAllocDown
 	qInitCode
+	qParentScope
 	qIdent
 	qType
 	qValue
