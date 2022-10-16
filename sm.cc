@@ -50,6 +50,11 @@ long stack[stackMax],sp;
 // TO DO: maybe the offset should be built into code instead.
 #define FRAME_PARAMS_OFFSET  (2*PTR_SIZE)
 
+// Hardcoded offset from fp to static link pointer,
+// in a nested method.  This points to the frame of the enclosing scope.
+// In my calling convention, it is actually the hidden first parameter
+// to the method.  So it sits at the start of the params.
+#define FRAME_STATIC_LINK_OFFSET  FRAME_PARAMS_OFFSET
 
 
 // good grief, can't hardcode these
@@ -295,6 +300,20 @@ findLabel( int label )
 }
 
 
+// Returns pointer to the static scope <uplevels> higher (0 is the current scope).
+// This only works in a nested method, unless uplevels is 0.
+//
+char*
+upStaticFrame( int uplevels )
+{
+  char* up_fp = call_fp;
+  for ( int i = 0; i < uplevels; ++i ) {
+    up_fp = *(char**)(up_fp + FRAME_STATIC_LINK_OFFSET);
+  }
+  return up_fp;
+}
+
+
 void
 walkTable()
 {
@@ -344,6 +363,27 @@ walkTable()
               if (++sp>=stackMax) fatal("stack overflow");
               stack[sp] = (long) *(void**) (call_fp + code[pc++] + FRAME_PARAMS_OFFSET);
               continue;
+       case tPushUpLocalI : {
+              if (++sp>=stackMax) fatal("stack overflow");
+              int uplevels = code[pc++];
+              int offset = code[pc++];
+              stack[sp] = *(int*) (upStaticFrame( uplevels ) + offset);
+              continue;
+              }
+       case tPushUpLocalB : {
+              if (++sp>=stackMax) fatal("stack overflow");
+              int uplevels = code[pc++];
+              int offset = code[pc++];
+              stack[sp] = *(char*) (upStaticFrame( uplevels ) + offset);
+              continue;
+              }
+       case tPushUpLocalP : {
+              if (++sp>=stackMax) fatal("stack overflow");
+              int uplevels = code[pc++];
+              int offset = code[pc++];
+              stack[sp] = (long) *(void**) (upStaticFrame( uplevels ) + offset);
+              continue;
+              }
        case tPushConstI :
               if (++sp>=stackMax) fatal("stack overflow");
               stack[sp] = code[pc++];
@@ -364,6 +404,20 @@ walkTable()
               if (++sp>=stackMax) fatal("stack overflow");
               stack[sp] = (long) (call_sp + code[pc++]);
               continue;
+       case tPushAddrUpLocal : {
+              if (++sp>=stackMax) fatal("stack overflow");
+              int uplevels = code[pc++];
+              int offset = code[pc++];
+              stack[sp] = (long) (upStaticFrame( uplevels ) + offset);
+              continue;
+              }
+       case tPushAddrUpParam : {
+              if (++sp>=stackMax) fatal("stack overflow");
+              int uplevels = code[pc++];
+              int offset = code[pc++];
+              stack[sp] = (long) ( upStaticFrame( uplevels ) + offset + FRAME_PARAMS_OFFSET );
+              continue;
+              }
        case tFetchI :
               stack[sp] = *(int*) stack[sp];
               continue;

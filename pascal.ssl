@@ -43,11 +43,6 @@ title: 'Pascal Compiler 1.1.5 -- Jan 01 ''90';
 %    - Consider non-ISO extensions.  e.g. see "Units" e.g. from Turbo Pascal wikipedia page.
 %      Dynamic arrays.  Objects.  But, perhaps stick to my old goal, standard Pascal.
 %
-%    - variable initialization.
-%      The code should execute on entry to the scope.  I probably need multiple tcode streams,
-%      because there may be nested methods between the variables being initialized
-%      and the block statement of the scope.
-%
 %  PASCAL DOCS
 %      Here's some handy language material:
 %      https://www.freepascal.org/docs-html/ref/ref.html
@@ -486,8 +481,6 @@ TermAllowCF( out Label falseLabel );
 FactorAllowCF( out Label falseLabel );
 PrimaryAllowCF( out Label falseLabel );
 
-
-
 VarExpr( Node decl );
 LValueVar( Node decl );
 IncVar( Node decl );
@@ -495,6 +488,9 @@ DecVar( Node decl );
 
 CFToVal( inout Label falseLabel );
 ValToCF( out Label falseLabel );
+
+DeclLevel( Node decl ) >> int;
+DeclUpLevels( Node decl ) >> int;
 
 % ----------------------------- Declarations ----------------------------
 
@@ -665,7 +661,7 @@ GetOrCreateInitCode >> Code:
 % Note this is fpc syntax.  I'm not sure about other Pascals.
 %
 ExternalDecl( Node decl ):
-   [ equal_zero( oNodeGetInt( oNodeGet( decl, qParentScope ), qLevel ) )
+   [ equal_zero( @DeclLevel( decl ) )
       | false :  #eExternalMethodCannotBeNested
       | * :
    ]
@@ -738,7 +734,7 @@ ProcDecl:
    % It's first so the static chain is always at a fixed offset from the frame pointer.
    [ nested
       | true :
-         oScopeAllocType( @PointerTypeTo( IntegerType ) )   % arbitrary ptr type
+         int offset = oScopeAllocType( @PointerTypeTo( IntegerType ) )   % arbitrary ptr type
       | * :
    ]
 
@@ -838,7 +834,7 @@ FuncDecl:
    % It's first so the static chain is always at a fixed offset from the frame pointer.
    [ nested
       | true :
-         oScopeAllocType( @PointerTypeTo( IntegerType ) )   % arbitrary ptr type
+         int offset = oScopeAllocType( @PointerTypeTo( IntegerType ) )   % arbitrary ptr type
       | * :
    ]
 
@@ -1683,8 +1679,7 @@ PrimaryAllowCF( out Label falseLabel ):
 VarExpr( Node decl ):
    Node theType = oNodeGet( decl, qType )
    % how many levels up the static scope? Will ignore for globals.
-   Node declScope = oNodeGet( decl, qParentScope )
-   int uplevels = subtract( oNodeGetInt( oScopeCurrent, qLevel ), oNodeGetInt( declScope, qLevel ) )
+   int uplevels = @DeclUpLevels( decl )
 
    oTypeSPush( theType )
    [ oTypeSNodeType
@@ -2000,6 +1995,28 @@ Call( Node method ):
       | true : .tAllocActualsCdecl  oEmitInt( actualsSize )
       | false :  .tAllocActuals  oEmitInt( actualsSize )
    ]
+
+   % If method is nested, it takes a hidden first parameter:
+   % a pointer to the frame of the static scope in which the method is declared.
+   % The location of a scope's frame is equivalent to offset 0 in the scope's locals space
+   % (since local offsets are relative to the scope's frame pointer).
+   %
+   % The nested method may be in a higher scope (upLevels > 1),
+   % or a sibling of the method we're in (upLevels = 1),
+   % or an immediate child of the current method (upLevels = 0).
+   %
+   % To understand the upLevels computation, remember that a method's declaration
+   % and its contents (variables, nested functions, and body statement)
+   % are in two different scopes.
+
+   [ greater( @DeclLevel( method ), 0 )
+      | true :
+         .tPushAddrActual  oEmitInt( 0 )    % hidden param is at param offset 0
+         .tPushAddrUpLocal  oEmitInt( @DeclUpLevels( method ) )  oEmitInt( 0 )
+         .tAssignP
+      | * :
+   ]
+
 
    NodeIter paramIter = oNodeGetIter( paramScope, qDecls )
    Node param = oNodeIterValue( paramIter )
@@ -2429,6 +2446,18 @@ ReadStmt:
    ;
 
 % -------------------------------- Utilities -------------------------------
+
+
+% Return the static scope level of the given declaration
+%
+DeclLevel( Node decl ) >> int:
+   >> oNodeGetInt( oNodeGet( decl, qParentScope ), qLevel );
+   
+
+% How many levels higher is the given declaration from the current scope?
+%
+DeclUpLevels( Node decl ) >> int:
+   >> subtract( oNodeGetInt( oScopeCurrent, qLevel ), @DeclLevel( decl ) );
 
 
 % Require that the top two types on the type stack are matching (ignoring subranges).
