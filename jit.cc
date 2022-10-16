@@ -35,8 +35,7 @@ I have these problems.
 
   - I should support emitMov( int, byte ) e.g. for passing a byte to an extern method taking int,
       where that should be allowed.  Just need the appropriate movsx instruction.
-  - stack size/align rules (?) e.g. I saw somewhere requires stack aligned on 16 bytes or something?
-  - also I've done no align/padding of allocated vars, or record fields.
+  - I've done no align/padding of allocated vars, or record fields.
 
   - not yet honoring callee-save or caller-save of registers
   - have not yet implemented dumping registers into temp, when I run out
@@ -53,10 +52,6 @@ I have these problems.
     In general I'd add operandFlagsToValue() in those places.  But can I find them
     systematically?  Or do I need to add that everywhere?
 
-  - Bug in ssl tool: ssl int literals are silently limited to short,
-      which I noticed when using a literal value for min 32-bit integer.
-      Worked around with an operation, but would be nice to advance ssl to int codes and literals,
-      and C++.
 
 MISSING LANGUAGE FEATURES
 
@@ -103,12 +98,6 @@ the native calling convention, in addition to absolute code address.
 If multiple pascal units (as opposed to native units) are used together,
 those units need to be allocated within 2GB of each other so they can access
 the public global variables and methods in my usual way.  This should probably be straightforward.
-
-
-Be able to access all parent scopes, not just immediate local and global.
-   (Can see these in the parser, but don't have a way to describe the reference,
-   or to actually access them.  Need a pointer chain as a hidden parameter into methods,
-   and follow that up as needed.)
 
 
 OUT OF SCOPE
@@ -227,6 +216,13 @@ char* nativePc = 0;
 #define FRAME_PARAMS_OFFSET (2 * sizeof(void*))
 #define FPO  FRAME_PARAMS_OFFSET
 
+// Hardcoded offset from fp to static link pointer,
+// in a nested method.  This points to the frame of the enclosing scope.
+// In my calling convention, it is actually the hidden first parameter
+// to the method.  So it sits at the start of the params.
+#define FRAME_STATIC_LINK_OFFSET  FRAME_PARAMS_OFFSET
+
+
 // Operand stack
 //
 typedef enum {
@@ -253,6 +249,7 @@ typedef enum {
   jit_Operand_Kind_Addr_Local,
   jit_Operand_Kind_Addr_Param,
   jit_Operand_Kind_Addr_Actual,
+  jit_Operand_Kind_Addr_Reg_Offset,
 
   jit_Operand_Kind_ConstI,
 
@@ -461,7 +458,7 @@ public:
   bool isVar() const { return _kind >= jit_Operand_Kind_GlobalB &&
                               _kind <= jit_Operand_Kind_ActualP; }
   bool isAddrOfVar() const { return _kind >= jit_Operand_Kind_Addr_Global &&
-                                    _kind <= jit_Operand_Kind_Addr_Actual; }
+                                    _kind <= jit_Operand_Kind_Addr_Reg_Offset; }
   bool isVarOrAddrOfVar() const { return isVar() || isAddrOfVar(); }
   bool isDeref() const { return _kind >= jit_Operand_Kind_RegP_DerefB &&
                                 _kind <= jit_Operand_Kind_RegP_DerefP; }
@@ -517,6 +514,7 @@ void operandFlagsToValue( Operand& x, int size );
 
 Register* allocateReg();
 void forceAllocateReg( Register* reg );
+Register* getUpFrame( int uplevels );
 Operand allocateTemp( int size );
 void preserveRegsAcrossCall();
 jitOperandKind operandKindReg( int size );
@@ -1014,6 +1012,66 @@ generateCode()
           operandStack.emplace_back( jit_Operand_Kind_ParamP, *tCodePc++ );
         }
         break;
+      case tPushUpLocalI : {
+          int uplevels = *tCodePc++;
+          int offset = *tCodePc++;
+          Register* frameReg = getUpFrame( uplevels );
+          Operand x( jit_Operand_Kind_RegP_DerefI, frameReg, offset );
+          // For now, deref is only understood by emitMov, so need to get var into a register
+          operandIntoReg( x );
+          operandStack.push_back( x );
+        }
+        break;
+      case tPushUpLocalB : {
+          int uplevels = *tCodePc++;
+          int offset = *tCodePc++;
+          Register* frameReg = getUpFrame( uplevels );
+          Operand x( jit_Operand_Kind_RegP_DerefB, frameReg, offset );
+          // For now, deref is only understood by emitMov, so need to get var into a register
+          operandIntoReg( x );
+          operandStack.push_back( x );
+        }
+        break;
+      case tPushUpLocalP : {
+          int uplevels = *tCodePc++;
+          int offset = *tCodePc++;
+          Register* frameReg = getUpFrame( uplevels );
+          Operand x( jit_Operand_Kind_RegP_DerefP, frameReg, offset );
+          // For now, deref is only understood by emitMov, so need to get var into a register
+          operandIntoReg( x );
+          operandStack.push_back( x );
+        }
+        break;
+      case tPushUpParamI : {
+          int uplevels = *tCodePc++;
+          int offset = *tCodePc++;
+          Register* frameReg = getUpFrame( uplevels );
+          Operand x( jit_Operand_Kind_RegP_DerefI, frameReg, offset + FPO );
+          // For now, deref is only understood by emitMov, so need to get var into a register
+          operandIntoReg( x );
+          operandStack.push_back( x );
+        }
+        break;
+      case tPushUpParamB : {
+          int uplevels = *tCodePc++;
+          int offset = *tCodePc++;
+          Register* frameReg = getUpFrame( uplevels );
+          Operand x( jit_Operand_Kind_RegP_DerefB, frameReg, offset + FPO );
+          // For now, deref is only understood by emitMov, so need to get var into a register
+          operandIntoReg( x );
+          operandStack.push_back( x );
+        }
+        break;
+      case tPushUpParamP : {
+          int uplevels = *tCodePc++;
+          int offset = *tCodePc++;
+          Register* frameReg = getUpFrame( uplevels );
+          Operand x( jit_Operand_Kind_RegP_DerefP, frameReg, offset + FPO );
+          // For now, deref is only understood by emitMov, so need to get var into a register
+          operandIntoReg( x );
+          operandStack.push_back( x );
+        }
+        break;
       case tPushConstI : {
           operandStack.emplace_back( jit_Operand_Kind_ConstI, *tCodePc++ );
         }
@@ -1034,6 +1092,20 @@ generateCode()
           operandStack.emplace_back( jit_Operand_Kind_Addr_Actual, *tCodePc++ );
         }
         break;
+      case tPushAddrUpLocal : {
+          int uplevels = *tCodePc++;
+          int offset = *tCodePc++;
+          Register* frameReg = getUpFrame( uplevels );
+          operandStack.emplace_back( jit_Operand_Kind_Addr_Reg_Offset, frameReg, offset );
+        }
+        break;
+      case tPushAddrUpParam : {
+          int uplevels = *tCodePc++;
+          int offset = *tCodePc++;
+          Register* frameReg = getUpFrame( uplevels );
+          operandStack.emplace_back( jit_Operand_Kind_Addr_Reg_Offset, frameReg, offset + FPO );
+        }
+        break;
       case tFetchI : {
           Operand x = operandStack.back();   operandStack.pop_back();
           // x is a pointer to a value of size 4.
@@ -1044,10 +1116,8 @@ generateCode()
           // The actual retrieval of the value can be included in the next operation.
           // But, for now, we only handle that operand kind in emitMov.
           // So we have to retrieve it into a register now.
-          Operand result( jit_Operand_Kind_RegI, allocateReg() );
-          emitMov( result, x );
-          operandStack.push_back( result );
-          x.release();
+          operandIntoReg( x );
+          operandStack.push_back( x );
         }
         break;
       case tFetchB : {
@@ -1060,10 +1130,8 @@ generateCode()
           // The actual retrieval of the value can be included in the next operation.
           // But, for now, we only handle that operand kind in emitMov.
           // So we have to retrieve it into a register now.
-          Operand result( jit_Operand_Kind_RegB, allocateReg() );
-          emitMov( result, x );
-          operandStack.push_back( result );
-          x.release();
+          operandIntoReg( x );
+          operandStack.push_back( x );
         }
         break;
       case tFetchP : {
@@ -1076,10 +1144,8 @@ generateCode()
           // The actual retrieval of the value can be included in the next operation.
           // But, for now, we only handle that operand kind in emitMov.
           // So we have to retrieve it into a register now.
-          Operand result( jit_Operand_Kind_RegP, allocateReg() );
-          emitMov( result, x );
-          operandStack.push_back( result );
-          x.release();
+          operandIntoReg( x );
+          operandStack.push_back( x );
         }
         break;
       case tAssignI : {
@@ -1745,6 +1811,51 @@ forceAllocateReg( Register* reg )
 }
 
 
+// Return a register pointing to the stack frame of an enclosing static scope
+// (uplevels > 0) or the current scope (uplevels = 0).  This is used for working with
+// nested methods, which may access variables in enclosing scopes.
+//
+// The caller is free to further modify the register (e.g. for array/record indexing).
+// (As a future optimization, I may cache the immediate parent scope in r10, whcih is a
+// convention for languages with static scopes.  In that case, I'll need to prevent
+// modifying the register, copying to a different one if a further modification is needed.
+//
+// The caller will need to release the register at some point.
+// For now, the caller uses the register to create a Deref operand, so the register will
+// become released when that operand is released. 
+//
+//
+Register*
+getUpFrame( int uplevels )
+{
+  Register* reg = allocateReg();
+
+  if ( uplevels == 0 ) {
+    // Pointer to the current scope.  This is needed when calling a nested method
+    // that's an immediate child of the current scope (which need not be nested itself).
+    // For now, always copying from rbp into another register that the user can modify further.
+    Operand opReg( jit_Operand_Kind_RegP, reg );
+    Operand opRbp( jit_Operand_Kind_RegP, regRbp );
+    emitMov( opReg, opRbp );
+    return reg;
+  }
+
+  // Move up the static link chain, consisting of the first parameter into nested methods.
+  // First jump up starts near rbp.
+  Operand opReg( jit_Operand_Kind_RegP, reg );
+  Operand opStaticLinkFromRbp( jit_Operand_Kind_RegP_DerefP, regRbp, FRAME_STATIC_LINK_OFFSET );
+  emitMov( opReg, opStaticLinkFromRbp );
+
+  // Subsequent jumps, if any, are starting from the register we are advancing through the chain.
+  for ( int level = 1; level < uplevels; ++level ) {
+    Operand opStaticLinkFromReg( jit_Operand_Kind_RegP_DerefP, reg, FRAME_STATIC_LINK_OFFSET );
+    emitMov( opReg, opStaticLinkFromReg );
+  }
+
+  return reg;
+}
+
+
 // Move in-use registers that are not callee-save, into temporaries,
 // and update operand stack to refer to temp instead.
 //
@@ -2039,6 +2150,7 @@ Operand::size() const
     case jit_Operand_Kind_ParamB:
     case jit_Operand_Kind_ActualB:
     case jit_Operand_Kind_RegB:
+    case jit_Operand_Kind_RegP_DerefB:
     case jit_Operand_Kind_Flags:
       return 1;
 
@@ -2048,6 +2160,7 @@ Operand::size() const
     case jit_Operand_Kind_ActualI:
     case jit_Operand_Kind_ConstI:
     case jit_Operand_Kind_RegI:
+    case jit_Operand_Kind_RegP_DerefI:
       return 4;
 
     case jit_Operand_Kind_GlobalP:
@@ -2058,7 +2171,9 @@ Operand::size() const
     case jit_Operand_Kind_Addr_Local:
     case jit_Operand_Kind_Addr_Param:
     case jit_Operand_Kind_Addr_Actual:
+    case jit_Operand_Kind_Addr_Reg_Offset:
     case jit_Operand_Kind_RegP:
+    case jit_Operand_Kind_RegP_DerefP:
       return 8;
 
     default:
@@ -2114,6 +2229,7 @@ operandIntoReg( Operand& x )
   }
   Operand newX( regKind, allocateReg() );
   emitMov( newX, x );
+  x.release();
   x = newX;
 }
 
@@ -2275,6 +2391,20 @@ operandDeref( Operand& x, int size )
           break;
       }
       break;
+    case jit_Operand_Kind_Addr_Reg_Offset:
+      switch ( size ) {
+        case 1:
+          x = Operand( jit_Operand_Kind_RegP_DerefB, x._reg, x._value );
+          break;
+        case 4:
+          x = Operand( jit_Operand_Kind_RegP_DerefI, x._reg, x._value );
+          break;
+        case 8:
+          x = Operand( jit_Operand_Kind_RegP_DerefP, x._reg, x._value );
+          break;
+        default:
+          break;
+      }
     case jit_Operand_Kind_RegP:
       switch ( size ) {
         case 1:
@@ -2289,7 +2419,7 @@ operandDeref( Operand& x, int size )
         default:
           break;
       }
-      break;    
+      break;      break;    
     default:
       fatal( "operandDeref: unexpected operands\n" );
       break;
@@ -3447,6 +3577,11 @@ emitMov( const Operand& x, const Operand& y )
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_Addr_Actual ):
       // lea reg64, [rsp+offset]
       emit( Instr( 0x8d ).w().reg( x._reg ).mem( regRsp, y._value ) );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_Addr_Reg_Offset ):
+      // lea x_reg64, [y_reg+offset]
+      emit( Instr( 0x8d ).w().reg( x._reg ).mem( y._reg, y._value ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ConstI ):
