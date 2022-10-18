@@ -7,10 +7,12 @@
 typedef enum {
     nINVALID,
     Object,
+    nWorkspace,
+    nProgram,
+    nUnit,
     nScope,
     nDeclaration,
     nIdent,
-    nProgram,
     nMethod,
     nProc,
     nFunc,
@@ -38,18 +40,25 @@ typedef enum {
 
 typedef enum {
     qINVALID,
+    qUnits,
+    qProgram,
+    qIdent,
+    qUsedUnits,
+    qChildScope,
+    qMainRoutineScope,
+    qInitLabel,
+    qFinalLabel,
+    qInitRoutineScope,
+    qFinalRoutineScope,
     qLevel,
     qDecls,
     qSize,
     qAllocDown,
     qInitCode,
     qParentScope,
-    qIdent,
     qType,
     qValue,
-    qMainRoutineScope,
     qParams,
-    qChildScope,
     qBodyDefined,
     qExternal,
     qExternalName,
@@ -69,18 +78,25 @@ typedef enum {
 #endif /* Object */
 
 #define GetqINVALID(N)		(Integer4)	GetAttr(N, qINVALID)
+#define GetqUnits(N)		(List)	GetAttr(N, qUnits)
+#define GetqProgram(N)		(Node)	GetAttr(N, qProgram)
+#define GetqIdent(N)		(Integer4)	(intptr_t) GetAttr(N, qIdent)
+#define GetqUsedUnits(N)		(List)	GetAttr(N, qUsedUnits)
+#define GetqChildScope(N)		(Node)	GetAttr(N, qChildScope)
+#define GetqMainRoutineScope(N)		(Node)	GetAttr(N, qMainRoutineScope)
+#define GetqInitLabel(N)		(Integer4)	(intptr_t) GetAttr(N, qInitLabel)
+#define GetqFinalLabel(N)		(Integer4)	(intptr_t) GetAttr(N, qFinalLabel)
+#define GetqInitRoutineScope(N)		(Node)	GetAttr(N, qInitRoutineScope)
+#define GetqFinalRoutineScope(N)		(Node)	GetAttr(N, qFinalRoutineScope)
 #define GetqLevel(N)		(Integer4)	(intptr_t) GetAttr(N, qLevel)
 #define GetqDecls(N)		(List)	GetAttr(N, qDecls)
 #define GetqSize(N)		(Integer4)	(intptr_t) GetAttr(N, qSize)
 #define GetqAllocDown(N)		(Boolean1)	(intptr_t) GetAttr(N, qAllocDown)
 #define GetqInitCode(N)		(Integer4)	(intptr_t) GetAttr(N, qInitCode)
 #define GetqParentScope(N)		(Node)	GetAttr(N, qParentScope)
-#define GetqIdent(N)		(Integer4)	(intptr_t) GetAttr(N, qIdent)
 #define GetqType(N)		(Node)	GetAttr(N, qType)
 #define GetqValue(N)		(Integer4)	(intptr_t) GetAttr(N, qValue)
-#define GetqMainRoutineScope(N)		(Node)	GetAttr(N, qMainRoutineScope)
 #define GetqParams(N)		(Node)	GetAttr(N, qParams)
-#define GetqChildScope(N)		(Node)	GetAttr(N, qChildScope)
 #define GetqBodyDefined(N)		(Boolean1)	(intptr_t) GetAttr(N, qBodyDefined)
 #define GetqExternal(N)		(Boolean1)	(intptr_t) GetAttr(N, qExternal)
 #define GetqExternalName(N)		(StringN)	GetAttr(N, qExternalName)
@@ -98,18 +114,25 @@ typedef enum {
 #define GetqScope(N)		(Node)	GetAttr(N, qScope)
 
 #define SetqINVALID(N,V)		SetAttr(N, qINVALID, V)
+#define SetqUnits(N,V)		SetAttr(N, qUnits, V)
+#define SetqProgram(N,V)		SetAttr(N, qProgram, V)
+#define SetqIdent(N,V)		SetAttr(N, qIdent, (void*)(intptr_t)(V))
+#define SetqUsedUnits(N,V)		SetAttr(N, qUsedUnits, V)
+#define SetqChildScope(N,V)		SetAttr(N, qChildScope, V)
+#define SetqMainRoutineScope(N,V)		SetAttr(N, qMainRoutineScope, V)
+#define SetqInitLabel(N,V)		SetAttr(N, qInitLabel, (void*)(intptr_t)(V))
+#define SetqFinalLabel(N,V)		SetAttr(N, qFinalLabel, (void*)(intptr_t)(V))
+#define SetqInitRoutineScope(N,V)		SetAttr(N, qInitRoutineScope, V)
+#define SetqFinalRoutineScope(N,V)		SetAttr(N, qFinalRoutineScope, V)
 #define SetqLevel(N,V)		SetAttr(N, qLevel, (void*)(intptr_t)(V))
 #define SetqDecls(N,V)		SetAttr(N, qDecls, V)
 #define SetqSize(N,V)		SetAttr(N, qSize, (void*)(intptr_t)(V))
 #define SetqAllocDown(N,V)		SetAttr(N, qAllocDown, (void*)(intptr_t)(V))
 #define SetqInitCode(N,V)		SetAttr(N, qInitCode, (void*)(intptr_t)(V))
 #define SetqParentScope(N,V)		SetAttr(N, qParentScope, V)
-#define SetqIdent(N,V)		SetAttr(N, qIdent, (void*)(intptr_t)(V))
 #define SetqType(N,V)		SetAttr(N, qType, V)
 #define SetqValue(N,V)		SetAttr(N, qValue, (void*)(intptr_t)(V))
-#define SetqMainRoutineScope(N,V)		SetAttr(N, qMainRoutineScope, V)
 #define SetqParams(N,V)		SetAttr(N, qParams, V)
-#define SetqChildScope(N,V)		SetAttr(N, qChildScope, V)
 #define SetqBodyDefined(N,V)		SetAttr(N, qBodyDefined, (void*)(intptr_t)(V))
 #define SetqExternal(N,V)		SetAttr(N, qExternal, (void*)(intptr_t)(V))
 #define SetqExternalName(N,V)		SetAttr(N, qExternalName, V)
@@ -128,10 +151,12 @@ typedef enum {
 
 #define NewnINVALID()		NewNode(nINVALID)
 #define NewObject()		NewNode(Object)
+#define NewnWorkspace()		NewNode(nWorkspace)
+#define NewnProgram()		NewNode(nProgram)
+#define NewnUnit()		NewNode(nUnit)
 #define NewnScope()		NewNode(nScope)
 #define NewnDeclaration()		NewNode(nDeclaration)
 #define NewnIdent()		NewNode(nIdent)
-#define NewnProgram()		NewNode(nProgram)
 #define NewnMethod()		NewNode(nMethod)
 #define NewnProc()		NewNode(nProc)
 #define NewnFunc()		NewNode(nFunc)

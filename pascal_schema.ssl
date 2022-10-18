@@ -4,10 +4,12 @@
 type node_type:
 	nINVALID
 	Object
+	nWorkspace
+	nProgram
+	nUnit
 	nScope
 	nDeclaration
 	nIdent
-	nProgram
 	nMethod
 	nProc
 	nFunc
@@ -35,18 +37,25 @@ type node_type:
 
 type node_attribute:
 	qINVALID
+	qUnits
+	qProgram
+	qIdent
+	qUsedUnits
+	qChildScope
+	qMainRoutineScope
+	qInitLabel
+	qFinalLabel
+	qInitRoutineScope
+	qFinalRoutineScope
 	qLevel
 	qDecls
 	qSize
 	qAllocDown
 	qInitCode
 	qParentScope
-	qIdent
 	qType
 	qValue
-	qMainRoutineScope
 	qParams
-	qChildScope
 	qBodyDefined
 	qExternal
 	qExternalName

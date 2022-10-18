@@ -115,10 +115,17 @@ input:
    pAnd
    pOr
    pNot
+   pUses
+   pUnit
+   pInterface
+   pImplementation
+   pInitialization
+   pFinalization
    pWriteln
    pWrite
    pReadln
    pRead
+
    pForward
    pExternal
    pName
@@ -447,6 +454,7 @@ rules
 
 % ----------------------------- Global Variables ----------------------------
 
+Node    workspace              % root of database
 Node    globalScope            % global nScope
 Node    mainRoutineScope       % scope for temporaries in main routine
 
@@ -497,6 +505,8 @@ DeclUpLevels( Node decl ) >> int;
 Program:
    Node t
 
+   workspace = oNodeNew( nWorkspace )
+
    oScopeBegin( 0 )
    globalScope = oScopeCurrent
 
@@ -518,8 +528,10 @@ Program:
    pProgram
    pIdent
 
-   Node progDecl = @newIdent( nProgram, kProgram, LAST_ID )
-   oScopeDeclare( progDecl )
+   Node program = oNodeNew( nProgram )
+   oNodeSetInt( program, qIdent, LAST_ID )
+   oNodeSet( workspace, qProgram, program )
+
 
    [
       | '(' :
@@ -547,7 +559,7 @@ Program:
    oScopeBegin( 0 )
    mainRoutineScope = oScopeCurrent
    oNodeSetBoolean( oScopeCurrent, qAllocDown, true )
-   oNodeSet( progDecl, qMainRoutineScope, oScopeCurrent )
+   oNodeSet( program, qMainRoutineScope, oScopeCurrent )
    oScopeEnd
 
    @BlockDecls( nGlobalVar )
