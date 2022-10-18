@@ -153,6 +153,15 @@ void*    GetAttr  ( Node node, int attr_code );
 long     GetValue ( Node node, int attr_code );
 void     FreeNode ( Node N, Boolean1 recurse );
 
+// Working with a node's list attribute.
+// These methods auto-create the List on first use.
+// It's too unfriendly to expect the client to do that.
+// TO DO: it would also be good to create empty lists in NewNode.
+// TO DO: for now, the list created here does not have a node type constraint,
+// because I didn't capture the one described in the schema file.
+
+void     NodeAddLast( Node N, int attr_code, Node value );
+
 /*
  *  Lists
  */

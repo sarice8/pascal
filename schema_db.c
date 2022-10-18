@@ -252,6 +252,22 @@ Boolean1         recurse;
 }
 
 
+// Node methods that auto-create a List attriute.
+
+void
+NodeAddLast( Node N, int attr_code, Node value )
+{
+    List L = (List) GetAttr( N, attr_code );
+    if ( !L ) {
+        // Unfortunately we don't know the constraint type
+        // given in the schema.  So allow anything.
+        L = NewList( 1 );  // 1 = Object, in any schema
+        SetAttr( N, attr_code, L );
+    }
+    AddLast( L, value );
+}
+
+
 /*
  *  Lists
  */
