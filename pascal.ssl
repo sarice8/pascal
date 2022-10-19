@@ -232,6 +232,7 @@ error:
    eAlreadyDefined
    eOnlyOneVarCanBeInitialized
    eExternalMethodCannotBeNested
+   eCantFindUnitFile
    ;
 
 include 'pascal_schema.ssl'
@@ -303,6 +304,7 @@ mechanism node_mech:
     oNodeSetKind (Node, node_attribute, kind) % set attribute of node  *** MIGHT NOT NEED
     oNodeSetLabel( Node, node_attribute, Label )  % set Label attribute of node
     oNodeSetCode( Node, node_attribute, Code )    % set Code attribute of node
+    oNodeAddLast( Node, node_attribute, Node value )  % append to a List attribute of node
     oNodeGet (Node, node_attribute) >> Node    % get Node attribute of node
     oNodeGetString (Node, node_attribute) >> String
     oNodeGetInt (Node, node_attribute) >> int  % get int attribute of node
@@ -310,6 +312,7 @@ mechanism node_mech:
     oNodeGetLabel (Node, node_attribute) >> Label      % get Label attribute of node
     oNodeGetCode (Node, node_attribute) >> Code        % get code stream attribute of node
     oNodeNull (Node) >> boolean          % is node null?
+    oNodeFind (Node, node_attribute listAttr, node_attribute valueAttr, int value) >> Node  % find node with value in list
     oNodeGetIter (Node, node_attribute) >> NodeIter   % get an iterator over nodes in a List attribute
     oNodeIterValue (NodeIter) >> Node             % the node that iter is referring to (NodeNull if no more nodes)
     oNodeIterNext (inout NodeIter)                 % advance iterator through list
@@ -414,6 +417,12 @@ mechanism code_mech:
    oCodePop                 % restore the current code stream to the previous one
    ;
 
+mechanism include_mech:
+   oIncludeUnitFile( int id ) >> boolean  % search for <unit>.pas and include it.
+                                          % returns false if can't find.
+   oIncludeEnd              % stop including the current file
+   ;
+
 
 mechanism count :
    oCountPush(int)          % start a new counter, with initial value
@@ -446,6 +455,7 @@ mechanism msg_mech:
    oMsg( int num )             % print message "oMsg <num>"
    oMsgTrace( int num )        % print message "oMsg <num>" followed by ssl traceback
    oMsgNode( Node node )       % print node
+   oMsgNodeLong( Node node )   % print node with more detail
    oMsgNodeVec( NodeVec vec )  % print node vec
    ;
 
@@ -455,9 +465,8 @@ rules
 % ----------------------------- Global Variables ----------------------------
 
 Node    workspace              % root of database
-Node    globalScope            % global nScope
-Node    mainRoutineScope       % scope for temporaries in main routine
-
+Node    initScope              % scope for temporaries global var init,
+                               % and program main stmt / unit initialization stmts
 % built-in nTypes
 Node    FileType
 Node    IntegerType
@@ -507,8 +516,10 @@ Program:
 
    workspace = oNodeNew( nWorkspace )
 
+   % root scope is used for builtins e.g. Integer,
+   % and is a parent to any used units, and the program's own global scope.
    oScopeBegin( 0 )
-   globalScope = oScopeCurrent
+   Node rootScope = oScopeCurrent
 
    @installBuiltIns
 
@@ -540,6 +551,8 @@ Program:
          t = @newIdent( nVar, kVar, LAST_ID )
          oNodeSet( t, qType, FileType )
          oScopeDeclareAlloc( t )
+         % TO DO: I shouldn't declare the files in root scope.
+         %        Should save them for program's global scope.
 
          ','
          pIdent
@@ -553,19 +566,36 @@ Program:
    ]
    ';'
 
+   % The uses clause may only appear once, immediately after the program declaration.
+   [
+      | pUses :  @UsesClause( program )
+      | * :
+   ]
+
+   % Global scope for the program, below any used units.
+   % TO DO: I have a problem here.  I want separate scopes for visibility,
+   %    but need to allocate global vars from a common offset counter,
+   %    which I have in Scope currently.
+   %    I need a way to share allocators.  Should only be necessary for global scopes.
+   %    I could make global scope (with allocUp) a special case, and allocate from a
+   %    global counter despite having separate Scopes.
+   %    Or I could declare Scopes to "extend" another scope, meaning it shares the allocator.
+   oScopeBegin( 0 )
+   Node globalScope = oScopeCurrent
+
    % A new scope just for temporaries in the main routine
    % Create it up front, in case it's needed by variable initialization exprs.
    % But we won't stay in it here.
    oScopeBegin( 0 )
-   mainRoutineScope = oScopeCurrent
-   oNodeSetBoolean( oScopeCurrent, qAllocDown, true )
-   oNodeSet( program, qMainRoutineScope, oScopeCurrent )
+   initScope = oScopeCurrent
+   oNodeSetBoolean( initScope, qAllocDown, true )
+   oNodeSet( program, qMainRoutineScope, initScope )
    oScopeEnd
 
    @BlockDecls( nGlobalVar )
 
 
-   oScopeEnter( mainRoutineScope )
+   oScopeEnter( initScope )
 
    % The block statement includes a stack frame, and enter/return,
    % even for the main routine.
@@ -576,6 +606,198 @@ Program:
 
    '.'
    oScopeEnd   % global scope
+   ;
+
+
+% The uses clause is a list of units required by the user program or unit.
+% We will find and compile the named units (unless already loaded)
+% and make the public portions of the named units visible to this program.
+UsesClause( Node user ):
+   {
+      pIdent
+      Node unit = @FindOrCompileUnit( LAST_ID )
+      [ equal_node( unit, Null )
+         | false :
+            oNodeAddLast( user, qUsedUnits, unit )
+
+            % TO DO: put a declaration in the current scope, naming the unit and pointing to it.
+            %   This is to allow references to  <unit>.<identifier_in_unit>
+            %   Maybe something like nUsedUnit or nImportUnit
+
+            % Make unit's public scope directly visible.
+            % We can do this by entering the unit's public scope, prior to creating the user's scope.
+            % (The user scope will be able to shadow declarations in the unit.)
+            % Need to take care that this scope nesting doesn't confuse me, including with units that
+            % include other units.  But since use clauses are always at the start of a program or unit,
+            % it may work out ok.
+            oScopeEnter( oNodeGet( unit, qPublicScope ) )
+
+            % TO DO: generate a call to the unit's initialization method, if any.
+            % This should go in the program's main init routine, prior to
+            % any var initialization for the program itself.
+            % Actually this should be done in the order the units are loaded,
+            % so maybe must be done at the end, iterating over workspace qUnits.
+            % And similarly for finalization, in reverse order.
+
+         | * :
+      ]
+
+      [
+         | ',' :
+         | * :  >
+      ]
+   }
+   ';'
+   ;
+
+
+FindOrCompileUnit( int id ) >> Node:
+   % TO DO
+   oMsg( 10 )  oMsg( id )
+   % We might have this unit loaded already
+   Node unit = oNodeFind( workspace, qUnits, qIdent, id )
+   [ equal_node( unit, Null )
+      | false :  >> unit
+      | * :
+   ]
+
+   % If not, search for the source file on disk
+   boolean ok = oIncludeUnitFile( id )
+   [ ok
+      | false :  #eCantFindUnitFile  >> Null
+      | * :
+   ]
+
+   % compile it, adding it into the workspace
+   % then return it.
+   unit = @Unit
+
+   % TO DO: ensure we are at pEof
+   % end the include
+   oIncludeEnd
+   >> unit;
+
+
+
+Unit >> Node:
+   pUnit
+   pIdent
+   Node unit = oNodeNew( nUnit )
+   oNodeSetInt( unit, qIdent, LAST_ID )
+   oNodeAddLast( workspace, qUnits, unit )
+   ';'
+   [
+      | pUses :   @UsesClause( unit )
+      | * :
+   ]
+
+   % mandatory sections
+
+   % NOTE, despite syntax diagrams, method headers in the interface may have 'external' clause.
+   % Confirmed this looking at some units shipped with fpc.
+   pInterface
+   oScopeBegin( 0 )
+   oNodeSet( unit, qPublicScope, oScopeCurrent )
+
+   % A scope for temporaries needed by variable initialization
+   oScopeBegin( 0 )
+   initScope = oScopeCurrent
+   oNodeSetBoolean( initScope, qAllocDown, true )
+   oNodeSet( unit, qInitRoutineScope, initScope )
+   oScopeEnd
+
+   @UnitInterface( unit )
+
+   pImplementation
+   oScopeBegin( 0 )
+   oNodeSet( unit, qPrivateScope, oScopeCurrent )
+   @UnitImplementation( unit )
+
+   [
+      | pInitialization :  @UnitInitialization( unit, true )   % init routine with statements from init section
+      | * :                @UnitInitialization( unit, false )  % still need an implicit init routine
+   ]
+   [
+      | pFinalization :  @UnitFinalization( unit )
+      | * :
+   ]
+   pEnd  '.'
+   oScopeEnd  % impl scope
+   oScopeEnd  % interface scope
+   >> unit;
+
+
+UnitInterface( Node unit ):
+   {[
+      | pConst :     @ConstDecl
+      | pType :      @TypeDecl
+      | pVar :       @VarDecl( nGlobalVar )
+      | pProcedure : @ProcHeaderDecl
+      | pFunction :  @FuncHeaderDecl
+      | * :          >
+   ]}
+   ;
+
+UnitImplementation( Node unit ):
+   @BlockDecls( nGlobalVar )
+   ;
+
+
+UnitInitialization( Node unit, boolean hasStmts ):
+   Label label = oLabelNew
+   .tLabel  oEmitLabel( label )
+   oNodeSetLabel( unit, qInitLabel, label )
+
+   int patchLS
+   .tEnter  patchLS = Here  .tSpace
+
+   % insert any code for initialization of this unit's variables.
+   
+   Node scope
+   Code initCode
+
+   scope = oNodeGet( unit, qPublicScope )
+   initCode = oNodeGetCode( scope, qInitCode )
+   oMsg( 3000 )
+   oMsgNodeLong( scope )
+   oMsg( 3001 )
+   oEmitCode( initCode )
+   oNodeSetCode( scope, qInitCode, codeNull )
+
+   scope = oNodeGet( unit, qPrivateScope )
+   initCode = oNodeGetCode( scope, qInitCode )
+   oEmitCode( initCode )
+   oNodeSetCode( scope, qInitCode, codeNull )
+
+   oScopeEnter( oNodeGet( unit, qInitRoutineScope ) )
+
+   [ hasStmts
+      | true :     
+         @Statement
+         {[
+            | ';' :  @Statement
+            | * :
+         ]}
+      | * :
+   ]
+
+   .tReturn
+
+   int localSpace = oNodeGetInt( oScopeCurrent, qSize )
+   oPatch( patchLS, localSpace )
+   oScopeEnd   % init routine scope, for temporaries
+   ;
+
+UnitFinalization( Node unit ):
+   #eNotImplemented
+   ;
+
+ProcHeaderDecl:
+   #eNotImplemented
+   ;
+
+FuncHeaderDecl:
+   #eNotImplemented
    ;
 
 
@@ -620,10 +842,25 @@ BlockStmt( Label labelForBody, Node varScope ):
    int patchLS
    .tEnter  patchLS = Here  .tSpace
 
+   % call init routine of each loaded unit, in the order they were loaded
+   % (used directly or indirectly by the main program).
+   NodeIter it = oNodeGetIter( workspace, qUnits )
+   {
+      Node unit = oNodeIterValue( it )
+      [ oNodeNull( unit )
+         | true :  >
+         | false :
+            .tAllocActuals  oEmitInt( 0 )  % not sure I need this. maybe for stack alignment.
+            .tCall  oEmitLabel( oNodeGetLabel( unit, qInitLabel ) )
+            .tFreeActuals  oEmitInt( 0 )
+            oNodeIterNext( it )
+      ]
+   }
+
    % insert any code for initialization of this scope's variables
    Code initCode = oNodeGetCode( varScope, qInitCode )
    oEmitCode( initCode )
-   oNodeSetCode( oScopeCurrent, qInitCode, codeNull )
+   oNodeSetCode( varScope, qInitCode, codeNull )
 
    @Statement
    .tReturn
@@ -735,7 +972,7 @@ ProcDecl:
          oNodeSet( decl, qParams, Null )
    ]
 
-   int level = oNodeGetInt( oScopeCurrent, qLevel )
+   int level = @ScopeLevel
    boolean nested = greater( level, 0 )
    inc( level )
    oScopeBegin( level )
@@ -835,7 +1072,7 @@ FuncDecl:
          oNodeSet( decl, qType, Null )
    ]
 
-   int level = oNodeGetInt( oScopeCurrent, qLevel )
+   int level = @ScopeLevel
    boolean nested = greater( level, 0 )
    inc( level )
    oScopeBegin( level )
@@ -1047,8 +1284,8 @@ VarDecl( node_type varNodeType ):
                % (so the temporaries get allocated in the right scope).
                % TO DO: Maybe I should make the global scope the special case, instead.
                boolean changedScope = false
-               [ equal_node( oScopeCurrent, globalScope )
-                  | true : oScopeEnter( mainRoutineScope )
+               [ equal_zero( @ScopeLevel )
+                  | true : oScopeEnter( initScope )
                            changedScope = true
                   | * :
                ]
@@ -2459,6 +2696,10 @@ ReadStmt:
 
 % -------------------------------- Utilities -------------------------------
 
+% Return the static scope level of the current scope
+%
+ScopeLevel >> int:
+   >> oNodeGetInt( oScopeCurrent, qLevel );
 
 % Return the static scope level of the given declaration
 %
@@ -2469,7 +2710,7 @@ DeclLevel( Node decl ) >> int:
 % How many levels higher is the given declaration from the current scope?
 %
 DeclUpLevels( Node decl ) >> int:
-   >> subtract( oNodeGetInt( oScopeCurrent, qLevel ), @DeclLevel( decl ) );
+   >> subtract( @ScopeLevel, @DeclLevel( decl ) );
 
 
 % Require that the top two types on the type stack are matching (ignoring subranges).

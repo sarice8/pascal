@@ -5,6 +5,7 @@ type node_type:
 	nINVALID
 	Object
 	nWorkspace
+	nModule
 	nProgram
 	nUnit
 	nScope
@@ -43,6 +44,8 @@ type node_attribute:
 	qUsedUnits
 	qChildScope
 	qMainRoutineScope
+	qPublicScope
+	qPrivateScope
 	qInitLabel
 	qFinalLabel
 	qInitRoutineScope

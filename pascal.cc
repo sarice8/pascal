@@ -528,6 +528,9 @@ Node dNode;  // temporary for several mechanisms
     case oNodeSetCode:
             SetValue ((Node)ssl_argv(0,3), ssl_argv(1,3), ssl_argv(2,3));
             continue;
+    case oNodeAddLast:
+            NodeAddLast((Node)ssl_argv(0,3), ssl_argv(1,3), (Node)ssl_argv(2,3));
+            continue;
     case oNodeGet:
             ssl_result = (long) GetAttr ((Node)ssl_argv(0,2), ssl_argv(1,2));
             continue;
@@ -543,6 +546,14 @@ Node dNode;  // temporary for several mechanisms
     case oNodeNull:
             ssl_result = ((Node)ssl_param == NULL);
             continue;
+    case oNodeFind: {
+            Node N = (Node)ssl_argv(0,4);
+            int nodeAttr = ssl_argv(1,4);
+            int valueAttr = ssl_argv(2,4);
+            long value = ssl_argv(3,4);
+            ssl_result = (long) nodeFindValue_NoErrorChecking (N, nodeAttr, valueAttr, value);
+            continue;
+            }
     case oNodeGetIter: {
             List list = (List) GetAttr((Node)ssl_argv(0,2), ssl_argv(1,2));
             if ( !list ) {
@@ -727,8 +738,6 @@ Node dNode;  // temporary for several mechanisms
     case oScopeBegin:
             dNode = NewNode (nScope);
             if (++dScopeStackPtr == dScopeStackSize) ssl_fatal ("Scope Stack overflow");
-            // schema 1.4 needs our help to create empty list attribute.  A bit unfriendly.
-            SetAttr( dNode, qDecls, NewList(nDeclaration) );
             SetValue( dNode, qLevel, ssl_param );
             dScopeStack[dScopeStackPtr] = dNode;
             continue;
@@ -749,7 +758,7 @@ Node dNode;  // temporary for several mechanisms
             Node scope = dScopeStack[dScopeStackPtr];
             Node decl = (Node) ssl_param;
             SetAttr( decl, qParentScope, scope );
-            AddLast( (List) GetAttr( scope, qDecls ), decl );
+            NodeAddLast( scope, qDecls, decl );
             continue;
             }
     case oScopeDeclareAlloc: {
@@ -757,7 +766,7 @@ Node dNode;  // temporary for several mechanisms
             Node scope = dScopeStack[dScopeStackPtr];
             Node decl = (Node)ssl_param;
             SetAttr( decl, qParentScope, scope );
-            AddLast( (List) GetAttr( scope, qDecls ), decl );
+            NodeAddLast( scope, qDecls, decl );
             Node theType = (Node) GetAttr( decl, qType );
             ssl_assert( theType != NULL );
             int size = GetValue( theType, qSize );
@@ -910,6 +919,32 @@ Node dNode;  // temporary for several mechanisms
             }
             continue;
 
+
+     /* Mechanism include_mech */
+
+     case oIncludeUnitFile : {
+            // TO DO
+            // search for unit file <unit>.pas
+            const char* unitName = ssl_get_id_string( ssl_param );
+            std::string filename = std::string( unitName ) + ".pas";
+            FILE* fp = fopen( filename.c_str(), "r" );
+            ssl_result = ( fp != nullptr );
+            if ( fp ) {
+              printf( "Including %s\n", filename.c_str() );
+              // TO DO: tell ssl to not auto-end the include file,
+              // instead it should return pEof and we'll explicitly end it
+              ssl_include_filename( filename.c_str() );
+            }
+            }
+            continue;
+     case oIncludeEnd : {
+            // TO DO
+            // Tell ssl to stop including the current file
+            // OR, this should happen when explicitly accepting pEof of the include file
+            printf( "Should stop including file now\n" );
+            }
+            continue;
+
      /* Mechanism count */
 
      case oCountPush :
@@ -1009,6 +1044,9 @@ Node dNode;  // temporary for several mechanisms
             continue;
      case oMsgNode :
             DumpNodeShort( (Node) ssl_param );
+            continue;
+     case oMsgNodeLong :
+            DumpNodeLong( (Node) ssl_param );
             continue;
      case oMsgNodeVec : {
             NODE_VEC_PTR nv = (NODE_VEC_PTR) ssl_param;

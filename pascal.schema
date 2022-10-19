@@ -15,21 +15,23 @@ nWorkspace =>
         qUnits:         List            (nUnit)                 [Pri,Opt]
         qProgram:       Node            (nProgram)              [Pri,Opt]
 
-
-Object ::= nProgram
-nProgram =>
+Object ::= nModule
+nModule =>
         qIdent:         Integer4
         qUsedUnits:     List            (nUnit)                 [Alt,Opt]
+
+
+nModule ::= nProgram
+nProgram =>
         qChildScope:    Node            (nScope)                [Pri]
         % scope for use by the main routine, for temporaries
         qMainRoutineScope:  Node        (nScope)                [Pri]
 
 
-Object ::= nUnit
+nModule ::= nUnit
 nUnit =>
-        qIdent:         Integer4
-        qUsedUnits:     List            (nUnit)                 [Alt,Opt]
-        qChildScope:    Node            (nScope)                [Pri]
+        qPublicScope:   Node            (nScope)                [Pri]
+        qPrivateScope:  Node            (nScope)                [Pri]
         qInitLabel:     Integer4            % initialization method label, or 0 for none
         qFinalLabel:    Integer4            % finalization method label, or 0 for none
         % scope for use by the initialization routine, for temporaries
