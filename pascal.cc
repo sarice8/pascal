@@ -110,6 +110,9 @@ CodeStream* currentCodeStream = nullptr;
 /*************** Variables for semantic mechanisms ***************/
 
 
+// workspace
+Node            workspace = nullptr;
+
 // scope stack
 #define dScopeStackSize 40
 Node            dScopeStack[dScopeStackSize];
@@ -420,6 +423,36 @@ init_my_operations()
 }
 
 
+// Allocate size bytes from the given scope.  Returns the address of the allocated memory.
+//
+long
+scopeAlloc( Node scope, int size )
+{
+  long addr;
+  long offset;
+  int allocMode = GetValue( scope, qAllocMode );
+
+  switch ( allocMode ) {
+    case allocGlobal:
+      offset = GetValue( workspace, qGlobalSize );
+      addr = offset;
+      SetValue( workspace, qGlobalSize, offset + size );
+      break;
+    case allocDown:
+      offset = GetValue( scope, qSize );
+      addr = -offset - size;
+      SetValue( scope, qSize, offset + size );
+      break;
+    case allocUp:
+      offset = GetValue( scope, qSize );
+      addr = offset;
+      SetValue( scope, qSize, offset + size );
+      break;
+  }
+  return addr;
+}
+
+
 // Creates some global data that should appear in the output file.
 // Given a pointer to the data to be stored, and the number of bytes.
 // Returns the address of the data in the output file's global data space.
@@ -431,8 +464,8 @@ createGlobalData( const char* sourceData, int sourceBytes )
   int numInts = (sourceBytes + 3) / 4;
   if (dSLptr + numInts + 2 >= dSLsize) ssl_fatal("SL overflow");
 
-  int offset = GetValue( globalScope, qSize );
-  SetValue( globalScope, qSize, offset + sourceBytes );
+  // allocating as ints, because the strlit data table assumes that (see just below)
+  int offset = scopeAlloc( globalScope, numInts * sizeof( int ) );
 
   // the data currenty resides in the output file's "strlit table"
   // with the format:
@@ -733,12 +766,21 @@ Node dNode;  // temporary for several mechanisms
             continue;
 
 
+    /* Mechanism workspace_mech */
+
+    case oWorkspaceNew:
+            workspace = NewNode (nWorkspace);
+            ssl_result = (long) workspace;
+            continue;
+
+
     /* Mechanism scope_mech */
 
     case oScopeBegin:
             dNode = NewNode (nScope);
             if (++dScopeStackPtr == dScopeStackSize) ssl_fatal ("Scope Stack overflow");
-            SetValue( dNode, qLevel, ssl_param );
+            SetValue( dNode, qLevel, ssl_argv(0,2) );
+            SetValue( dNode, qAllocMode, ssl_argv(1,2) );
             dScopeStack[dScopeStackPtr] = dNode;
             continue;
     case oScopeEnter:
@@ -770,14 +812,7 @@ Node dNode;  // temporary for several mechanisms
             Node theType = (Node) GetAttr( decl, qType );
             ssl_assert( theType != NULL );
             int size = GetValue( theType, qSize );
-            long offset = GetValue( scope, qSize );
-            if ( GetValue( scope, qAllocDown ) ) {
-              SetValue( decl, qValue, -offset - size );
-              SetValue( scope, qSize, offset + size );
-            } else {
-              SetValue( decl, qValue, offset );
-              SetValue( scope, qSize, offset + size );
-            }
+            SetValue( decl, qValue, scopeAlloc( scope, size ) );
             continue;
             }
     case oScopeAllocType: {
@@ -786,14 +821,7 @@ Node dNode;  // temporary for several mechanisms
             Node theType = (Node)ssl_param;
             ssl_assert( theType != NULL );
             int size = GetValue( theType, qSize );
-            long offset = GetValue( scope, qSize );
-            if ( GetValue( scope, qAllocDown ) ) {
-              ssl_result = -offset - size;
-              SetValue( scope, qSize, offset + size );
-            } else {
-              ssl_result = offset;
-              SetValue( scope, qSize, offset + size );
-            }
+            ssl_result = scopeAlloc( scope, size );
             continue;
             }
     case oScopeFind:

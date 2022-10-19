@@ -43,6 +43,7 @@ typedef enum {
     qINVALID,
     qUnits,
     qProgram,
+    qGlobalSize,
     qIdent,
     qUsedUnits,
     qChildScope,
@@ -56,7 +57,7 @@ typedef enum {
     qLevel,
     qDecls,
     qSize,
-    qAllocDown,
+    qAllocMode,
     qInitCode,
     qParentScope,
     qType,
@@ -83,6 +84,7 @@ typedef enum {
 #define GetqINVALID(N)		(Integer4)	GetAttr(N, qINVALID)
 #define GetqUnits(N)		(List)	GetAttr(N, qUnits)
 #define GetqProgram(N)		(Node)	GetAttr(N, qProgram)
+#define GetqGlobalSize(N)		(Integer4)	(intptr_t) GetAttr(N, qGlobalSize)
 #define GetqIdent(N)		(Integer4)	(intptr_t) GetAttr(N, qIdent)
 #define GetqUsedUnits(N)		(List)	GetAttr(N, qUsedUnits)
 #define GetqChildScope(N)		(Node)	GetAttr(N, qChildScope)
@@ -96,7 +98,7 @@ typedef enum {
 #define GetqLevel(N)		(Integer4)	(intptr_t) GetAttr(N, qLevel)
 #define GetqDecls(N)		(List)	GetAttr(N, qDecls)
 #define GetqSize(N)		(Integer4)	(intptr_t) GetAttr(N, qSize)
-#define GetqAllocDown(N)		(Boolean1)	(intptr_t) GetAttr(N, qAllocDown)
+#define GetqAllocMode(N)		(Boolean1)	(intptr_t) GetAttr(N, qAllocMode)
 #define GetqInitCode(N)		(Integer4)	(intptr_t) GetAttr(N, qInitCode)
 #define GetqParentScope(N)		(Node)	GetAttr(N, qParentScope)
 #define GetqType(N)		(Node)	GetAttr(N, qType)
@@ -121,6 +123,7 @@ typedef enum {
 #define SetqINVALID(N,V)		SetAttr(N, qINVALID, V)
 #define SetqUnits(N,V)		SetAttr(N, qUnits, V)
 #define SetqProgram(N,V)		SetAttr(N, qProgram, V)
+#define SetqGlobalSize(N,V)		SetAttr(N, qGlobalSize, (void*)(intptr_t)(V))
 #define SetqIdent(N,V)		SetAttr(N, qIdent, (void*)(intptr_t)(V))
 #define SetqUsedUnits(N,V)		SetAttr(N, qUsedUnits, V)
 #define SetqChildScope(N,V)		SetAttr(N, qChildScope, V)
@@ -134,7 +137,7 @@ typedef enum {
 #define SetqLevel(N,V)		SetAttr(N, qLevel, (void*)(intptr_t)(V))
 #define SetqDecls(N,V)		SetAttr(N, qDecls, V)
 #define SetqSize(N,V)		SetAttr(N, qSize, (void*)(intptr_t)(V))
-#define SetqAllocDown(N,V)		SetAttr(N, qAllocDown, (void*)(intptr_t)(V))
+#define SetqAllocMode(N,V)		SetAttr(N, qAllocMode, (void*)(intptr_t)(V))
 #define SetqInitCode(N,V)		SetAttr(N, qInitCode, (void*)(intptr_t)(V))
 #define SetqParentScope(N,V)		SetAttr(N, qParentScope, V)
 #define SetqType(N,V)		SetAttr(N, qType, V)

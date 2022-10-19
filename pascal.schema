@@ -14,6 +14,8 @@ nWorkspace =>
         % all loaded units; not necessarily visible to program or each other
         qUnits:         List            (nUnit)                 [Pri,Opt]
         qProgram:       Node            (nProgram)              [Pri,Opt]
+        qGlobalSize:    Integer4
+        
 
 Object ::= nModule
 nModule =>
@@ -49,7 +51,7 @@ nScope =>
         qLevel:         Integer4        % static scope level (0 = globals)
         qDecls:         List            (nDeclaration)          [Pri,Opt]
         qSize:          Integer4        % space required by declared variables
-        qAllocDown:     Boolean1        % allocate from -1 downto -size
+        qAllocMode:     Boolean1        % how to allocate variables
         qInitCode:      Integer4        % id of code stream to initialize scope's vars
 
 Object ::= nDeclaration

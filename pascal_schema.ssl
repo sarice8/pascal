@@ -40,6 +40,7 @@ type node_attribute:
 	qINVALID
 	qUnits
 	qProgram
+	qGlobalSize
 	qIdent
 	qUsedUnits
 	qChildScope
@@ -53,7 +54,7 @@ type node_attribute:
 	qLevel
 	qDecls
 	qSize
-	qAllocDown
+	qAllocMode
 	qInitCode
 	qParentScope
 	qType

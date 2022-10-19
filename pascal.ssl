@@ -291,6 +291,12 @@ type String:
    stringNull = 0
    ;
 
+% allocation modes for oScopeBegin
+type AllocMode:
+   allocGlobal = 0  % allocate from global data
+   allocDown        % allocate down the stack
+   allocUp          % allocate up the stack
+   ;
 
 % Some general schema node operations.
 % node_type and node_attribute are defined in generated file pascal_schema.ssl included above.
@@ -368,8 +374,12 @@ mechanism more_builtins:      % These should be built-in SSL operations
     CURRENT_STRLIT >> String            % text value of just-accepted string literal
     ;
 
+mechanism workspace_mech:
+    oWorkspaceNew >> Node
+    ;
+
 mechanism scope_mech:
-    oScopeBegin( int level )             % create a new scope. Subsequent declarations will go here.
+    oScopeBegin( int level, AllocMode )  % create a new scope. Subsequent declarations will go here.
                                          %  level = static scope depth (0 = globals)
     oScopeEnter( Node scope )            % enter an existing scope.
     oScopeEnd                            % end current scope. Subsequent declarations will go to previous scope.
@@ -514,11 +524,11 @@ DeclUpLevels( Node decl ) >> int;
 Program:
    Node t
 
-   workspace = oNodeNew( nWorkspace )
+   workspace = oWorkspaceNew
 
    % root scope is used for builtins e.g. Integer,
    % and is a parent to any used units, and the program's own global scope.
-   oScopeBegin( 0 )
+   oScopeBegin( 0, allocGlobal )
    Node rootScope = oScopeCurrent
 
    @installBuiltIns
@@ -580,15 +590,14 @@ Program:
    %    I could make global scope (with allocUp) a special case, and allocate from a
    %    global counter despite having separate Scopes.
    %    Or I could declare Scopes to "extend" another scope, meaning it shares the allocator.
-   oScopeBegin( 0 )
+   oScopeBegin( 0, allocGlobal )
    Node globalScope = oScopeCurrent
 
    % A new scope just for temporaries in the main routine
    % Create it up front, in case it's needed by variable initialization exprs.
    % But we won't stay in it here.
-   oScopeBegin( 0 )
+   oScopeBegin( 0, allocDown )
    initScope = oScopeCurrent
-   oNodeSetBoolean( initScope, qAllocDown, true )
    oNodeSet( program, qMainRoutineScope, initScope )
    oScopeEnd
 
@@ -632,12 +641,11 @@ UsesClause( Node user ):
             % it may work out ok.
             oScopeEnter( oNodeGet( unit, qPublicScope ) )
 
-            % TO DO: generate a call to the unit's initialization method, if any.
-            % This should go in the program's main init routine, prior to
-            % any var initialization for the program itself.
-            % Actually this should be done in the order the units are loaded,
-            % so maybe must be done at the end, iterating over workspace qUnits.
-            % And similarly for finalization, in reverse order.
+            % TO DO: don't do the scopeEnter above.  Instead, do them after the loop that obtains
+            % all the used units.  So they don't interfere with compilation of other units.
+            % Also TO DO: at the end of a module (unit/program) end the scopes we enter here.
+            % e.g. enterUsedUnits / endUsedUnits.  That should let us compile indirectly-used units
+            %     while not leaving those visible to other users e.g. program.
 
          | * :
       ]
@@ -652,8 +660,6 @@ UsesClause( Node user ):
 
 
 FindOrCompileUnit( int id ) >> Node:
-   % TO DO
-   oMsg( 10 )  oMsg( id )
    % We might have this unit loaded already
    Node unit = oNodeFind( workspace, qUnits, qIdent, id )
    [ equal_node( unit, Null )
@@ -696,20 +702,19 @@ Unit >> Node:
    % NOTE, despite syntax diagrams, method headers in the interface may have 'external' clause.
    % Confirmed this looking at some units shipped with fpc.
    pInterface
-   oScopeBegin( 0 )
+   oScopeBegin( 0, allocGlobal )
    oNodeSet( unit, qPublicScope, oScopeCurrent )
 
    % A scope for temporaries needed by variable initialization
-   oScopeBegin( 0 )
+   oScopeBegin( 0, allocDown )
    initScope = oScopeCurrent
-   oNodeSetBoolean( initScope, qAllocDown, true )
    oNodeSet( unit, qInitRoutineScope, initScope )
    oScopeEnd
 
    @UnitInterface( unit )
 
    pImplementation
-   oScopeBegin( 0 )
+   oScopeBegin( 0, allocGlobal )
    oNodeSet( unit, qPrivateScope, oScopeCurrent )
    @UnitImplementation( unit )
 
@@ -758,9 +763,6 @@ UnitInitialization( Node unit, boolean hasStmts ):
 
    scope = oNodeGet( unit, qPublicScope )
    initCode = oNodeGetCode( scope, qInitCode )
-   oMsg( 3000 )
-   oMsgNodeLong( scope )
-   oMsg( 3001 )
    oEmitCode( initCode )
    oNodeSetCode( scope, qInitCode, codeNull )
 
@@ -975,7 +977,7 @@ ProcDecl:
    int level = @ScopeLevel
    boolean nested = greater( level, 0 )
    inc( level )
-   oScopeBegin( level )
+   oScopeBegin( level, allocUp )
    Node paramScope = oScopeCurrent
 
    % A nested method has a hidden first param for the parent static scope.
@@ -1020,8 +1022,7 @@ ProcDecl:
          oScopeEnter( paramScope )
 
          % Start scope for declarations within the proc
-         oScopeBegin( level )
-         oNodeSetBoolean( oScopeCurrent, qAllocDown, true )
+         oScopeBegin( level, allocDown )
          oNodeSet( decl, qChildScope, oScopeCurrent )
 
          Label label = oNodeGetLabel( decl, qValue )
@@ -1075,7 +1076,7 @@ FuncDecl:
    int level = @ScopeLevel
    boolean nested = greater( level, 0 )
    inc( level )
-   oScopeBegin( level )
+   oScopeBegin( level, allocUp )
    Node paramScope = oScopeCurrent
 
    % A nested method has a hidden first param for the parent static scope.
@@ -1127,8 +1128,7 @@ FuncDecl:
          % TO DO: Perhaps I could mark the scope read-only at this point.
          oScopeEnter( paramScope )
 
-         oScopeBegin( level )
-         oNodeSetBoolean( oScopeCurrent, qAllocDown, true )
+         oScopeBegin( level, allocDown )
          oNodeSet( decl, qChildScope, oScopeCurrent )
 
          Label label = oNodeGetLabel( decl, qValue )
@@ -1412,7 +1412,7 @@ TypeRef( out Node resultType ):
 
       | pRecord :
          resultType = oNodeNew( nRecordType )
-         oScopeBegin( -1 )    % level is meaningless here
+         oScopeBegin( -1, allocUp )    % level is meaningless here
 
          @VarDecl( nRecordField )
 
