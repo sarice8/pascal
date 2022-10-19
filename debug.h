@@ -30,11 +30,11 @@ typedef struct dbg_variables_struct {
 #define DBG_TYPE_DISPLAY  ((char *)0x1)
 
 void dbg_init ( const char* debug_data_file, const char* source_filename, const char* input_filename,
-                short break_opcode, dbg_variables* debug_variables );
+                int break_opcode, dbg_variables* debug_variables );
 int dbg_command( char* command );
 void dbg_hit_breakpoint();
 int dbg_check_step_count();
-int dbg_check_input_breakpoint( short input_line, short input_col );
+int dbg_check_input_breakpoint( int input_line, int input_col );
 void dbg_walkTable();
 
 /*  Application Interface to generic debugger.

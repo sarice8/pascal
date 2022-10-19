@@ -95,7 +95,7 @@ int dbg_symbol_table_last;
 
 #define        MAXARGS    10
 
-local short   *dbg_line_table;            /* positions of lines in code     */
+local int*     dbg_line_table;            /* positions of lines in code     */
 
 local int      dbg_trace;                 /* trace source file?             */
 
@@ -115,8 +115,8 @@ local int      dbg_line_step_line;        /* for "next": orig line #        */
 #define        DBG_MAX_BREAKPOINTS 10
 
 struct dbg_breakpoint_struct {
-    short      pc;         /* address of breakpoint */
-    short      code;       /* normal code at that address */
+    int        pc;         /* address of breakpoint */
+    int        code;       /* normal code at that address */
     int        line;       /* stop at <line> if line != -1 */
     const char* in_rule;   /* stop in <rule> if rule name != NULL */
     int        input_line; /* stop at i<line> if line != -1 */
@@ -127,19 +127,19 @@ local struct dbg_breakpoint_struct dbg_breakpoint [DBG_MAX_BREAKPOINTS];
 local int      dbg_num_breakpoints;
 local int      dbg_breakpoints_installed;
 
-local short    oBreak_opcode;
+local int      oBreak_opcode;
 
-dbg_variables *dbg_vars;
+dbg_variables* dbg_vars;
 
 /* "up", "down" commands can modify display context */
-local short    display_pc;
-local short    display_sp;   /* call stack */
+local int      display_pc;
+local int      display_sp;   /* call stack */
 local long     display_var_fp;
 
 // Forward declarations
 
-local void display_source_for_pc ( short pc );
-local void display_context_vars ( short pc, long fp, int show_globals, const char* var_name );
+local void display_source_for_pc ( int pc );
+local void display_context_vars ( int pc, long fp, int show_globals, const char* var_name );
 local void display_value ( char* type_name, char* symbol_name, long value );
 
 int dbg_run ();
@@ -157,7 +157,7 @@ void dbgui_restart ( const char* input_filename );
 void dbgui_main_loop ();
 void dbgui_create_debug_window ( const char* source_filename, const char* input_filename );
 void dbgui_restart_input_window ( const char* input_filename );
-void dbgui_at_line ( short line );
+void dbgui_at_line ( int line );
 void dbgui_at_input_position ( int line, int col );
 void dbgui_execution_status ( const char* status_string );
 
@@ -182,7 +182,7 @@ void dbgui_execution_status ( const char* status_string );
 
 void
 dbg_init ( const char* debug_data_file, const char* source_filename, const char* input_filename,
-           short break_opcode, dbg_variables* debug_variables )
+           int break_opcode, dbg_variables* debug_variables )
 {
     FILE      *fp;
     int        entries;
@@ -214,7 +214,7 @@ dbg_init ( const char* debug_data_file, const char* source_filename, const char*
     int read = fscanf (fp, "%d", &entries);
     assert( read == 1 );
 
-    dbg_line_table = (short *) malloc ((entries+1) * sizeof(short));
+    dbg_line_table = (int *) malloc ((entries+1) * sizeof(int));
     dbg_line_table[0] = entries;
     for (line = 1; line <= entries; line++)
     {
@@ -248,7 +248,7 @@ dbg_init ( const char* debug_data_file, const char* source_filename, const char*
 int
 dbg_check_step_count()
 {
-    short     line;
+    int     line;
 
     if ((dbg_step_mode == DBG_STEP_NONE) || 
         ((dbg_step_mode == DBG_STEP_INSTRUCTION) && (dbg_step_count-- > 0)))
@@ -294,7 +294,7 @@ dbg_check_step_count()
     Returns TRUE if we have hit an input-line breakpoint. */
 
 int
-dbg_check_input_breakpoint ( short input_line, short input_col )
+dbg_check_input_breakpoint ( int input_line, int input_col )
 {
     int  i;
 
@@ -322,7 +322,7 @@ dbg_check_input_breakpoint ( short input_line, short input_col )
 int
 dbg_command ( char* command )
 {
-    short     line;
+    int       line;
     int       argc;
     char     *argv [MAXARGS];
     int       i;
@@ -676,9 +676,9 @@ dbg_run ()
 void
 dbg_display_position()
 {
-    short     line;
+    int       line;
     char      buffer[50];
-    short     input_line, input_col;
+    int       input_line, input_col;
 
     /* Reset displayed context for up/down commands */
     display_pc = ssl_pc;
@@ -701,9 +701,9 @@ dbg_display_position()
 
 
 void
-display_source_for_pc ( short pc )
+display_source_for_pc ( int pc )
 {
-    short     line;
+    int     line;
 
     line = dbg_find_line (pc);
     dbgui_at_line (line);
@@ -791,7 +791,7 @@ split_args ( char* cmdbuf, int* argc, char** argv )
 void
 dbg_hit_breakpoint()
 {
-    short    i;
+    int    i;
 
     ssl_pc--;
 
@@ -826,8 +826,8 @@ dbg_hit_breakpoint()
 void
 dbg_hit_input_breakpoint ()
 {
-    short    i;
-    short    input_line, input_col;
+    int    i;
+    int    input_line, input_col;
 
     ssl_get_input_position (&input_line, &input_col);
 
@@ -850,7 +850,7 @@ dbg_execution_complete()
 int
 dbg_find_line ( int pc )
 {
-    short        line;
+    int          line;
     int          max_line = dbg_line_table[0];
 
     /* Skip to last source line at that pc address */
@@ -968,7 +968,7 @@ dbgui_restart_input_window ( const char* input_filename )
 
 
 void
-dbgui_at_line ( short line )
+dbgui_at_line ( int line )
 {
 #if 0
     /*  This is how I used to do it with TxEd on the Amiga */
@@ -1100,7 +1100,7 @@ display_value ( char* type_name, char* symbol_name, long value )
  * will be displayed.
  */
 void
-display_context_vars ( short pc, long fp, int show_globals, const char* var_name )
+display_context_vars ( int pc, long fp, int show_globals, const char* var_name )
 {
     int    symbol;
     long   value;
