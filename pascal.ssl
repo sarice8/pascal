@@ -763,17 +763,21 @@ UnitInterface( Node unit ):
 
       | pProcedure :
          Node decl = @ProcHeaderDecl
-         % despite syntax diagrams, fpc does allow external clause on methods in unit interface
+         % despite syntax diagrams, fpc does allow external clause on methods in unit interface,
+         % even though this clause is an alternative for the body statement.
          [
-            | pExternal : @ExternalDecl( decl )
+            | pExternal :
+               @ExternalDecl( decl )
+               ';'
             | * :
          ]
 
       | pFunction :
          Node decl = @FuncHeaderDecl
-         % despite syntax diagrams, fpc does allow external clause on methods in unit interface
          [
-            | pExternal : @ExternalDecl( decl )
+            | pExternal :
+               @ExternalDecl( decl )
+               ';'
             | * :
          ]
 
