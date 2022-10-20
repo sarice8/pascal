@@ -585,13 +585,6 @@ Program:
    @EnterUsedUnits( program )
 
    % Global scope for the program, below any used units.
-   % TO DO: I have a problem here.  I want separate scopes for visibility,
-   %    but need to allocate global vars from a common offset counter,
-   %    which I have in Scope currently.
-   %    I need a way to share allocators.  Should only be necessary for global scopes.
-   %    I could make global scope (with allocUp) a special case, and allocate from a
-   %    global counter despite having separate Scopes.
-   %    Or I could declare Scopes to "extend" another scope, meaning it shares the allocator.
    oScopeBegin( 0, allocGlobal )
    Node globalScope = oScopeCurrent
 
