@@ -1,4 +1,4 @@
-#define SSL_CODE_TABLE_SIZE 8000
+#define SSL_CODE_TABLE_SIZE 8500
 
 #define oJumpForward 0
 #define oJumpBack 1
@@ -183,6 +183,7 @@
 #define eOnlyOneVarCanBeInitialized 22
 #define eExternalMethodCannotBeNested 23
 #define eCantFindUnitFile 24
+#define eInternalScopeMismatch 25
 #define nINVALID 0
 #define Object 1
 #define nWorkspace 2
@@ -228,9 +229,9 @@
 #define qInitLabel 10
 #define qFinalLabel 11
 #define qInitRoutineScope 12
-#define qFinalRoutineScope 13
-#define qLevel 14
-#define qDecls 15
+#define qLevel 13
+#define qDecls 14
+#define qExtends 15
 #define qSize 16
 #define qAllocMode 17
 #define qInitCode 18
@@ -410,8 +411,9 @@ struct ssl_error_table_struct ssl_error_table[] = {
    "eOnlyOneVarCanBeInitialized", 22,
    "eExternalMethodCannotBeNested", 23,
    "eCantFindUnitFile", 24,
+   "eInternalScopeMismatch", 25,
    "", 0
 };
-int ssl_error_table_size = 25;
+int ssl_error_table_size = 26;
 
 #endif // SSL_INCLUDE_ERR_TABLE

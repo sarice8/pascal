@@ -849,7 +849,15 @@ Node dNode;  // temporary for several mechanisms
             }
             continue;
     case oScopeFindInCurrentScope: {
-            dNode = nodeFindValue_NoErrorChecking (dScopeStack[dScopeStackPtr], qDecls, qIdent, ssl_last_id);
+            Node scope = dScopeStack[dScopeStackPtr];
+            dNode = nodeFindValue_NoErrorChecking( scope, qDecls, qIdent, ssl_last_id );
+            if ( !dNode ) {
+              // Look in a scope we extend, too.  Needed to provide impl for procs in unit interface.
+              Node extends = (Node) GetAttr( scope, qExtends );
+              if ( extends) {
+                dNode = nodeFindValue_NoErrorChecking( extends, qDecls, qIdent, ssl_last_id );
+              }
+            }
             ssl_result = (long) dNode;
             continue;
             }

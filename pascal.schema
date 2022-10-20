@@ -15,7 +15,7 @@ nWorkspace =>
         qUnits:         List            (nUnit)                 [Pri,Opt]
         qProgram:       Node            (nProgram)              [Pri,Opt]
         qGlobalSize:    Integer4
-        
+
 
 Object ::= nModule
 nModule =>
@@ -38,8 +38,6 @@ nUnit =>
         qFinalLabel:    Integer4            % finalization method label, or 0 for none
         % scope for use by the initialization routine, for temporaries
         qInitRoutineScope:  Node        (nScope)                [Pri]
-        % scope for use by the finalization routine, for temporaries
-        qFinalRoutineScope:  Node       (nScope)                [Pri]
 
 
 % -----------------------------------------------------------------------
@@ -50,6 +48,9 @@ Object ::= nScope
 nScope =>
         qLevel:         Integer4        % static scope level (0 = globals)
         qDecls:         List            (nDeclaration)          [Pri,Opt]
+        % This scope extends another, in terms of visibility (e.g. unit impl extends interface).
+        % A decl with the same name would be redeclaring (or providing impl), not shadowing.
+        qExtends:       Node            (nScope)                [Alt,Opt]
         qSize:          Integer4        % space required by declared variables
         qAllocMode:     Boolean1        % how to allocate variables
         qInitCode:      Integer4        % id of code stream to initialize scope's vars

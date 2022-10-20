@@ -53,9 +53,9 @@ typedef enum {
     qInitLabel,
     qFinalLabel,
     qInitRoutineScope,
-    qFinalRoutineScope,
     qLevel,
     qDecls,
+    qExtends,
     qSize,
     qAllocMode,
     qInitCode,
@@ -94,9 +94,9 @@ typedef enum {
 #define GetqInitLabel(N)		(Integer4)	(intptr_t) GetAttr(N, qInitLabel)
 #define GetqFinalLabel(N)		(Integer4)	(intptr_t) GetAttr(N, qFinalLabel)
 #define GetqInitRoutineScope(N)		(Node)	GetAttr(N, qInitRoutineScope)
-#define GetqFinalRoutineScope(N)		(Node)	GetAttr(N, qFinalRoutineScope)
 #define GetqLevel(N)		(Integer4)	(intptr_t) GetAttr(N, qLevel)
 #define GetqDecls(N)		(List)	GetAttr(N, qDecls)
+#define GetqExtends(N)		(Node)	GetAttr(N, qExtends)
 #define GetqSize(N)		(Integer4)	(intptr_t) GetAttr(N, qSize)
 #define GetqAllocMode(N)		(Boolean1)	(intptr_t) GetAttr(N, qAllocMode)
 #define GetqInitCode(N)		(Integer4)	(intptr_t) GetAttr(N, qInitCode)
@@ -133,9 +133,9 @@ typedef enum {
 #define SetqInitLabel(N,V)		SetAttr(N, qInitLabel, (void*)(intptr_t)(V))
 #define SetqFinalLabel(N,V)		SetAttr(N, qFinalLabel, (void*)(intptr_t)(V))
 #define SetqInitRoutineScope(N,V)		SetAttr(N, qInitRoutineScope, V)
-#define SetqFinalRoutineScope(N,V)		SetAttr(N, qFinalRoutineScope, V)
 #define SetqLevel(N,V)		SetAttr(N, qLevel, (void*)(intptr_t)(V))
 #define SetqDecls(N,V)		SetAttr(N, qDecls, V)
+#define SetqExtends(N,V)		SetAttr(N, qExtends, V)
 #define SetqSize(N,V)		SetAttr(N, qSize, (void*)(intptr_t)(V))
 #define SetqAllocMode(N,V)		SetAttr(N, qAllocMode, (void*)(intptr_t)(V))
 #define SetqInitCode(N,V)		SetAttr(N, qInitCode, (void*)(intptr_t)(V))

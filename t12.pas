@@ -26,15 +26,17 @@ begin
   writeln( 'Hello from main.  x1=', x1 );
   proc1( 5, 6 );
   writeln( 'u1x1=', u1x1 );
-  {
+
   unit1_proc1( 50, 60 );
   x1 := 15;
   unit1_proc1( 51, 61 );
-  unit1.x1 := 16;
-  unit1_proc1( 52, 62 );
+
+
+  // unit1.x1 := 16;
+  // unit1_proc1( 52, 62 );
 
   writeln( x1 );
-  writeln( unit1.x1 );
-  }
+
+  // writeln( unit1.x1 );
 
 end.

@@ -50,9 +50,9 @@ type node_attribute:
 	qInitLabel
 	qFinalLabel
 	qInitRoutineScope
-	qFinalRoutineScope
 	qLevel
 	qDecls
+	qExtends
 	qSize
 	qAllocMode
 	qInitCode

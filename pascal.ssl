@@ -233,6 +233,7 @@ error:
    eOnlyOneVarCanBeInitialized
    eExternalMethodCannotBeNested
    eCantFindUnitFile
+   eInternalScopeMismatch
    ;
 
 include 'pascal_schema.ssl'
@@ -489,7 +490,7 @@ Node    StringType
 
 Block( node_type varNodeType, Label labelForBody );
 BlockDecls( node_type varNodeType );
-BlockStmt( Label labelForBody, Node varScope );
+BlockStmt( Label labelForBody, Node varScope, boolean isMain );
 VarDecl( node_type varNodeType );
 newType( node_type nt, int size ) >> Node;
 newIdent( node_type nt, kind k, int id ) >> Node;
@@ -581,6 +582,7 @@ Program:
       | pUses :  @UsesClause( program )
       | * :
    ]
+   @EnterUsedUnits( program )
 
    % Global scope for the program, below any used units.
    % TO DO: I have a problem here.  I want separate scopes for visibility,
@@ -609,12 +611,17 @@ Program:
    % The block statement includes a stack frame, and enter/return,
    % even for the main routine.
    % That will be necessary for temporaries allocated in the main routine.
-   @BlockStmt( mainLabel, globalScope )
+
+   % isMain means we'll generate calls to the unit init/final methods in here too.
+   % Alternatively we could do that in a higher level method that calls main.
+   boolean isMain = true
+   @BlockStmt( mainLabel, globalScope, isMain )
 
    oScopeEnd   % main routine scope
 
    '.'
    oScopeEnd   % global scope
+   @EndUsedUnits( program )   % used units scopes
    ;
 
 
@@ -632,30 +639,50 @@ UsesClause( Node user ):
             % TO DO: put a declaration in the current scope, naming the unit and pointing to it.
             %   This is to allow references to  <unit>.<identifier_in_unit>
             %   Maybe something like nUsedUnit or nImportUnit
-
-            % Make unit's public scope directly visible.
-            % We can do this by entering the unit's public scope, prior to creating the user's scope.
-            % (The user scope will be able to shadow declarations in the unit.)
-            % Need to take care that this scope nesting doesn't confuse me, including with units that
-            % include other units.  But since use clauses are always at the start of a program or unit,
-            % it may work out ok.
-            oScopeEnter( oNodeGet( unit, qPublicScope ) )
-
-            % TO DO: don't do the scopeEnter above.  Instead, do them after the loop that obtains
-            % all the used units.  So they don't interfere with compilation of other units.
-            % Also TO DO: at the end of a module (unit/program) end the scopes we enter here.
-            % e.g. enterUsedUnits / endUsedUnits.  That should let us compile indirectly-used units
-            %     while not leaving those visible to other users e.g. program.
-
          | * :
       ]
-
       [
          | ',' :
          | * :  >
       ]
-   }
+   }   
    ';'
+   ;
+
+EnterUsedUnits( Node user ):
+   % Make the used units' public scopes directly visible.
+   % This is done after the units are all compiled, so they don't interfere with each other incorrectly.
+   NodeIter unitIt = oNodeGetIter( user, qUsedUnits )
+   {
+      Node unit = oNodeIterValue( unitIt )
+      [ oNodeNull( unit )
+         | false :
+            oScopeEnter( oNodeGet( unit, qPublicScope ) )
+         | * :
+            >
+      ]
+      oNodeIterNext( unitIt )
+   }
+   ;
+
+EndUsedUnits( Node user ):
+   % Leave the units' public scopes, so no longer visible.
+   NodeIter unitIt = oNodeGetIter( user, qUsedUnits )
+   {
+      Node unit = oNodeIterValue( unitIt )
+      [ oNodeNull( unit )
+         | false :
+            % Consistency check.  Make sure our scope enter / end have lined up correctly.
+            [ oNodeEqual( oScopeCurrent, oNodeGet( unit, qPublicScope ) )
+               | true :
+               | false :  #eInternalScopeMismatch
+            ]
+            oScopeEnd
+         | * :
+            >
+      ]
+      oNodeIterNext( unitIt )
+   }
    ;
 
 
@@ -696,6 +723,7 @@ Unit >> Node:
       | pUses :   @UsesClause( unit )
       | * :
    ]
+   @EnterUsedUnits( unit )
 
    % mandatory sections
 
@@ -716,6 +744,7 @@ Unit >> Node:
    pImplementation
    oScopeBegin( 0, allocGlobal )
    oNodeSet( unit, qPrivateScope, oScopeCurrent )
+   oNodeSet( oScopeCurrent, qExtends, oNodeGet( unit, qPublicScope ) )
    @UnitImplementation( unit )
 
    [
@@ -723,12 +752,13 @@ Unit >> Node:
       | * :                @UnitInitialization( unit, false )  % still need an implicit init routine
    ]
    [
-      | pFinalization :  @UnitFinalization( unit )
-      | * :
+      | pFinalization :  @UnitFinalization( unit, true )
+      | * :              @UnitFinalization( unit, false )   % have an implicit final routine, may be handy later
    ]
    pEnd  '.'
    oScopeEnd  % impl scope
    oScopeEnd  % interface scope
+   @EndUsedUnits( unit )  % used units scopes
    >> unit;
 
 
@@ -737,8 +767,23 @@ UnitInterface( Node unit ):
       | pConst :     @ConstDecl
       | pType :      @TypeDecl
       | pVar :       @VarDecl( nGlobalVar )
-      | pProcedure : @ProcHeaderDecl
-      | pFunction :  @FuncHeaderDecl
+
+      | pProcedure :
+         Node decl = @ProcHeaderDecl
+         % despite syntax diagrams, fpc does allow external clause on methods in unit interface
+         [
+            | pExternal : @ExternalDecl( decl )
+            | * :
+         ]
+
+      | pFunction :
+         Node decl = @FuncHeaderDecl
+         % despite syntax diagrams, fpc does allow external clause on methods in unit interface
+         [
+            | pExternal : @ExternalDecl( decl )
+            | * :
+         ]
+
       | * :          >
    ]}
    ;
@@ -778,7 +823,7 @@ UnitInitialization( Node unit, boolean hasStmts ):
          @Statement
          {[
             | ';' :  @Statement
-            | * :
+            | * :    >
          ]}
       | * :
    ]
@@ -790,22 +835,39 @@ UnitInitialization( Node unit, boolean hasStmts ):
    oScopeEnd   % init routine scope, for temporaries
    ;
 
-UnitFinalization( Node unit ):
-   #eNotImplemented
-   ;
 
-ProcHeaderDecl:
-   #eNotImplemented
-   ;
+UnitFinalization( Node unit, boolean hasStmts ):
+   Label label = oLabelNew
+   .tLabel  oEmitLabel( label )
+   oNodeSetLabel( unit, qFinalLabel, label )
 
-FuncHeaderDecl:
-   #eNotImplemented
+   int patchLS
+   .tEnter  patchLS = Here  .tSpace
+
+   % final routine scope, for temporaries
+   oScopeBegin( 0, allocDown )
+
+   [ hasStmts
+      | true :     
+         @Statement
+         {[
+            | ';' :  @Statement
+            | * :    >
+         ]}
+      | * :
+   ]
+
+   .tReturn
+
+   int localSpace = oNodeGetInt( oScopeCurrent, qSize )
+   oPatch( patchLS, localSpace )
+   oScopeEnd   % final routine scope, for temporaries
    ;
 
 
 Block( node_type varNodeType, Label labelForBody ):
    @BlockDecls( varNodeType )
-   @BlockStmt( labelForBody, oScopeCurrent )
+   @BlockStmt( labelForBody, oScopeCurrent, false )
    ;
 
 
@@ -830,20 +892,7 @@ CheckForUndefinedMethods:
    ;
 
 
-
-% Given the scope of vars in this block.
-% Usually it's the current scope, but it's a bit different for the main statement.
-%
-BlockStmt( Label labelForBody, Node varScope ):
-   .tLabel  oEmitLabel( labelForBody )
-
-   % Proc, func, and main routine all start with tEnter
-   % to create a stack frame.  This will be used for temporaries
-   % (and local vars in the case of proc, func).
-
-   int patchLS
-   .tEnter  patchLS = Here  .tSpace
-
+InitializeUnits:
    % call init routine of each loaded unit, in the order they were loaded
    % (used directly or indirectly by the main program).
    NodeIter it = oNodeGetIter( workspace, qUnits )
@@ -857,7 +906,43 @@ BlockStmt( Label labelForBody, Node varScope ):
             .tFreeActuals  oEmitInt( 0 )
             oNodeIterNext( it )
       ]
-   }
+   };
+
+
+FinalizeUnits:
+   NodeIter it = oNodeGetIter( workspace, qUnits )
+   {
+      Node unit = oNodeIterValue( it )
+      [ oNodeNull( unit )
+         | true :  >
+         | false :
+            .tAllocActuals  oEmitInt( 0 )  % not sure I need this. maybe for stack alignment.
+            .tCall  oEmitLabel( oNodeGetLabel( unit, qFinalLabel ) )
+            .tFreeActuals  oEmitInt( 0 )
+            oNodeIterNext( it )
+      ]
+   };
+
+
+% Given the scope of vars in this block.
+% Usually it's the current scope, but it's a bit different for the main statement.
+%
+BlockStmt( Label labelForBody, Node varScope, boolean isMain ):
+   .tLabel  oEmitLabel( labelForBody )
+
+   % Proc, func, and main routine all start with tEnter
+   % to create a stack frame.  This will be used for temporaries
+   % (and local vars in the case of proc, func).
+
+   int patchLS
+   .tEnter  patchLS = Here  .tSpace
+
+   % If we're generating the program main method,
+   % add in calls to the loaded units' initialization and finalization.
+   [ isMain
+      | true :  @InitializeUnits
+      | * :
+   ]
 
    % insert any code for initialization of this scope's variables
    Code initCode = oNodeGetCode( varScope, qInitCode )
@@ -865,6 +950,12 @@ BlockStmt( Label labelForBody, Node varScope ):
    oNodeSetCode( varScope, qInitCode, codeNull )
 
    @Statement
+
+   [ isMain
+      | true :  @FinalizeUnits
+      | * :
+   ]
+
    .tReturn
 
    int localSpace = oNodeGetInt( oScopeCurrent, qSize )
@@ -934,7 +1025,7 @@ ExternalDecl( Node decl ):
    ;
 
 
-ProcDecl:
+ProcHeaderDecl >> Node:
    pIdent
 
    % If we already have a forward declaration, we'll modify that decl
@@ -1000,6 +1091,11 @@ ProcDecl:
    ]
 
    @MethodModifiers( decl )
+   >> decl;
+
+
+ProcDecl:
+   Node decl = @ProcHeaderDecl
 
    % Body may be a statement, "forward", "external".
    % Note, this syntax is based on FPC, and I'm not sure if other Pascals are similar.
@@ -1019,9 +1115,11 @@ ProcDecl:
 
          % Enter the params scope again, so params are visible in body.
          % TO DO: Perhaps I could mark the scope read-only at this point.
+         Node paramScope = oNodeGet( decl, qParams )
          oScopeEnter( paramScope )
 
          % Start scope for declarations within the proc
+         int level = oNodeGetInt( paramScope, qLevel )
          oScopeBegin( level, allocDown )
          oNodeSet( decl, qChildScope, oScopeCurrent )
 
@@ -1035,7 +1133,8 @@ ProcDecl:
    ';';
 
 
-FuncDecl:
+
+FuncHeaderDecl >> Node:
    pIdent
 
    % If we already have a forward declaration, we'll modify that decl
@@ -1114,6 +1213,12 @@ FuncDecl:
 
    @MethodModifiers( decl )
 
+   >> decl;
+
+
+FuncDecl:
+   Node decl = @FuncHeaderDecl
+
    % Body may be a statement, "forward", "external".
    [
       | pForward :
@@ -1126,8 +1231,11 @@ FuncDecl:
 
          % Enter the params scope again, so params are visible in body.
          % TO DO: Perhaps I could mark the scope read-only at this point.
+         Node paramScope = oNodeGet( decl, qParams )
          oScopeEnter( paramScope )
 
+         % Start scope for declarations within the func
+         int level = oNodeGetInt( paramScope, qLevel )
          oScopeBegin( level, allocDown )
          oNodeSet( decl, qChildScope, oScopeCurrent )
 
