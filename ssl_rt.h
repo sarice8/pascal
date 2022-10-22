@@ -193,11 +193,24 @@ void ssl_init_scanner ( struct ssl_token_table_struct *keyword_table,
  */
 void ssl_scanner_init_comment( const char* start_str, const char* end_str );
 
+
+/*
+ *  Should include files end automatically at eof?  Default true.
+ */
+void ssl_end_include_at_eof( int end_include_at_eof );
+
+
 /*
  *  Include another source file
  */
 void ssl_include_filename ( const char* filename );
 
+
+/*
+ *  Stop including the current source file.
+ *  Only needed when an application uses ssl_end_include_at_eof( 0 ).
+ */
+void ssl_end_include();
 
 /*
  *  Reset the input to the start of the source file,

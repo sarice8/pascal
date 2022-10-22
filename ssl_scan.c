@@ -98,9 +98,20 @@ void   s_lookup_id ();
 void   s_hit_eof ();
 void   s_restart_scanner_input_position ();
 
-static int    s_including_file;   /* "Include" application source files */
-static FILE  *s_src_includer;
-static int    s_src_includer_line_number;
+static int    s_end_include_at_eof = 1;
+
+typedef struct ssl_include_info_struct {
+    FILE*        file;
+    char*        line_text;
+    int          col;
+    int          line_number;
+} ssl_include_info;
+
+// The include stack records where we should resume after the include.
+#define SSL_INCLUDE_STACK_SIZE 40
+ssl_include_info ssl_include_stack[SSL_INCLUDE_STACK_SIZE];
+int ssl_include_sp = 0;
+
 
 /* ---- End of private variables ----- */
 
@@ -180,8 +191,6 @@ struct ssl_special_codes_struct      *special_codes;
     // Applications can override this by calling ssl_scanner_init_comment() themselves.
     ssl_scanner_init_comment( "%", "" );
     ssl_using_default_comment_brackets = 1;
-
-    s_including_file = 0;
 }
 
 
@@ -217,10 +226,8 @@ ssl_reset_input ()
 {
     fclose (ssl_src_file);
 
-    if (s_including_file)
-    {
-        fclose (s_src_includer);
-        s_including_file = 0;
+    while ( ssl_include_sp ) {
+        ssl_end_include();
     }
 
     if ((ssl_src_file=fopen(ssl_input_filename, "r"))==NULL)
@@ -233,14 +240,27 @@ ssl_reset_input ()
 }
 
 
+/*
+ *  Should include files end automatically at eof?  Default true.
+ */
+void ssl_end_include_at_eof( int end_include_at_eof )
+{
+  s_end_include_at_eof = end_include_at_eof;
+}
+
+
 void
 ssl_include_filename( const char* include_filename )
 {
-    if (s_including_file)
-        ssl_fatal ("Nested includes are not yet supported");
-    s_including_file = 1;
-    s_src_includer = ssl_src_file;
-    s_src_includer_line_number = ssl_line_number;
+    // Record where we should resume when finished the include
+    if ( ++ssl_include_sp >= SSL_INCLUDE_STACK_SIZE ) {
+        ssl_fatal( "ssl include stack overflow\n" );
+    }
+    ssl_include_stack[ssl_include_sp].file = ssl_src_file;
+    ssl_include_stack[ssl_include_sp].line_text = strdup( ssl_line_buffer );
+    ssl_include_stack[ssl_include_sp].col = ( s_src_ptr - ssl_line_buffer );
+    ssl_include_stack[ssl_include_sp].line_number = ssl_line_number;
+
     ssl_src_file = fopen (include_filename, "r");
     if (ssl_src_file == NULL)
     {
@@ -251,6 +271,31 @@ ssl_include_filename( const char* include_filename )
     s_src_ptr = ssl_line_buffer;
     ssl_line_listed = 1;
     ssl_line_number = 0;
+}
+
+
+/*  Stop reading the current include file, and resume the earlier file.
+ *  By default this happens automatically when eof is reached,
+ *  but the application can request to do it manually at an appropriate point.
+ */
+void
+ssl_end_include()
+{
+    if ( ssl_include_sp == 0 ) {
+        ssl_fatal( "ssl_end_include: was not including a file\n" );
+    }
+
+    fclose (ssl_src_file);
+
+    ssl_src_file = ssl_include_stack[ssl_include_sp].file;
+    strcpy( ssl_line_buffer, ssl_include_stack[ssl_include_sp].line_text );
+    s_src_ptr = ssl_line_buffer + ssl_include_stack[ssl_include_sp].col;
+    ssl_line_number = ssl_include_stack[ssl_include_sp].line_number;
+    free( ssl_include_stack[ssl_include_sp].line_text );
+    --ssl_include_sp;
+
+    ssl_line_listed = 1;
+    ssl_get_next_token();
 }
 
 
@@ -555,22 +600,13 @@ ssl_accept_token ()
 void
 s_hit_eof ()
 {
-    if (!s_including_file)
-    {
+    if ( ssl_include_sp && s_end_include_at_eof ) {
+        ssl_end_include();
+    } else {
         ssl_token.code = s_special_codes->eof;
     }
-    else
-    {
-        fclose (ssl_src_file);
-        s_including_file = 0;
-        ssl_src_file = s_src_includer;
-        ssl_line_buffer[0] = '\0';
-        s_src_ptr = ssl_line_buffer;
-        ssl_line_number = s_src_includer_line_number;
-        ssl_line_listed = 1;
-        ssl_get_next_token();
-    }
 }
+
 
 /* Used by debugger: get current input file position */
 
