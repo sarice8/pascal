@@ -393,6 +393,10 @@ init_my_scanner()
   ssl_scanner_init_comment( "(*", "*)" );  // Original pascal comments
   ssl_scanner_init_comment( "{", "}" );    // Introduced by Turbo Pascal
   ssl_scanner_init_comment( "//", "" );    // to end of line. Delphi pascal.
+
+  // I'm using the scanner's include mechanism to read unit files.
+  // But I'll control when the including should stop, e.g. in case a unit file is malformed.
+  ssl_end_include_at_eof( 0 );
 }
 
 
@@ -596,6 +600,15 @@ Node dNode;  // temporary for several mechanisms
             }
             continue;
             }
+    case oNodeGetIterLast: {
+            List list = (List) GetAttr((Node)ssl_argv(0,2), ssl_argv(1,2));
+            if ( !list ) {
+              ssl_result = 0;
+            } else {
+              ssl_result = (long) LastItem( list );
+            }
+            continue;
+            }
     case oNodeIterValue: {
             Item item = (Item)ssl_param;
             if ( item == NULL ) {
@@ -609,6 +622,14 @@ Node dNode;  // temporary for several mechanisms
             Item item = (Item) ssl_var_stack[ssl_param];
             if ( item != NULL ) {
               item = NextItem( item );
+              ssl_var_stack[ssl_param] = (long) item;
+            }
+            continue;
+            }
+    case oNodeIterPrev: {
+            Item item = (Item) ssl_var_stack[ssl_param];
+            if ( item != NULL ) {
+              item = PrevItem( item );
               ssl_var_stack[ssl_param] = (long) item;
             }
             continue;
@@ -974,10 +995,9 @@ Node dNode;  // temporary for several mechanisms
             }
             continue;
      case oIncludeEnd : {
-            // TO DO
             // Tell ssl to stop including the current file
-            // OR, this should happen when explicitly accepting pEof of the include file
-            printf( "Should stop including file now\n" );
+            // OR, this should happen when explicitly accepting pEof of the include file?
+            ssl_end_include();
             }
             continue;
 

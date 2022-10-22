@@ -22,8 +22,7 @@ procedure setPixel( x, y : integer; color : integer ); cdecl; external 'runlib' 
 function getPixel( x, y : integer ) : integer; cdecl; external 'runlib' name 'runlibGetPixel';
 procedure delay( milliseconds : integer ); cdecl; external 'runlib' name 'runlibDelay';
 
-// Wait for a key, and return its scan code.  Scan codes defined by SDL2.
-// TO DO: should return both ascii char and scan code.
+// Wait for a key, and return its "keysym".  keysyms defined by SDL2.
 function waitKey : integer; cdecl; external 'runlib' name 'runlibWaitKey';
 
 // Key codes that could be returned by waitKey

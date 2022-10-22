@@ -8,6 +8,7 @@ type node_type:
 	nModule
 	nProgram
 	nUnit
+	nUnitImpl
 	nScope
 	nDeclaration
 	nIdent
@@ -45,6 +46,7 @@ type node_attribute:
 	qUsedUnits
 	qChildScope
 	qMainRoutineScope
+	qImpl
 	qPublicScope
 	qPrivateScope
 	qInitLabel

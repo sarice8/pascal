@@ -32,12 +32,19 @@ nProgram =>
 
 nModule ::= nUnit
 nUnit =>
+        qImpl:          Node            (nUnitImpl)             [Pri]
         qPublicScope:   Node            (nScope)                [Pri]
         qPrivateScope:  Node            (nScope)                [Pri]
         qInitLabel:     Integer4            % initialization method label, or 0 for none
         qFinalLabel:    Integer4            % finalization method label, or 0 for none
         % scope for use by the initialization routine, for temporaries
         qInitRoutineScope:  Node        (nScope)                [Pri]
+
+
+% unit impl is split out because it has its own UsedUnits.
+% could move qPrivateScope etc here.
+% 
+nModule ::= nUnitImpl
 
 
 % -----------------------------------------------------------------------

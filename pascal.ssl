@@ -321,8 +321,10 @@ mechanism node_mech:
     oNodeNull (Node) >> boolean          % is node null?
     oNodeFind (Node, node_attribute listAttr, node_attribute valueAttr, int value) >> Node  % find node with value in list
     oNodeGetIter (Node, node_attribute) >> NodeIter   % get an iterator over nodes in a List attribute
+    oNodeGetIterLast (Node, node_attribute) >> NodeIter  % get an iterator over nodes in a List, starting at last
     oNodeIterValue (NodeIter) >> Node             % the node that iter is referring to (NodeNull if no more nodes)
-    oNodeIterNext (inout NodeIter)                 % advance iterator through list
+    oNodeIterNext (inout NodeIter)                % advance iterator through list
+    oNodeIterPrev (inout NodeIter)                % advance iterator backwards through list
     oNodeType (Node) >> node_type        % return node type of node
     oNodeEqual (Node, Node) >> boolean   % compare two nodes for equality
                                          % (i.e. same node, not just same contents)
@@ -619,8 +621,8 @@ Program:
 
 
 % The uses clause is a list of units required by the user program or unit.
-% We will find and compile the named units (unless already loaded)
-% and make the public portions of the named units visible to this program.
+% We will find and compile the named units (unless already loaded).
+% We do not make the unit interface visible to the user, the caller will do so later.
 UsesClause( Node user ):
    {
       pIdent
@@ -645,6 +647,7 @@ UsesClause( Node user ):
 EnterUsedUnits( Node user ):
    % Make the used units' public scopes directly visible.
    % This is done after the units are all compiled, so they don't interfere with each other incorrectly.
+   % Units later in the list have priority.
    NodeIter unitIt = oNodeGetIter( user, qUsedUnits )
    {
       Node unit = oNodeIterValue( unitIt )
@@ -660,7 +663,7 @@ EnterUsedUnits( Node user ):
 
 EndUsedUnits( Node user ):
    % Leave the units' public scopes, so no longer visible.
-   NodeIter unitIt = oNodeGetIter( user, qUsedUnits )
+   NodeIter unitIt = oNodeGetIterLast( user, qUsedUnits )
    {
       Node unit = oNodeIterValue( unitIt )
       [ oNodeNull( unit )
@@ -674,7 +677,7 @@ EndUsedUnits( Node user ):
          | * :
             >
       ]
-      oNodeIterNext( unitIt )
+      oNodeIterPrev( unitIt )
    }
    ;
 
@@ -710,19 +713,20 @@ Unit >> Node:
    pIdent
    Node unit = oNodeNew( nUnit )
    oNodeSetInt( unit, qIdent, LAST_ID )
-   oNodeAddLast( workspace, qUnits, unit )
+   Node unitImpl = oNodeNew( nUnitImpl )
+   oNodeSetInt( unitImpl, qIdent, LAST_ID )
+   oNodeSet( unit, qImpl, unitImpl )
    ';'
+
+   % mandatory sections
+
+   pInterface
    [
       | pUses :   @UsesClause( unit )
       | * :
    ]
    @EnterUsedUnits( unit )
 
-   % mandatory sections
-
-   % NOTE, despite syntax diagrams, method headers in the interface may have 'external' clause.
-   % Confirmed this looking at some units shipped with fpc.
-   pInterface
    oScopeBegin( 0, allocGlobal )
    oNodeSet( unit, qPublicScope, oScopeCurrent )
 
@@ -733,8 +737,17 @@ Unit >> Node:
    oScopeEnd
 
    @UnitInterface( unit )
+   oScopeEnd  % interface scope
 
    pImplementation
+   [
+      | pUses :   @UsesClause( unitImpl )
+      | * :
+   ]
+   @EnterUsedUnits( unitImpl )
+   % re-enter interface scope after impl's uses.  interface still has priority.
+   oScopeEnter( oNodeGet( unit, qPublicScope ) )
+
    oScopeBegin( 0, allocGlobal )
    oNodeSet( unit, qPrivateScope, oScopeCurrent )
    oNodeSet( oScopeCurrent, qExtends, oNodeGet( unit, qPublicScope ) )
@@ -742,16 +755,19 @@ Unit >> Node:
 
    [
       | pInitialization :  @UnitInitialization( unit, true )   % init routine with statements from init section
-      | * :                @UnitInitialization( unit, false )  % still need an implicit init routine
+      | * :                @UnitInitialization( unit, false )  % implicit init routine
    ]
    [
       | pFinalization :  @UnitFinalization( unit, true )
-      | * :              @UnitFinalization( unit, false )   % have an implicit final routine, may be handy later
+      | * :              @UnitFinalization( unit, false )   % implicit final routine, may be handy later
    ]
    pEnd  '.'
+
    oScopeEnd  % impl scope
    oScopeEnd  % interface scope
-   @EndUsedUnits( unit )  % used units scopes
+   @EndUsedUnits( unitImpl )  % used units scopes
+   @EndUsedUnits( unit )
+   oNodeAddLast( workspace, qUnits, unit )
    >> unit;
 
 
@@ -907,7 +923,7 @@ InitializeUnits:
 
 
 FinalizeUnits:
-   NodeIter it = oNodeGetIter( workspace, qUnits )
+   NodeIter it = oNodeGetIterLast( workspace, qUnits )
    {
       Node unit = oNodeIterValue( it )
       [ oNodeNull( unit )
@@ -916,7 +932,7 @@ FinalizeUnits:
             .tAllocActuals  oEmitInt( 0 )  % not sure I need this. maybe for stack alignment.
             .tCall  oEmitLabel( oNodeGetLabel( unit, qFinalLabel ) )
             .tFreeActuals  oEmitInt( 0 )
-            oNodeIterNext( it )
+            oNodeIterPrev( it )
       ]
    };
 

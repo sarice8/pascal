@@ -3,11 +3,7 @@
 
 
 program test (input, output);
-  //uses t12_unit1, t12_unit2;
-  // scanner include mechanism needs work, resumes at next line I think.  see s_hit_eof().
- uses t12_unit1
- {  , t12_unit2 }
- ;
+  uses t12_unit1, t12_unit2;
 
 
   var x1 : integer = 1;
@@ -26,6 +22,7 @@ begin
   writeln( 'Hello from main.  x1=', x1 );
   proc1( 5, 6 );
   writeln( 'u1x1=', u1x1 );
+  writeln( 'u2x1=', u2x1 );
 
   unit1_proc1( 50, 60 );
   x1 := 15;

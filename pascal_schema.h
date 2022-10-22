@@ -11,6 +11,7 @@ typedef enum {
     nModule,
     nProgram,
     nUnit,
+    nUnitImpl,
     nScope,
     nDeclaration,
     nIdent,
@@ -48,6 +49,7 @@ typedef enum {
     qUsedUnits,
     qChildScope,
     qMainRoutineScope,
+    qImpl,
     qPublicScope,
     qPrivateScope,
     qInitLabel,
@@ -89,6 +91,7 @@ typedef enum {
 #define GetqUsedUnits(N)		(List)	GetAttr(N, qUsedUnits)
 #define GetqChildScope(N)		(Node)	GetAttr(N, qChildScope)
 #define GetqMainRoutineScope(N)		(Node)	GetAttr(N, qMainRoutineScope)
+#define GetqImpl(N)		(Node)	GetAttr(N, qImpl)
 #define GetqPublicScope(N)		(Node)	GetAttr(N, qPublicScope)
 #define GetqPrivateScope(N)		(Node)	GetAttr(N, qPrivateScope)
 #define GetqInitLabel(N)		(Integer4)	(intptr_t) GetAttr(N, qInitLabel)
@@ -128,6 +131,7 @@ typedef enum {
 #define SetqUsedUnits(N,V)		SetAttr(N, qUsedUnits, V)
 #define SetqChildScope(N,V)		SetAttr(N, qChildScope, V)
 #define SetqMainRoutineScope(N,V)		SetAttr(N, qMainRoutineScope, V)
+#define SetqImpl(N,V)		SetAttr(N, qImpl, V)
 #define SetqPublicScope(N,V)		SetAttr(N, qPublicScope, V)
 #define SetqPrivateScope(N,V)		SetAttr(N, qPrivateScope, V)
 #define SetqInitLabel(N,V)		SetAttr(N, qInitLabel, (void*)(intptr_t)(V))
@@ -165,6 +169,7 @@ typedef enum {
 #define NewnModule()		NewNode(nModule)
 #define NewnProgram()		NewNode(nProgram)
 #define NewnUnit()		NewNode(nUnit)
+#define NewnUnitImpl()		NewNode(nUnitImpl)
 #define NewnScope()		NewNode(nScope)
 #define NewnDeclaration()		NewNode(nDeclaration)
 #define NewnIdent()		NewNode(nIdent)
