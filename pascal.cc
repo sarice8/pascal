@@ -83,6 +83,7 @@ FILE *t_out,*t_doc,*t_lst;
 char   t_lineBuffer[t_lineSize];
 char   t_listing;                  /* do we want a listing file? */
 
+std::vector<std::string> search_path;
 
 // Forward declarations
 void open_my_files();
@@ -219,8 +220,9 @@ usage()
 #ifdef INTEGRATE_SSL_DEBUGGER
   hasDebugger = 1;
 #endif
-  printf( "Usage:  pascal [-l]%s <file>\n", hasDebugger ? " [-d]" : "" );
+  printf( "Usage:  pascal [-l] [-I<dir>]%s <file>\n", hasDebugger ? " [-d]" : "" );
   printf( "  -l : create listing\n" );
+  printf( "  -I<dir> : add directory to unit search path\n" );
   if ( hasDebugger ) {
     printf( "  -d : run ssl debugger\n" );
   }
@@ -234,12 +236,18 @@ main( int argc, char* argv[] )
   int arg;
 
   t_listing = 0;
+  search_path.push_back( "." );
 
   for ( arg = 1; ( arg < argc ) && ( argv[arg][0] == '-' ); ++arg ) {
     if ( strcmp( argv[arg], "-l" ) == 0 ) {
       t_listing = 1;
     } else if ( strcmp( argv[arg], "-d" ) == 0 ) {
       optionDebug = 1;
+    } else if ( strncmp( argv[arg], "-I", 2 ) == 0 ) {
+      char* dir = argv[arg] + 2;
+      if ( strlen( dir ) > 0 ) {
+        search_path.push_back( argv[arg] + 2 );
+      }
     } else {
       usage();
       exit( 1 );
@@ -993,17 +1001,22 @@ Node dNode;  // temporary for several mechanisms
      /* Mechanism include_mech */
 
      case oIncludeUnitFile : {
-            // TO DO
             // search for unit file <unit>.pas
             const char* unitName = ssl_get_id_string( ssl_param );
             std::string filename = std::string( unitName ) + ".pas";
-            FILE* fp = fopen( filename.c_str(), "r" );
+            std::string fullPath;
+            FILE* fp = nullptr;
+            for ( auto& dir : search_path ) {
+              fullPath = dir + "/" + filename;
+              fp = fopen( fullPath.c_str(), "r" );
+              if ( fp ) {
+                break;
+              }
+            }
             ssl_result = ( fp != nullptr );
             if ( fp ) {
-              printf( "Including %s\n", filename.c_str() );
-              // TO DO: tell ssl to not auto-end the include file,
-              // instead it should return pEof and we'll explicitly end it
-              ssl_include_filename( filename.c_str() );
+              printf( "Including %s\n", fullPath.c_str() );
+              ssl_include_filename( fullPath.c_str() );
             }
             }
             continue;
