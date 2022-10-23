@@ -29,11 +29,11 @@ begin
   unit1_proc1( 51, 61 );
 
 
-  // unit1.x1 := 16;
-  // unit1_proc1( 52, 62 );
+  t12_unit1.x1 := 16;
+  unit1_proc1( 52, 62 );
 
   writeln( x1 );
 
-  // writeln( unit1.x1 );
+  writeln( t12_unit1.x1 );
 
 end.

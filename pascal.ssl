@@ -35,12 +35,7 @@ title: 'Pascal Compiler 1.1.5 -- Jan 01 ''90';
 %
 %  MISSING
 %
-%    - procedure and function declarations may be nested within other procs/funcs!
-%      They are allowed to see locals within those parent scopes.
-%      Pass a hidden parameter to nested methods, to follow up to parent scopes as needed.
-%      Need a level counter at each scope, and uplevels count on reference to local/param.
-%      
-%    - Consider non-ISO extensions.  e.g. see "Units" e.g. from Turbo Pascal wikipedia page.
+%    - Consider non-ISO extensions.  e.g. 
 %      Dynamic arrays.  Objects.  But, perhaps stick to my old goal, standard Pascal.
 %
 %  PASCAL DOCS
@@ -393,6 +388,7 @@ mechanism scope_mech:
     oScopeFind >> Node                   % find declaration of last accepted identifier.  Returns Null if not found.
     oScopeFindRequire >> Node            % find declaration of last accepted identifier.  Error if not found.
     oScopeFindInCurrentScope >> Node     % find declaration of last accepted identifier, only within the current scope.  Null if not found.
+    oScopeFindRequireInScope( Node scope ) >> Node  % find decl of last accepted identifier, only within the given scope.  Error it not found.
     ;
 
 mechanism type_mech:
@@ -631,9 +627,12 @@ UsesClause( Node user ):
          | false :
             oNodeAddLast( user, qUsedUnits, unit )
 
-            % TO DO: put a declaration in the current scope, naming the unit and pointing to it.
-            %   This is to allow references to  <unit>.<identifier_in_unit>
-            %   Maybe something like nUsedUnit or nImportUnit
+            % Put a declaration in the current scope, naming the unit and pointing to it.
+            % This is to allow references to  <unit>.<identifier_in_unit>
+            Node unitRef = oNodeNew( nUnitRef )
+            oNodeSetInt( unitRef, qIdent, oNodeGetInt( unit, qIdent ) )
+            oNodeSet( unitRef, qPublicScope, oNodeGet( unit, qPublicScope ) )
+            oScopeDeclare( unitRef )
          | * :
       ]
       [
@@ -643,6 +642,21 @@ UsesClause( Node user ):
    }   
    ';'
    ;
+
+
+% If the given decl is for an nUnitRef, the program is using syntax <unit>.<identifier>
+% Parse the rest of that to find the intended decl.
+%
+ResolveUnitRef( inout Node decl ):
+   [ oNodeType( decl )
+      | nUnitRef :
+         Node scope = oNodeGet( decl, qPublicScope )
+         '.'
+         pIdent
+         decl = oScopeFindRequireInScope( scope )
+      | * :
+   ];
+
 
 EnterUsedUnits( Node user ):
    % Make the used units' public scopes directly visible.
@@ -1441,10 +1455,11 @@ TypeRef( out Node resultType ):
    [
       | pIdent :           % previously named type (including intrinsics)
          Node decl = oScopeFindRequire
+         @ResolveUnitRef( decl )
          [ oNodeType( decl )
-           | nTypeDecl :
+            | nTypeDecl :
                resultType = oNodeGet( decl, qType )
-           | * :
+            | * :
                #eNotType
                resultType = IntegerType
          ]
@@ -1575,6 +1590,7 @@ ConstExpr:
          oValuePush( TOKEN_VALUE )
       | pIdent :
          Node decl = oScopeFindRequire
+         @ResolveUnitRef( decl )
          [ oNodeType( decl )
             | nConst :
                oValuePush( oNodeGetInt( decl, qValue ) )
@@ -1996,6 +2012,7 @@ PrimaryAllowCF( out Label falseLabel ):
 
       | pIdent :
          Node decl = oScopeFindRequire
+         @ResolveUnitRef( decl )
          Node theType
 
          [ oNodeType( decl )
@@ -2025,6 +2042,7 @@ PrimaryAllowCF( out Label falseLabel ):
          pIdent
 
          Node decl = oScopeFindRequire
+         @ResolveUnitRef( decl )
          Node theType
 
          @LValueVar( decl )
@@ -2517,6 +2535,7 @@ Statement:
 
 AssignOrCallStmt:
    Node decl = oScopeFindRequire
+   @ResolveUnitRef( decl )
    [ oNodeType( decl )
       | nProc :                           @Call( decl )
       | nGlobalVar, nLocalVar, nParam :   @AssignStmt( decl )
@@ -2600,6 +2619,7 @@ LValueExpr:
    % I think there can also be typecasts, not supported yet.  Check standard syntax.
    pIdent
    Node decl = oScopeFindRequire
+   @ResolveUnitRef( decl )
    [ oNodeType( decl )
       | nGlobalVar, nLocalVar, nParam :
       | * :  #eNotVar
@@ -2675,6 +2695,7 @@ ForStmt:
    % TO DO: disallow use of a compound variable field.
    %        Could do that by disallowing use of LValueIndexes,
    %        or by double-checking the decl's qType here.
+   % TO DO: I think I read somewhere that the variable must be in current scope.
    @LValueVar( decl )
    @RequireIntPop
 

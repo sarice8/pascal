@@ -78,6 +78,14 @@ nIdent =>
                                    % for nParam: local address (relative to frame ptr)
 
 
+% nUnitRef appears in a scope that uses a unit.  It's used to support syntax <unit>.<ident>
+% 
+nIdent ::= nUnitRef
+nUnitRef =>
+        qPublicScope:   Node            (nScope)                [Alt]
+
+
+
 % nMethod is a proc or func declaration.
 % qValue is the label.  It is allocated when the declaration is first seen
 % (including forward declaration).  That lets calls invoke the method

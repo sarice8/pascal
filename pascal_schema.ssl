@@ -12,6 +12,7 @@ type node_type:
 	nScope
 	nDeclaration
 	nIdent
+	nUnitRef
 	nMethod
 	nProc
 	nFunc

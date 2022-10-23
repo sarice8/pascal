@@ -15,6 +15,7 @@ typedef enum {
     nScope,
     nDeclaration,
     nIdent,
+    nUnitRef,
     nMethod,
     nProc,
     nFunc,
@@ -173,6 +174,7 @@ typedef enum {
 #define NewnScope()		NewNode(nScope)
 #define NewnDeclaration()		NewNode(nDeclaration)
 #define NewnIdent()		NewNode(nIdent)
+#define NewnUnitRef()		NewNode(nUnitRef)
 #define NewnMethod()		NewNode(nMethod)
 #define NewnProc()		NewNode(nProc)
 #define NewnFunc()		NewNode(nFunc)

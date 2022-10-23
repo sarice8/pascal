@@ -882,6 +882,19 @@ Node dNode;  // temporary for several mechanisms
             ssl_result = (long) dNode;
             continue;
             }
+    case oScopeFindRequireInScope: {
+            Node scope = (Node) ssl_param;
+            dNode = nodeFindValue_NoErrorChecking( scope, qDecls, qIdent, ssl_last_id );
+            ssl_result = (long) dNode;
+            if (dNode == NULL)
+            {
+                ssl_error ("Undefined symbol");
+                ssl_pc--;
+                ssl_error_recovery ();
+            }
+            continue;
+            }
+
 
     /* Mechanism type_mech */
 
