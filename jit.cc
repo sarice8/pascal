@@ -173,6 +173,7 @@ void usage( int status );
 void loadTCodeAndAllocNativeCode();
 void allocNativeCode();
 void protectNativeCode();
+void dumpNativeCode();
 void outB( char c );
 void outI( int i );
 void outL( long l );
@@ -187,6 +188,8 @@ void toDo( const char* msg, ... );
 char* filename = 0;
 bool optionListing = true;
 FILE* listingFile = nullptr;
+bool optionDumpCode = true;
+FILE* dumpCodeFile = nullptr;
 
 int* tCode = 0;
 int  tCodeLen = 0;
@@ -670,6 +673,8 @@ parseArgs( int argc, char* argv[] )
       usage( 0 );
     } else if ( strcmp( astr, "-l" ) == 0 ) {
       optionListing = true;
+    } else if ( strcmp( astr, "-u" ) == 0 ) {
+      optionDumpCode = true;
     } else if ( astr[0] == '-' ) {
       usage( 1 );
     } else {
@@ -690,8 +695,9 @@ parseArgs( int argc, char* argv[] )
 void
 usage( int status )
 {
-  printf( "Usage:   jit [-l] <file>\n" );
+  printf( "Usage:   jit [-l] [-u] <file>\n" );
   printf( "  -l : create listing\n" );
+  printf( "  -u : dump machine code\n" );
   exit( status );
 }
 
@@ -709,11 +715,6 @@ public:
 
   // requests the REX.W flag, converting a 32-bit instruction to 64-bit.
   Instr& w();
-
-  // Indicate that the instruction is using an 8-bit register.
-  // This may necessitate use of a blank REX prefix (to refer to the low byte of rsi/rdi
-  // or rsp/rbp if I want that in the future).
-  Instr& r8();
 
   // specifies an opcode extension, which lives in the reg field of the ModR/M byte.
   Instr& opc( char opcodeExtension );
@@ -945,6 +946,280 @@ emit( const Instr& instr )
   instr.emit();
 }
 
+
+// Instruction templates are based on the Intel x86-64 instruction docs.
+// I don't make templates for all possible variants, though.
+//
+// One of the emit methods can take my high-level operands,
+// and choose the matching instruction template, and emit that.
+//
+class InstrTempl {
+public:
+  InstrTempl( int size, int opcode );
+
+  InstrTempl& opc( int extension );  // opcode extension
+  InstrTempl& RM();  // operands r, r/m
+  InstrTempl& MR();  // operands r/m, r
+  InstrTempl& MI();  // operands r/m, imm
+  InstrTempl& imm8();  // override size of I to 8 rather than _size
+
+  // this should go in a templates class instead.
+  static const InstrTempl* findMatch( const std::vector<InstrTempl>& templates, const Operand& x, const Operand& y );
+
+  // helper for filling out a template.  translate an operand for a particular template field, generating instr data.
+  static void operandToI( Instr& instr, const Operand& operand, int size );
+  static void operandToR( Instr& instr, const Operand& operand, int size );
+  static void operandToM( Instr& instr, const Operand& operand, int size );
+
+  // DATA
+  int _size;        // 8 or 32 (for 32/64)
+  int _opcode;
+  int _xType = 0;   // 1=I, 2=R, 3=M   0 = no x
+  int _yType = 0;   // 1=I, 2=R, 3=M   0 = no y
+  int _opc = -1;     // opcode extension, or -1
+  int _immSize = 0;  // usually size, unless overridden
+};
+
+InstrTempl::InstrTempl( int size, int opcode )
+  : _size( size ), _immSize( size ), _opcode( opcode )
+{}
+
+InstrTempl&
+InstrTempl::opc( int opcodeExtension ) {
+  _opc = opcodeExtension;
+  return *this;
+}
+
+InstrTempl&
+InstrTempl::RM() {
+  _xType = 2;
+  _yType = 3;
+  return *this;
+}
+
+InstrTempl&
+InstrTempl::MR() {
+  _xType = 3;
+  _yType = 2;
+  return *this;
+}
+
+InstrTempl&
+InstrTempl::MI() {
+  _xType = 3;
+  _yType = 1;
+  return *this;
+}
+
+InstrTempl&
+InstrTempl::imm8() {
+  _immSize = 8;
+  return *this;
+}
+
+
+// For private use by InstrTempls, when I have a class for that.
+const InstrTempl*
+InstrTempl::findMatch( const std::vector<InstrTempl>& templates, const Operand& x, const Operand& y )
+{
+  // classify the operands
+  // Note: template operand size is in bits, and is either 8 or 32.
+  // (64 is assumed to be an available variant of a template with size 32, via setting Instr.w())
+  // Potential confusion: while InstrTempl size is in bits, Operand size is in bytes.
+  int xTemplSize = x.size() * 8;
+  if ( xTemplSize == 64 ) {
+    xTemplSize = 32;
+  }
+  int yTemplSize = y.size() * 8;
+  if ( yTemplSize == 64 ) {
+    yTemplSize = 32;
+  }
+
+  int xType = 0;
+  if ( x.isMem() ) {
+    xType = 3;
+  } else if ( x.isReg() ) {
+    xType = 2;
+  } else if ( x.isConst() ) {
+    xType = 1;
+  } else {
+    toDo( "template lookup: unexpected operand\n" );
+  }
+
+  int yType = 0;
+  if ( y.isMem() ) {
+    yType = 3;
+  } else if ( y.isReg() ) {
+    yType = 2;
+  } else if ( y.isConst() ) {
+    yType = 1;
+  } else {
+    toDo( "template lookup: unexpected operand\n" );
+  }
+
+
+  // find the matching template
+  for ( auto& templ : templates ) {
+    if ( ( xTemplSize == templ._size ) &&
+         ( yTemplSize == templ._immSize ) ) {
+
+      if ( ( xType == templ._xType ) &&
+           ( yType == templ._yType ) ) {
+        return &templ;
+      }
+      // a R operand can fit in an M template too.
+      if ( ( xType == 2 && templ._xType == 3 &&
+             yType == templ._yType ) ||
+           ( yType == 2 && templ._yType == 3 &&
+             xType == templ._xType ) ) {
+        return &templ;
+      }
+    }
+  }
+
+  return nullptr;
+}
+
+
+void
+InstrTempl::operandToI( Instr& instr, const Operand& operand, int templSize )
+{
+  if ( operand._kind != jit_Operand_Kind_ConstI ) {
+    fatal( "InstrTempl::operandToI unexpected operand\n" );
+  }
+
+  switch ( templSize ) {
+    case 8:
+      instr.imm8( operand._value );
+      break;
+    case 32:
+      instr.imm32( operand._value );
+      break;
+    default:
+      fatal( "InstrTempl::operandToI unexpected size\n" );
+  }
+}
+
+
+void
+InstrTempl::operandToR( Instr& instr, const Operand& operand, int templSize )
+{
+  switch ( operand._kind ) {
+    case jit_Operand_Kind_RegB:
+      assert( templSize == 8 );
+      instr.reg8( operand._reg );
+      break;
+    case jit_Operand_Kind_RegI:
+    case jit_Operand_Kind_RegP:
+      assert( templSize == 32 );
+      instr.reg( operand._reg );
+      break;
+    default:
+      fatal( "InstrTempl::operandToR unexpected operand\n" );
+  }
+}
+
+
+void
+InstrTempl::operandToM( Instr& instr, const Operand& operand, int templSize )
+{
+  switch ( operand._kind ) {
+    case jit_Operand_Kind_GlobalB:
+    case jit_Operand_Kind_GlobalI:
+    case jit_Operand_Kind_GlobalP:
+    case jit_Operand_Kind_Addr_Global:
+      instr.memRipRelative( &data[ operand._value ] );
+      break;
+
+    case jit_Operand_Kind_LocalB:
+    case jit_Operand_Kind_LocalI:
+    case jit_Operand_Kind_LocalP:
+    case jit_Operand_Kind_Addr_Local:
+      instr.mem( regRbp, operand._value );
+      break;
+
+    case jit_Operand_Kind_ParamB:
+    case jit_Operand_Kind_ParamI:
+    case jit_Operand_Kind_ParamP:
+    case jit_Operand_Kind_Addr_Param:
+      instr.mem( regRbp, operand._value + FRAME_PARAMS_OFFSET );
+      break;
+
+    case jit_Operand_Kind_ActualB:
+    case jit_Operand_Kind_ActualI:
+    case jit_Operand_Kind_ActualP:
+    case jit_Operand_Kind_Addr_Actual:
+      instr.mem( regRsp, operand._value );
+      break;
+
+    case jit_Operand_Kind_RegB:
+      assert( templSize == 8 );
+      instr.rmReg8( operand._reg );
+      break;
+    case jit_Operand_Kind_RegI:
+    case jit_Operand_Kind_RegP:
+      assert( templSize == 32 );
+      instr.rmReg( operand._reg );
+      break;
+
+    case jit_Operand_Kind_RegP_DerefB:
+    case jit_Operand_Kind_RegP_DerefI:
+    case jit_Operand_Kind_RegP_DerefP:
+    case jit_Operand_Kind_Addr_Reg_Offset:
+      instr.mem( operand._reg, operand._value );
+      break;
+
+    default:
+      fatal( "InstrTempl::operandToM unexpected operand\n" );
+   }
+}
+
+
+void
+emit( const std::vector<InstrTempl>& templates, const Operand& x, const Operand& y )
+{
+  const InstrTempl* templ = InstrTempl::findMatch( templates, x, y );
+  if ( !templ ) {
+    toDo( "template lookup: didn't find a match\n" );
+    return;
+  }
+
+  // create an Instr using the template and operands
+  // TO DO: allow for instr with multiple opcodes
+  Instr instr( templ->_opcode );
+  // Is this a sixty-four bit operation?  (Operand size is in bytes.)
+  if ( x.size() == 8 ) {
+    instr.w();
+  }
+  if ( templ->_opc >= 0 ) {
+    instr.opc( templ->_opc );
+  }
+  switch( templ->_xType ) {
+    case 2:
+      InstrTempl::operandToR( instr, x, templ->_size );
+      break;
+    case 3:
+      InstrTempl::operandToM( instr, x, templ->_size );
+      break;
+    default:
+      fatal( "unexpected type in template\n" );
+  }
+  switch( templ->_yType ) {
+    case 1:
+      InstrTempl::operandToI( instr, y, templ->_immSize );
+      break;
+    case 2:
+      InstrTempl::operandToR( instr, y, templ->_immSize );
+      break;
+    case 3:
+      InstrTempl::operandToM( instr, y, templ->_immSize );
+      break;
+    default:
+      fatal( "unexpected type in template\n" );
+  }
+
+  emit( instr );
+}
 
 // ----------------------------------------------------------------------------
 
@@ -1707,6 +1982,9 @@ generateCode()
 
   finishMethod();
   makePatches();
+  if ( optionDumpCode ) {
+    dumpNativeCode();
+  }
 }
 
 
@@ -2722,87 +3000,27 @@ emitJcc( char* addr, ConditionFlags flags )
 }
 
 
+
 // x += y
 // x is a register
 //
 void
 emitAdd( const Operand& x, const Operand& y )
 {
-  switch ( KindPair( x._kind, y._kind ) ) {
+  // Instruction info from Intel docs
+  static std::vector<InstrTempl> templates = {
+    InstrTempl( 8,  0x80 ).opc( 0 ).MI(),   // I with size8 will implicitly mean ib i.e. imm8
+    InstrTempl( 32, 0x81 ).opc( 0 ).MI(),   // I with size8 will implicitly mean id i.e. imm32
+                                            // size32 implicitly allows rex.w to become sixtyfour,
+                                            // though I remains imm32 and sign-extends to sixtyfour
+    InstrTempl( 32, 0x83 ).opc( 0 ).MI().imm8(),  // override the default of I being 32 due to size.  imm8 will be sign extended to 32 (or sixtyfour)
+    InstrTempl( 8,  0x00 ).MR(),
+    InstrTempl( 32, 0x01 ).MR(),
+    InstrTempl( 8,  0x02 ).RM(),
+    InstrTempl( 32, 0x03 ).RM()
+  };
 
-    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_GlobalB ):
-      toDo( "emitAdd\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_LocalB ):
-      toDo( "emitAdd\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_ParamB ):
-      toDo( "emitAdd\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_ConstI ):
-      toDo( "emitAdd\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_RegB ):
-      toDo( "emitAdd\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_GlobalI ):
-      // add reg_x, [rip + offsetToGlobal]
-      emit( Instr( 0x03 ).reg( x._reg ).memRipRelative( &data[y._value] ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_LocalI ):
-      // add reg_x, [rbp + y.value];
-      emit( Instr( 0x03 ).reg( x._reg ).mem( regRbp, y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ParamI ):
-      // add reg_x, [rbp + y.value + FPO]
-      emit( Instr( 0x03 ).reg( x._reg ).mem( regRbp, y._value + FPO ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ConstI ):
-      // add reg32, immediate32
-      emit( Instr( 0x81 ).opc( 0 ).rmReg( x._reg ).imm32( y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_RegI ):
-      // add reg_x32, reg_y32
-      emit( Instr( 0x03 ).reg( x._reg ).rmReg( y._reg ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_GlobalP ):
-      // add reg_x64, [rip + offsetToGlobal]
-      emit( Instr( 0x03 ).w().reg( x._reg ).memRipRelative( &data[y._value] ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_LocalP ):
-      // add reg_x64, [rbp + y.value];
-      emit( Instr( 0x03 ).w().reg( x._reg ).mem( regRbp, y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ParamP ):
-      // add reg_x64, [rbp + y.value + FPO]
-      emit( Instr( 0x03 ).w().reg( x._reg ).mem( regRbp, y._value + FPO ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ConstI ):
-      // add reg64, immediate32 sign-extended to 64 bits
-      emit( Instr( 0x81 ).w().opc( 0 ).rmReg( x._reg ).imm32( y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegP ):
-      // add x_reg64, y_reg64
-      emit( Instr( 0x01 ).w().reg( y._reg ).rmReg( x._reg ) );
-      break;
-
-    default:
-      fatal( "emitAdd: unexpected operands\n" );
-  }
+  emit( templates, x, y );
 }
 
 
@@ -3990,6 +4208,29 @@ protectNativeCode()
     fatal( "mprotect failed with status %d\n", errno );
   }
 }
+
+
+// Dump machine code to a text file on disk, to help with debugging.
+//
+void
+dumpNativeCode()
+{
+  std::string dumpCodeFilename( filename );
+  dumpCodeFilename.append( ".jit_out.txt" );
+  dumpCodeFile = fopen( dumpCodeFilename.c_str(), "w" );
+  if ( !dumpCodeFile ) {
+    printf(" jit can't open code dump file %s\n", dumpCodeFilename.c_str() );
+    return;
+  }
+
+  // For now, this assumes that native code is all allocated in one contiguous block
+  for ( char* addr = nativeCode; addr < nativePc; ++addr ) {
+    fprintf( dumpCodeFile, "%02x\n", (unsigned char) *addr );
+  }
+
+  fclose( dumpCodeFile );
+}
+
 
 
 void
