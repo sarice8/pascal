@@ -713,6 +713,9 @@ public:
   Instr( char opcode );
   Instr( char opcode1, char opcode2 );
 
+  // provide opcode2 if not done via constructor
+  Instr& opcode2( char opcode2 );
+
   // requests the REX.W flag, converting a 32-bit instruction to 64-bit.
   Instr& w();
 
@@ -780,6 +783,13 @@ Instr::Instr( char opcode1, char opcode2 )
   : _opcode1( opcode1 ), _opcode2( opcode2 ), _haveOpcode2( true )
 {}
 
+// Can provide second opcode byte separately
+Instr&
+Instr::opcode2( char opcode2 ) {
+  _opcode2 = opcode2;
+  _haveOpcode2 = true;
+  return *this;
+}
 
 // requests the REX.W flag, converting a 32-bit instruction to 64-bit.
 Instr&
@@ -956,24 +966,34 @@ emit( const Instr& instr )
 class InstrTempl {
 public:
   InstrTempl( int size, int opcode );
+  InstrTempl( int size, int opcode1, int opcode2 );
 
   InstrTempl& opc( int extension );  // opcode extension
   InstrTempl& RM();  // operands r, r/m
   InstrTempl& MR();  // operands r/m, r
   InstrTempl& MI();  // operands r/m, imm
+  InstrTempl& M();   // single operand r/m
   InstrTempl& imm8();  // override size of I to 8 rather than _size
+
+  void emit( const Operand& x, const Operand& y ) const;
+  void emit( const Operand& x ) const;
 
   // this should go in a templates class instead.
   static const InstrTempl* findMatch( const std::vector<InstrTempl>& templates, const Operand& x, const Operand& y );
+  static const InstrTempl* findMatch( const std::vector<InstrTempl>& templates, const Operand& x );
 
+private:
+  
   // helper for filling out a template.  translate an operand for a particular template field, generating instr data.
-  static void operandToI( Instr& instr, const Operand& operand, int size );
-  static void operandToR( Instr& instr, const Operand& operand, int size );
-  static void operandToM( Instr& instr, const Operand& operand, int size );
+  void operandToI( Instr& instr, const Operand& operand, int size ) const;
+  void operandToR( Instr& instr, const Operand& operand, int size ) const;
+  void operandToM( Instr& instr, const Operand& operand, int size ) const;
 
   // DATA
   int _size;        // 8 or 32 (for 32/64)
   int _opcode;
+  int _opcode2 = 0;
+  bool _haveOpcode2 = false;
   int _xType = 0;   // 1=I, 2=R, 3=M   0 = no x
   int _yType = 0;   // 1=I, 2=R, 3=M   0 = no y
   int _opc = -1;     // opcode extension, or -1
@@ -982,6 +1002,10 @@ public:
 
 InstrTempl::InstrTempl( int size, int opcode )
   : _size( size ), _immSize( size ), _opcode( opcode )
+{}
+
+InstrTempl::InstrTempl( int size, int opcode1, int opcode2 )
+  : _size( size ), _immSize( size ), _opcode( opcode1 ), _opcode2( opcode2 ), _haveOpcode2( true )
 {}
 
 InstrTempl&
@@ -1012,9 +1036,48 @@ InstrTempl::MI() {
 }
 
 InstrTempl&
+InstrTempl::M() {
+  _xType = 3;
+  _yType = 0;
+  return *this;
+}
+
+InstrTempl&
 InstrTempl::imm8() {
   _immSize = 8;
   return *this;
+}
+
+
+// private helper: classify an operand for the template mechanism.
+//
+void
+classify( const Operand& operand, int& templSize, int& templType )
+{
+  // templ size is 8 bits or 32 bits
+  // (we assume a 64-bit instruction can be created from a 32-bit instruction using Instr.w())
+  switch ( operand.size() ) {
+    case 1:
+      templSize = 8;
+      break;
+    case 4:
+    case 8:
+      templSize = 32;
+      break;
+    default:
+      fatal( "classify: unexpected operand size\n" );
+  }
+
+  templType = 0;
+  if ( operand.isMem() ) {
+    templType = 3;
+  } else if ( operand.isReg() ) {
+    templType = 2;
+  } else if ( operand.isConst() ) {
+    templType = 1;
+  } else {
+    toDo( "classify: unexpected operand type\n" );
+  }
 }
 
 
@@ -1023,40 +1086,10 @@ const InstrTempl*
 InstrTempl::findMatch( const std::vector<InstrTempl>& templates, const Operand& x, const Operand& y )
 {
   // classify the operands
-  // Note: template operand size is in bits, and is either 8 or 32.
-  // (64 is assumed to be an available variant of a template with size 32, via setting Instr.w())
-  // Potential confusion: while InstrTempl size is in bits, Operand size is in bytes.
-  int xTemplSize = x.size() * 8;
-  if ( xTemplSize == 64 ) {
-    xTemplSize = 32;
-  }
-  int yTemplSize = y.size() * 8;
-  if ( yTemplSize == 64 ) {
-    yTemplSize = 32;
-  }
-
-  int xType = 0;
-  if ( x.isMem() ) {
-    xType = 3;
-  } else if ( x.isReg() ) {
-    xType = 2;
-  } else if ( x.isConst() ) {
-    xType = 1;
-  } else {
-    toDo( "template lookup: unexpected operand\n" );
-  }
-
-  int yType = 0;
-  if ( y.isMem() ) {
-    yType = 3;
-  } else if ( y.isReg() ) {
-    yType = 2;
-  } else if ( y.isConst() ) {
-    yType = 1;
-  } else {
-    toDo( "template lookup: unexpected operand\n" );
-  }
-
+  int xTemplSize, yTemplSize;
+  int xType, yType;
+  classify( x, xTemplSize, xType );
+  classify( y, yTemplSize, yType );
 
   // find the matching template
   for ( auto& templ : templates ) {
@@ -1081,8 +1114,36 @@ InstrTempl::findMatch( const std::vector<InstrTempl>& templates, const Operand& 
 }
 
 
+// Find a matching template for a 1-operand instruction.
+//
+const InstrTempl*
+InstrTempl::findMatch( const std::vector<InstrTempl>& templates, const Operand& x )
+{
+  // classify the operands
+  int xTemplSize;
+  int xType;
+  classify( x, xTemplSize, xType );
+
+  // find the matching template
+  for ( auto& templ : templates ) {
+    if ( ( xTemplSize == templ._size ) &&
+         ( templ._yType == 0 ) ) {
+
+      if ( xType == templ._xType ) {
+        return &templ;
+      }
+      // a R operand can fit in an M template too.
+      if ( xType == 2 && templ._xType == 3 ) {
+        return &templ;
+      }
+    }
+  }
+
+  return nullptr;
+}
+
 void
-InstrTempl::operandToI( Instr& instr, const Operand& operand, int templSize )
+InstrTempl::operandToI( Instr& instr, const Operand& operand, int templSize ) const
 {
   if ( operand._kind != jit_Operand_Kind_ConstI ) {
     fatal( "InstrTempl::operandToI unexpected operand\n" );
@@ -1102,7 +1163,7 @@ InstrTempl::operandToI( Instr& instr, const Operand& operand, int templSize )
 
 
 void
-InstrTempl::operandToR( Instr& instr, const Operand& operand, int templSize )
+InstrTempl::operandToR( Instr& instr, const Operand& operand, int templSize ) const
 {
   switch ( operand._kind ) {
     case jit_Operand_Kind_RegB:
@@ -1121,7 +1182,7 @@ InstrTempl::operandToR( Instr& instr, const Operand& operand, int templSize )
 
 
 void
-InstrTempl::operandToM( Instr& instr, const Operand& operand, int templSize )
+InstrTempl::operandToM( Instr& instr, const Operand& operand, int templSize ) const
 {
   switch ( operand._kind ) {
     case jit_Operand_Kind_GlobalB:
@@ -1183,43 +1244,96 @@ emit( const std::vector<InstrTempl>& templates, const Operand& x, const Operand&
     toDo( "template lookup: didn't find a match\n" );
     return;
   }
+  templ->emit( x, y );
+}
 
+
+void
+emit( const std::vector<InstrTempl>& templates, const Operand& x )
+{
+  const InstrTempl* templ = InstrTempl::findMatch( templates, x );
+  if ( !templ ) {
+    toDo( "template lookup: didn't find a match\n" );
+    return;
+  }
+  templ->emit( x );
+}
+
+
+void
+InstrTempl::emit( const Operand& x, const Operand& y ) const
+{
   // create an Instr using the template and operands
-  // TO DO: allow for instr with multiple opcodes
-  Instr instr( templ->_opcode );
+  Instr instr( _opcode );
+  if ( _haveOpcode2 ) {
+    instr.opcode2( _opcode2 );
+  }
+
   // Is this a sixty-four bit operation?  (Operand size is in bytes.)
   if ( x.size() == 8 ) {
     instr.w();
   }
-  if ( templ->_opc >= 0 ) {
-    instr.opc( templ->_opc );
+  if ( _opc >= 0 ) {
+    instr.opc( _opc );
   }
-  switch( templ->_xType ) {
+  switch( _xType ) {
     case 2:
-      InstrTempl::operandToR( instr, x, templ->_size );
+      operandToR( instr, x, _size );
       break;
     case 3:
-      InstrTempl::operandToM( instr, x, templ->_size );
+      operandToM( instr, x, _size );
       break;
     default:
       fatal( "unexpected type in template\n" );
   }
-  switch( templ->_yType ) {
+  switch( _yType ) {
     case 1:
-      InstrTempl::operandToI( instr, y, templ->_immSize );
+      operandToI( instr, y, _immSize );
       break;
     case 2:
-      InstrTempl::operandToR( instr, y, templ->_immSize );
+      operandToR( instr, y, _immSize );
       break;
     case 3:
-      InstrTempl::operandToM( instr, y, templ->_immSize );
+      operandToM( instr, y, _immSize );
       break;
     default:
       fatal( "unexpected type in template\n" );
   }
 
-  emit( instr );
+  ::emit( instr );
 }
+
+
+void
+InstrTempl::emit( const Operand& x ) const
+{
+  // create an Instr using the template and operand
+  Instr instr( _opcode );
+  if ( _haveOpcode2 ) {
+    instr.opcode2( _opcode2 );
+  }
+
+  // Is this a sixty-four bit operation?  (Operand size is in bytes.)
+  if ( x.size() == 8 ) {
+    instr.w();
+  }
+  if ( _opc >= 0 ) {
+    instr.opc( _opc );
+  }
+  switch( _xType ) {
+    case 2:
+      operandToR( instr, x, _size );
+      break;
+    case 3:
+      operandToM( instr, x, _size );
+      break;
+    default:
+      fatal( "unexpected type in template\n" );
+  }
+
+  ::emit( instr );
+}
+
 
 // ----------------------------------------------------------------------------
 
@@ -2697,7 +2811,7 @@ operandDeref( Operand& x, int size )
         default:
           break;
       }
-      break;      break;    
+      break;
     default:
       fatal( "operandDeref: unexpected operands\n" );
       break;
@@ -2813,6 +2927,16 @@ operandFlagsToValue( Operand& x, int size )
 // in order to match Intel's documentation.
 // Note that linux gdb shows the opposite AT&T syntax:   instruction  src, dest
 //
+// I have a few layers for generating machine code.
+// outB() etc - write bytes to the code stream.
+// emitRex(), emitModRM* - emit REX prefix and ModR/M byte, in various configurations.
+//                         The caller needs to know what configuration it wants.
+// Instr - Slightly higher level, assembles all pieces for one instruction.
+//         Currently only supports instructions involving a ModR/M byte.
+// InstrTempl - Highest level.  Instruction templates based closely on Intel docs.
+//         Finds a matching template based on Operands, and knows how to translate Operands
+//         into underlying Instr api.
+// 
 // ----------------------------------------------------------------------------
 
 
@@ -3030,82 +3154,18 @@ emitAdd( const Operand& x, const Operand& y )
 void
 emitSub( const Operand& x, const Operand& y )
 {
-  switch ( KindPair( x._kind, y._kind ) ) {
+  // Instruction info from Intel docs
+  static std::vector<InstrTempl> templates = {
+    InstrTempl( 8,  0x80 ).opc( 5 ).MI(),
+    InstrTempl( 32, 0x81 ).opc( 5 ).MI(),
+    InstrTempl( 32, 0x83 ).opc( 5 ).MI().imm8(),
+    InstrTempl( 8,  0x28 ).MR(),
+    InstrTempl( 32, 0x29 ).MR(),
+    InstrTempl( 8,  0x2a ).RM(),
+    InstrTempl( 32, 0x2b ).RM()
+  };
 
-    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_GlobalB ):
-      toDo( "emitSub\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_LocalB ):
-      toDo( "emitSub\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_ParamB ):
-      toDo( "emitSub\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_ConstI ):
-      toDo( "emitSub\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_RegB ):
-      toDo( "emitSub\n" );
-      break;
-
-
-    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_GlobalI ):
-      // sub x_reg32, [rip + offsetToGlobal]
-      emit( Instr( 0x2b ).reg( x._reg ).memRipRelative( &data[y._value] ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_LocalI ):
-      // sub x_reg32, [rbp+offset]
-      emit( Instr( 0x2b ).reg( x._reg ).mem( regRbp, y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ParamI ):
-      // sub x_reg32, [rbp + offset + FPO]
-      emit( Instr( 0x2b ).reg( x._reg ).mem( regRbp, y._value + FPO ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ConstI ):
-      // sub reg32, immediate32
-      emit( Instr( 0x81 ).opc( 5 ).rmReg( x._reg ).imm32( y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_RegI ):
-      // sub x_reg32, y_reg32
-      emit( Instr( 0x2b ).reg( x._reg ).rmReg( y._reg ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_GlobalP ):
-      // sub x_reg64, [rip + offsetToGlobal]
-      emit( Instr( 0x2b ).w().reg( x._reg ).memRipRelative( &data[y._value] ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_LocalP ):
-      // sub x_reg32, [rbp+offset]
-      emit( Instr( 0x2b ).reg( x._reg ).mem( regRbp, y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ParamP ):
-      // sub x_reg32, [rbp + offset + FPO]
-      emit( Instr( 0x2b ).w().reg( x._reg ).mem( regRbp, y._value + FPO ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ConstI ):
-      // sub reg64, immediate32 sign-extended to 64 bits
-      emit( Instr( 0x81 ).w().opc( 5 ).rmReg( x._reg ).imm32( y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegP ):
-      // sub x_reg64, y_reg64
-      emit( Instr( 0x2b ).w().reg( x._reg ).rmReg( y._reg ) );
-      break;
-
-    default:
-      fatal( "emitSub: unexpected operands\n" );
-  }
+  emit( templates, x, y );
 }
 
 
@@ -3115,23 +3175,12 @@ emitSub( const Operand& x, const Operand& y )
 void
 emitNeg( const Operand& x )
 {
-  switch ( x._kind ) {
+  static std::vector<InstrTempl> templates = {
+    InstrTempl( 8,  0xf6 ).opc( 3 ).M(),
+    InstrTempl( 32, 0xf7 ).opc( 3 ).M()
+  };
 
-    case jit_Operand_Kind_RegB:
-      emit( Instr( 0xf6 ).opc( 3 ).rmReg8( x._reg ) );
-      break;
-
-    case jit_Operand_Kind_RegI:
-      emit( Instr( 0xf7 ).opc( 3 ).rmReg( x._reg ) );
-      break;
-
-    case jit_Operand_Kind_RegP:
-      emit( Instr( 0xf7 ).w().opc( 3 ).rmReg( x._reg ) );
-      break;
-
-    default:
-      fatal( "emitNeg: unexpected operands\n" );
-  }
+  emit( templates, x );
 }
 
 
@@ -3141,31 +3190,26 @@ emitNeg( const Operand& x )
 void
 emitMult( const Operand& x, const Operand& y )
 {
+  // imul - signed multiply
+  static std::vector<InstrTempl> templates = {
+    InstrTempl( 32, 0x0f, 0xaf ).RM()
+    // There's a 3-arg variant that my template system doesn't allow for yet: RMI.  R = M * I
+    // Have to check for that in the switch statement below.
+  };
+
+
   switch ( KindPair( x._kind, y._kind ) ) {
 
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_GlobalI ):
-      // imul reg32, [rip + offsetToGlobal]
-      emit( Instr( 0x0f, 0xaf ).reg( x._reg ).memRipRelative( &data[y._value] ) );
-      break;
-
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_LocalI ):
-      // imul reg32, [rbp + y._value]
-      emit( Instr( 0x0f, 0xaf ).reg( x._reg ).mem( regRbp, y._value ) );
-      break;
-
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ParamI ):
-      // imul reg32, [rbp + y._value + FPO]
-      emit( Instr( 0x0f, 0xaf ).reg( x._reg ).mem( regRbp, y._value + FPO ) );
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_RegI ):
+      emit( templates, x, y );
       break;
  
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ConstI ):
       // imul x_reg32, x_reg32, immediate32   -- i.e. x = x * i
       emit( Instr( 0x69 ).reg( x._reg ).rmReg( x._reg ).imm32( y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_RegI ):
-      // imul x_reg32, y_reg32
-      emit( Instr( 0x0f, 0xaf ).reg( x._reg ).rmReg( y._reg ) );
       break;
 
     default:
@@ -3194,33 +3238,19 @@ emitCdq()
 void
 emitDiv( const Operand& x, const Operand& y )
 {
+  // Signed divide.
+  // The first argument is implicitly *ax or *dx:*ax.
+  // So, the template only takes one operand.
+
+  static std::vector<InstrTempl> templates = {
+    InstrTempl( 8,  0xf6 ).opc( 7 ).M(),   // first argument implicitly AX, result in AL (remainder in AH)
+    InstrTempl( 32, 0xf7 ).opc( 7 ).M()    // first argument implicitly EDX:EAX, result in EAX (remainder in EDX)
+                                           // or 64-bit: first arg in RDX:RAX, result in RAX (remainder in RDX)
+  };
+
   assert( x._reg == regRax );
 
-  switch ( KindPair( x._kind, y._kind ) ) {
-
-    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_GlobalI ):
-      // idiv [rip + offsetToGlobal]
-      emit( Instr( 0xf7 ).opc( 7 ).memRipRelative( &data[y._value] ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_LocalI ):
-      // idiv [rbp + y._value]
-      emit( Instr( 0xf7 ).opc( 7 ).mem( regRbp, y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ParamI ):
-      // idiv [rbp + y._value + FPO]
-      emit( Instr( 0xf7 ).opc( 7 ).mem( regRbp, y._value + FPO ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_RegI ):
-      // idiv y_reg32
-      emit( Instr( 0xf7 ).opc( 7 ).rmReg( y._reg ) );
-      break;
-
-    default:
-      fatal( "emitDiv: unexpected operands\n" );
-  }
+  emit( templates, y );
 }
 
 
@@ -3261,26 +3291,12 @@ emitShl( const Operand& x, const Operand& y )
 void
 emitInc( const Operand& x )
 {
-  switch ( x._kind ) {
+  static std::vector<InstrTempl> templates = {
+    InstrTempl( 8,  0xfe ).opc( 0 ).M(),
+    InstrTempl( 32, 0xff ).opc( 0 ).M()
+  };
 
-    case jit_Operand_Kind_RegB:
-      // inc reg8
-      emit( Instr( 0xfe ).opc( 0 ).rmReg8( x._reg ) );
-      break;
-
-    case jit_Operand_Kind_RegI:
-      // inc reg32
-      emit( Instr( 0xff ).opc( 0 ).rmReg( x._reg ) );
-      break;
-
-    case jit_Operand_Kind_RegP:
-      // inc reg64
-      emit( Instr( 0xff ).w().opc( 0 ).rmReg( x._reg ) );
-      break;
-
-    default:
-      fatal( "emitInc: unexpected operands\n" );
-  }
+  emit( templates, x );
 }
 
 
@@ -3290,26 +3306,12 @@ emitInc( const Operand& x )
 void
 emitDec( const Operand& x )
 {
-  switch ( x._kind ) {
+  static std::vector<InstrTempl> templates = {
+    InstrTempl( 8,  0xfe ).opc( 1 ).M(),
+    InstrTempl( 32, 0xff ).opc( 1 ).M()
+  };
 
-    case jit_Operand_Kind_RegB:
-      // dec reg8
-      emit( Instr( 0xfe ).opc( 1 ).rmReg8( x._reg ) );
-      break;
-
-    case jit_Operand_Kind_RegI:
-      // dec reg32
-      emit( Instr( 0xff ).opc( 1 ).rmReg( x._reg ) );
-      break;
-
-    case jit_Operand_Kind_RegP:
-      // dec reg64
-      emit( Instr( 0xff ).w().opc( 1 ).rmReg( x._reg ) );
-      break;
-
-    default:
-      fatal( "emitDec: unexpected operands\n" );
-  }
+  emit( templates, x );
 }
 
 
@@ -3322,176 +3324,17 @@ emitDec( const Operand& x )
 void
 emitCmp( const Operand& x, const Operand& y )
 {
-  switch ( KindPair( x._kind, y._kind ) ) {
+  static std::vector<InstrTempl> templates = {
+    InstrTempl( 8,  0x80 ).opc( 7 ).MI(),
+    InstrTempl( 32, 0x81 ).opc( 7 ).MI(),
+    InstrTempl( 32, 0x83 ).opc( 7 ).MI().imm8(),
+    InstrTempl(  8, 0x38 ).MR(),
+    InstrTempl( 32, 0x89 ).MR(),
+    InstrTempl(  8, 0x3a ).RM(),
+    InstrTempl( 32, 0x3b ).RM()
+  };
 
-    case KindPair( jit_Operand_Kind_GlobalB, jit_Operand_Kind_ConstI ):
-      // cmp [rip + offsetToGlobal], immediate8 (truncated from the given int32)
-      emit( Instr( 0x80 ).opc( 7 ).memRipRelative( &data[x._value] ).imm8( y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_GlobalB, jit_Operand_Kind_RegB ):
-      // cmp [rip + offsetToGlobal], reg8
-      emit( Instr( 0x38 ).reg( y._reg ).memRipRelative( &data[x._value] ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_GlobalI, jit_Operand_Kind_ConstI ):
-      // cmp [rip + offsetToGlobal], immediate32
-      emit( Instr( 0x81 ).opc( 7 ).memRipRelative( &data[x._value] ).imm32( y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_GlobalI, jit_Operand_Kind_RegI ):
-      // cmp [rip + offsetToGlobal], reg32
-      emit( Instr( 0x39 ).reg( y._reg ).memRipRelative( &data[x._value] ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_GlobalP, jit_Operand_Kind_ConstI ):
-      // cmp [rip + offsetToGlobal], immediate32 sign-extended to 64 bits
-      emit( Instr( 0x81 ).w().opc( 7 ).memRipRelative( &data[x._value] ).imm32( y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_GlobalP, jit_Operand_Kind_RegP ):
-      // cmp [rip + offsetToGlobal], reg64
-      emit( Instr( 0x39 ).w().reg( y._reg ).memRipRelative( &data[x._value] ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_LocalB, jit_Operand_Kind_ConstI ):
-      // cmp [rbp + x._value], immediate8 (truncated from given int32)
-      emit( Instr( 0x80 ).opc( 7 ).mem( regRbp, x._value ).imm8( y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_LocalB, jit_Operand_Kind_RegB ):
-      // cmp [rbp + x._value], reg8
-      emit( Instr( 0x38 ).reg( y._reg ).mem( regRbp, x._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_LocalI, jit_Operand_Kind_ConstI ):
-      // cmp [rbp + x._value], immediate32
-      emit( Instr( 0x81 ).opc( 7 ).mem( regRbp, x._value ).imm32( y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_LocalI, jit_Operand_Kind_RegI ):
-      // cmp [rbp + x._value], reg32
-      emit( Instr( 0x39 ).reg( y._reg ).mem( regRbp, x._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_LocalP, jit_Operand_Kind_ConstI ):
-      // cmp [rbp + x._value], immediate32 sign-extended to 64 bits
-      emit( Instr( 0x81 ).w().opc( 7 ).mem( regRbp, x._value ).imm32( y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_LocalP, jit_Operand_Kind_RegP ):
-      // cmp [rbp + x._value], reg64
-      emit( Instr( 0x39 ).w().reg( y._reg ).mem( regRbp, x._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_ParamB, jit_Operand_Kind_ConstI ):
-      // cmp [rbp + x._value + FPO], immediate8 (truncated from given int32)
-      emit( Instr( 0x80 ).opc( 7 ).mem( regRbp, x._value + FPO ).imm8( y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_ParamB, jit_Operand_Kind_RegB ):
-      // cmp [rbp + x._value + FPO], reg8
-      emit( Instr( 0x38 ).reg( y._reg ).mem( regRbp, x._value + FPO ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_ParamI, jit_Operand_Kind_ConstI ):
-      // cmp [rbp + x._value + FPO], immediate32
-      emit( Instr( 0x81 ).opc( 7 ).mem( regRbp, x._value + FPO ).imm32( y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_ParamI, jit_Operand_Kind_RegI ):
-      // cmp [rbp + x._value + FPO], reg32
-      emit( Instr( 0x39 ).reg( y._reg ).mem( regRbp, x._value + FPO ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_ParamP, jit_Operand_Kind_ConstI ):
-      // cmp [rbp + x._value + FPO], immediate32 sign-extended to 64 bits
-      emit( Instr( 0x81 ).w().opc( 7 ).mem( regRbp, x._value + FPO ).imm32( y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_ParamP, jit_Operand_Kind_RegP ):
-      // cmp [rbp + x._value + FPO], reg64
-      emit( Instr( 0x39 ).w().reg( y._reg ).mem( regRbp, x._value + FPO ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_GlobalB ):
-      // cmp reg8, [rip + offsetToGlobal]
-      emit( Instr( 0x3a ).reg( x._reg ).memRipRelative( &data[y._value] ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_LocalB ):
-      // cmp reg8, [rbp + y.value]
-      emit( Instr( 0x3a ).reg( x._reg ).mem( regRbp, y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_ParamB ):
-      // cmp reg8, [rbp + y.value + FPO]
-      emit( Instr( 0x3a ).reg( x._reg ).mem( regRbp, y._value + FPO ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_ConstI ):
-      // cmp reg8, immediate8 (truncated from given int32 )
-      emit( Instr( 0x80 ).opc( 7 ).rmReg( x._reg ).imm8( y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_RegB ):
-      // cmp x_reg8, y_reg8
-      emit( Instr( 0x3a ).reg( x._reg ).rmReg( y._reg ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_GlobalI ):
-      // cmp reg32, [rip + offsetToGlobal]
-      emit( Instr( 0x3b ).reg( x._reg ).memRipRelative( &data[y._value] ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_LocalI ):
-      // cmp reg32, [rbp + y.value]
-      emit( Instr( 0x3b ).reg( x._reg ).mem( regRbp, y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ParamI ):
-      // cmp reg32, [rbp + y.value + FPO]
-      emit( Instr( 0x3b ).reg( x._reg ).mem( regRbp, y._value + FPO ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ConstI ):
-      // cmp reg32, immediate32
-      emit( Instr( 0x81 ).opc( 7 ).rmReg( x._reg ).imm32( y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_RegI ):
-      // cmp x_reg32, y_reg32
-      emit( Instr( 0x3b ).reg( x._reg ).rmReg( y._reg ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_GlobalP ):
-      // cmp reg64, [rip + offsetToGlobal]
-      emit( Instr( 0x3b ).w().reg( x._reg ).memRipRelative( &data[y._value] ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_LocalP ):
-      // cmp reg64, [rbp + y.value]
-      emit( Instr( 0x3b ).w().reg( x._reg ).mem( regRbp, y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ParamP ):
-      // cmp reg64, [rbp + y.value + FPO]
-      emit( Instr( 0x3b ).w().reg( x._reg ).mem( regRbp, y._value + FPO ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ConstI ):
-      // cmp reg64, immediate32 sign extended to 64 bits
-      emit( Instr( 0x81 ).w().opc( 7 ).rmReg( x._reg ).imm32( y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegP ):
-      // cmp x_reg64, y_reg64
-      emit( Instr( 0x3b ).w().reg( x._reg ).rmReg( y._reg ) );
-      break;
-
-    default:
-      fatal( "emitCmp: unexpected operands\n" );
-  }
+  emit( templates, x, y );
 }
 
 
@@ -3535,221 +3378,86 @@ emitSet( const Operand& x, ConditionFlags flags )
 void
 emitMov( const Operand& x, const Operand& y )
 {
+  static std::vector<InstrTempl> movTemplates = {
+    InstrTempl( 8,  0x88 ).MR(),
+    InstrTempl( 32, 0x89 ).MR(),
+    InstrTempl( 8,  0x8a ).RM(),
+    InstrTempl( 32, 0x8b ).RM(),
+    // There's an instruction template using operands "OI" which isn't supported by
+    // the template mechanism yet.  But, it is equivalent to the MI instructions next.
+    // (The only advantage is it avoids a ModR/M byte).
+    InstrTempl( 8,  0xc6 ).opc( 0 ).MI(),
+    InstrTempl( 32, 0xc7 ).opc( 0 ).MI()
+  };
+
+  static std::vector<InstrTempl> leaTemplates = {
+    InstrTempl( 32, 0x8d ).RM()
+  };
+
   switch ( KindPair( x._kind, y._kind ) ) {
 
     case KindPair( jit_Operand_Kind_GlobalB, jit_Operand_Kind_ConstI ):
-      // mov [rip + offsetToGlobal], immmediate8
-      emit( Instr( 0xc6 ).opc( 0 ).memRipRelative( &data[x._value] ).imm8( y._value ) );
-      break;
-
     case KindPair( jit_Operand_Kind_GlobalB, jit_Operand_Kind_RegB ):
-      // mov [rip + offsetToGlobal], reg8
-      emit( Instr( 0x88 ).reg8( y._reg ).memRipRelative( &data[x._value] ) );
-      break;
-
     case KindPair( jit_Operand_Kind_GlobalI, jit_Operand_Kind_ConstI ):
-      // mov [rip + offsetToGlobal], immmediate32
-      emit( Instr( 0xc7 ).opc( 0 ).memRipRelative( &data[x._value] ).imm32( y._value ) );
-      break;
-
     case KindPair( jit_Operand_Kind_GlobalI, jit_Operand_Kind_RegI ):
-      // mov [rip + offsetToGlobal], reg32
-      emit( Instr( 0x89 ).reg( y._reg ).memRipRelative( &data[x._value] ) );
-      break;
-
     case KindPair( jit_Operand_Kind_GlobalP, jit_Operand_Kind_ConstI ):
-      // mov [rip + offsetToGlobal], immmediate32 sign-extended to 64 bits
-      emit( Instr( 0xc7 ).w().opc( 0 ).memRipRelative( &data[x._value] ).imm32( y._value ) );
-      break;
-
     case KindPair( jit_Operand_Kind_GlobalP, jit_Operand_Kind_RegP ):
-      // mov [rip + offsetToGlobal], reg64
-      emit( Instr( 0x89 ).w().reg( y._reg ).memRipRelative( &data[x._value] ) );
-      break;
-
     case KindPair( jit_Operand_Kind_LocalB, jit_Operand_Kind_ConstI ):
-      // mov [rbp+offset], immediate8
-      emit( Instr( 0xc6 ).opc( 0 ).mem( regRbp, x._value ).imm8( y._value ) );
-      break;
-
     case KindPair( jit_Operand_Kind_LocalB, jit_Operand_Kind_RegB ):
-      // mov [rbp+offset], reg8
-      emit( Instr( 0x88 ).reg8( y._reg ).mem( regRbp, x._value ) );
-      break;
-
     case KindPair( jit_Operand_Kind_LocalI, jit_Operand_Kind_ConstI ):
-      // mov [rbp+offset], immediate32
-      emit( Instr( 0xc7 ).opc( 0 ).mem( regRbp, x._value ).imm32( y._value ) );
-      break;
-
     case KindPair( jit_Operand_Kind_LocalI, jit_Operand_Kind_RegI ):
-      // mov [rbp+offset], reg32
-      emit( Instr( 0x89 ).reg( y._reg ).mem( regRbp, x._value ) );
-      break;
-
     case KindPair( jit_Operand_Kind_LocalP, jit_Operand_Kind_ConstI ):
-      // mov [rbp+offset], immediate32 sign-extended to 64 bits
-      emit( Instr( 0xc7 ).w().opc( 0 ).mem( regRbp, x._value ).imm32( y._value ) );
-      break;
-
     case KindPair( jit_Operand_Kind_LocalP, jit_Operand_Kind_RegP ):
-      // mov [rbp+offset], reg64
-      emit( Instr( 0x89 ).w().reg( y._reg ).mem( regRbp, x._value ) );
-      break;
-
     case KindPair( jit_Operand_Kind_ParamB, jit_Operand_Kind_ConstI ):
-      // mov [rbp + offset + FPO], immediate8
-      emit( Instr( 0xc6 ).opc( 0 ).mem( regRbp, x._value + FPO ).imm8( y._value ) );
-      break;
-
     case KindPair( jit_Operand_Kind_ParamB, jit_Operand_Kind_RegB ):
-      // mov [rbp + offset + FPO], reg8
-      emit( Instr( 0x88 ).reg8( y._reg ).mem( regRbp, x._value + FPO ) );
-      break;
-
     case KindPair( jit_Operand_Kind_ParamI, jit_Operand_Kind_ConstI ):
-      // mov [rbp + offset + FPO], immediate32
-      emit( Instr( 0xc7 ).opc( 0 ).mem( regRbp, x._value + FPO ).imm32( y._value ) );
-      break;
-
     case KindPair( jit_Operand_Kind_ParamI, jit_Operand_Kind_RegI ):
-      // mov [rbp + offset + FPO], reg32
-      emit( Instr( 0x89 ).reg( y._reg ).mem( regRbp, x._value + FPO ) );
-      break;
-
     case KindPair( jit_Operand_Kind_ParamP, jit_Operand_Kind_ConstI ):
-      // mov [rbp + offset + FPO], immediate32 sign-extended to 64 bits
-      emit( Instr( 0xc7 ).w().opc( 0 ).mem( regRbp, x._value + FPO ).imm32( y._value ) );
-      break;
-
     case KindPair( jit_Operand_Kind_ParamP, jit_Operand_Kind_RegP ):
-      emit( Instr( 0x89 ).w().reg( y._reg ).mem( regRbp, x._value + FPO ) );
-      break;
-
-    // Note, Kind_Actual* only appear on the left side of emitMov,
-    // and not in any other operations.
-    // They are used to assign to actual space, when setting up a call.
-
     case KindPair( jit_Operand_Kind_ActualB, jit_Operand_Kind_ConstI ):
-      // mov [rsp + offset], immediate8
-      emit( Instr( 0xc6 ).opc( 0 ).mem( regRsp, x._value ).imm8( y._value ) );
-      break;
-
     case KindPair( jit_Operand_Kind_ActualB, jit_Operand_Kind_RegB ):
-      // mov [rsp + offset], reg8
-      emit( Instr( 0x88 ).reg8( y._reg ).mem( regRsp, x._value ) );
-      break;
-
     case KindPair( jit_Operand_Kind_ActualI, jit_Operand_Kind_ConstI ):
-      // mov [rsp + offset], immediate32
-      emit( Instr( 0xc7 ).opc( 0 ).mem( regRsp, x._value ).imm32( y._value ) );
-      break;
-
     case KindPair( jit_Operand_Kind_ActualI, jit_Operand_Kind_RegI ):
-      // mov [rsp + offset], reg32
-      emit( Instr( 0x89 ).reg( y._reg ).mem( regRsp, x._value ) );
-      break;
-
     case KindPair( jit_Operand_Kind_ActualP, jit_Operand_Kind_ConstI ):
-      // mov [rsp + offset], immediate32 sign-extended to 64 bits
-      emit( Instr( 0xc7 ).w().opc( 0 ).mem( regRsp, x._value ).imm32( y._value ) );
-      break;
-
     case KindPair( jit_Operand_Kind_ActualP, jit_Operand_Kind_RegP ):
-      // mov [rsp + offset], reg64
-      emit( Instr( 0x89 ).w().reg( y._reg ).mem( regRsp, x._value ) );
-      break;
-
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_GlobalB ):
-      // mov reg8, [rip + offsetToGlobal]
-      emit( Instr( 0x8a ).reg8( x._reg ).memRipRelative( &data[y._value] ) );
-      break;
-
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_LocalB ):
-      // mov x_reg8, [rbp + y._value]
-      emit( Instr( 0x8a ).reg8( x._reg ).mem( regRbp, y._value ) );
-      break;
-
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_ParamB ):
-      // mov x_reg8, [rbp + y._value + FPO]
-      emit( Instr( 0x8a ).reg8( x._reg ).mem( regRbp, y._value + FPO ) );
-      break;
-
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_ActualB ):
-      // mov x_reg8, [rsp + y._value]
-      emit( Instr( 0x8a ).reg8( x._reg ).mem( regRsp, y._value ) );
-      break;
-
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_ConstI ):
-      // mov reg8, immediate8
-      // TO DO: confirm that this works correctly for all registers to r15,
-      //        and doesn't get confused by encodings for ah bh ch dh etc.
-      // Note, I can't use Instr() here because this may need to set REX.B
-      // and Instr() doesn't know how to do that without a base reg.
-      // I can't create an Instr() with a base reg, because that would
-      // lead to a ModR/M byte.
-      emitRex( false, nullptr, x._reg, false, true );
-      outB( 0xb0 | regIdLowBits( x._reg->_nativeId ) );
-      outB( y._value );
-      break;
-
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_RegB ):
-      // mov x_reg8, y_reg8
-      emit( Instr( 0x8a ).reg8( x._reg ).rmReg8( y._reg ) );
-      break;
-
     case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_RegP_DerefB ):
-      // mov x_reg8, [y_reg64 + offset]
-      emit( Instr( 0x8a ).reg8( x._reg ).mem( y._reg, y._value ) );
-      break;
-
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_GlobalI ):
-      // mov x_reg32, [rip + offsetToGlobal]
-      emit( Instr( 0x8b ).reg( x._reg ).memRipRelative( &data[y._value] ) );
-      break;
-
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_LocalI ):
-      // mov x_reg32, [rbp + y._value]
-      emit( Instr( 0x8b ).reg( x._reg ).mem( regRbp, y._value ) );
-      break;
-
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ParamI ):
-      // mov x_reg32, [rbp + y._value + FPO]
-      emit( Instr( 0x8b ).reg( x._reg ).mem( regRbp, y._value + FPO ) );
-      break;
-
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ActualI ):
-      // mov x_reg32, [rsp + y._value]
-      emit( Instr( 0x8b ).reg( x._reg ).mem( regRsp, y._value ) );
-      break;
-
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ConstI ):
-      // mov x_reg32, immediate32
-      // As noted above, can't use Instr() for this instruction yet,
-      // due to need for REG.B without ModR/M.
-      emitRex( false, nullptr, x._reg );
-      outB( 0xb8 | regIdLowBits( x._reg->_nativeId ) );
-      outI( y._value );
-      break;
-
     case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_RegI ):
-      // mov x_reg32, y_reg32
-      emit( Instr( 0x8b ).reg( x._reg ).rmReg( y._reg ) );
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_RegP_DerefI ):
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_GlobalP ):
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_LocalP ):
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ParamP ):
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ActualP ):
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegP ):
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegP_DerefP ):
+    case KindPair( jit_Operand_Kind_RegP_DerefB, jit_Operand_Kind_ConstI ):
+    case KindPair( jit_Operand_Kind_RegP_DerefB, jit_Operand_Kind_RegB ):
+    case KindPair( jit_Operand_Kind_RegP_DerefI, jit_Operand_Kind_ConstI ):
+    case KindPair( jit_Operand_Kind_RegP_DerefI, jit_Operand_Kind_RegI ):
+    case KindPair( jit_Operand_Kind_RegP_DerefP, jit_Operand_Kind_ConstI ):
+    case KindPair( jit_Operand_Kind_RegP_DerefP, jit_Operand_Kind_RegP ):
+      emit( movTemplates, x, y );
       break;
 
-    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_RegP_DerefI ):
-      // mov x_reg32, [y_reg64 + offset]
-      emit( Instr( 0x8b ).reg( x._reg ).mem( y._reg, y._value ) );
-      break;
+
+    // MOVSXD - sign extend into larger destination
+
+    // TO DO: the template mechanism doesn't handle movsxd yet
+    //  because it needs a mix of sixty-four bit and 32-bit/8-bit.
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_GlobalI ):
       // movsxd x_reg64, [rip + offsetToGlobal] 32 bits sign-extended to 64 bits
       emit( Instr( 0x63 ).w().reg( x._reg ).memRipRelative( &data[y._value] ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_GlobalP ):
-      // mov x_reg64, [rip + offsetToGlobal]
-      emit( Instr( 0x8b ).w().reg( x._reg ).memRipRelative( &data[y._value] ) );
       break;
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_LocalI ):
@@ -3757,50 +3465,42 @@ emitMov( const Operand& x, const Operand& y )
       emit( Instr( 0x63 ).w().reg( x._reg ).mem( regRbp, y._value ) );
       break;
 
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_LocalP ):
-      // mov x_reg, [rbp + y._value]
-      emit( Instr( 0x8b ).w().reg( x._reg ).mem( regRbp, y._value ) );
-      break;
-
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ParamI ):
       // movsxd x_reg64, [rbp + y._value + FPO] 32 bits sign-extended to 64 bits
       emit( Instr( 0x63 ).w().reg( x._reg ).mem( regRbp, y._value + FPO ) );
       break;
 
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ParamP ):
-      // mov reg_x, [rbp + y._value + FPO]
-      emit( Instr( 0x8b ).w().reg( x._reg ).mem( regRbp, y._value + FPO ) );
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegI ):
+      // movsxd x_reg64, y_reg32 sign-extended to 64 bits
+      emit( Instr( 0x63 ).w().reg( x._reg ).rmReg( y._reg ) );
       break;
 
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ActualP ):
-      // mov x_reg, [rsp + y._value]
-      emit( Instr( 0x8b ).w().reg( x._reg ).mem( regRsp, y._value ) );
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegP_DerefI ):
+      // movsxd x_reg64, [y_reg64 + offset] 32 bits sign-extended to 64 bits
+      emit( Instr( 0x63 ).w().reg( x._reg ).mem( y._reg, y._value ) );
       break;
+
+    case KindPair( jit_Operand_Kind_RegP_DerefP, jit_Operand_Kind_RegI ):
+      // I can't mov into memory with sign extension in one instruction,
+      // because movsxd only moves into register.
+      // But I can do it in two steps, moving the register to itself with extension first.
+      // On the other hand, maybe I don't need this (same goes for the VarP, RegI cases).
+      toDo( "emitMov: moving memoryP, regI with sign extension\n" );
+      break;
+
+
+    // LEA
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_Addr_Global ):
-      // lea reg, [rip + offsetToGlobal]
-      emit( Instr( 0x8d ).w().reg( x._reg ).memRipRelative( &data[y._value] ) );
-      break;
-
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_Addr_Local ):
-      // lea reg64, [rbp+offset]
-      emit( Instr( 0x8d ).w().reg( x._reg ).mem( regRbp, y._value ) );
-      break;
-
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_Addr_Param ):
-      // lea reg64, [rbp + y._value + FPO]
-      emit( Instr( 0x8d ).w().reg( x._reg ).mem( regRbp, y._value + FPO ) );
-      break;
-
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_Addr_Actual ):
-      // lea reg64, [rsp+offset]
-      emit( Instr( 0x8d ).w().reg( x._reg ).mem( regRsp, y._value ) );
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_Addr_Reg_Offset ):
+      emit( leaTemplates, x, y );
       break;
 
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_Addr_Reg_Offset ):
-      // lea x_reg64, [y_reg+offset]
-      emit( Instr( 0x8d ).w().reg( x._reg ).mem( y._reg, y._value ) );
-      break;
+
+    // mov reg, imm64
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ConstI ):
       // mov reg64, immediate64 (which I sign-extend from the given 32-bit constant).
@@ -3812,63 +3512,6 @@ emitMov( const Operand& x, const Operand& y )
       outL( (long) y._value );
       break;
 
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegI ):
-      // movsxd x_reg64, y_reg32 sign-extended to 64 bits
-      emit( Instr( 0x63 ).w().reg( x._reg ).rmReg( y._reg ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegP ):
-      // mov x_reg64, y_reg64
-      emit( Instr( 0x8b ).w().reg( x._reg ).rmReg( y._reg ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegP_DerefI ):
-      // movsxd x_reg64, [y_reg64 + offset] 32 bits sign-extended to 64 bits
-      emit( Instr( 0x63 ).w().reg( x._reg ).mem( y._reg, y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_RegP_DerefP ):
-      // mov x_reg64, [y_reg64 + offset]
-      emit( Instr( 0x8b ).w().reg( x._reg ).mem( y._reg, y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP_DerefB, jit_Operand_Kind_ConstI ):
-      // mov [reg64+offset], immediate8
-      emit( Instr( 0xc6 ).opc( 0 ).mem( x._reg, x._value ).imm8( y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP_DerefB, jit_Operand_Kind_RegB ):
-      // mov [x_reg64 + offset], y_reg8
-      emit( Instr( 0x88 ).reg8( y._reg ).mem( x._reg, x._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP_DerefI, jit_Operand_Kind_ConstI ):
-      // mov [reg64+offset], immediate32
-      emit( Instr( 0xc7 ).opc( 0 ).mem( x._reg, x._value ).imm32( y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP_DerefI, jit_Operand_Kind_RegI ):
-      // mov [x_reg64 + offset], y_reg32
-      emit( Instr( 0x89 ).reg( y._reg ).mem( x._reg, x._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP_DerefP, jit_Operand_Kind_ConstI ):
-      // mov [reg64+offset], immediate32 sign-extended to 64 bits
-      emit( Instr( 0xc7 ).w().opc( 0 ).mem( x._reg, x._value ).imm32( y._value ) );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP_DerefP, jit_Operand_Kind_RegI ):
-      // I can't mov into memory with sign extension in one instruction,
-      // because movsxd only moves into register.
-      // But I can do it in two steps, moving the register to itself with extension first.
-      // On the other hand, maybe I don't need this (same goes for the VarP, RegI cases).
-      toDo( "emitMov: moving memoryP, regI with sign extension\n" );
-      break;
-
-    case KindPair( jit_Operand_Kind_RegP_DerefP, jit_Operand_Kind_RegP ):
-      // mov [x_reg64 + offset], y_reg64
-      emit( Instr( 0x89 ).w().reg( y._reg ).mem( x._reg, x._value ) );
-      break;
 
     default:
       fatal( "emitMov: unexpected operands\n" );
