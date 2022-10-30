@@ -229,6 +229,7 @@ error:
    eExternalMethodCannotBeNested
    eCantFindUnitFile
    eInternalScopeMismatch
+   eEnumValueNotAscending
    ;
 
 include 'pascal_schema.ssl'
@@ -248,15 +249,6 @@ type NodeVec:  % A pointer to a vector of Node.  See mechanism node_vec_mech
 type boolean:
    false    = 0
    true     = 1;
-
-type kind:           % kind of identifier
-   kUndefined        % not yet added to symbol table
-   kProgram
-   kProc
-   kFunc
-   kConst
-   kType
-   kVar;
 
 % intrinsic types & type constructs
 
@@ -303,7 +295,6 @@ mechanism node_mech:
     oNodeSetString (Node, node_attribute, String)
     oNodeSetInt (Node, node_attribute, int) % set int attribute of node
     oNodeSetBoolean (Node, node_attribute, boolean)
-    oNodeSetKind (Node, node_attribute, kind) % set attribute of node  *** MIGHT NOT NEED
     oNodeSetLabel( Node, node_attribute, Label )  % set Label attribute of node
     oNodeSetCode( Node, node_attribute, Code )    % set Code attribute of node
     oNodeAddLast( Node, node_attribute, Node value )  % append to a List attribute of node
@@ -491,7 +482,7 @@ BlockDecls( node_type varNodeType );
 BlockStmt( Label labelForBody, Node varScope, boolean isMain );
 VarDecl( node_type varNodeType );
 newType( node_type nt, int size ) >> Node;
-newIdent( node_type nt, kind k, int id ) >> Node;
+newIdent( node_type nt, int id ) >> Node;
 EmitValue( Node decl );
 TypeRef( out Node theType );
 PointerTypeTo( Node theType ) >> Node;
@@ -557,7 +548,7 @@ Program:
       | '(' :
          pIdent      % input, output files
 
-         t = @newIdent( nVar, kVar, LAST_ID )
+         t = @newIdent( nVar, LAST_ID )
          oNodeSet( t, qType, FileType )
          oScopeDeclareAlloc( t )
          % TO DO: I shouldn't declare the files in root scope.
@@ -566,7 +557,7 @@ Program:
          ','
          pIdent
 
-         t = @newIdent( nVar, kVar, LAST_ID )
+         t = @newIdent( nVar, LAST_ID )
          oNodeSet( t, qType, FileType )
          oScopeDeclareAlloc( t )
 
@@ -1064,7 +1055,7 @@ ProcHeaderDecl >> Node:
    [ oNodeNull( decl )
       | true :
          % first declaration
-         decl = @newIdent( nProc, kProc, LAST_ID )
+         decl = @newIdent( nProc, LAST_ID )
          oNodeSetLabel( decl, qValue, oLabelNew )
 
       | false :
@@ -1173,7 +1164,7 @@ FuncHeaderDecl >> Node:
    [ oNodeNull( decl )
       | true :
          % first declaration
-         decl = @newIdent( nFunc, kFunc, LAST_ID )
+         decl = @newIdent( nFunc, LAST_ID )
          oNodeSetLabel( decl, qValue, oLabelNew )
 
       | false :
@@ -1291,7 +1282,7 @@ FormalArgDecl:
 
             {  pIdent
 
-               decl = @newIdent( nParam, kVar, LAST_ID )
+               decl = @newIdent( nParam, LAST_ID )
                oNodeSetBoolean( decl, qInOut, isInOut )
                oNodeVecAppend( decls, decl )
 
@@ -1337,7 +1328,7 @@ FormalArgDecl:
 ConstDecl:
    {[
       | pIdent :
-         Node decl = @newIdent( nConst, kConst, LAST_ID )
+         Node decl = @newIdent( nConst, LAST_ID )
          '='
 
          @ConstExpr
@@ -1358,7 +1349,7 @@ ConstDecl:
 TypeDecl:
    {[
       | pIdent :
-         Node decl = @newIdent( nTypeDecl, kType, LAST_ID )
+         Node decl = @newIdent( nTypeDecl, LAST_ID )
          '='
          Node theType
          @TypeRef( theType )
@@ -1375,7 +1366,7 @@ VarDecl( node_type varNodeType ):
          NodeVec decls = oNodeVecNew
          Node decl
          {
-            decl = @newIdent( varNodeType, kVar, LAST_ID )
+            decl = @newIdent( varNodeType, LAST_ID )
             oNodeVecAppend( decls, decl )
             [
                | ',' :
@@ -1567,8 +1558,67 @@ TypeRef( out Node resultType ):
          oTypeAdd( resultType )
 
 
+      | '(' :
+         % An enum type declaration.
+         resultType = oNodeNew( nEnumType )
+         int value = 0
+         boolean first = true
+
+         % We'll declare the enum values in two scopes: the current scope, and a scope nested in the enum type.
+         % That will let programs use either <val> or <enumType>.<val>
+         Node outerScope = oScopeCurrent
+         oScopeBegin( -1, allocUp )   % level is meaningless, and we won't use allocate
+
+         {
+            % TO DO: assert that name not already seen in this scope, i.e. this enum.
+            %  And possibly not in the outerScope either, since that probably wouldn't count as shadowing.
+            %  It might be in some other higher/used scope.
+            pIdent
+            Node decl = @newIdent( nEnumValue, LAST_ID )
+            Node decl2 = @newIdent( nEnumValue, LAST_ID )
+            oNodeSet( decl, qType, resultType )
+            oNodeSet( decl2, qType, resultType )
+            [
+               | '=', ':=' :
+                  @ConstExpr
+                  % value must be ascending
+                  % this obviously doesn't apply to the first value
+                  [ first
+                     | false :
+                        [ greater( oValueTop, value )
+                           | false :   #eEnumValueNotAscending
+                           | * :
+                        ]
+                     | * :
+                  ]
+                  value = oValueTop
+                  oValuePop
+               | * :
+            ]
+            oNodeSetInt( decl, qValue, value )
+            oNodeSetInt( decl2, qValue, value )
+            oScopeDeclare( decl )
+
+            oScopeEnter( outerScope )
+            oScopeDeclare( decl2 )
+            oScopeEnd
+
+            inc( value )
+            first = false
+            [
+               | ',' :
+               | * :    >
+            ]
+         }
+         ')'
+
+         oNodeSet( resultType, qScope, oScopeCurrent )
+         oNodeSetInt( resultType, qSize, 4 )   % always integer sized
+         oScopeEnd
+         oTypeAdd( resultType )
+
+
       % *** TO DO: following type constructors are not implemented *** 
-      % *** TO DO: also missing declaration of enum type
       | pSet :
          pOf
          Node theType
@@ -1739,7 +1789,7 @@ ExprAllowCF( out Label falseLabel ):
          @CFToVal( falseLabel )
          @MatchTypes
          [ oTypeSNodeType
-            | nIntegerType, nBooleanType :  .tEqualI
+            | nIntegerType, nEnumType, nBooleanType :  .tEqualI
             | nPointerType :                .tEqualP
             | nCharType, nStringType :      #eNotImplemented
             | * :                           #eNotAllowed
@@ -1753,7 +1803,7 @@ ExprAllowCF( out Label falseLabel ):
          @CFToVal( falseLabel )
          @MatchTypes
          [ oTypeSNodeType
-            | nIntegerType, nBooleanType :  .tNotEqualI
+            | nIntegerType, nEnumType, nBooleanType :  .tNotEqualI
             | nPointerType :                .tNotEqualP
             | nCharType, nStringType :      #eNotImplemented
             | * :                           #eNotAllowed
@@ -1767,7 +1817,7 @@ ExprAllowCF( out Label falseLabel ):
          @CFToVal( falseLabel )
          @MatchTypes
          [ oTypeSNodeType
-            | nIntegerType, nBooleanType :  .tLessI
+            | nIntegerType, nEnumType, nBooleanType :  .tLessI
             | nCharType, nStringType :      #eNotImplemented
             | * :                           #eNotAllowed
          ]
@@ -1780,7 +1830,7 @@ ExprAllowCF( out Label falseLabel ):
          @CFToVal( falseLabel )
          @MatchTypes
          [ oTypeSNodeType
-            | nIntegerType, nBooleanType :  .tGreaterI
+            | nIntegerType, nEnumType, nBooleanType :  .tGreaterI
             | nCharType, nStringType :      #eNotImplemented
             | * :                           #eNotAllowed
          ]
@@ -1793,7 +1843,7 @@ ExprAllowCF( out Label falseLabel ):
          @CFToVal( falseLabel )
          @MatchTypes
          [ oTypeSNodeType
-            | nIntegerType, nBooleanType :  .tLessEqualI
+            | nIntegerType, nEnumType, nBooleanType :  .tLessEqualI
             | nCharType, nStringType :      #eNotImplemented
             | * :                           #eNotAllowed
          ]
@@ -1806,7 +1856,7 @@ ExprAllowCF( out Label falseLabel ):
          @CFToVal( falseLabel )
          @MatchTypes
          [ oTypeSNodeType
-            | nIntegerType, nBooleanType :  .tGreaterEqualI
+            | nIntegerType, nEnumType, nBooleanType :  .tGreaterEqualI
             | nCharType, nStringType :      #eNotImplemented
             | * :                           #eNotAllowed
          ]
@@ -2020,11 +2070,11 @@ PrimaryAllowCF( out Label falseLabel ):
 
                @Call( decl )
 
-            | nConst :
+            | nConst, nEnumValue :
                theType = oNodeGet( decl, qType )
                oTypeSPush( theType )
                [ oTypeSNodeType
-                  | nIntegerType, nBooleanType :
+                  | nIntegerType, nEnumType, nBooleanType :
                      .tPushConstI @EmitValue( decl )
                   | * :
                      #eNotImplemented
@@ -2071,7 +2121,7 @@ VarExpr( Node decl ):
 
    oTypeSPush( theType )
    [ oTypeSNodeType
-      | nIntegerType :
+      | nIntegerType, nEnumType :
          [ oNodeType( decl )
             | nGlobalVar :   .tPushGlobalI  @EmitValue( decl )
             | nLocalVar :
@@ -2191,7 +2241,7 @@ VarExpr( Node decl ):
 
 FetchVar:
    [ oTypeSNodeType
-      | nIntegerType :   .tFetchI
+      | nIntegerType, nEnumType :   .tFetchI
       | nBooleanType :   .tFetchB
       | nCharType, nStringType, nFileType : #eNotImplemented
       | nPointerType :   .tFetchP
@@ -2445,7 +2495,7 @@ Call( Node method ):
                           % Assign to offset in actuals space
 
                           [ oTypeSNodeType
-                             | nIntegerType :            .tAssignI
+                             | nIntegerType, nEnumType : .tAssignI
                              | nBooleanType :            .tAssignB
                              | nCharType, nStringType, nFileType :   #eNotImplemented
                              | nPointerType :            .tAssignP
@@ -2499,7 +2549,7 @@ Call( Node method ):
          oTypeSPush( resultType )
 
          [ oTypeSNodeType
-            | nIntegerType :   .tPushLocalI  oEmitInt( tempOffset )
+            | nIntegerType, nEnumType :   .tPushLocalI  oEmitInt( tempOffset )
             | nBooleanType :   .tPushLocalB  oEmitInt( tempOffset )
             | nCharType, nStringType, nFileType : #eNotImplemented
             | nPointerType :   .tPushLocalP  oEmitInt( tempOffset )
@@ -2563,7 +2613,7 @@ AssignStmt( Node decl ):
 %
 Assign:
    [ oTypeSNodeType
-      | nIntegerType :            .tAssignI
+      | nIntegerType, nEnumType : .tAssignI
       | nBooleanType :            .tAssignB
       | nCharType, nStringType, nFileType :   #eNotImplemented
 
@@ -2594,7 +2644,7 @@ AssignResultStmt( Node funcDecl ):
    @Expr
    @MatchTypes
    [ oTypeSNodeType
-      | nIntegerType :            .tAssignI
+      | nIntegerType, nEnumType : .tAssignI
       | nBooleanType :            .tAssignB
       | nCharType, nStringType, nFileType :   #eNotImplemented
 
@@ -2815,6 +2865,9 @@ WriteStmt:
                | nBooleanType :             .tWriteBool
                | nStringType :              .tWriteStr
                | nCharType, nFileType :     #eNotImplemented
+               | nEnumType :
+                  % TO DO: write value name via table lookup
+                  .tWriteI
                | nPointerType :             .tWriteP
                | * :                        #eNotAllowed
             ]
@@ -2911,7 +2964,7 @@ newType( node_type nt, int size ) >> Node:
 % Create and return a new nIdent of the given node_type, with the given ident id.
 % Does not add it to any scope.
 %
-newIdent( node_type nt, kind k, int id ) >> Node:
+newIdent( node_type nt, int id ) >> Node:
   Node t = oNodeNew( nt )
   oNodeSetInt( t, qIdent, id )
   >> t
@@ -2942,6 +2995,10 @@ OrdinalLow( Node theType ) >> int:
       | nIntegerType :  >> oMININT
       | nBooleanType :  >> 0
       | nCharType :     >> 0
+      | nEnumType :
+         Node enumScope = oNodeGet( theType, qScope )
+         Node first = oNodeIterValue( oNodeGetIter( enumScope, qDecls ) )
+         >> oNodeGetInt( first, qValue )
       | nSubrangeType : >> oNodeGetInt( theType, qLow )
       | * :             #eNotOrdinalType
                         >> 0
@@ -2972,34 +3029,34 @@ installBuiltIns:
 
    Node t
 
-   t = @newIdent( nTypeDecl, kType, oIdAdd_File )
+   t = @newIdent( nTypeDecl, oIdAdd_File )
    oNodeSet( t, qType, FileType )
    oScopeDeclare( t )
 
-   t = @newIdent( nTypeDecl, kType, oIdAdd_Integer )
+   t = @newIdent( nTypeDecl, oIdAdd_Integer )
    oNodeSet( t, qType, IntegerType )
    oScopeDeclare( t )
 
-   t = @newIdent( nTypeDecl, kType, oIdAdd_Boolean )
+   t = @newIdent( nTypeDecl, oIdAdd_Boolean )
    oNodeSet( t, qType, BooleanType )
    oScopeDeclare( t )
 
-   t = @newIdent( nTypeDecl, kType, oIdAdd_Char )
+   t = @newIdent( nTypeDecl, oIdAdd_Char )
    oNodeSet( t, qType, CharType )
    oScopeDeclare( t )
 
-   t = @newIdent( nTypeDecl, kType, oIdAdd_String )
+   t = @newIdent( nTypeDecl, oIdAdd_String )
    oNodeSet( t, qType, StringType )
    oScopeDeclare( t )
 
    % Built-in constants
 
-   t = @newIdent( nConst, kConst, oIdAdd_True )
+   t = @newIdent( nConst, oIdAdd_True )
    oNodeSet( t, qType, BooleanType )
    oNodeSetInt( t, qValue, 1 )
    oScopeDeclare( t )
 
-   t = @newIdent( nConst, kConst, oIdAdd_False )
+   t = @newIdent( nConst, oIdAdd_False )
    oNodeSet( t, qType, BooleanType )
    oNodeSetInt( t, qValue, 0 )
    oScopeDeclare( t )

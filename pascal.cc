@@ -568,7 +568,6 @@ Node dNode;  // temporary for several mechanisms
             continue;
     case oNodeSetInt:
     case oNodeSetBoolean:
-    case oNodeSetKind:
     case oNodeSetLabel:
     case oNodeSetCode:
             SetValue ((Node)ssl_argv(0,3), ssl_argv(1,3), ssl_argv(2,3));

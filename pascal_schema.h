@@ -20,6 +20,7 @@ typedef enum {
     nProc,
     nFunc,
     nConst,
+    nEnumValue,
     nTypeDecl,
     nVar,
     nGlobalVar,
@@ -179,6 +180,7 @@ typedef enum {
 #define NewnProc()		NewNode(nProc)
 #define NewnFunc()		NewNode(nFunc)
 #define NewnConst()		NewNode(nConst)
+#define NewnEnumValue()		NewNode(nEnumValue)
 #define NewnTypeDecl()		NewNode(nTypeDecl)
 #define NewnVar()		NewNode(nVar)
 #define NewnGlobalVar()		NewNode(nGlobalVar)

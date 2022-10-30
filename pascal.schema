@@ -123,6 +123,8 @@ nFunc =>
 
 nIdent ::= nConst
 
+nConst ::= nEnumValue
+
 nIdent ::= nTypeDecl
 
 nIdent ::= nVar
@@ -186,10 +188,11 @@ nRecordType =>
         qScope:         Node            (nScope)                [Pri]
 
 
-% TO DO: Looks like I didn't support this in SSL yet
 nType ::= nEnumType
 nEnumType =>
-        % the enum value declarations, each as a const with its int value 
+        % The enum value declarations (nEnumValue), each with its int value.
+        % The values are declared both here and the parent scope, so can be used with or without
+        % the enum type name as a prefix.
         qScope:         Node            (nScope)                [Pri]
 
 % a collection of enum values, like a bit vector

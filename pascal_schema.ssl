@@ -17,6 +17,7 @@ type node_type:
 	nProc
 	nFunc
 	nConst
+	nEnumValue
 	nTypeDecl
 	nVar
 	nGlobalVar
