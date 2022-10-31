@@ -609,10 +609,18 @@ void emitModRMMemRipRelative( const Register* operandReg, void* globalPtr, int n
 void emitModRM_OpcRMMemRipRelative( int opcodeExtension, void* globalPtr, int numAdditionalInstrBytes );
 
 // runtime library methods
+
+struct EnumNameTable {
+  int value;
+  int padding;
+  const char* name;
+};
+
 extern void runlibWriteI( int val );
 extern void runlibWriteBool( bool val );
 extern void runlibWriteStr( char* ptr );
 extern void runlibWriteP( char* ptr );
+extern void runlibWriteEnum( int val, EnumNameTable* table );
 extern void runlibWriteCR();
 
 extern void grInit();
@@ -2081,6 +2089,16 @@ generateCode()
           operandIntoSpecificReg( x, paramReg1, 8 );
           emitCallExtern( (char*) runlibWriteP );
           x.release();
+        }
+        break;
+      case tWriteEnum : {
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
+          operandIntoSpecificReg( x, paramRegs[0], 4 );
+          operandIntoSpecificReg( y, paramRegs[1], 8 );
+          emitCallExtern( (char*) runlibWriteEnum );
+          x.release();
+          y.release();
         }
         break;
       case tWriteCR : {
@@ -3943,6 +3961,18 @@ void
 runlibWriteP( char* ptr )
 {
   printf( " <%p>", ptr );
+}
+
+void
+runlibWriteEnum( int val, EnumNameTable* table )
+{
+  for ( int i = 0; table[i].name != nullptr; ++i ) {
+    if ( table[i].value == val ) {
+      printf( "%s", table[i].name );
+      return;
+    }
+  }
+  printf( "<?badEnum>" );
 }
 
 void

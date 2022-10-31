@@ -195,6 +195,7 @@ output:
    tWriteBool        %  "     "    : write TRUE/FALSE, pop
    tWriteStr         %  "     "    : write string whose addr is on tos, pop
    tWriteP           %  "     "    : write ptr var whose addr is on tos, pop
+   tWriteEnum        %  "     "    : write enum name.  Name table on tos, value under it, pop both
    tWriteCR          %  "     "    : write cr
 
 %  Other:
@@ -343,6 +344,7 @@ mechanism math:
     inc (inout int)
     dec (inout int)
     negate (int) >> int
+    add( int x, int y ) >> int
     subtract( int x, int y ) >> int     % x - y
     multiply( int x, int y ) >> int     % x * y
     equal( int x, int y ) >> boolean
@@ -376,6 +378,7 @@ mechanism scope_mech:
     oScopeDeclare( Node decl )           % add declaration to current scope.
     oScopeDeclareAlloc( Node decl )      % add declaration to current scope, and allocate space according to its type
     oScopeAllocType( Node theType ) >> int   % allocate space for type in current scope, and return its address
+    oScopeAlloc( int size, int align ) >> int % allocate bytes, with given alignment in bytes 
     oScopeFind >> Node                   % find declaration of last accepted identifier.  Returns Null if not found.
     oScopeFindRequire >> Node            % find declaration of last accepted identifier.  Error if not found.
     oScopeFindInCurrentScope >> Node     % find declaration of last accepted identifier, only within the current scope.  Null if not found.
@@ -465,6 +468,7 @@ rules
 % ----------------------------- Global Variables ----------------------------
 
 Node    workspace              % root of database
+Node    globalScope            % scope for globals in the current module
 Node    initScope              % scope for temporaries global var init,
                                % and program main stmt / unit initialization stmts
 % built-in nTypes
@@ -575,7 +579,7 @@ Program:
 
    % Global scope for the program, below any used units.
    oScopeBegin( 0, allocGlobal )
-   Node globalScope = oScopeCurrent
+   globalScope = oScopeCurrent
 
    % A new scope just for temporaries in the main routine
    % Create it up front, in case it's needed by variable initialization exprs.
@@ -734,6 +738,7 @@ Unit >> Node:
 
    oScopeBegin( 0, allocGlobal )
    oNodeSet( unit, qPublicScope, oScopeCurrent )
+   globalScope = oScopeCurrent
 
    % A scope for temporaries needed by variable initialization
    oScopeBegin( 0, allocDown )
@@ -752,10 +757,11 @@ Unit >> Node:
    @EnterUsedUnits( unitImpl )
    % re-enter interface scope after impl's uses.  interface still has priority.
    oScopeEnter( oNodeGet( unit, qPublicScope ) )
-
+   
    oScopeBegin( 0, allocGlobal )
    oNodeSet( unit, qPrivateScope, oScopeCurrent )
    oNodeSet( oScopeCurrent, qExtends, oNodeGet( unit, qPublicScope ) )
+   globalScope = oScopeCurrent
    @UnitImplementation( unit )
 
    [
@@ -994,16 +1000,16 @@ MethodModifiers( Node decl ):
    ;
 
 
-% We need an initCode code stream for the current scope.
+% We need an initCode code stream for the given scope.
 % Create it if not present yet.  Return it.
 % (This will be used for variable initialization.)
 %
-GetOrCreateInitCode >> Code:
-   Code initCode = oNodeGetCode( oScopeCurrent, qInitCode )
+GetOrCreateInitCode( Node scope ) >> Code:
+   Code initCode = oNodeGetCode( scope, qInitCode )
    [ equal_code( initCode, codeNull )
       | true :
          initCode = oCodeNew
-         oNodeSetCode( oScopeCurrent, qInitCode, initCode )
+         oNodeSetCode( scope, qInitCode, initCode )
       | * :
    ]
    >> initCode;
@@ -1399,7 +1405,7 @@ VarDecl( node_type varNodeType ):
                ]
 
                % we need an initCode stream for this scope
-               Code initCode = @GetOrCreateInitCode
+               Code initCode = @GetOrCreateInitCode( oScopeCurrent )
                oCodePush( initCode )
 
                % currently the global level has two scopes:
@@ -1562,6 +1568,7 @@ TypeRef( out Node resultType ):
          % An enum type declaration.
          resultType = oNodeNew( nEnumType )
          int value = 0
+         int numValues = 0
          boolean first = true
 
          % We'll declare the enum values in two scopes: the current scope, and a scope nested in the enum type.
@@ -1578,12 +1585,17 @@ TypeRef( out Node resultType ):
             Node decl2 = @newIdent( nEnumValue, LAST_ID )
             oNodeSet( decl, qType, resultType )
             oNodeSet( decl2, qType, resultType )
+
+            % build up name table, for i/o
+            int nameOffset = oStringAllocLit( ID_STRING( LAST_ID ) )
+            oNodeSetInt( decl, qNameOffset, nameOffset )
+            oNodeSetInt( decl2, qNameOffset, nameOffset )
             [
                | '=', ':=' :
                   @ConstExpr
                   % value must be ascending
                   % this obviously doesn't apply to the first value
-                  [ first
+                  [ equal_zero( numValues )
                      | false :
                         [ greater( oValueTop, value )
                            | false :   #eEnumValueNotAscending
@@ -1604,7 +1616,7 @@ TypeRef( out Node resultType ):
             oScopeEnd
 
             inc( value )
-            first = false
+            inc( numValues )
             [
                | ',' :
                | * :    >
@@ -1615,6 +1627,52 @@ TypeRef( out Node resultType ):
          oNodeSet( resultType, qScope, oScopeCurrent )
          oNodeSetInt( resultType, qSize, 4 )   % always integer sized
          oScopeEnd
+
+         % Finish creation of the name table
+         %    struct {
+         %      int    value;
+         %      int    padding;
+         %      char*  name;
+         %    } table[ numValues + 1 ];
+         %  final entry will have name == nullptr
+         %
+         % I'll need to generate init code, to store pointers in global data,
+         % since I don't have a relocation mechanism for static data at the moment.
+         oCodePush( @GetOrCreateInitCode( globalScope ) )
+         oScopeEnter( globalScope )
+         int size = multiply( add( numValues, 1 ), 16 )
+         int addr = oScopeAlloc( size, 8 )
+         oScopeEnd
+         oNodeSetInt( resultType, qNameTable, addr )
+         % loop over enum values
+         NodeIter it = oNodeGetIter( oNodeGet( resultType, qScope ), qDecls )
+         {
+            Node enumValue = oNodeIterValue( it )
+            [ oNodeNull( enumValue )
+               | true :  >
+               | * :
+            ]
+            .tPushAddrGlobal  oEmitInt( addr )
+            .tPushConstI  oEmitInt( oNodeGetInt( enumValue, qValue ) )
+            .tAssignI
+            addr = add( addr, 8 )
+            .tPushAddrGlobal  oEmitInt( addr )
+            .tPushAddrGlobal  oEmitInt( oNodeGetInt( enumValue, qNameOffset ) )
+            .tAssignP
+            addr = add( addr, 8 )
+            oNodeIterNext( it )
+         }
+         % final table entry
+         .tPushAddrGlobal  oEmitInt( addr )
+         .tPushConstI  oEmitInt( 0 )
+         .tAssignI
+         addr = add( addr, 8 )
+         .tPushAddrGlobal  oEmitInt( addr )
+         .tPushConstI  oEmitInt( 0 )
+         .tAssignP
+         addr = add( addr, 8 )
+         oCodePop
+
          oTypeAdd( resultType )
 
 
@@ -2866,8 +2924,9 @@ WriteStmt:
                | nStringType :              .tWriteStr
                | nCharType, nFileType :     #eNotImplemented
                | nEnumType :
-                  % TO DO: write value name via table lookup
-                  .tWriteI
+                  % write name via table lookup
+                  .tPushAddrGlobal  oEmitInt( oNodeGetInt( oTypeSTop, qNameTable ) )
+                  .tWriteEnum
                | nPointerType :             .tWriteP
                | * :                        #eNotAllowed
             ]

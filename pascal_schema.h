@@ -75,6 +75,7 @@ typedef enum {
     qOldParams,
     qOldType,
     qResultOffset,
+    qNameOffset,
     qInOut,
     qPointerType,
     qBaseType,
@@ -82,6 +83,7 @@ typedef enum {
     qLow,
     qHigh,
     qScope,
+    qNameTable,
 } AttrCode;
 #endif /* Object */
 
@@ -117,6 +119,7 @@ typedef enum {
 #define GetqOldParams(N)		(Node)	GetAttr(N, qOldParams)
 #define GetqOldType(N)		(Node)	GetAttr(N, qOldType)
 #define GetqResultOffset(N)		(Integer4)	(intptr_t) GetAttr(N, qResultOffset)
+#define GetqNameOffset(N)		(Integer4)	(intptr_t) GetAttr(N, qNameOffset)
 #define GetqInOut(N)		(Boolean1)	(intptr_t) GetAttr(N, qInOut)
 #define GetqPointerType(N)		(Node)	GetAttr(N, qPointerType)
 #define GetqBaseType(N)		(Node)	GetAttr(N, qBaseType)
@@ -124,6 +127,7 @@ typedef enum {
 #define GetqLow(N)		(Integer4)	(intptr_t) GetAttr(N, qLow)
 #define GetqHigh(N)		(Integer4)	(intptr_t) GetAttr(N, qHigh)
 #define GetqScope(N)		(Node)	GetAttr(N, qScope)
+#define GetqNameTable(N)		(Integer4)	(intptr_t) GetAttr(N, qNameTable)
 
 #define SetqINVALID(N,V)		SetAttr(N, qINVALID, V)
 #define SetqUnits(N,V)		SetAttr(N, qUnits, V)
@@ -157,6 +161,7 @@ typedef enum {
 #define SetqOldParams(N,V)		SetAttr(N, qOldParams, V)
 #define SetqOldType(N,V)		SetAttr(N, qOldType, V)
 #define SetqResultOffset(N,V)		SetAttr(N, qResultOffset, (void*)(intptr_t)(V))
+#define SetqNameOffset(N,V)		SetAttr(N, qNameOffset, (void*)(intptr_t)(V))
 #define SetqInOut(N,V)		SetAttr(N, qInOut, (void*)(intptr_t)(V))
 #define SetqPointerType(N,V)		SetAttr(N, qPointerType, V)
 #define SetqBaseType(N,V)		SetAttr(N, qBaseType, V)
@@ -164,6 +169,7 @@ typedef enum {
 #define SetqLow(N,V)		SetAttr(N, qLow, (void*)(intptr_t)(V))
 #define SetqHigh(N,V)		SetAttr(N, qHigh, (void*)(intptr_t)(V))
 #define SetqScope(N,V)		SetAttr(N, qScope, V)
+#define SetqNameTable(N,V)		SetAttr(N, qNameTable, (void*)(intptr_t)(V))
 
 #define NewnINVALID()		NewNode(nINVALID)
 #define NewObject()		NewNode(Object)

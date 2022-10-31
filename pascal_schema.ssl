@@ -72,6 +72,7 @@ type node_attribute:
 	qOldParams
 	qOldType
 	qResultOffset
+	qNameOffset
 	qInOut
 	qPointerType
 	qBaseType
@@ -79,5 +80,6 @@ type node_attribute:
 	qLow
 	qHigh
 	qScope
+	qNameTable
 	;
 

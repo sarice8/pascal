@@ -159,6 +159,7 @@ struct instrInfo_s tCodeInstrs[] = {
   { "tWriteBool", 0 },
   { "tWriteStr", 0 },
   { "tWriteP", 0 },
+  { "tWriteEnum", 0 },
   { "tWriteCR", 0 }
 };
 int numtCodeInstrs = sizeof(tCodeInstrs) / sizeof(tCodeInstrs[0]);
@@ -598,6 +599,27 @@ walkTable()
               continue;
        case tWriteP :
               printf(" <%p>", (void*) stack[sp--]);
+              continue;
+       case tWriteEnum: {
+              struct nameTableEntryT {
+                int value;
+                int padding;
+                char* name;                
+              };
+              nameTableEntryT* table = (nameTableEntryT*) stack[sp--];
+              int value = (int) stack[sp--];
+              int i;
+              for ( i = 0; table[i].name != nullptr; ++i ) {
+                if ( table[i].value == value ) {
+                  break;
+                }
+              }
+              if ( table[i].name != nullptr ) {
+                printf( "%s", table[i].name );
+              } else {
+                printf( "<?badEnum>" );
+              }
+              }
               continue;
        case tWriteCR :
               printf("\n");

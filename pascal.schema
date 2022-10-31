@@ -124,6 +124,8 @@ nFunc =>
 nIdent ::= nConst
 
 nConst ::= nEnumValue
+nEnumValue =>
+        qNameOffset:    Integer4    % offset of name in global data, for building name table
 
 nIdent ::= nTypeDecl
 
@@ -194,6 +196,9 @@ nEnumType =>
         % The values are declared both here and the parent scope, so can be used with or without
         % the enum type name as a prefix.
         qScope:         Node            (nScope)                [Pri]
+        % Global data offset of name table: <value><offset of char*>..
+        % ending with name == nullptr
+        qNameTable:     Integer4
 
 % a collection of enum values, like a bit vector
 nType ::= nSetType

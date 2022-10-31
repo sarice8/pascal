@@ -740,6 +740,9 @@ Node dNode;  // temporary for several mechanisms
     case negate :
             ssl_result = -ssl_param;
             continue;
+    case add :
+            ssl_result = ( ssl_argv( 0, 2 ) + ssl_argv( 1, 2 ) );
+            continue;
     case subtract :
             ssl_result = (ssl_argv(0,2) - ssl_argv(1,2));
             continue;
@@ -849,6 +852,14 @@ Node dNode;  // temporary for several mechanisms
             Node theType = (Node)ssl_param;
             ssl_assert( theType != NULL );
             int size = GetValue( theType, qSize );
+            ssl_result = scopeAlloc( scope, size );
+            continue;
+            }
+    case oScopeAlloc: {
+            ssl_assert (dScopeStackPtr >= 1);
+            Node scope = dScopeStack[dScopeStackPtr];
+            int size = ssl_argv( 0, 2 );
+            // TO DO: use align i.e. ssl_argv( 1, 2 )
             ssl_result = scopeAlloc( scope, size );
             continue;
             }
