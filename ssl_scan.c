@@ -668,6 +668,60 @@ ssl_add_id( const char* name, int code )
 }
 
 
+/*  ssl_lookup_id
+ *  Look up an identifier name in the scanner's identifier table.
+ *  If not found, it is added to the table, with the given code (typically pIDENTIFIER).
+ *  Returns the identifier value.
+ */
+int
+ssl_lookup_id( const char* name, int code )
+{
+    int i;
+    const char* a;
+    const char* b;
+
+    int namelen = strlen( name );
+
+    if (ssl_case_sensitive)
+    {
+        for (i=1; i < ssl_id_table_next; i++)
+        {
+            if (namelen == ssl_id_table [i].namelen)
+            {
+                a = name;
+                b = ssl_id_table [i].name;
+                while ((*a++) == (*b++))
+                {
+                    if (!*a)    /* match */
+                    {
+                        return i;
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
+        for (i=1; i < ssl_id_table_next; i++)
+        {
+            if (namelen == ssl_id_table [i].namelen)
+            {
+                a = name;
+                b = ssl_id_table [i].name;
+                while (s_upper[*a++] == s_upper[*b++])
+                {
+                    if (!*a)    /* match */
+                    {
+                        return i;
+                    }
+                }
+            }
+        }
+    }
+    return ssl_add_id( name, code );
+}
+
+
 /*
 *****************************************************************************
 *
@@ -689,52 +743,7 @@ ssl_add_id( const char* name, int code )
 void
 s_lookup_id ()
 {
-    int i;
-    const char* a;
-    const char* b;
-
-    if (ssl_case_sensitive)
-    {
-        for (i=1; i < ssl_id_table_next; i++)
-        {
-            if (ssl_token.namelen == ssl_id_table [i].namelen)
-            {
-                a = ssl_token.name;
-                b = ssl_id_table [i].name;
-                while ((*a++) == (*b++))
-                {
-                    if (!*a)    /* match */
-                    {
-                        ssl_token.code = ssl_id_table [i].code;  /* for built-in ids */
-                        ssl_token.val  = i;                  /* for user ids */
-                        return;
-                    }
-                }
-            }
-        }
-    }
-    else
-    {
-        for (i=1; i < ssl_id_table_next; i++)
-        {
-            if (ssl_token.namelen == ssl_id_table [i].namelen)
-            {
-                a = ssl_token.name;
-                b = ssl_id_table [i].name;
-                while (s_upper[*a++] == s_upper[*b++])
-                {
-                    if (!*a)    /* match */
-                    {
-                        ssl_token.code = ssl_id_table [i].code;  /* for built-in ids */
-                        ssl_token.val  = i;                  /* for user ids */
-                        return;
-                    }
-                }
-            }
-        }
-    }
-
-    ssl_token.val = ssl_add_id (ssl_token.name, s_special_codes->ident);
+    ssl_token.val = ssl_lookup_id( ssl_token.name, s_special_codes->ident );
 }
 
 

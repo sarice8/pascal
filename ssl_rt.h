@@ -280,6 +280,14 @@ void ssl_error ( const char* msg );
  */
 int ssl_add_id ( const char* name, int code );
 
+
+/*  Look up an identifier name in the scanner's identifier table.
+ *  If not found, it is added to the table, with the given code (typically pIDENTIFIER).
+ *  Returns the identifier value.
+ */
+int ssl_lookup_id ( const char* name, int code );
+
+
 /*
  *  Return the name of a given identifier.
  */
