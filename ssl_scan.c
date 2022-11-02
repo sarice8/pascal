@@ -744,6 +744,7 @@ void
 s_lookup_id ()
 {
     ssl_token.val = ssl_lookup_id( ssl_token.name, s_special_codes->ident );
+    ssl_token.code = ssl_id_table[ ssl_token.val ].code;
 }
 
 
