@@ -3081,9 +3081,14 @@
 8572:          oChangeIntLitToLabelIdent
 8573:    ]
       
-         % Label must be declared in the same scope it is used.
-         % (Some pascals allow non-local goto, but we do not.
-         % That would require more tracking of dynamic scope, to unwind stack.)
+         % Some pascals have rules about where you can jump (to a sibling statement or
+         % higher level statement in the block, but not into a lower lower level statement.)
+         % fpc just says "jumping into a nested statement can have strange effects."
+         % I'm going to follow that and not prohibit any goto, as long as it's in the same block.
+      
+         % Label must be declared in the same block (same scope) it is used.
+         % Some pascals allow non-local goto, but we do not.
+         % That would require more tracking of dynamic scope, to unwind stack.
          % Note: in main program statement, this relies on the temporaries scope extending
          %  the main scope (where a label declaration would occur).
 8581:    Node decl = oScopeFindRequireInScope( oScopeCurrent )
