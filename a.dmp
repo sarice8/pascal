@@ -39,9 +39,44 @@
   65	tPushConstI	   1
   67	tAssignI
   68	tPushAddrGlobal	 116
-  70	tWriteStr
-  71	tPushGlobalI	 112
-  73	tPushAddrGlobal	  32
-  75	tWriteEnum
-  76	tWriteCR
-  77	tReturn
+  70	tPushConstI	   0
+  72	tAssignI
+  73	tLabel	   2
+  75	tPushAddrGlobal	 120
+  77	tWriteStr
+  78	tPushGlobalI	 112
+  80	tPushAddrGlobal	  32
+  82	tWriteEnum
+  83	tWriteCR
+  84	tPushAddrGlobal	 116
+  86	tPushGlobalI	 116
+  88	tPushConstI	   1
+  90	tAddI
+  91	tAssignI
+  92	tPushGlobalI	 116
+  94	tPushConstI	   3
+  96	tLessI
+  97	tJumpFalse	   6
+  99	tJump	   2
+ 101	tLabel	   6
+ 103	tPushAddrGlobal	 116
+ 105	tPushConstI	   0
+ 107	tAssignI
+ 108	tLabel	   4
+ 110	tPushAddrGlobal	 124
+ 112	tWriteStr
+ 113	tPushAddrGlobal	 116
+ 115	tPushGlobalI	 116
+ 117	tPushConstI	   1
+ 119	tAddI
+ 120	tAssignI
+ 121	tPushGlobalI	 116
+ 123	tPushConstI	   3
+ 125	tLessI
+ 126	tJumpFalse	   7
+ 128	tJump	   4
+ 130	tLabel	   7
+ 132	tPushAddrGlobal	 128
+ 134	tWriteStr
+ 135	tWriteCR
+ 136	tReturn

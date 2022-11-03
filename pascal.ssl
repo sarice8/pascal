@@ -89,6 +89,7 @@ input:
    pConst
    pType
    pVar
+   pLabel
    pBegin
    pEnd
    pArray
@@ -107,6 +108,7 @@ input:
    pUntil
    pContinue
    pBreak
+   pGoto
    pAnd
    pOr
    pNot
@@ -231,6 +233,7 @@ error:
    eCantFindUnitFile
    eInternalScopeMismatch
    eEnumValueNotAscending
+   eUsedButNotDefined
    ;
 
 include 'pascal_schema.ssl'
@@ -406,6 +409,7 @@ mechanism id_mech:
     oIdAdd_String >> int
     oIdAdd_True >> int
     oIdAdd_False >> int
+    oChangeIntLitToLabelIdent    % change current token from pIntLit to pIdent "_label_<intlit>"
     ;
 
 
@@ -584,7 +588,10 @@ Program:
    % A new scope just for temporaries in the main routine
    % Create it up front, in case it's needed by variable initialization exprs.
    % But we won't stay in it here.
+   % Note we say it extends the global scope, so that during main statement evaluation
+   % any user labels declared in the global scope are considered to be part of the current scope.
    oScopeBegin( 0, allocDown )
+   oNodeSet( oScopeCurrent, qExtends, globalScope )
    initScope = oScopeCurrent
    oNodeSet( program, qMainRoutineScope, initScope )
    oScopeEnd
@@ -606,6 +613,7 @@ Program:
    oScopeEnd   % main routine scope
 
    '.'
+   @CheckForUndefinedLabels
    oScopeEnd   % global scope
    @EndUsedUnits( program )   % used units scopes
    ;
@@ -787,6 +795,7 @@ UnitInterface( Node unit ):
       | pConst :     @ConstDecl
       | pType :      @TypeDecl
       | pVar :       @VarDecl( nGlobalVar )
+      % label declaration not allowed in interface
 
       | pProcedure :
          Node decl = @ProcHeaderDecl
@@ -892,6 +901,7 @@ UnitFinalization( Node unit, boolean hasStmts ):
 Block( node_type varNodeType, Label labelForBody ):
    @BlockDecls( varNodeType )
    @BlockStmt( labelForBody, oScopeCurrent, false )
+   @CheckForUndefinedLabels
    ;
 
 
@@ -900,6 +910,7 @@ BlockDecls( node_type varNodeType ):
       | pConst :     @ConstDecl
       | pType :      @TypeDecl
       | pVar :       @VarDecl( varNodeType )
+      | pLabel :     @LabelDecl
       | pProcedure : @ProcDecl
       | pFunction :  @FuncDecl
       | * :          >
@@ -913,6 +924,33 @@ BlockDecls( node_type varNodeType ):
 CheckForUndefinedMethods:
    % TO DO
    % Note: disregard methods marked external
+   ;
+
+% were there any labels declared in the current scope, and used,
+% but never defined (as the prefix of a stement)?
+%
+CheckForUndefinedLabels:
+   NodeIter it = oNodeGetIter( oScopeCurrent, qDecls )
+   {
+      Node decl = oNodeIterValue( it )
+      [ oNodeNull( decl )
+         | false :
+         | * :  >
+      ]
+      [ oNodeType( decl )
+         | nLabel :
+            [ oNodeGetBoolean( decl, qDefined )
+               | false :
+                  [ oNodeGetBoolean( decl, qUsed )
+                     | true :    #eUsedButNotDefined  % TO DO: give the decl in the message
+                     | * :
+                  ]
+               | * :
+            ]
+         | * :
+      ]
+      oNodeIterNext( it )
+   }
    ;
 
 
@@ -1440,6 +1478,35 @@ VarDecl( node_type varNodeType ):
       | * :
          >
    ]};
+
+
+% Parse a list of label declarations.
+% We'll create a tcode label at declaration time, for each user label.
+% If the user label is an integer, we'll record it as _label_<int> in the decl.
+%
+LabelDecl:
+   {
+      Node decl
+      [
+         | pIdent :
+         | pIntLit :
+            % Replace token with identifier "_label_<intlit>"
+            oChangeIntLitToLabelIdent
+      ]
+      decl = @newIdent( nLabel, LAST_ID )
+      % TO DO: ensure not already declared in this scope.
+      %        Or maybe that can be part of oScopeDeclare.
+      Label label = oLabelNew
+      oNodeSetLabel( decl, qValue, label )
+      oScopeDeclare( decl )
+      [
+         | ',' :
+         | * :
+            >
+      ]
+   }
+   ';'
+   ;
 
 
 % Parse a type reference, returning the nType.
@@ -2445,7 +2512,7 @@ Call( Node method ):
    % I don't want to issue .tLabelExtern for unused methods, that seems inefficient.
    [ oNodeGetBoolean( method, qExternal )
       | true :
-         [ oNodeGetBoolean( method, qCalled )
+         [ oNodeGetBoolean( method, qUsed )
             | false :
                % define the extern label on first use
                @DefineExternLabel( method )
@@ -2453,7 +2520,7 @@ Call( Node method ):
          ]
      | * :
    ]
-   oNodeSetBoolean( method, qCalled, true )
+   oNodeSetBoolean( method, qUsed, true )
 
    % If the method has a cdecl modifier, the back end will need to use the native
    % calling convention, instead of my own.  But, the convention varies by platform,
@@ -2636,20 +2703,39 @@ Statement:
       | pBreak :       @BreakStmt
       | pContinue :    @ContinueStmt
       | pBegin :       @BeginStmt
-      | pIdent :       @AssignOrCallStmt
+      | pIdent :       @LabelOrAssignOrCallStmt
+      | pGoto :        @GotoStmt
+      | pIntLit :      % should be an integer label
+                       oChangeIntLitToLabelIdent
+                       @LabelOrAssignOrCallStmt
       | * :            % null statement : don't accept any tokens
    ];
 
 
-AssignOrCallStmt:
+LabelOrAssignOrCallStmt:
    Node decl = oScopeFindRequire
    @ResolveUnitRef( decl )
    [ oNodeType( decl )
+      | nLabel :                          @LabelDefinition( decl )
+                                          @Statement
       | nProc :                           @Call( decl )
       | nGlobalVar, nLocalVar, nParam :   @AssignStmt( decl )
       | nFunc :                           @AssignResultStmt( decl )
       | * :                               #eBadStatement
    ];
+
+
+% Parse a "label:" prefix in front of a statement.
+%
+LabelDefinition( Node decl ):
+   [ oNodeGetBoolean( decl, qDefined )
+      | true :  #eAlreadyDefined
+      | * :
+   ]
+   .tLabel  oEmitLabel( oNodeGetLabel( decl, qValue ) )
+   oNodeSetBoolean( decl, qDefined, true )
+   ':'
+   ;
 
 
 % Given decl, the just-accepted first identifier on the left hand side.
@@ -2898,6 +2984,25 @@ BreakStmt:
       | false :
          .tJump  oEmitLabel( oLoopBreakLabel )
    ];
+
+
+GotoStmt:
+   [
+      | pIdent :
+      | pIntLit :
+         % Replace token with identifier "_label_<intlit>"
+         oChangeIntLitToLabelIdent
+   ]
+
+   % Label must be declared in the same scope it is used.
+   % (Some pascals allow non-local goto, but we do not.
+   % That would require more tracking of dynamic scope, to unwind stack.)
+   % Note: in main program statement, this relies on the temporaries scope extending
+   %  the main scope (where a label declaration would occur).
+   Node decl = oScopeFindRequireInScope( oScopeCurrent )
+   oNodeSetBoolean( decl, qUsed, true )
+   .tJump  oEmitLabel( oNodeGetLabel( decl, qValue ) )
+   ;
 
 
 BeginStmt:

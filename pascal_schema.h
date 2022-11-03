@@ -27,6 +27,7 @@ typedef enum {
     nLocalVar,
     nRecordField,
     nParam,
+    nLabel,
     nType,
     nFileType,
     nIntegerType,
@@ -71,12 +72,13 @@ typedef enum {
     qExternal,
     qExternalName,
     qCdecl,
-    qCalled,
+    qUsed,
     qOldParams,
     qOldType,
     qResultOffset,
     qNameOffset,
     qInOut,
+    qDefined,
     qPointerType,
     qBaseType,
     qIndexType,
@@ -115,12 +117,13 @@ typedef enum {
 #define GetqExternal(N)		(Boolean1)	(intptr_t) GetAttr(N, qExternal)
 #define GetqExternalName(N)		(StringN)	GetAttr(N, qExternalName)
 #define GetqCdecl(N)		(Boolean1)	(intptr_t) GetAttr(N, qCdecl)
-#define GetqCalled(N)		(Boolean1)	(intptr_t) GetAttr(N, qCalled)
+#define GetqUsed(N)		(Boolean1)	(intptr_t) GetAttr(N, qUsed)
 #define GetqOldParams(N)		(Node)	GetAttr(N, qOldParams)
 #define GetqOldType(N)		(Node)	GetAttr(N, qOldType)
 #define GetqResultOffset(N)		(Integer4)	(intptr_t) GetAttr(N, qResultOffset)
 #define GetqNameOffset(N)		(Integer4)	(intptr_t) GetAttr(N, qNameOffset)
 #define GetqInOut(N)		(Boolean1)	(intptr_t) GetAttr(N, qInOut)
+#define GetqDefined(N)		(Boolean1)	(intptr_t) GetAttr(N, qDefined)
 #define GetqPointerType(N)		(Node)	GetAttr(N, qPointerType)
 #define GetqBaseType(N)		(Node)	GetAttr(N, qBaseType)
 #define GetqIndexType(N)		(Node)	GetAttr(N, qIndexType)
@@ -157,12 +160,13 @@ typedef enum {
 #define SetqExternal(N,V)		SetAttr(N, qExternal, (void*)(intptr_t)(V))
 #define SetqExternalName(N,V)		SetAttr(N, qExternalName, V)
 #define SetqCdecl(N,V)		SetAttr(N, qCdecl, (void*)(intptr_t)(V))
-#define SetqCalled(N,V)		SetAttr(N, qCalled, (void*)(intptr_t)(V))
+#define SetqUsed(N,V)		SetAttr(N, qUsed, (void*)(intptr_t)(V))
 #define SetqOldParams(N,V)		SetAttr(N, qOldParams, V)
 #define SetqOldType(N,V)		SetAttr(N, qOldType, V)
 #define SetqResultOffset(N,V)		SetAttr(N, qResultOffset, (void*)(intptr_t)(V))
 #define SetqNameOffset(N,V)		SetAttr(N, qNameOffset, (void*)(intptr_t)(V))
 #define SetqInOut(N,V)		SetAttr(N, qInOut, (void*)(intptr_t)(V))
+#define SetqDefined(N,V)		SetAttr(N, qDefined, (void*)(intptr_t)(V))
 #define SetqPointerType(N,V)		SetAttr(N, qPointerType, V)
 #define SetqBaseType(N,V)		SetAttr(N, qBaseType, V)
 #define SetqIndexType(N,V)		SetAttr(N, qIndexType, V)
@@ -193,6 +197,7 @@ typedef enum {
 #define NewnLocalVar()		NewNode(nLocalVar)
 #define NewnRecordField()		NewNode(nRecordField)
 #define NewnParam()		NewNode(nParam)
+#define NewnLabel()		NewNode(nLabel)
 #define NewnType()		NewNode(nType)
 #define NewnFileType()		NewNode(nFileType)
 #define NewnIntegerType()		NewNode(nIntegerType)

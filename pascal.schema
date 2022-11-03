@@ -104,7 +104,7 @@ nMethod =>
         qExternal:      Boolean1
         qExternalName:  StringN
         qCdecl:         Boolean1
-        qCalled:        Boolean1     % has anybody called this method
+        qUsed:          Boolean1     % has anybody called this method
 
         % The next two fields are used when a forward declaration is redefined.
         % I don't really need to keep them, but don't have a way to cleanly delete nodes yet.
@@ -140,6 +140,14 @@ nVar ::= nRecordField
 nVar ::= nParam
 nParam =>
         qInOut:         Boolean1      % has VAR keyword
+
+nIdent ::= nLabel
+nLabel =>
+        % A user label may be an identifier or an integer literal.
+        % If the user label is an integer "1234", we'll record it with identifier "_label_1234".
+        % qValue is our tcode label for this user label.  It's created at label declaration time.
+        qDefined:       Boolean1      % true when location for the label has been set
+        qUsed:          Boolean1      % true if referenced by a goto
 
 
 Object ::= nType

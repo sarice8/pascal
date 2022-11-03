@@ -24,6 +24,7 @@ type node_type:
 	nLocalVar
 	nRecordField
 	nParam
+	nLabel
 	nType
 	nFileType
 	nIntegerType
@@ -68,12 +69,13 @@ type node_attribute:
 	qExternal
 	qExternalName
 	qCdecl
-	qCalled
+	qUsed
 	qOldParams
 	qOldType
 	qResultOffset
 	qNameOffset
 	qInOut
+	qDefined
 	qPointerType
 	qBaseType
 	qIndexType

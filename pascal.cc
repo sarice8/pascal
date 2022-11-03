@@ -310,6 +310,7 @@ struct ssl_token_table_struct my_keyword_table[] = {
   "const",              pConst,
   "type",               pType,
   "var",                pVar,
+  "label",              pLabel,
   "begin",              pBegin,
   "end",                pEnd,
   "array",              pArray,
@@ -328,6 +329,7 @@ struct ssl_token_table_struct my_keyword_table[] = {
   "until",              pUntil,
   "continue",           pContinue,
   "break",              pBreak,
+  "goto",               pGoto,
   "and",                pAnd,
   "or",                 pOr,
   "not",                pNot,
@@ -903,9 +905,15 @@ Node dNode;  // temporary for several mechanisms
     case oScopeFindRequireInScope: {
             Node scope = (Node) ssl_param;
             dNode = nodeFindValue_NoErrorChecking( scope, qDecls, qIdent, ssl_last_id );
+            if ( !dNode ) {
+              // Look in a scope we extend, too.
+              Node extends = (Node) GetAttr( scope, qExtends );
+              if ( extends) {
+                dNode = nodeFindValue_NoErrorChecking( extends, qDecls, qIdent, ssl_last_id );
+              }
+            }
             ssl_result = (long) dNode;
-            if (dNode == NULL)
-            {
+            if ( !dNode ) {
                 ssl_error ("Undefined symbol");
                 ssl_pc--;
                 ssl_error_recovery ();
@@ -973,6 +981,20 @@ Node dNode;  // temporary for several mechanisms
     case oIdAdd_False:
             ssl_result = ssl_add_id( "false", pIdent );
             continue;
+    case oChangeIntLitToLabelIdent: {
+            // change current token from pIntLit to pIdent "_label_<intlit>"
+            ssl_assert( ssl_token.code == pIntLit );   // intlit text is in ssl_token.name
+            std::string name = std::string( "_label_" ) + std::string( ssl_token.name );
+            // should have a more official way of pushing data into the scanner's current token
+            strcpy( ssl_token.name, name.c_str() );
+            ssl_token.namelen = name.length();
+            ssl_token.code = pIdent;
+            ssl_token.val = ssl_lookup_id( ssl_token.name, pIdent );
+            // token was already accepted prior to the change,
+            // but re-accept it to set some cached data in scanner.
+            ssl_accept_token();
+            continue;
+            }
 
 
      /* Mechanism label_mech */
