@@ -183,6 +183,12 @@ void ssl_init_scanner ( struct ssl_token_table_struct *keyword_table,
                         struct ssl_special_codes_struct *special_codes );
 
 /*
+ *  Initialize scanner's code for charlit.
+ */
+void ssl_set_code_charlit( int code_charlit );
+
+
+/*
  *  Set the bracketing text for a comment.
  *  This may be called multiple times to allow for multiple comment styles.
  *  If end_str is "", the comment goes to the end of the line.

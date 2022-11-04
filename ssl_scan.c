@@ -69,6 +69,8 @@ static char   *s_src_ptr;                   /* current position within line  */
 static struct ssl_token_table_struct   *s_keyword_table;
 static struct ssl_token_table_struct   *s_operator_table;
 static struct ssl_special_codes_struct *s_special_codes;
+static int    s_code_charlit;
+
 
 /*  Character classes  */
 
@@ -133,6 +135,7 @@ struct ssl_special_codes_struct      *special_codes;
     s_keyword_table = keyword_table;
     s_operator_table = operator_table;
     s_special_codes = special_codes;
+    s_code_charlit = s_special_codes->invalid;
 
     /* Set up scanner tables */
 
@@ -191,6 +194,13 @@ struct ssl_special_codes_struct      *special_codes;
     // Applications can override this by calling ssl_scanner_init_comment() themselves.
     ssl_scanner_init_comment( "%", "" );
     ssl_using_default_comment_brackets = 1;
+}
+
+
+void
+ssl_set_code_charlit( int code_charlit )
+{
+  s_code_charlit = code_charlit;
 }
 
 
@@ -523,6 +533,13 @@ ssl_get_next_token ()
         }
         *p = '\0';
         ssl_token.namelen = p-ssl_strlit_buffer;
+
+        // For Pascal: a string of length 1 is actually a charlit
+        if ( ssl_token.namelen == 1 &&
+             s_code_charlit != s_special_codes->invalid ) {
+          ssl_token.code = s_code_charlit;
+          ssl_token.val = (int) ssl_strlit_buffer[0];
+        }
     }
 
     else                               /* some form of punctuation */
