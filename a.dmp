@@ -54,53 +54,77 @@
   87	tWriteI
   88	tWriteCR
   89	tPushAddrGlobal	 116
-  91	tPushConstI	  10
-  93	tAssignI
-  94	tPushAddrGlobal	 112
-  96	tPushConstI	  10
-  98	tCastItoB
-  99	tAssignB
- 100	tPushGlobalI	 116
- 102	tPushGlobalB	 112
- 104	tCastBtoI
- 105	tEqualI
- 106	tJumpFalse	   2
- 108	tPushAddrGlobal	 136
- 110	tWriteStr
- 111	tWriteCR
- 112	tLabel	   2
- 114	tPushAddrGlobal	 120
- 116	tPushConstI	   3
- 118	tAssignI
- 119	tPushAddrGlobal	 116
- 121	tPushGlobalI	 120
- 123	tAssignI
- 124	tPushAddrGlobal	 164
- 126	tWriteStr
- 127	tPushGlobalI	 116
- 129	tWriteI
- 130	tWriteCR
- 131	tPushAddrGlobal	 168
- 133	tWriteStr
- 134	tPushConstI	   1
- 136	tWriteI
- 137	tWriteCR
- 138	tPushAddrGlobal	 114
- 140	tPushConstI	  49
- 142	tCastItoB
- 143	tAssignB
- 144	tPushAddrGlobal	 176
- 146	tWriteStr
- 147	tPushGlobalB	 114
- 149	tWriteChar
- 150	tWriteCR
- 151	tPushAddrGlobal	 116
- 153	tPushGlobalB	 114
- 155	tCastBtoI
- 156	tAssignI
- 157	tPushAddrGlobal	 180
- 159	tWriteStr
- 160	tPushGlobalI	 116
- 162	tWriteI
- 163	tWriteCR
- 164	tReturn
+  91	tPushConstI	 256
+  93	tPushConstI	  50
+  95	tAddI
+  96	tAssignI
+  97	tPushAddrGlobal	 114
+  99	tPushGlobalI	 116
+ 101	tCastItoB
+ 102	tAssignB
+ 103	tPushAddrGlobal	 136
+ 105	tWriteStr
+ 106	tPushGlobalB	 114
+ 108	tWriteChar
+ 109	tWriteCR
+ 110	tPushAddrGlobal	 116
+ 112	tPushGlobalI	 116
+ 114	tCastItoB
+ 115	tCastBtoI
+ 116	tAssignI
+ 117	tPushAddrGlobal	 140
+ 119	tWriteStr
+ 120	tPushGlobalI	 116
+ 122	tWriteI
+ 123	tWriteCR
+ 124	tPushAddrGlobal	 116
+ 126	tPushConstI	  10
+ 128	tAssignI
+ 129	tPushAddrGlobal	 112
+ 131	tPushConstI	  10
+ 133	tCastItoB
+ 134	tAssignB
+ 135	tPushGlobalI	 116
+ 137	tPushGlobalB	 112
+ 139	tCastBtoI
+ 140	tEqualI
+ 141	tJumpFalse	   2
+ 143	tPushAddrGlobal	 144
+ 145	tWriteStr
+ 146	tWriteCR
+ 147	tLabel	   2
+ 149	tPushAddrGlobal	 120
+ 151	tPushConstI	   3
+ 153	tAssignI
+ 154	tPushAddrGlobal	 116
+ 156	tPushGlobalI	 120
+ 158	tAssignI
+ 159	tPushAddrGlobal	 172
+ 161	tWriteStr
+ 162	tPushGlobalI	 116
+ 164	tWriteI
+ 165	tWriteCR
+ 166	tPushAddrGlobal	 176
+ 168	tWriteStr
+ 169	tPushConstI	   1
+ 171	tWriteI
+ 172	tWriteCR
+ 173	tPushAddrGlobal	 114
+ 175	tPushConstI	  49
+ 177	tCastItoB
+ 178	tAssignB
+ 179	tPushAddrGlobal	 184
+ 181	tWriteStr
+ 182	tPushGlobalB	 114
+ 184	tWriteChar
+ 185	tWriteCR
+ 186	tPushAddrGlobal	 116
+ 188	tPushGlobalB	 114
+ 190	tCastBtoI
+ 191	tAssignI
+ 192	tPushAddrGlobal	 188
+ 194	tWriteStr
+ 195	tPushGlobalI	 116
+ 197	tWriteI
+ 198	tWriteCR
+ 199	tReturn

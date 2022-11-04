@@ -37,13 +37,13 @@ begin
   c1 := #130;
   i1 := integer(c1);
   writeln( 'c1=', c1, ' i1=', i1 );
+}
 
-  i1 := 256 + 49;
+  i1 := 256 + 50;
   c1 := chr( i1 );
   writeln( 'c1=', c1 );
   i1 := ord( chr( i1 ) );
   writeln( 'i1=', i1 );
-}
 
   i1 := 10;
   b1 := 10;

@@ -618,6 +618,7 @@ struct EnumNameTable {
 
 extern void runlibWriteI( int val );
 extern void runlibWriteBool( bool val );
+extern void runlibWriteChar( char val );
 extern void runlibWriteStr( char* ptr );
 extern void runlibWriteP( char* ptr );
 extern void runlibWriteEnum( int val, EnumNameTable* table );
@@ -1102,7 +1103,10 @@ InstrTempl::findMatch( const std::vector<InstrTempl>& templates, const Operand& 
   // find the matching template
   for ( auto& templ : templates ) {
     if ( ( xTemplSize == templ._size ) &&
-         ( yTemplSize == templ._immSize ) ) {
+         ( ( yTemplSize == templ._immSize ) ||
+           // ConstI can fit either imm8 or imm32 template
+           // (because we don't have ConstB at the moment)
+           ( yType == 1 ) ) ) {
 
       if ( ( xType == templ._xType ) &&
            ( yType == templ._yType ) ) {
@@ -1635,6 +1639,50 @@ generateCode()
           y.release();
         }
         break;
+
+      case tCastBtoI : {
+          Operand x = operandStack.back();  operandStack.pop_back();
+          if ( x.isConst() ) {
+            // We only have ConstI so no change.
+            operandStack.push_back( x );
+          } else {
+            // Expect the front end to use this instruction appropriately
+            assert( x.size() == 1 );
+            if ( x.isReg() ) {
+              // zero-extend in the current register.  Mov RegI, RegB  will do so.
+              Operand result( jit_Operand_Kind_RegI, x._reg );
+              emitMov( result, x );
+              operandStack.push_back( result );
+            } else {
+              Operand result( jit_Operand_Kind_RegI, allocateReg() );
+              // zero-extend from x
+              emitMov( result, x );
+              operandStack.push_back( result );
+              x.release();
+            }
+          }
+        }
+        break;
+      case tCastItoB : {
+          Operand x = operandStack.back();  operandStack.pop_back();
+          if ( x.isConst() ) {
+            // We only have ConstI but it can act as a ConstB too.
+            // Just truncate the value as a precaution.
+            x._value &= 0xff;
+            operandStack.push_back( x );
+          } else {
+            // I might have been able to load just the low byte from wherever x is,
+            // but for now I'll just load the entire x into a register, then truncate it.
+            operandIntoReg( x );
+            // Actually I probably don't really need to truncate the register (zero-extending low byte)
+            // at this time.  Just update the operand kind to RegB.
+            // Any subsequent use of the register should either only take the low byte, or should
+            // zero-extend it first It think.
+            x._kind = jit_Operand_Kind_RegB;
+            operandStack.push_back( x );
+          }
+        }
+        break;
       case tIncI : {
           Operand x = operandStack.back();  operandStack.pop_back();
           if ( x.isConst() ) {
@@ -2072,6 +2120,14 @@ generateCode()
           Register* paramReg1 = paramRegs[0];
           operandIntoSpecificReg( x, paramReg1, 1 );
           emitCallExtern( (char*) runlibWriteBool );
+          x.release();
+        }
+        break;
+      case tWriteChar : {
+          Operand x = operandStack.back();   operandStack.pop_back();
+          Register* paramReg1 = paramRegs[0];
+          operandIntoSpecificReg( x, paramReg1, 1 );
+          emitCallExtern( (char*) runlibWriteChar );
           x.release();
         }
         break;
@@ -3408,6 +3464,10 @@ emitMov( const Operand& x, const Operand& y )
     InstrTempl( 32, 0xc7 ).opc( 0 ).MI()
   };
 
+  static std::vector<InstrTempl> movzxTemplates = {
+    InstrTempl( 32, 0x0f, 0xb6 ).RM().imm8()    // a bit misleading: y is 8-bit, but not immediate
+  };
+
   static std::vector<InstrTempl> leaTemplates = {
     InstrTempl( 32, 0x8d ).RM()
   };
@@ -3468,10 +3528,23 @@ emitMov( const Operand& x, const Operand& y )
       break;
 
 
-    // MOVSXD - sign extend into larger destination
+    // MOVZX - zero extend from uint8 to int32
+
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_GlobalB ):
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_LocalB ):
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ParamB ):
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_ActualB ):
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_RegB ):
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_RegP_DerefB ):
+      emit( movzxTemplates, x, y );
+      break;
+
+
+    // MOVSXD - sign extend from int32 to int64
 
     // TO DO: the template mechanism doesn't handle movsxd yet
-    //  because it needs a mix of sixty-four bit and 32-bit/8-bit.
+    //  because it needs a mix of 64-bit and 32-bit arguments
+    //  (while templates treat those as independent variants).
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_GlobalI ):
       // movsxd x_reg64, [rip + offsetToGlobal] 32 bits sign-extended to 64 bits
@@ -3944,11 +4017,16 @@ runlibWriteI( int val )
   printf( "%d", val );
 }
 
-// TO DO: argument type byte or int?
 void
 runlibWriteBool( bool val )
 {
   printf( val ? "TRUE" : "FALSE" );
+}
+
+void
+runlibWriteChar( char val )
+{
+  printf( "%c", val );
 }
 
 void
