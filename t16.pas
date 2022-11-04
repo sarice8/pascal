@@ -1,9 +1,14 @@
 program t16;
   // byte, char types
+  // ord, chr methods
+
+  type Direction = (North, East, South, West);
   
   var b1, b2: byte;
   var c1, c2: char;
   var i1: integer;
+
+  var d1: Direction;
 
   // byte       uint8_t
   // shortint   int8_t
@@ -45,4 +50,15 @@ begin
   if i1 = b1 then
     writeln( 'int/byte comparison worked' );
 
+  d1 := West;
+  i1 := ord( d1 );
+  writeln( 'i1=', i1 );
+  writeln( 'ord=', ord( East ) );
+  
+  c1 := chr(49);
+  writeln( 'c1=', c1 );
+  i1 := ord( c1 );
+  writeln( 'i1=', i1 );
+
+  
 end.

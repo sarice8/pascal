@@ -19,6 +19,8 @@ typedef enum {
     nMethod,
     nProc,
     nFunc,
+    nBuiltInFunc,
+    nBuiltInProc,
     nConst,
     nEnumValue,
     nTypeDecl,
@@ -31,6 +33,7 @@ typedef enum {
     nType,
     nFileType,
     nIntegerType,
+    nByteType,
     nBooleanType,
     nBooleanCFType,
     nCharType,
@@ -189,6 +192,8 @@ typedef enum {
 #define NewnMethod()		NewNode(nMethod)
 #define NewnProc()		NewNode(nProc)
 #define NewnFunc()		NewNode(nFunc)
+#define NewnBuiltInFunc()		NewNode(nBuiltInFunc)
+#define NewnBuiltInProc()		NewNode(nBuiltInProc)
 #define NewnConst()		NewNode(nConst)
 #define NewnEnumValue()		NewNode(nEnumValue)
 #define NewnTypeDecl()		NewNode(nTypeDecl)
@@ -201,6 +206,7 @@ typedef enum {
 #define NewnType()		NewNode(nType)
 #define NewnFileType()		NewNode(nFileType)
 #define NewnIntegerType()		NewNode(nIntegerType)
+#define NewnByteType()		NewNode(nByteType)
 #define NewnBooleanType()		NewNode(nBooleanType)
 #define NewnBooleanCFType()		NewNode(nBooleanCFType)
 #define NewnCharType()		NewNode(nCharType)

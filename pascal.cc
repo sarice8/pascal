@@ -972,6 +972,9 @@ Node dNode;  // temporary for several mechanisms
     case oIdAdd_Char:
             ssl_result = ssl_add_id( "char", pIdent );
             continue;
+    case oIdAdd_Byte:
+            ssl_result = ssl_add_id( "byte", pIdent );
+            continue;
     case oIdAdd_String:
             ssl_result = ssl_add_id( "string", pIdent );
             continue;
@@ -980,6 +983,12 @@ Node dNode;  // temporary for several mechanisms
             continue;
     case oIdAdd_False:
             ssl_result = ssl_add_id( "false", pIdent );
+            continue;
+    case oIdAdd_Ord:
+            ssl_result = ssl_add_id( "ord", pIdent );
+            continue;
+    case oIdAdd_Chr:
+            ssl_result = ssl_add_id( "chr", pIdent );
             continue;
     case oChangeIntLitToLabelIdent: {
             // change current token from pIntLit to pIdent "_label_<intlit>"

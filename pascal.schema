@@ -120,6 +120,11 @@ nFunc =>
         qResultOffset:  Integer4    % offset of VAR param for result
 
 
+% A built-in method is handled specially by the compiler.
+% It may have special rules for parameters, so params aren't declared in the symbol table.
+nIdent ::= nBuiltInFunc
+nIdent ::= nBuiltInProc
+
 
 nIdent ::= nConst
 
@@ -162,7 +167,8 @@ nType =>
 
 nType ::= nFileType
 
-nType ::= nIntegerType
+nType ::= nIntegerType    % int32_t
+nType ::= nByteType       % uint8_t
 
 nType ::= nBooleanType
 

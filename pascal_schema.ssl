@@ -16,6 +16,8 @@ type node_type:
 	nMethod
 	nProc
 	nFunc
+	nBuiltInFunc
+	nBuiltInProc
 	nConst
 	nEnumValue
 	nTypeDecl
@@ -28,6 +30,7 @@ type node_type:
 	nType
 	nFileType
 	nIntegerType
+	nByteType
 	nBooleanType
 	nBooleanCFType
 	nCharType

@@ -125,6 +125,8 @@ struct instrInfo_s tCodeInstrs[] = {
   { "tAssignB", 0 },
   { "tAssignP", 0 },
   { "tCopy", 1 },
+  { "tCastBtoI", 0 },
+  { "tCastItoB", 0 },
   { "tIncI", 0 },
   { "tDecI", 0 },
   { "tMultI", 0 },
@@ -157,6 +159,7 @@ struct instrInfo_s tCodeInstrs[] = {
   { "tLabelExtern", 2 },
   { "tWriteI", 0 },
   { "tWriteBool", 0 },
+  { "tWriteChar", 0 },
   { "tWriteStr", 0 },
   { "tWriteP", 0 },
   { "tWriteEnum", 0 },
@@ -450,6 +453,14 @@ walkTable()
               pc++;
               continue;
               }
+       case tCastBtoI :
+              // zero-extends from uint8_t to int32_t
+              stack[sp] = (int32_t) (uint8_t) stack[sp];
+              continue;
+       case tCastItoB :
+              // truncates from int32_t to uint8_t
+              stack[sp] = (uint8_t) stack[sp];
+              continue;
        case tIncI :
               stack[sp]++;
               continue;
@@ -593,6 +604,9 @@ walkTable()
               continue;
        case tWriteBool :
               printf(stack[sp--] ? "TRUE" : "FALSE");
+              continue;
+       case tWriteChar :
+              printf( "%c", (char) stack[sp--] );
               continue;
        case tWriteStr :
               printf("%s", (char*) stack[sp--]);

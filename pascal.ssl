@@ -163,6 +163,8 @@ output:
    tAssignB          %   "    byte   "    "   "  "   "    "    "   "   "
    tAssignP          %   "    ptr    "    "   "  "   "    "    "   "   "
    tCopy             % <#bytes> - copy bytes.  tos=src, 2nd=dest (pop 2)
+   tCastBtoI         % zero-extend uint8_t to int32_t
+   tCastItoB         % truncate int32_t to uint8_t
    tIncI             % increment int value on top of expr stack
    tDecI             % decrement int value on top of expr stack
    tMultI            % multiply top two integers (replacing with result)
@@ -195,6 +197,7 @@ output:
    tLabelExtern      % <label#> <offsetToStrLit> - defines label to mean an extern symbol, whose name is in global data
    tWriteI           % for writeln : write integer on tos, pop
    tWriteBool        %  "     "    : write TRUE/FALSE, pop
+   tWriteChar        %  "     "    : write char, pop
    tWriteStr         %  "     "    : write string whose addr is on tos, pop
    tWriteP           %  "     "    : write ptr var whose addr is on tos, pop
    tWriteEnum        %  "     "    : write enum name.  Name table on tos, value under it, pop both
@@ -406,9 +409,12 @@ mechanism id_mech:
     oIdAdd_Integer >> int
     oIdAdd_Boolean >> int
     oIdAdd_Char >> int
+    oIdAdd_Byte >> int
     oIdAdd_String >> int
     oIdAdd_True >> int
     oIdAdd_False >> int
+    oIdAdd_Ord >> int
+    oIdAdd_Chr >> int
     oChangeIntLitToLabelIdent    % change current token from pIntLit to pIdent "_label_<intlit>"
     ;
 
@@ -481,7 +487,13 @@ Node    IntegerType
 Node    BooleanType
 Node    BooleanCFType
 Node    CharType
+Node    ByteType
 Node    StringType
+
+% nBuiltInFunc
+Node    BuiltIn_Ord
+Node    BuiltIn_Chr
+
 
 % -------------------------- Forward Declarations -------------------------
 
@@ -1910,8 +1922,10 @@ ExprAllowCF( out Label falseLabel ):
    {[
       | '=' :
          @CFToVal( falseLabel )
+         @PromoteToIntOptional
          @BoolExprAllowCF( falseLabel )
          @CFToVal( falseLabel )
+         @PromoteToIntOptional
          @MatchTypes
          [ oTypeSNodeType
             | nIntegerType, nEnumType, nBooleanType :  .tEqualI
@@ -1924,8 +1938,10 @@ ExprAllowCF( out Label falseLabel ):
 
       | '<>' :
          @CFToVal( falseLabel )
+         @PromoteToIntOptional
          @BoolExprAllowCF( falseLabel )
          @CFToVal( falseLabel )
+         @PromoteToIntOptional
          @MatchTypes
          [ oTypeSNodeType
             | nIntegerType, nEnumType, nBooleanType :  .tNotEqualI
@@ -1938,8 +1954,10 @@ ExprAllowCF( out Label falseLabel ):
 
       | '<' :
          @CFToVal( falseLabel )
+         @PromoteToIntOptional
          @BoolExprAllowCF( falseLabel )
          @CFToVal( falseLabel )
+         @PromoteToIntOptional
          @MatchTypes
          [ oTypeSNodeType
             | nIntegerType, nEnumType, nBooleanType :  .tLessI
@@ -1951,8 +1969,10 @@ ExprAllowCF( out Label falseLabel ):
 
       | '>' :
          @CFToVal( falseLabel )
+         @PromoteToIntOptional
          @BoolExprAllowCF( falseLabel )
          @CFToVal( falseLabel )
+         @PromoteToIntOptional
          @MatchTypes
          [ oTypeSNodeType
             | nIntegerType, nEnumType, nBooleanType :  .tGreaterI
@@ -1964,8 +1984,10 @@ ExprAllowCF( out Label falseLabel ):
 
       | '<=' :
          @CFToVal( falseLabel )
+         @PromoteToIntOptional
          @BoolExprAllowCF( falseLabel )
          @CFToVal( falseLabel )
+         @PromoteToIntOptional
          @MatchTypes
          [ oTypeSNodeType
             | nIntegerType, nEnumType, nBooleanType :  .tLessEqualI
@@ -1977,8 +1999,10 @@ ExprAllowCF( out Label falseLabel ):
 
       | '>=' :
          @CFToVal( falseLabel )
+         @PromoteToIntOptional
          @BoolExprAllowCF( falseLabel )
          @CFToVal( falseLabel )
+         @PromoteToIntOptional
          @MatchTypes
          [ oTypeSNodeType
             | nIntegerType, nEnumType, nBooleanType :  .tGreaterEqualI
@@ -2126,14 +2150,14 @@ ArithExprAllowCF( out Label falseLabel ):
    @TermAllowCF( falseLabel )
    {[
       | pPlus :
-         @RequireIntPop
+         @PromoteToIntPop
          @TermAllowCF( falseLabel )  % actually not allowing CF, will be caught by type check
-         @RequireInt
+         @PromoteToInt
          .tAddI
       | pMinus :
-         @RequireIntPop
+         @PromoteToIntPop
          @TermAllowCF( falseLabel )
-         @RequireInt
+         @PromoteToInt
          .tSubI
       | * :
          >
@@ -2143,14 +2167,14 @@ TermAllowCF( out Label falseLabel ):
    @FactorAllowCF( falseLabel )
    {[
       | pTimes :
-         @RequireIntPop
+         @PromoteToIntPop
          @FactorAllowCF( falseLabel )  % actually not allowing CF, will be caught by type check
-         @RequireInt
+         @PromoteToInt
          .tMultI
       | pDivide :
-         @RequireIntPop
+         @PromoteToIntPop
          @FactorAllowCF( falseLabel )
-         @RequireInt
+         @PromoteToInt
          .tDivI
       | * :
          >
@@ -2160,10 +2184,12 @@ FactorAllowCF( out Label falseLabel ):
    [
       | pPlus :
          @PrimaryAllowCF( falseLabel )  % actually not allowing CF, will be caught by type check
-         @RequireInt
+         % TO DO: unary +/- is supposed to leave expression type as-is.
+         @PromoteToInt
       | pMinus :
          @PrimaryAllowCF( falseLabel )
-         @RequireInt
+         % TO DO: unary +/- is supposed to leave expression type as-is.
+         @PromoteToInt
          .tNegI
       | * :
          @PrimaryAllowCF( falseLabel )
@@ -2192,8 +2218,10 @@ PrimaryAllowCF( out Label falseLabel ):
 
          [ oNodeType( decl )
             | nFunc :
-
                @Call( decl )
+
+            | nBuiltInFunc :
+               @CallBuiltInFunc( decl )
 
             | nConst, nEnumValue :
                theType = oNodeGet( decl, qType )
@@ -2270,7 +2298,7 @@ VarExpr( Node decl ):
                ]
          ]
 
-      | nBooleanType :
+      | nBooleanType, nByteType, nCharType :
          [ oNodeType( decl )
             | nGlobalVar :   .tPushGlobalB  @EmitValue( decl )
             | nLocalVar :
@@ -2294,7 +2322,7 @@ VarExpr( Node decl ):
                ]
          ]
 
-      | nCharType, nStringType, nFileType :
+      | nStringType, nFileType :
          #eNotImplemented
 
       | nPointerType :
@@ -2329,7 +2357,7 @@ VarExpr( Node decl ):
             | * :               % just ptr value alone
          ]
 
-      | * :
+      | nArrayType, nRecordType :
          % compound type
          % first, push addr of start of var
          [ oNodeType( decl )
@@ -2366,11 +2394,11 @@ VarExpr( Node decl ):
 
 FetchVar:
    [ oTypeSNodeType
-      | nIntegerType, nEnumType :   .tFetchI
-      | nBooleanType :   .tFetchB
-      | nCharType, nStringType, nFileType : #eNotImplemented
-      | nPointerType :   .tFetchP
-      | * :              % compound type; leave as addr
+      | nIntegerType, nEnumType :  .tFetchI
+      | nBooleanType, nByteType, nCharType :  .tFetchB
+      | nStringType, nFileType :   #eNotImplemented
+      | nPointerType :             .tFetchP
+      | nArrayType, nRecordType :  % compound type; leave as addr
    ];
 
 
@@ -2481,9 +2509,27 @@ PointerDeref:
 % This is used for assignment.
 %
 CoerceType:
-   % TO DO: not implemented yet.  For now I require exact type match.
-   @MatchTypes
-   ;
+   node_type nt = oTypeSNodeType
+   oTypeSPop
+   [ equal_node_type( nt, oTypeSNodeType )
+      | false :
+         % Can we implicitly convert the value to the desired type?
+         [ oTypeSNodeType
+            | nIntegerType :
+               [ nt
+                  | nByteType :   .tCastBtoI  >>
+                  | * :
+               ]
+            | nByteType :
+               [ nt
+                  | nIntegerType :   .tCastItoB  >>
+                  | * :
+               ]
+            | * :
+         ]
+         #eTypeMismatch
+      | * :
+   ];
 
 
 % Called on first use of an extern method
@@ -2621,10 +2667,10 @@ Call( Node method ):
 
                           [ oTypeSNodeType
                              | nIntegerType, nEnumType : .tAssignI
-                             | nBooleanType :            .tAssignB
-                             | nCharType, nStringType, nFileType :   #eNotImplemented
+                             | nBooleanType, nByteType, nCharType :  .tAssignB
+                             | nStringType, nFileType :   #eNotImplemented
                              | nPointerType :            .tAssignP
-                             | * :
+                             | nArrayType, nRecordType :
                                  % compound types: copy value into actuals space
                                  int size = oNodeGetInt( oTypeSTop, qSize )
                                  .tCopy  oEmitInt( size )    % multi-word copy
@@ -2675,16 +2721,64 @@ Call( Node method ):
 
          [ oTypeSNodeType
             | nIntegerType, nEnumType :   .tPushLocalI  oEmitInt( tempOffset )
-            | nBooleanType :   .tPushLocalB  oEmitInt( tempOffset )
-            | nCharType, nStringType, nFileType : #eNotImplemented
+            | nBooleanType, nByteType, nCharType :   .tPushLocalB  oEmitInt( tempOffset )
+            | nStringType, nFileType :  #eNotImplemented
             | nPointerType :   .tPushLocalP  oEmitInt( tempOffset )
-            | * :              % compound type: push address
+            | nArrayType, nRecordType :   % compound type: push address
                                .tPushAddrLocal  oEmitInt( tempOffset )
          ]
       | * :
    ]
    
    .tFreeActuals  oEmitInt( actualsSize )
+   ;
+
+
+% Parse a call to a built-in function, identified by the just-accepted identifier.
+% This will also generate the code to push the return value on the expr stack,
+% and push the return type on the type stack.
+%
+CallBuiltInFunc( Node method ):
+
+   % Ord(x)
+   [ oNodeEqual( method, BuiltIn_Ord )
+      | true :
+         % parameter is any scalar type (including boolean, enum, char)
+         % result is integer
+         '('
+         @Expr
+         [ oTypeSNodeType
+            | nIntegerType, nEnumType :
+            | nBooleanType, nByteType, nCharType :  .tCastBtoI
+            | * :  #eTypeMismatch
+         ]
+         oTypeSPop
+         oTypeSPush( IntegerType )
+         ')'
+         >>
+      | * :
+   ]
+
+   % Chr(x)
+   [ oNodeEqual( method, BuiltIn_Chr )
+      | true :
+         % parameter is integer
+         % result is char
+         '('
+         @Expr
+         [ oTypeSNodeType
+            | nIntegerType :    .tCastItoB
+            | nByteType :
+            | * :  #eTypeMismatch
+         ]
+         oTypeSPop
+         oTypeSPush( CharType )
+         ')'
+         >>
+      | * :
+   ]
+
+   #eNotImplemented
    ;
 
 
@@ -2745,7 +2839,7 @@ AssignStmt( Node decl ):
    @LValueVar( decl )
    ':=' 
    @Expr
-   @MatchTypes
+   @CoerceType
    @Assign
    ;
 
@@ -2757,13 +2851,12 @@ AssignStmt( Node decl ):
 %
 Assign:
    [ oTypeSNodeType
-      | nIntegerType, nEnumType : .tAssignI
-      | nBooleanType :            .tAssignB
-      | nCharType, nStringType, nFileType :   #eNotImplemented
-
+      | nIntegerType, nEnumType :  .tAssignI
+      | nBooleanType, nByteType, nCharType :  .tAssignB
+      | nStringType, nFileType :   #eNotImplemented
+      | nPointerType :             .tAssignP
       % compound var assigns; addrs of src, dest on stack
-      | nPointerType :            .tAssignP
-      | * :
+      | nArrayType, nRecordType :
           int size = oNodeGetInt( oTypeSTop, qSize )
           .tCopy  oEmitInt( size )    % multi-word copy
    ]
@@ -2786,15 +2879,14 @@ AssignResultStmt( Node funcDecl ):
 
    ':='
    @Expr
-   @MatchTypes
+   @CoerceType
    [ oTypeSNodeType
       | nIntegerType, nEnumType : .tAssignI
-      | nBooleanType :            .tAssignB
-      | nCharType, nStringType, nFileType :   #eNotImplemented
-
-      % compound var assigns; addrs of src, dest on stack
+      | nBooleanType, nByteType, nCharType :  .tAssignB
+      | nStringType, nFileType :   #eNotImplemented
       | nPointerType :            .tAssignP
-      | * :
+      % compound var assigns; addrs of src, dest on stack
+      | nArrayType, nRecordType :
           int size = oNodeGetInt( oTypeSTop, qSize )
           .tCopy  oEmitInt( size )    % multi-word copy
    ]
@@ -3031,8 +3123,10 @@ WriteStmt:
             [ oTypeSNodeType
                | nIntegerType :             .tWriteI
                | nBooleanType :             .tWriteBool
+               | nByteType :                .tCastBtoI  .tWriteI
+               | nCharType :                .tWriteChar
                | nStringType :              .tWriteStr
-               | nCharType, nFileType :     #eNotImplemented
+               | nFileType :                #eNotImplemented
                | nEnumType :
                   % write name via table lookup
                   .tPushAddrGlobal  oEmitInt( oNodeGetInt( oTypeSTop, qNameTable ) )
@@ -3105,6 +3199,47 @@ RequireInt:
       | nIntegerType :
       | * :          #eNotInteger
    ];
+
+
+% Convert the top value to integer (if it isn't already).
+% It must be implicitly convertable to integer.
+% Pop the type stack.
+%
+PromoteToIntPop:
+   [ oTypeSNodeType
+      | nIntegerType :
+      | nByteType :        .tCastBtoI
+      | * :                #eNotInteger
+   ]
+   oTypeSPop;
+
+% Convert the top value to integer (if it isn't already).
+% It must be implicitly convertable to integer.
+% Leave integer on the type stack.
+%
+PromoteToInt:
+   [ oTypeSNodeType
+      | nIntegerType :
+      | nByteType :        .tCastBtoI
+                           oTypeSPop
+                           oTypeSPush( IntegerType )
+      | * :                #eNotInteger
+   ];
+
+
+% If the top value is implicitly convertable to integer, do so.
+% Otherwise leave it as-is.
+%
+PromoteToIntOptional:
+   [ oTypeSNodeType
+      | nByteType :        .tCastBtoI
+                           oTypeSPop
+                           oTypeSPush( IntegerType )
+      | * :
+   ];
+
+
+
 
 RequireBoolPop:
    [ oTypeSNodeType
@@ -3191,6 +3326,7 @@ installBuiltIns:
    BooleanType = @newType( nBooleanType, 1 )
    BooleanCFType = @newType( nBooleanCFType, 1 )
    CharType = @newType( nCharType, 1 )
+   ByteType = @newType( nByteType, 1 )
    StringType = @newType( nStringType, 256 )    % string with default length 256
 
    % Declare those type identifiers.
@@ -3214,6 +3350,10 @@ installBuiltIns:
    oNodeSet( t, qType, CharType )
    oScopeDeclare( t )
 
+   t = @newIdent( nTypeDecl, oIdAdd_Byte )
+   oNodeSet( t, qType, ByteType )
+   oScopeDeclare( t )
+
    t = @newIdent( nTypeDecl, oIdAdd_String )
    oNodeSet( t, qType, StringType )
    oScopeDeclare( t )
@@ -3230,6 +3370,15 @@ installBuiltIns:
    oNodeSetInt( t, qValue, 0 )
    oScopeDeclare( t )
 
+   % Built-in methods
+   % These aren't declared like normal methods, because they may have
+   % special rules for parameter types (e.g. any scalar type).
+   % Calls to these methods will be handled specially by the compiler.
+
+   BuiltIn_Ord = @newIdent( nBuiltInFunc, oIdAdd_Ord )
+   oScopeDeclare( BuiltIn_Ord )
+   BuiltIn_Chr = @newIdent( nBuiltInFunc, oIdAdd_Chr )
+   oScopeDeclare( BuiltIn_Chr )
    ;
 
 end
