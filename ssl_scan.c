@@ -40,7 +40,7 @@ static char sccsid[] = "%W% %G% %U% %P%";
 #define ssl_line_size          256
 char    ssl_line_buffer [ssl_line_size];
 
-char    ssl_strlit_buffer [SSL_STRLIT_SIZE+1];
+char    ssl_strlit_buffer [SSL_STRLIT_SIZE+2];
 
 struct  ssl_id_table_struct ssl_id_table [ssl_id_table_size];
 int     ssl_id_table_next;
@@ -99,6 +99,8 @@ int ssl_using_default_comment_brackets = 0;
 void   s_lookup_id ();
 void   s_hit_eof ();
 void   s_restart_scanner_input_position ();
+void   s_parse_strlit();
+
 
 static int    s_end_include_at_eof = 1;
 
@@ -509,30 +511,10 @@ ssl_get_next_token ()
         ssl_token.code = s_special_codes->intlit;
     }
 
-    else if (*s_src_ptr == '\'')
+    else if ( *s_src_ptr == '\'' ||
+              *s_src_ptr == '#' )
     {
-        s_src_ptr++;
-        ssl_token.code = s_special_codes->strlit;
-        p = ssl_strlit_buffer;
-        while (p - ssl_strlit_buffer < SSL_STRLIT_SIZE)
-        {
-            if (*s_src_ptr == '\'')
-            {
-                if (*++s_src_ptr == '\'')
-                {
-                    *p++ = '\'';
-                    s_src_ptr++;
-                }
-                else
-                    break;
-            }
-            else if (*s_src_ptr == '\0')
-                break;
-            else
-                *p++ = *s_src_ptr++;
-        }
-        *p = '\0';
-        ssl_token.namelen = p-ssl_strlit_buffer;
+        s_parse_strlit();
 
         // For Pascal: a string of length 1 is actually a charlit
         if ( ssl_token.namelen == 1 &&
@@ -589,6 +571,62 @@ ssl_get_next_token ()
              setting code to invalid (e.g. intlit, strlit, ...) */
         }
     }
+}
+
+
+// Pascal strlit:
+// A strit consists of a sequence of 'text' and #nnn character code bytes,
+// with no intervening space.   Within 'text', a double '' means the ' character.
+//
+void
+s_parse_strlit()
+{
+    char* p = ssl_strlit_buffer;
+    ssl_token.code = s_special_codes->strlit;
+
+    while ( 1 ) {
+        if ( *s_src_ptr == '\'' ) {
+            s_src_ptr++;
+
+            while ( 1 ) {
+                if ( *s_src_ptr == '\'' ) {
+                    if ( *++s_src_ptr == '\'' ) {
+                        if ( p - ssl_strlit_buffer < SSL_STRLIT_SIZE ) {
+                            *p++ = '\'';
+                        }
+                        ++s_src_ptr;
+                    } else {
+                        break;
+                    }
+                } else if ( *s_src_ptr == '\0' ) {
+                    break;
+                } else {
+                    if ( p - ssl_strlit_buffer < SSL_STRLIT_SIZE ) {
+                        *p++ = *s_src_ptr;
+                    }
+                    ++s_src_ptr;
+                }
+            }
+
+        } else if ( *s_src_ptr == '#' ) {
+           int code = 0;
+           s_src_ptr++;
+           while ( *s_src_ptr >= '0' && *s_src_ptr <= '9' ) {
+               code *= 10;
+               code += *s_src_ptr - '0';
+               ++s_src_ptr;
+           }
+           if ( p - ssl_strlit_buffer < SSL_STRLIT_SIZE ) {
+               *p++ = (char) code;
+           }
+
+        } else {
+            break;
+        }
+    }
+
+    *p = '\0';
+    ssl_token.namelen = p-ssl_strlit_buffer;
 }
 
 
