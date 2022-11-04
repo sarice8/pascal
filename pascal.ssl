@@ -51,6 +51,7 @@ input:
    pIdent
    pIntLit
    pStrLit
+   pCharLit
    pAssign       ':='
    pSemiColon    ';'
    pEqual        '='
@@ -2200,6 +2201,10 @@ PrimaryAllowCF( out Label falseLabel ):
       | pIntLit :
          .tPushConstI  oEmitInt( TOKEN_VALUE )
          oTypeSPush( IntegerType )
+
+      | pCharLit :
+         .tPushConstI  oEmitInt( TOKEN_VALUE )
+         oTypeSPush( CharType )
 
       | '(' :
          @ExprAllowCF( falseLabel )

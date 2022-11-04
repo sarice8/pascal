@@ -28,6 +28,16 @@ program t16;
 
 begin
 
+{
+  writeln( 'Hello '#65#66#67#68 );
+  // fpc doesn't allow spaces between char codes:
+  //   writeln( 'Hello '#65 #66 #67 #68 );
+  writeln( #65#66#67'There' );
+}
+
+  c1 := 'a';
+  writeln( c1, ' ', ord( c1 ) );
+
   b1 := 130;
   i1 := b1;
 
