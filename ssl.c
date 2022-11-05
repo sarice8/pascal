@@ -110,73 +110,73 @@ int    option_debug;        /* run ssl compiler under debugger */
 int    option_no_warning;   /* don't report warning messages */
 
 int    option_list_code;    /* write generated code in listing file too */
-short  list_code_previous_location;
+int    list_code_previous_location;
 
 /*************** Variables for semantic mechanisms ***************/
 
 
-#define w_outTableSize 10000
-short   w_outTable[w_outTableSize];     /* Emit into this table */
-short   w_here;                         /* Output position */
+#define w_outTableSize 100000
+int     w_outTable[w_outTableSize];     /* Emit into this table */
+int     w_here;                         /* Output position */
 
-#define w_lineTableSize 5000            /* Max # lines for debug table */
-short   w_lineTable[w_lineTableSize];   /* Line# of every instruction */
+#define w_lineTableSize 50000           /* Max # lines for debug table */
+int     w_lineTable[w_lineTableSize];   /* Line# of every instruction */
 
 
 char target_title[SSL_STRLIT_SIZE+1];   /* Title of processor being compiled */
 
 
-#define dSSsize 40                        /* SS: scope stack               */
+#define dSSsize 400                        /* SS: scope stack               */
 NODE_PTR       dSS[dSSsize];
-short          dSSptr;
-short          dSSlookup;     /* for lookup in scope stack */
+int            dSSptr;
+int            dSSlookup;     /* for lookup in scope stack */
 
 NODE_PTR       dGlobalScope;  /* Global nScope (only set at end of parsing) */
 
 
 /*  Table of string aliases for declarations  */
 
-#define dStrTableSize 100
+#define dStrTableSize 10000
 struct dStrTableType {
   char      *buffer;                   /* text is stored in separately allocated memory */
   NODE_PTR   decl_ptr;                 /* associated nDeclaration node */
 } dStrTable[dStrTableSize];
-short dStrTableNext;
+int dStrTableNext;
 
 /* code patch stacks */
 
-#define dMarkSize 20               /* marks in the following patch stacks */
-#define dPatchCTAsize 20           /*     (not all the stacks need marks) */
-#define dPatchCTsize 500
-#define dPatchCEsize 300
-#define dPatchCsize 800
-#define dPatchLsize 20
-#define dPatchBsize 50
+#define dMarkSize 200               /* marks in the following patch stacks */
+#define dPatchCTAsize 200           /*     (not all the stacks need marks) */
+#define dPatchCTsize 5000
+#define dPatchCEsize 3000
+#define dPatchCsize 8000
+#define dPatchLsize 200
+#define dPatchBsize 500
 
 
-short dPatchCTA[dPatchCTAsize];    /* choice table addr ptrs */
-short dPatchCT[dPatchCTsize];      /* choice table built here */
-short dPatchCE[dPatchCEsize];      /* choice exits */
-short dPatchC[dPatchCsize];        /* calls to undefined rules */
-short dPatchL[dPatchLsize];        /* start of loop */
-short dPatchB[dPatchBsize];        /* breaks out of loop */
+int dPatchCTA[dPatchCTAsize];    /* choice table addr ptrs */
+int dPatchCT[dPatchCTsize];      /* choice table built here */
+int dPatchCE[dPatchCEsize];      /* choice exits */
+int dPatchC[dPatchCsize];        /* calls to undefined rules */
+int dPatchL[dPatchLsize];        /* start of loop */
+int dPatchB[dPatchBsize];        /* breaks out of loop */
 
 /* array pointing to patch stacks */
 
 struct dPSType {
-  short *stack;
-  short ptr;
-  short size;
-  short mark[dMarkSize];
-  short markPtr;
+  int *stack;
+  int ptr;
+  int size;
+  int mark[dMarkSize];
+  int markPtr;
 } dPS[6];
 
 
 #ifdef DEBUG
 
 void dump_tree_short( void* var, void* udata );
-void dump_short_int_stack( void* var, void* udata );
-void dump_short_int( void* var, void* udata );
+void dump_int_stack( void* var, void* udata );
+void dump_int( void* var, void* udata );
 void dump_node_short( void* var, void* udata );
 void dump_var_stack( void* var, void* udata );
 
@@ -185,7 +185,7 @@ dbg_variables debug_variables[] =
     /* "Name",     address,             udata,           function */
 
     "SS",          (char *)dSS,         (char *)&dSSptr, dump_tree_short,
-    "Here",        (char *)&w_here,       NULL,          dump_short_int,
+    "Here",        (char *)&w_here,       NULL,          dump_int,
 #if 0
     "vars",        NULL,                  NULL,          dump_var_stack,
 #endif
@@ -228,15 +228,13 @@ void init_my_operations();
 
 
 void
-main (argc, argv)
-int   argc;
-char *argv[];
+main( int argc, char* argv[] )
 {
-    short   arg;
-    char   *p;
-    int     status;
+    int   arg;
+    char* p;
+    int   status;
 
-  /* Prepare Files */
+    /* Prepare Files */
 
     option_list = 0;
     option_debug_out = 0;
@@ -523,7 +521,7 @@ init_my_operations()
 void
 install_system_operations ( long* next_operation )
 {
-    short      id;
+    int        id;
     int        index;
     NODE_PTR   node_ptr;
 
@@ -580,7 +578,7 @@ install_system_operations ( long* next_operation )
 void
 install_system_types ( NODE_PTR* int_type, NODE_PTR* token_type )
 {
-    short      id;
+    int        id;
     NODE_PTR   node_ptr;
 
     id = ssl_add_id ("int", pIdent);
@@ -601,7 +599,7 @@ install_system_types ( NODE_PTR* int_type, NODE_PTR* token_type )
 /* ----------------------------------------------------------------------- */
 
 NODE_PTR dNode;
-short    dTemp;                            /* multi-purpose */
+int      dTemp;                            /* multi-purpose */
 
 
 #include "ssl_begin.h"
@@ -999,13 +997,12 @@ NODE_PTR          scope_ptr;
 void
 w_dump_tables()
 {
-    short             i;
-    short             count;
-    struct rule_addr
-    {
-        const char *name;
-        short      addr;
-        struct rule_addr *next;
+    int               i;
+    int               count;
+    struct rule_addr {
+        const char* name;
+        int         addr;
+        struct rule_addr* next;
     };
     struct rule_addr *head, *curr, *prev, *new_rule;
     int               rule_table_size;
@@ -1229,16 +1226,16 @@ dump_debug_symbols ()
 void
 list_generated_code ()
 {
-    short  pc, target, final_target;
-    short  option_val, options;
-    short  addr;
-    short  op;
-    short  arg;
+    int    pc, target, final_target;
+    int    option_val, options;
+    int    addr;
+    int    op;
+    int    arg;
     int    has_arg;
-    const char  *get_op_name ();
+    const char* get_op_name();
 
     /*  keep track of when next choice table is coming up  */
-    short  choice_table [dPatchCTAsize], choice_table_sp;
+    int    choice_table [dPatchCTAsize], choice_table_sp;
 
     fprintf (f_lst, "\nGenerated code:\n\n");
 
@@ -1334,8 +1331,8 @@ list_generated_code ()
 }
 
 
-const char *get_op_name (op)
-short               op;
+const char*
+get_op_name( int op )
 {
     NODE_PTR    node_ptr;
 
@@ -1358,14 +1355,14 @@ short               op;
 void
 w_optimize_table ()
 {
-    short  pc, target, final_target;
-    short  options;
-    short  improved_count;
-    short  improved_case_jump_count;
-    short  find_ultimate_destination();
+    int    pc, target, final_target;
+    int    options;
+    int    improved_count;
+    int    improved_case_jump_count;
+    int    find_ultimate_destination();
 
     /*  keep track of when next choice table is coming up  */
-    short  choice_table [dPatchCTAsize], choice_table_sp;
+    int    choice_table[dPatchCTAsize], choice_table_sp;
 
     printf ("\nOptimizing table...\n");
 
@@ -1496,8 +1493,8 @@ w_optimize_table ()
 }
 
 
-short find_ultimate_destination (pc)
-short                      pc;
+int
+find_ultimate_destination( int pc )
 {
     while (1)
     {
@@ -1526,12 +1523,12 @@ short                      pc;
 void
 dump_tree_short ( void* variable, void* udata )
 {
-    short       stack_size;
-    NODE_PTR   *stack;
+    int         stack_size;
+    NODE_PTR*   stack;
 
     stack = (NODE_PTR *) variable;
 
-    for (stack_size = *((short *) udata);
+    for (stack_size = *((int*) udata);
          stack_size > 0;
          stack_size--)
     {
@@ -1552,14 +1549,14 @@ dump_node_short ( void* variable, void* udata )
 
 
 void
-dump_short_int_stack ( void* variable, void* udata )
+dump_int_stack ( void* variable, void* udata )
 {
-    short     stack_size;
-    short    *stack;
+    int  stack_size;
+    int* stack;
 
-    stack = (short *) variable;
+    stack = (int*) variable;
 
-    for (stack_size = *((short *) udata);
+    for (stack_size = *((int*) udata);
          stack_size > 0;
          stack_size--)
     {
@@ -1569,11 +1566,11 @@ dump_short_int_stack ( void* variable, void* udata )
 
 
 void
-dump_short_int ( void* variable, void* udata )
+dump_int ( void* variable, void* udata )
 {
-    short    *var;
+    int    *var;
 
-    var = (short *) variable;
+    var = (int*) variable;
 
     printf ("\t%d\n", *var);
 }
