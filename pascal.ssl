@@ -238,6 +238,7 @@ error:
    eInternalScopeMismatch
    eEnumValueNotAscending
    eUsedButNotDefined
+   eCantUsePredSuccOnEnumWithValueGaps
    ;
 
 include 'pascal_schema.ssl'
@@ -416,6 +417,8 @@ mechanism id_mech:
     oIdAdd_False >> int
     oIdAdd_Ord >> int
     oIdAdd_Chr >> int
+    oIdAdd_Pred >> int
+    oIdAdd_Succ >> int
     oChangeIntLitToLabelIdent    % change current token from pIntLit to pIdent "_label_<intlit>"
     ;
 
@@ -494,6 +497,8 @@ Node    StringType
 % nBuiltInFunc
 Node    BuiltIn_Ord
 Node    BuiltIn_Chr
+Node    BuiltIn_Pred
+Node    BuiltIn_Succ
 
 
 % -------------------------- Forward Declarations -------------------------
@@ -506,6 +511,7 @@ newType( node_type nt, int size ) >> Node;
 newIdent( node_type nt, int id ) >> Node;
 EmitValue( Node decl );
 TypeRef( out Node theType );
+EnumTypeRef( out Node resultType );
 PointerTypeTo( Node theType ) >> Node;
 OrdinalLow( Node theType ) >> int;
 AssignStmt( Node decl );
@@ -1646,114 +1652,7 @@ TypeRef( out Node resultType ):
 
       | '(' :
          % An enum type declaration.
-         resultType = oNodeNew( nEnumType )
-         int value = 0
-         int numValues = 0
-         boolean first = true
-
-         % We'll declare the enum values in two scopes: the current scope, and a scope nested in the enum type.
-         % That will let programs use either <val> or <enumType>.<val>
-         Node outerScope = oScopeCurrent
-         oScopeBegin( -1, allocUp )   % level is meaningless, and we won't use allocate
-
-         {
-            % TO DO: assert that name not already seen in this scope, i.e. this enum.
-            %  And possibly not in the outerScope either, since that probably wouldn't count as shadowing.
-            %  It might be in some other higher/used scope.
-            pIdent
-            Node decl = @newIdent( nEnumValue, LAST_ID )
-            Node decl2 = @newIdent( nEnumValue, LAST_ID )
-            oNodeSet( decl, qType, resultType )
-            oNodeSet( decl2, qType, resultType )
-
-            % build up name table, for i/o
-            int nameOffset = oStringAllocLit( ID_STRING( LAST_ID ) )
-            oNodeSetInt( decl, qNameOffset, nameOffset )
-            oNodeSetInt( decl2, qNameOffset, nameOffset )
-            [
-               | '=', ':=' :
-                  @ConstExpr
-                  % value must be ascending
-                  % this obviously doesn't apply to the first value
-                  [ equal_zero( numValues )
-                     | false :
-                        [ greater( oValueTop, value )
-                           | false :   #eEnumValueNotAscending
-                           | * :
-                        ]
-                     | * :
-                  ]
-                  value = oValueTop
-                  oValuePop
-               | * :
-            ]
-            oNodeSetInt( decl, qValue, value )
-            oNodeSetInt( decl2, qValue, value )
-            oScopeDeclare( decl )
-
-            oScopeEnter( outerScope )
-            oScopeDeclare( decl2 )
-            oScopeEnd
-
-            inc( value )
-            inc( numValues )
-            [
-               | ',' :
-               | * :    >
-            ]
-         }
-         ')'
-
-         oNodeSet( resultType, qScope, oScopeCurrent )
-         oNodeSetInt( resultType, qSize, 4 )   % always integer sized
-         oScopeEnd
-
-         % Finish creation of the name table
-         %    struct {
-         %      int    value;
-         %      int    padding;
-         %      char*  name;
-         %    } table[ numValues + 1 ];
-         %  final entry will have name == nullptr
-         %
-         % I'll need to generate init code, to store pointers in global data,
-         % since I don't have a relocation mechanism for static data at the moment.
-         oCodePush( @GetOrCreateInitCode( globalScope ) )
-         oScopeEnter( globalScope )
-         int size = multiply( add( numValues, 1 ), 16 )
-         int addr = oScopeAlloc( size, 8 )
-         oScopeEnd
-         oNodeSetInt( resultType, qNameTable, addr )
-         % loop over enum values
-         NodeIter it = oNodeGetIter( oNodeGet( resultType, qScope ), qDecls )
-         {
-            Node enumValue = oNodeIterValue( it )
-            [ oNodeNull( enumValue )
-               | true :  >
-               | * :
-            ]
-            .tPushAddrGlobal  oEmitInt( addr )
-            .tPushConstI  oEmitInt( oNodeGetInt( enumValue, qValue ) )
-            .tAssignI
-            addr = add( addr, 8 )
-            .tPushAddrGlobal  oEmitInt( addr )
-            .tPushAddrGlobal  oEmitInt( oNodeGetInt( enumValue, qNameOffset ) )
-            .tAssignP
-            addr = add( addr, 8 )
-            oNodeIterNext( it )
-         }
-         % final table entry
-         .tPushAddrGlobal  oEmitInt( addr )
-         .tPushConstI  oEmitInt( 0 )
-         .tAssignI
-         addr = add( addr, 8 )
-         .tPushAddrGlobal  oEmitInt( addr )
-         .tPushConstI  oEmitInt( 0 )
-         .tAssignP
-         addr = add( addr, 8 )
-         oCodePop
-
-         oTypeAdd( resultType )
+         @EnumTypeRef( resultType )
 
 
       % *** TO DO: following type constructors are not implemented *** 
@@ -1764,6 +1663,129 @@ TypeRef( out Node resultType ):
       | * :       % this works for cases except where expr starts with an id
          @ConstExpr '..' @ConstExpr
    ];
+
+
+% Parse an enum type.
+% We've already accepted the '('
+% Returns the new type.
+%
+EnumTypeRef( out Node resultType ):
+
+   resultType = oNodeNew( nEnumType )
+   int value = 0
+   int numValues = 0
+   boolean first = true
+
+   % We'll declare the enum values in two scopes: the current scope, and a scope nested in the enum type.
+   % That will let programs use either <val> or <enumType>.<val>
+   Node outerScope = oScopeCurrent
+   oScopeBegin( -1, allocUp )   % level is meaningless, and we won't use allocate
+
+   {
+      % TO DO: assert that name not already seen in this scope, i.e. this enum.
+      %  And possibly not in the outerScope either, since that probably wouldn't count as shadowing.
+      %  It might be in some other higher/used scope.
+      pIdent
+      Node decl = @newIdent( nEnumValue, LAST_ID )
+      Node decl2 = @newIdent( nEnumValue, LAST_ID )
+      oNodeSet( decl, qType, resultType )
+      oNodeSet( decl2, qType, resultType )
+
+      % build up name table, for i/o
+      int nameOffset = oStringAllocLit( ID_STRING( LAST_ID ) )
+      oNodeSetInt( decl, qNameOffset, nameOffset )
+      oNodeSetInt( decl2, qNameOffset, nameOffset )
+      [
+         | '=', ':=' :
+            @ConstExpr
+            % value must be ascending
+            % this obviously doesn't apply to the first value
+            [ equal_zero( numValues )
+               | false :
+                  [ greater( oValueTop, value )
+                     | false :   #eEnumValueNotAscending
+                     | * :
+                  ]
+               | * :
+            ]
+            [ equal( value, oValueTop )
+               | false :
+                  % The values differ from 0..N-1.  pred/succ may not be used with this type.
+                  oNodeSetBoolean( resultType, qHasGap, true )
+               | * :
+            ]
+            value = oValueTop
+            oValuePop
+         | * :
+      ]
+      oNodeSetInt( decl, qValue, value )
+      oNodeSetInt( decl2, qValue, value )
+      oScopeDeclare( decl )
+
+      oScopeEnter( outerScope )
+      oScopeDeclare( decl2 )
+      oScopeEnd
+
+      inc( value )
+      inc( numValues )
+      [
+         | ',' :
+         | * :    >
+      ]
+   }
+   ')'
+
+   oNodeSet( resultType, qScope, oScopeCurrent )
+   oNodeSetInt( resultType, qSize, 4 )   % always integer sized
+   oScopeEnd
+
+   % Finish creation of the name table
+   %    struct {
+   %      int    value;
+   %      int    padding;
+   %      char*  name;
+   %    } table[ numValues + 1 ];
+   %  final entry will have name == nullptr
+   %
+   % I'll need to generate init code, to store pointers in global data,
+   % since I don't have a relocation mechanism for static data at the moment.
+   oCodePush( @GetOrCreateInitCode( globalScope ) )
+   oScopeEnter( globalScope )
+   int size = multiply( add( numValues, 1 ), 16 )
+   int addr = oScopeAlloc( size, 8 )
+   oScopeEnd
+   oNodeSetInt( resultType, qNameTable, addr )
+   % loop over enum values
+   NodeIter it = oNodeGetIter( oNodeGet( resultType, qScope ), qDecls )
+   {
+      Node enumValue = oNodeIterValue( it )
+      [ oNodeNull( enumValue )
+         | true :  >
+         | * :
+      ]
+      .tPushAddrGlobal  oEmitInt( addr )
+      .tPushConstI  oEmitInt( oNodeGetInt( enumValue, qValue ) )
+      .tAssignI
+      addr = add( addr, 8 )
+      .tPushAddrGlobal  oEmitInt( addr )
+      .tPushAddrGlobal  oEmitInt( oNodeGetInt( enumValue, qNameOffset ) )
+      .tAssignP
+      addr = add( addr, 8 )
+      oNodeIterNext( it )
+   }
+   % final table entry
+   .tPushAddrGlobal  oEmitInt( addr )
+   .tPushConstI  oEmitInt( 0 )
+   .tAssignI
+   addr = add( addr, 8 )
+   .tPushAddrGlobal  oEmitInt( addr )
+   .tPushConstI  oEmitInt( 0 )
+   .tAssignP
+   addr = add( addr, 8 )
+   oCodePop
+
+   oTypeAdd( resultType )
+   ;
 
 
 % --------------------------- Const Expressions --------------------------
@@ -2783,6 +2805,52 @@ CallBuiltInFunc( Node method ):
       | * :
    ]
 
+   % Pred(x)
+   [ oNodeEqual( method, BuiltIn_Pred )
+      | true :
+         % parameter is any enum type, as long as it has values 0..N-1
+         % result is the same enum type
+         '('
+         @Expr
+         [ oTypeSNodeType
+            | nEnumType :
+               % TO DO: does this skip past type aliases?
+               % TO DO: what if using pred/succ on a subrange type?
+               [ oNodeGetBoolean( oTypeSTop, qHasGap )
+                  | true :   #eCantUsePredSuccOnEnumWithValueGaps
+                  | * :
+               ]
+            | * :  #eTypeMismatch
+         ]
+         .tDecI
+         ')'
+         >>
+      | * :
+   ]
+
+   % Succ(x)
+   [ oNodeEqual( method, BuiltIn_Succ )
+      | true :
+         % parameter is any enum type, as long as it has values 0..N-1
+         % result is the same enum type
+         '('
+         @Expr
+         [ oTypeSNodeType
+            | nEnumType :
+               % TO DO: does this skip past type aliases?
+               % TO DO: what if using pred/succ on a subrange type?
+               [ oNodeGetBoolean( oTypeSTop, qHasGap )
+                  | true :   #eCantUsePredSuccOnEnumWithValueGaps
+                  | * :
+               ]
+            | * :  #eTypeMismatch
+         ]
+         .tIncI
+         ')'
+         >>
+      | * :
+   ]
+
    #eNotImplemented
    ;
 
@@ -3323,6 +3391,12 @@ EmitValue( Node decl ):
     oEmitInt( oNodeGetInt( decl, qValue ));
 
 
+DeclareBuiltInFunc( int id ) >> Node:
+   Node decl = @newIdent( nBuiltInFunc, id )
+   oScopeDeclare( decl )
+   >> decl;
+
+
 installBuiltIns:
 
    % install built-in types
@@ -3380,10 +3454,10 @@ installBuiltIns:
    % special rules for parameter types (e.g. any scalar type).
    % Calls to these methods will be handled specially by the compiler.
 
-   BuiltIn_Ord = @newIdent( nBuiltInFunc, oIdAdd_Ord )
-   oScopeDeclare( BuiltIn_Ord )
-   BuiltIn_Chr = @newIdent( nBuiltInFunc, oIdAdd_Chr )
-   oScopeDeclare( BuiltIn_Chr )
+   BuiltIn_Ord = @DeclareBuiltInFunc( oIdAdd_Ord )
+   BuiltIn_Chr = @DeclareBuiltInFunc( oIdAdd_Chr )
+   BuiltIn_Pred = @DeclareBuiltInFunc( oIdAdd_Pred )
+   BuiltIn_Succ = @DeclareBuiltInFunc( oIdAdd_Succ )
    ;
 
 end

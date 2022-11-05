@@ -89,6 +89,7 @@ typedef enum {
     qHigh,
     qScope,
     qNameTable,
+    qHasGap,
 } AttrCode;
 #endif /* Object */
 
@@ -134,6 +135,7 @@ typedef enum {
 #define GetqHigh(N)		(Integer4)	(intptr_t) GetAttr(N, qHigh)
 #define GetqScope(N)		(Node)	GetAttr(N, qScope)
 #define GetqNameTable(N)		(Integer4)	(intptr_t) GetAttr(N, qNameTable)
+#define GetqHasGap(N)		(Boolean1)	(intptr_t) GetAttr(N, qHasGap)
 
 #define SetqINVALID(N,V)		SetAttr(N, qINVALID, V)
 #define SetqUnits(N,V)		SetAttr(N, qUnits, V)
@@ -177,6 +179,7 @@ typedef enum {
 #define SetqHigh(N,V)		SetAttr(N, qHigh, (void*)(intptr_t)(V))
 #define SetqScope(N,V)		SetAttr(N, qScope, V)
 #define SetqNameTable(N,V)		SetAttr(N, qNameTable, (void*)(intptr_t)(V))
+#define SetqHasGap(N,V)		SetAttr(N, qHasGap, (void*)(intptr_t)(V))
 
 #define NewnINVALID()		NewNode(nINVALID)
 #define NewObject()		NewNode(Object)

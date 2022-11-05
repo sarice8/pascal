@@ -400,6 +400,7 @@ init_my_scanner()
 
   ssl_init_scanner( my_keyword_table, my_operator_table, &my_special_codes );
   ssl_set_code_charlit( pCharLit );
+  ssl_enable_pascal_char_codes( 1 );
 
   ssl_scanner_init_comment( "(*", "*)" );  // Original pascal comments
   ssl_scanner_init_comment( "{", "}" );    // Introduced by Turbo Pascal
@@ -990,6 +991,12 @@ Node dNode;  // temporary for several mechanisms
             continue;
     case oIdAdd_Chr:
             ssl_result = ssl_add_id( "chr", pIdent );
+            continue;
+    case oIdAdd_Pred:
+            ssl_result = ssl_add_id( "pred", pIdent );
+            continue;
+    case oIdAdd_Succ:
+            ssl_result = ssl_add_id( "succ", pIdent );
             continue;
     case oChangeIntLitToLabelIdent: {
             // change current token from pIntLit to pIdent "_label_<intlit>"

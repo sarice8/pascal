@@ -213,6 +213,8 @@ nEnumType =>
         % Global data offset of name table: <value><offset of char*>..
         % ending with name == nullptr
         qNameTable:     Integer4
+        % Is there a gap in the values of the type? Can't use pred/succ in that case.
+        qHasGap:        Boolean1
 
 % a collection of enum values, like a bit vector
 nType ::= nSetType

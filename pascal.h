@@ -1,4 +1,4 @@
-#define SSL_CODE_TABLE_SIZE 10000
+#define SSL_CODE_TABLE_SIZE 10200
 
 #define oJumpForward 0
 #define oJumpBack 1
@@ -193,6 +193,7 @@
 #define eInternalScopeMismatch 25
 #define eEnumValueNotAscending 26
 #define eUsedButNotDefined 27
+#define eCantUsePredSuccOnEnumWithValueGaps 28
 #define nINVALID 0
 #define Object 1
 #define nWorkspace 2
@@ -274,6 +275,7 @@
 #define qHigh 39
 #define qScope 40
 #define qNameTable 41
+#define qHasGap 42
 #define Null 0
 #define NullIter 0
 #define NullVec 0
@@ -377,32 +379,34 @@
 #define oIdAdd_False 102
 #define oIdAdd_Ord 103
 #define oIdAdd_Chr 104
-#define oChangeIntLitToLabelIdent 105
-#define oLabelNew 106
-#define oCodeNew 107
-#define oCodePush 108
-#define oCodePop 109
-#define oIncludeUnitFile 110
-#define oIncludeEnd 111
-#define oCountPush 112
-#define oCountInc 113
-#define oCountDec 114
-#define oCountIsZero 115
-#define oCountPop 116
-#define oValuePush 117
-#define oValueNegate 118
-#define oValueTop 119
-#define oValuePop 120
-#define oStringAllocLit 121
-#define oLoopPush 122
-#define oLoopContinueLabel 123
-#define oLoopBreakLabel 124
-#define oLoopPop 125
-#define oMsg 126
-#define oMsgTrace 127
-#define oMsgNode 128
-#define oMsgNodeLong 129
-#define oMsgNodeVec 130
+#define oIdAdd_Pred 105
+#define oIdAdd_Succ 106
+#define oChangeIntLitToLabelIdent 107
+#define oLabelNew 108
+#define oCodeNew 109
+#define oCodePush 110
+#define oCodePop 111
+#define oIncludeUnitFile 112
+#define oIncludeEnd 113
+#define oCountPush 114
+#define oCountInc 115
+#define oCountDec 116
+#define oCountIsZero 117
+#define oCountPop 118
+#define oValuePush 119
+#define oValueNegate 120
+#define oValueTop 121
+#define oValuePop 122
+#define oStringAllocLit 123
+#define oLoopPush 124
+#define oLoopContinueLabel 125
+#define oLoopBreakLabel 126
+#define oLoopPop 127
+#define oMsg 128
+#define oMsgTrace 129
+#define oMsgNode 130
+#define oMsgNodeLong 131
+#define oMsgNodeVec 132
 
 #ifdef SSL_INCLUDE_ERR_TABLE
 
@@ -435,8 +439,9 @@ struct ssl_error_table_struct ssl_error_table[] = {
    "eInternalScopeMismatch", 25,
    "eEnumValueNotAscending", 26,
    "eUsedButNotDefined", 27,
+   "eCantUsePredSuccOnEnumWithValueGaps", 28,
    "", 0
 };
-int ssl_error_table_size = 28;
+int ssl_error_table_size = 29;
 
 #endif // SSL_INCLUDE_ERR_TABLE
