@@ -186,6 +186,7 @@ void ssl_init_scanner ( struct ssl_token_table_struct *keyword_table,
  *  Initialize scanner's code for charlit.
  */
 void ssl_set_code_charlit( int code_charlit );
+void ssl_enable_pascal_char_codes( int enable );
 
 
 /*

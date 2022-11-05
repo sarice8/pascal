@@ -70,6 +70,7 @@ static struct ssl_token_table_struct   *s_keyword_table;
 static struct ssl_token_table_struct   *s_operator_table;
 static struct ssl_special_codes_struct *s_special_codes;
 static int    s_code_charlit;
+static int    s_enable_pascal_char_codes = 0;
 
 
 /*  Character classes  */
@@ -203,6 +204,17 @@ void
 ssl_set_code_charlit( int code_charlit )
 {
   s_code_charlit = code_charlit;
+}
+
+
+// If enabled, allow character codes of the form   #nnn
+// These may be used standalone, or adjacent to each other or 'text'
+// to form strlits.
+//
+void
+ssl_enable_pascal_char_codes( int enable )
+{
+  s_enable_pascal_char_codes = enable;
 }
 
 
@@ -512,7 +524,7 @@ ssl_get_next_token ()
     }
 
     else if ( *s_src_ptr == '\'' ||
-              *s_src_ptr == '#' )
+              ( s_enable_pascal_char_codes && *s_src_ptr == '#' ) )
     {
         s_parse_strlit();
 
@@ -608,7 +620,7 @@ s_parse_strlit()
                 }
             }
 
-        } else if ( *s_src_ptr == '#' ) {
+        } else if ( s_enable_pascal_char_codes && *s_src_ptr == '#' ) {
            int code = 0;
            s_src_ptr++;
            while ( *s_src_ptr >= '0' && *s_src_ptr <= '9' ) {
