@@ -1,6 +1,10 @@
 //  mygraph - my simple graphics library
 //
 
+// BUG: (probably need to fix in runlib)
+//      Need to protect against drawing pixels outside the window bounds.
+//      It's corrupting memory.
+
 unit mygraph;
 
 interface

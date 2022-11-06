@@ -21,9 +21,9 @@ var colorReverse : integer = rgb( 255, 0, 0 );
 
 
 
-CONST // other: ARRAY [0..2] OF integer  = (1,2,1);
-      // dx: ARRAY [0..7] of integer  = (1,1,0,-1,-1,-1,0,1);  { 8 directions }
-      // dy: ARRAY [0..7] of integer  = (0,-1,-1,-1,0,1,1,1);
+CONST other: ARRAY [0..2] OF integer  = (1,2,1);
+      dx: ARRAY [0..7] of integer  = (1,1,0,-1,-1,-1,0,1);  { 8 directions }
+      dy: ARRAY [0..7] of integer  = (0,-1,-1,-1,0,1,1,1);
 
       width   = 19;        { Board width }
       width1  = 20;        { Board width + 1 (empty margin }
@@ -32,11 +32,6 @@ CONST // other: ARRAY [0..2] OF integer  = (1,2,1);
       y_start = -11;
       x_size  = 11;        { Screen size of squares }
       y_size  = 11;
-
-// TO DO: was const
-VAR other: ARRAY [0..2] of integer;  // = (1,2,1);
-    dx: ARRAY [0..7] of integer;  // = (1,1,0,-1,-1,-1,0,1);  { 8 directions }
-    dy: ARRAY [0..7] of integer;  // = (0,-1,-1,-1,0,1,1,1);
 
 TYPE board_type = ARRAY [0..width1,0..width1] OF integer;
 
@@ -207,7 +202,7 @@ BEGIN
      cy := y_start + y_size * y;
      DrawCircle(cx,cy,5,color1);
      IF player = 1 THEN
-        FillShape(cx,cy,color1,color1)
+        FloodFill(cx,cy,color1,color1)
      ELSE
         BEGIN
            Draw(cx-5,cy,cx+5,cy, color0);
@@ -222,7 +217,7 @@ BEGIN
      cx := x_start + x_size * x;
      cy := y_start + y_size * y;
      DrawCircle(cx,cy,5,0);
-     FillShape(cx,cy,0,0);
+     FloodFill(cx,cy,0,0);
      IF x > 1 THEN Draw(cx-5,cy,cx,cy,color2);
      IF x < width THEN Draw(cx,cy,cx+5,cy,color2);
      IF y > 1 THEN Draw(cx,cy-5,cx,cy,color2);
@@ -308,37 +303,6 @@ END;
 
 
 BEGIN   { Main }
-
-    // ----------------------------------------------------
-    // Moved these from const to var
-    // ----------------------------------------------------
-
-    // other := (1,2,1);
-    other[0] := 1;
-    other[1] := 2;
-    other[2] := 1;
-
-    // dx := (1,1,0,-1,-1,-1,0,1);  { 8 directions }
-    dx[0] := 1;
-    dx[1] := 1;
-    dx[2] := 0;
-    dx[3] := -1;
-    dx[4] := -1;
-    dx[5] := -1;
-    dx[6] := 0;
-    dx[7] := 1;
-
-    // dy := (0,-1,-1,-1,0,1,1,1);
-    dy[0] := 0;
-    dy[1] := -1;
-    dy[2] := -1;
-    dy[3] := -1;
-    dy[4] := 0;
-    dy[5] := 1;
-    dy[6] := 1;
-    dy[7] := 1;
-
-    // ----------------------------------------------------
 
      // GraphColorMode;
      // Palette(3);
