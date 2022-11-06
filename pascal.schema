@@ -146,6 +146,13 @@ nVar ::= nParam
 nParam =>
         qInOut:         Boolean1      % has VAR keyword
 
+
+% A typed const is like a read-only global Variable.
+% It's used for type const arrays and records.
+% qValue is the global address of the value.
+nIdent ::= nTypedConst
+
+
 nIdent ::= nLabel
 nLabel =>
         % A user label may be an identifier or an integer literal.

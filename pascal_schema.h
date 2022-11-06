@@ -29,6 +29,7 @@ typedef enum {
     nLocalVar,
     nRecordField,
     nParam,
+    nTypedConst,
     nLabel,
     nType,
     nFileType,
@@ -205,6 +206,7 @@ typedef enum {
 #define NewnLocalVar()		NewNode(nLocalVar)
 #define NewnRecordField()		NewNode(nRecordField)
 #define NewnParam()		NewNode(nParam)
+#define NewnTypedConst()		NewNode(nTypedConst)
 #define NewnLabel()		NewNode(nLabel)
 #define NewnType()		NewNode(nType)
 #define NewnFileType()		NewNode(nFileType)

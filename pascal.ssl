@@ -364,6 +364,7 @@ mechanism math:
     equal_code( Code, Code ) >> boolean
     greater( int x, int y ) >> boolean
     oMININT >> int    % the minimum 32-bit integer.
+    oMAXINT >> int    % the maximum 32-bit integer.
     ;
 
 mechanism more_builtins:      % These should be built-in SSL operations
@@ -514,6 +515,7 @@ TypeRef( out Node theType );
 EnumTypeRef( out Node resultType );
 PointerTypeTo( Node theType ) >> Node;
 OrdinalLow( Node theType ) >> int;
+OrdinalHigh( Node theType ) >> int;
 AssignStmt( Node decl );
 BooleanExprControlFlow( out Label falseLabel );
 ExprAllowCF( out Label falseLabel );
@@ -1388,10 +1390,63 @@ FormalArgDecl:
       | * :
    ];
 
+
 ConstDecl:
    {[
       | pIdent :
-         Node decl = @newIdent( nConst, LAST_ID )
+         [
+            | ':' :
+               @TypedConstDecl
+            | * :
+               @UntypedConstDecl
+         ]
+      | * :
+         >
+   ]};
+
+
+% Parse an untyped const declaration.
+% We've just accepted the identifier.
+%
+UntypedConstDecl:
+   Node decl = @newIdent( nConst, LAST_ID )
+   '='
+
+   @ConstExpr
+   % TO DO: currently ConstExpr leaves int result on oValue stack
+   int val = oValueTop
+   oValuePop
+   oNodeSetInt( decl, qValue, val )
+
+   % TO DO: different types.  Currently assumes int!
+   % Untyped const decl is supposed to allow:
+   %   ordinal types, set types, pointer types (but only Nil), real types, char, string.
+   oNodeSet( decl, qType, IntegerType )
+
+   oScopeDeclare( decl )
+   ';'
+   ;
+
+
+% Parse a typed const declaration.
+% We've just accepted the identifier and ':'
+%
+TypedConstDecl:
+   Node decl = @newIdent( nTypedConst, LAST_ID )
+
+   Node theType
+   @TypeRef( theType )
+   oNodeSet( decl, qType, theType )
+
+   % TO DO: array and record consts are allocated in global memory,
+   % with global offset stored as decl value.
+   % Scalar consts are not allocated in memory, and their value is
+   % stored directly as the decl value.
+
+   % TO DO: skip subranges, similar to oTypeSNodeType.
+   [ oNodeType( theType )
+      | nBooleanType, nByteType, nCharType, nIntegerType, nEnumType:
+         % Parse expression and store value in decl
          '='
 
          @ConstExpr
@@ -1399,15 +1454,84 @@ ConstDecl:
          int val = oValueTop
          oValuePop
          oNodeSetInt( decl, qValue, val )
-
-         % TO DO: different types.  Currently assumes int!
-         oNodeSet( decl, qType, IntegerType )
-
          oScopeDeclare( decl )
          ';'
-      | * :
-         >
-   ]};
+
+      | nStringType, nFileType, nPointerType :
+         #eNotImplemented
+
+      | nArrayType, nRecordType :
+         % Allocate global space, store address in decl.
+         % Push into global scope init code stream (since we'll be issuing code
+         % rather than creating static data, at the moment).
+         % Parse expression and store in global memory.
+         oScopeEnter( globalScope )
+         int addr = oScopeAllocType( theType )
+         oScopeEnd
+         oCodePush( @GetOrCreateInitCode( globalScope ) )
+         oNodeSetInt( decl, qValue, addr )
+         '='
+         @TypedConstInit( theType, addr )
+         oCodePop
+         oScopeDeclare( decl )
+         ';'
+   ]
+   ;
+
+
+% Parse the initial value of a constant that's being stored in global memory.
+% (An array or record constant, and recursively all its elements.)
+% Given the type, and the address in global memory for the const value.
+% The caller has already pushed into the global init code stream.
+%
+TypedConstInit( Node theType, int addr ):
+   % TO DO: need to write into global init code stream
+   % which might not be current code stream (e.g. a const declared in a procedure)
+   % Probably the caller should do that, since it also allocated the global memory.
+
+   % TO DO: skip subranges, similar to oTypeSNodeTYpe
+   [ oNodeType( theType )
+      | nArrayType :
+         Node baseType = oNodeGet( theType, qBaseType )
+         Node indexType = oNodeGet( theType, qIndexType )
+         int low = @OrdinalLow( indexType )
+         int high = @OrdinalHigh( indexType )
+         int elementSize = oNodeGetInt( baseType, qSize )
+
+         '('
+         % Loop over elements
+         int i = low
+         {
+            @TypedConstInit( baseType, addr )
+            [ equal( i, high )
+               | true : >
+               | false :
+            ]
+            ','
+            addr = add( addr, elementSize )
+            inc( i )
+         }
+         ')'
+
+      | nRecordType :
+         #eNotImplemented
+      | nBooleanType, nByteType, nCharType:
+         .tPushAddrGlobal  oEmitInt( addr )
+         @ConstExpr
+         .tPushConstI  oEmitInt( oValueTop )
+         oValuePop
+         .tAssignB
+      | nIntegerType, nEnumType:
+         .tPushAddrGlobal  oEmitInt( addr )
+         @ConstExpr
+         .tPushConstI  oEmitInt( oValueTop )
+         oValuePop
+         .tAssignI
+      | nStringType, nFileType, nPointerType :
+         #eNotImplemented
+   ]
+   ;
+
 
 TypeDecl:
    {[
@@ -2260,7 +2384,7 @@ PrimaryAllowCF( out Label falseLabel ):
                      #eNotImplemented
                ]
 
-            | nGlobalVar, nLocalVar, nParam :
+            | nGlobalVar, nLocalVar, nParam, nTypedConst :
                @VarExpr( decl )
 
             | * :
@@ -2303,7 +2427,7 @@ VarExpr( Node decl ):
    [ oTypeSNodeType
       | nIntegerType, nEnumType :
          [ oNodeType( decl )
-            | nGlobalVar :   .tPushGlobalI  @EmitValue( decl )
+            | nGlobalVar, nTypedConst :   .tPushGlobalI  @EmitValue( decl )
             | nLocalVar :
                [ equal_zero( uplevels )
                   | true :  .tPushLocalI  @EmitValue( decl )
@@ -2327,7 +2451,7 @@ VarExpr( Node decl ):
 
       | nBooleanType, nByteType, nCharType :
          [ oNodeType( decl )
-            | nGlobalVar :   .tPushGlobalB  @EmitValue( decl )
+            | nGlobalVar, nTypedConst :   .tPushGlobalB  @EmitValue( decl )
             | nLocalVar :
                [ equal_zero( uplevels )
                   | true :  .tPushLocalB  @EmitValue( decl )
@@ -2354,7 +2478,7 @@ VarExpr( Node decl ):
 
       | nPointerType :
          [ oNodeType( decl )
-            | nGlobalVar :   .tPushGlobalP @EmitValue( decl )
+            | nGlobalVar, nTypedConst :   .tPushGlobalP @EmitValue( decl )
             | nLocalVar :
                [ equal_zero( uplevels )
                   | true :  .tPushLocalP  @EmitValue( decl )
@@ -2388,7 +2512,7 @@ VarExpr( Node decl ):
          % compound type
          % first, push addr of start of var
          [ oNodeType( decl )
-            | nGlobalVar :   .tPushAddrGlobal @EmitValue( decl )
+            | nGlobalVar, nTypedConst :   .tPushAddrGlobal @EmitValue( decl )
             | nLocalVar :
                [ equal_zero( uplevels )
                   | true :  .tPushAddrLocal  @EmitValue( decl )
@@ -3377,6 +3501,23 @@ OrdinalLow( Node theType ) >> int:
          Node first = oNodeIterValue( oNodeGetIter( enumScope, qDecls ) )
          >> oNodeGetInt( first, qValue )
       | nSubrangeType : >> oNodeGetInt( theType, qLow )
+      | * :             #eNotOrdinalType
+                        >> 0
+   ];
+
+
+% Return the high value of an ordinal type
+%
+OrdinalHigh( Node theType ) >> int:
+   [ oNodeType( theType )
+      | nIntegerType :  >> oMAXINT
+      | nBooleanType :  >> 1
+      | nCharType :     >> 255
+      | nEnumType :
+         Node enumScope = oNodeGet( theType, qScope )
+         Node last = oNodeIterValue( oNodeGetIterLast( enumScope, qDecls ) )
+         >> oNodeGetInt( last, qValue )
+      | nSubrangeType : >> oNodeGetInt( theType, qHigh )
       | * :             #eNotOrdinalType
                         >> 0
    ];

@@ -784,6 +784,9 @@ Node dNode;  // temporary for several mechanisms
     case oMININT :
             ssl_result = -2147483648;  // 0x80000000
             continue;
+    case oMAXINT :
+            ssl_result = 2147483647;  // 0x7fffffff
+            continue;
 
     /* Mechanism more_builtins */
 

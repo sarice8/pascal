@@ -76,7 +76,7 @@ begin
   d1 := West;
   writeln( d1 );
   writeln( pred( d1 ) );
-  writeln( succ( d1 ) );
+  // writeln( succ( d1 ) );
   //   runtime error 107
   // writeln( pred( North ) );
   //   error: range check error while evaluating constants

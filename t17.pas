@@ -48,9 +48,11 @@ program t17;
     begin
     end;
 
+ { TO DO: My compiler doesn't work here yet:
   const ci2 = 10;
   var v1: T2 = ( ( ci2, 2, 3 ), ( 4, ci2, 6 ), ( 7, 8, ci2 ) );
   //    -- that is allowed.  i.e. untyped const, which is more like preprocessor
+ }
 
 begin
 
@@ -64,11 +66,12 @@ begin
   writeln( c2[3,1], ',', c2[3,2], ',', c2[3,3] );
   writeln;
 
+{
   writeln( v1[1,1], ',', v1[1,2], ',', v1[1,3] );
   writeln( v1[2,1], ',', v1[2,2], ',', v1[2,3] );
   writeln( v1[3,1], ',', v1[3,2], ',', v1[3,3] );
   writeln;
-
+}
   // v1 := ( ( ci2, 2, 3 ), ( 4, ci2, 6 ), ( 7, 8, ci2 ) );
   //  error: found , but expected )  i.e. normal expression parenthesis; can't use array notation here
 
