@@ -1,5 +1,5 @@
 program t17;
-  // array init
+  // array init, record init
 
   type T1 = array[1 .. 3] of integer;
   const c1: T1 = ( 10, 20, 30 );
@@ -33,6 +33,14 @@ program t17;
   // var avx: array [1..ci1] of integer;
   //    error: can't evaluate constant expression
   //    So, can't even use it here.  Really not considered const, at least globally
+
+  type RT1 = record
+      i1: integer;
+      a1: T2;
+    end;
+
+  const cr1: RT1 = ( i1: 5; a1: ( ( 3, 2, 1 ), ( 6, 5, 4 ), ( 9, 8, 7 ) ) );
+
 
   procedure proc1( param1: integer );
       // var pvx: integer = ci1;
@@ -75,4 +83,9 @@ begin
   // v1 := ( ( ci2, 2, 3 ), ( 4, ci2, 6 ), ( 7, 8, ci2 ) );
   //  error: found , but expected )  i.e. normal expression parenthesis; can't use array notation here
 
+  writeln( cr1.i1 );
+  writeln( cr1.a1[1,1], ',', cr1.a1[1,2], ',', cr1.a1[1,3] );
+  writeln( cr1.a1[2,1], ',', cr1.a1[2,2], ',', cr1.a1[2,3] );
+  writeln( cr1.a1[3,1], ',', cr1.a1[3,2], ',', cr1.a1[3,3] );
+  writeln;
 end.

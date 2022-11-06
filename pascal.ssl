@@ -1514,19 +1514,42 @@ TypedConstInit( Node theType, int addr ):
          ')'
 
       | nRecordType :
-         #eNotImplemented
+         '('
+         Node fieldScope = oNodeGet( theType, qScope )
+         % Loop over zero or more named fields.  It's not necessary to name them all.
+         % fpc says the names that are given should be in order, but I'm not requiring that.
+         % Since this is global memory, uninitialized fields will be left as 0.
+         {
+            [
+               | pIdent :
+               | * :  >
+            ]
+            Node field = oScopeFindRequireInScope( fieldScope )
+            ':'
+            Node fieldType = oNodeGet( field, qType )
+            int fieldAddr = add( addr, oNodeGetInt( field, qValue ) )
+            @TypedConstInit( fieldType, fieldAddr )
+            [
+               | ';' :
+               | * :  >
+            ]
+         }
+         ')'
+
       | nBooleanType, nByteType, nCharType:
          .tPushAddrGlobal  oEmitInt( addr )
          @ConstExpr
          .tPushConstI  oEmitInt( oValueTop )
          oValuePop
          .tAssignB
+
       | nIntegerType, nEnumType:
          .tPushAddrGlobal  oEmitInt( addr )
          @ConstExpr
          .tPushConstI  oEmitInt( oValueTop )
          oValuePop
          .tAssignI
+
       | nStringType, nFileType, nPointerType :
          #eNotImplemented
    ]
