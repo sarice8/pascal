@@ -1485,9 +1485,6 @@ TypedConstDecl:
 % The caller has already pushed into the global init code stream.
 %
 TypedConstInit( Node theType, int addr ):
-   % TO DO: need to write into global init code stream
-   % which might not be current code stream (e.g. a const declared in a procedure)
-   % Probably the caller should do that, since it also allocated the global memory.
 
    % TO DO: skip subranges, similar to oTypeSNodeTYpe
    [ oNodeType( theType )
