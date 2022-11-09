@@ -965,6 +965,9 @@ Node dNode;  // temporary for several mechanisms
 
     /* Mechanism id_mech */
 
+    case oIdAdd_mysystem:
+            ssl_result = ssl_add_id( "mysystem", pIdent );
+            continue;
     case oIdAdd_File:
             ssl_result = ssl_add_id( "file", pIdent );
             continue;

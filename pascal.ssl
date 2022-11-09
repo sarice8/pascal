@@ -408,6 +408,7 @@ mechanism type_stack_mech:
 
 mechanism id_mech:
     % adds a predefined id to the scanner's id table, and returns the id code
+    oIdAdd_mysystem >> int
     oIdAdd_File >> int
     oIdAdd_Integer >> int
     oIdAdd_Boolean >> int
@@ -486,6 +487,9 @@ Node    workspace              % root of database
 Node    globalScope            % scope for globals in the current module
 Node    initScope              % scope for temporaries global var init,
                                % and program main stmt / unit initialization stmts
+
+int     mysystemId               % id of identifier "mysystem"
+
 % built-in nTypes
 Node    FileType
 Node    IntegerType
@@ -528,7 +532,7 @@ FactorAllowCF( out Label falseLabel );
 PrimaryAllowCF( out Label falseLabel );
 
 VarExpr( Node decl );
-LValueVar( Node decl );
+LValueVar( Node decl, boolean writeable );
 IncVar( Node decl );
 DecVar( Node decl );
 
@@ -595,6 +599,7 @@ Program:
    ]
    ';'
 
+   @UsesMySystem( program )
    % The uses clause may only appear once, immediately after the program declaration.
    [
       | pUses :  @UsesClause( program )
@@ -646,19 +651,7 @@ Program:
 UsesClause( Node user ):
    {
       pIdent
-      Node unit = @FindOrCompileUnit( LAST_ID )
-      [ equal_node( unit, Null )
-         | false :
-            oNodeAddLast( user, qUsedUnits, unit )
-
-            % Put a declaration in the current scope, naming the unit and pointing to it.
-            % This is to allow references to  <unit>.<identifier_in_unit>
-            Node unitRef = oNodeNew( nUnitRef )
-            oNodeSetInt( unitRef, qIdent, oNodeGetInt( unit, qIdent ) )
-            oNodeSet( unitRef, qPublicScope, oNodeGet( unit, qPublicScope ) )
-            oScopeDeclare( unitRef )
-         | * :
-      ]
+      @Uses( LAST_ID, user )
       [
          | ',' :
          | * :  >
@@ -666,6 +659,37 @@ UsesClause( Node user ):
    }   
    ';'
    ;
+
+
+% Process an implicit "uses mysystem" in every module, except in the mysystem unit itself.
+% (I'm calling the unit mysystem rather than system, so fpc doesn't use it to replace its own system unit.)
+%
+UsesMySystem( Node user ):
+   [ equal( oNodeGetInt( user, qIdent ), mysystemId )
+      | true :  >>
+      | * :
+   ]
+   @Uses( mysystemId, user )
+   ;
+
+
+% The given user module uses a unit with the given id,
+% which may or may not have been loaded already.
+%
+Uses( int id, Node user ):
+   Node unit = @FindOrCompileUnit( id )
+   [ equal_node( unit, Null )
+      | false :
+         oNodeAddLast( user, qUsedUnits, unit )
+
+         % Put a declaration in the current scope, naming the unit and pointing to it.
+         % This is to allow references to  <unit>.<identifier_in_unit>
+         Node unitRef = oNodeNew( nUnitRef )
+         oNodeSetInt( unitRef, qIdent, oNodeGetInt( unit, qIdent ) )
+         oNodeSet( unitRef, qPublicScope, oNodeGet( unit, qPublicScope ) )
+         oScopeDeclare( unitRef )
+      | * :
+   ];
 
 
 % If the given decl is for an nUnitRef, the program is using syntax <unit>.<identifier>
@@ -759,6 +783,7 @@ Unit >> Node:
    % mandatory sections
 
    pInterface
+   @UsesMySystem( unit )
    [
       | pUses :   @UsesClause( unit )
       | * :
@@ -779,6 +804,7 @@ Unit >> Node:
    oScopeEnd  % interface scope
 
    pImplementation
+   @UsesMySystem( unitImpl )
    [
       | pUses :   @UsesClause( unitImpl )
       | * :
@@ -1623,7 +1649,7 @@ VarDecl( node_type varNodeType ):
                   | * :
                ]
                % generate assignment in initCode stream
-               @LValueVar( decl )
+               @LValueVar( decl, true )
                @Expr
                @MatchTypes
                @Assign
@@ -2316,12 +2342,35 @@ BoolFactorAllowCF( out Label falseLabel ):
 ArithExprAllowCF( out Label falseLabel ):
    @TermAllowCF( falseLabel )
    {[
-      | pPlus :
-         @PromoteToIntPop
-         @TermAllowCF( falseLabel )  % actually not allowing CF, will be caught by type check
-         @PromoteToInt
-         .tAddI
-      | pMinus :
+      | '+' :
+         [ oTypeSNodeType
+            | nIntegerType, nByteType :
+               @PromoteToIntPop
+               @TermAllowCF( falseLabel )  % actually not allowing CF, will be caught by type check
+               @PromoteToInt
+               .tAddI
+            | nStringType, nCharType :
+               % String concatenation
+               #eNotImplemented
+            | nPointerType :
+               Node elementType = oNodeGet( oTypeSTop, qBaseType )
+               int elementSize = oNodeGetInt( elementType, qSize )
+               @TermAllowCF( falseLabel )  % actually not allowing CF
+               @PromoteToIntPop
+               [ equal( elementSize, 1 )
+                  | false :
+                     .tPushConstI  oEmitInt( elementSize )
+                     .tMultI
+                  | * :
+               ]
+               .tAddPI
+            | * :
+               #eNotAllowed
+         ]
+
+      | '-' :
+         % TO DO: pointer arithmetic, as above
+
          @PromoteToIntPop
          @TermAllowCF( falseLabel )
          @PromoteToInt
@@ -2419,7 +2468,9 @@ PrimaryAllowCF( out Label falseLabel ):
          @ResolveUnitRef( decl )
          Node theType
 
-         @LValueVar( decl )
+         % writeable is false because we're not on the left hand side of an assignment,
+         % or passign into a var parameter.  So it's ok to take the address of a typed const.
+         @LValueVar( decl, false )
 
          % The above leaves the pointed-to type on type stack.
          % Replace with ptr-to-<type>.
@@ -2820,7 +2871,7 @@ Call( Node method ):
                           % The actual is a pointer to the value.
                           % The type on the type stack (pushed above) is for the pointed-to value.
 
-                          @LValueExpr
+                          @LValueExpr( true )
                           % Addr of the referenced variable is on the expr stack,
                           % type of the variable is on the type stack.
 
@@ -3053,7 +3104,7 @@ LabelDefinition( Node decl ):
 %
 AssignStmt( Node decl ):
 
-   @LValueVar( decl )
+   @LValueVar( decl, true )
    ':=' 
    @Expr
    @CoerceType
@@ -3116,18 +3167,20 @@ AssignResultStmt( Node funcDecl ):
 % This is an expression that may appear on the left side of an assignment.
 % Leaves the address of the value on the expr stack,
 % and the type of the value at that address on the type stack.
+% If writeable is false, the expression won't be written to, so may access a
+% typed const.
 %
-LValueExpr:
+LValueExpr( boolean writeable ):
    % At the moment, all lvalue expressions start with a variable name.
    % I think there can also be typecasts, not supported yet.  Check standard syntax.
    pIdent
    Node decl = oScopeFindRequire
    @ResolveUnitRef( decl )
    [ oNodeType( decl )
-      | nGlobalVar, nLocalVar, nParam :
+      | nGlobalVar, nLocalVar, nParam, nTypedConst :
       | * :  #eNotVar
    ]
-   @LValueVar( decl )
+   @LValueVar( decl, writeable )
    ;
 
 
@@ -3136,7 +3189,7 @@ LValueExpr:
 % Leaves the lvalue address on the expression stack,
 % and the type of the value at that address on the type stack.
 %
-LValueVar( Node decl ):
+LValueVar( Node decl, boolean writeable ):
    [ oNodeType( decl )
       | nGlobalVar :   .tPushAddrGlobal @EmitValue( decl )
       | nLocalVar :    .tPushAddrLocal @EmitValue( decl )
@@ -3145,6 +3198,11 @@ LValueVar( Node decl ):
             | true :   % VAR param points to variable.  No dereference.
                        .tPushParamP @EmitValue( decl )
             | * :      .tPushAddrParam @EmitValue( decl )
+         ]
+      | nTypedConst :
+         [ writeable
+            | false :  .tPushAddrGlobal @EmitValue( decl )                       
+            | * :      #eNotVar
          ]
       | * :            #eNotVar
    ]
@@ -3155,7 +3213,7 @@ LValueVar( Node decl ):
 
 
 IncVar( Node decl ):
-   @LValueVar( decl )
+   @LValueVar( decl, true )
    @RequireIntPop
    @VarExpr( decl )
    oTypeSPop
@@ -3163,7 +3221,7 @@ IncVar( Node decl ):
    .tAssignI;
 
 DecVar( Node decl ):
-   @LValueVar( decl )
+   @LValueVar( decl, true )
    @RequireIntPop
    @VarExpr( decl )
    oTypeSPop
@@ -3199,7 +3257,7 @@ ForStmt:
    %        Could do that by disallowing use of LValueIndexes,
    %        or by double-checking the decl's qType here.
    % TO DO: I think I read somewhere that the variable must be in current scope.
-   @LValueVar( decl )
+   @LValueVar( decl, true )
    @RequireIntPop
 
    ':='
@@ -3559,6 +3617,10 @@ DeclareBuiltInFunc( int id ) >> Node:
 
 
 installBuiltIns:
+
+   % "mysystem" is the name of a unit that will be available everywhere.
+   % Add its name to the id table so we can easily spot the name later.
+   mysystemId = oIdAdd_mysystem
 
    % install built-in types
    FileType = @newType( nFileType, 4 )
