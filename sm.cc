@@ -136,6 +136,12 @@ struct instrInfo_s tCodeInstrs[] = {
   { "tSubI", 0 },
   { "tNegI", 0 },
   { "tNot", 0 },
+  { "tEqualB", 0 },
+  { "tNotEqualB", 0 },
+  { "tGreaterB", 0 },
+  { "tLessB", 0 },
+  { "tGreaterEqualB", 0 },
+  { "tLessEqualB", 0 },
   { "tEqualI", 0 },
   { "tNotEqualI", 0 },
   { "tGreaterI", 0 },
@@ -144,6 +150,10 @@ struct instrInfo_s tCodeInstrs[] = {
   { "tLessEqualI", 0 },
   { "tEqualP", 0 },
   { "tNotEqualP", 0 },
+  { "tGreaterP", 0 },
+  { "tLessP", 0 },
+  { "tGreaterEqualP", 0 },
+  { "tLessEqualP", 0 },
   { "tAllocActuals", 1 },
   { "tAllocActualsCdecl", 1 },
   { "tFreeActuals", 1 },
@@ -493,6 +503,32 @@ walkTable()
        case tNot :
               stack[sp] = !stack[sp];
               continue;
+
+       case tEqualB :
+              stack[sp-1] = stack[sp-1] == stack[sp];
+              sp--;
+              continue;
+       case tNotEqualB :
+              stack[sp-1] = stack[sp-1] != stack[sp];
+              sp--;
+              continue;
+       case tGreaterB :
+              stack[sp-1] = uint8_t(stack[sp-1]) > uint8_t(stack[sp]);
+              sp--;
+              continue;
+       case tLessB :
+              stack[sp-1] = uint8_t(stack[sp-1]) < uint8_t(stack[sp]);
+              sp--;
+              continue;
+       case tGreaterEqualB :
+              stack[sp-1] = uint8_t(stack[sp-1]) >= uint8_t(stack[sp]);
+              sp--;
+              continue;
+       case tLessEqualB :
+              stack[sp-1] = uint8_t(stack[sp-1]) <= uint8_t(stack[sp]);
+              sp--;
+              continue;
+
        case tEqualI :
               stack[sp-1] = stack[sp-1] == stack[sp];
               sp--;
@@ -517,6 +553,7 @@ walkTable()
               stack[sp-1] = stack[sp-1] <= stack[sp];
               sp--;
               continue;
+
        case tEqualP :
               stack[sp-1] = stack[sp-1] == stack[sp];
               sp--;
@@ -525,6 +562,23 @@ walkTable()
               stack[sp-1] = stack[sp-1] != stack[sp];
               sp--;
               continue;
+       case tGreaterP :
+              stack[sp-1] = uint64_t(stack[sp-1]) > uint64_t(stack[sp]);
+              sp--;
+              continue;
+       case tLessP :
+              stack[sp-1] = uint64_t(stack[sp-1]) < uint64_t(stack[sp]);
+              sp--;
+              continue;
+       case tGreaterEqualP :
+              stack[sp-1] = uint64_t(stack[sp-1]) >= uint64_t(stack[sp]);
+              sp--;
+              continue;
+       case tLessEqualP :
+              stack[sp-1] = uint64_t(stack[sp-1]) <= uint64_t(stack[sp]);
+              sp--;
+              continue;
+
        case tAllocActuals :
               call_sp -= code[pc++];
               if (call_sp < callStackLowerBound) fatal("call stack overflow");

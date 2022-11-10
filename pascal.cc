@@ -983,6 +983,9 @@ Node dNode;  // temporary for several mechanisms
     case oIdAdd_Byte:
             ssl_result = ssl_add_id( "byte", pIdent );
             continue;
+    case oIdAdd_Pointer:
+            ssl_result = ssl_add_id( "pointer", pIdent );
+            continue;
     case oIdAdd_String:
             ssl_result = ssl_add_id( "string", pIdent );
             continue;

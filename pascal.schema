@@ -191,6 +191,15 @@ nType ::= nPointerType
 nPointerType =>
         qBaseType:      Node            (nType)                 [Alt]
 
+
+% nUniversalPointerType is a separate type that can be assigned to/from
+% any pointer type.  I give it a base type nByteType to meet the requirement that
+% pointer arithmetic acts as if the pointed-to size is 1 byte.
+% But, universal pointer cannot be dereferenced.
+%
+nPointerType ::= nUniversalPointerType
+
+
 nType ::= nArrayType
 nArrayType =>
         % The index type is always just for one dimension.

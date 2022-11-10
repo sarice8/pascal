@@ -175,14 +175,24 @@ output:
    tSubI
    tNegI             % top entry *= -1
    tNot              % negate top boolean
+   tEqualB
+   tNotEqualB
+   tGreaterB         % B is uint8_t, so these are unsigned comparisons
+   tLessB
+   tGreaterEqualB
+   tLessEqualB
    tEqualI           % top two entries equal? (pop 2, push 1) (true=1)
-   tNotEqualI        %    NOTE, these all work for booleans too
+   tNotEqualI        %    NOTE, these all work for booleans too, but I'm moving to tEqualB etc for those
    tGreaterI         % 2nd entry greater than top entry? (pop 2, push answer)
    tLessI  
    tGreaterEqualI
    tLessEqualI
    tEqualP           % two two pointer values equal? (pop 2, push 1) (true=1)
    tNotEqualP
+   tGreaterP
+   tLessP
+   tGreaterEqualP
+   tLessEqualP
    tAllocActuals     % <#bytes> - make space on call stack for actual params (adjusting call stack sp)
    tAllocActualsCdecl  % <#bytes> - starting a call to a cdecl method.  tcode still describes my own calling convention.
    tFreeActuals      % <#bytes> - discard space on call stack allocated by tAllocActuals
@@ -239,6 +249,7 @@ error:
    eEnumValueNotAscending
    eUsedButNotDefined
    eCantUsePredSuccOnEnumWithValueGaps
+   eCantDereference
    ;
 
 include 'pascal_schema.ssl'
@@ -414,6 +425,7 @@ mechanism id_mech:
     oIdAdd_Boolean >> int
     oIdAdd_Char >> int
     oIdAdd_Byte >> int
+    oIdAdd_Pointer >> int
     oIdAdd_String >> int
     oIdAdd_True >> int
     oIdAdd_False >> int
@@ -497,6 +509,7 @@ Node    BooleanType
 Node    BooleanCFType
 Node    CharType
 Node    ByteType
+Node    UniversalPointerType
 Node    StringType
 
 % nBuiltInFunc
@@ -1483,7 +1496,7 @@ TypedConstDecl:
          oScopeDeclare( decl )
          ';'
 
-      | nStringType, nFileType, nPointerType :
+      | nStringType, nFileType, nPointerType, nUniversalPointerType :
          #eNotImplemented
 
       | nArrayType, nRecordType :
@@ -1573,7 +1586,7 @@ TypedConstInit( Node theType, int addr ):
          oValuePop
          .tAssignI
 
-      | nStringType, nFileType, nPointerType :
+      | nStringType, nFileType, nPointerType, nUniversalPointerType :
          #eNotImplemented
    ]
    ;
@@ -1651,7 +1664,7 @@ VarDecl( node_type varNodeType ):
                % generate assignment in initCode stream
                @LValueVar( decl, true )
                @Expr
-               @MatchTypes
+               @CoerceType
                @Assign
                [ changedScope
                   | true : oScopeEnd
@@ -2121,9 +2134,10 @@ ExprAllowCF( out Label falseLabel ):
          @PromoteToIntOptional
          @MatchTypes
          [ oTypeSNodeType
-            | nIntegerType, nEnumType, nBooleanType :  .tEqualI
-            | nPointerType :                .tEqualP
-            | nCharType, nStringType :      #eNotImplemented
+            | nBooleanType, nCharType :     .tEqualB
+            | nIntegerType, nEnumType :     .tEqualI
+            | nPointerType, nUniversalPointerType :    .tEqualP
+            | nStringType :                 #eNotImplemented
             | * :                           #eNotAllowed
          ]
          oTypeSPop
@@ -2137,9 +2151,10 @@ ExprAllowCF( out Label falseLabel ):
          @PromoteToIntOptional
          @MatchTypes
          [ oTypeSNodeType
-            | nIntegerType, nEnumType, nBooleanType :  .tNotEqualI
-            | nPointerType :                .tNotEqualP
-            | nCharType, nStringType :      #eNotImplemented
+            | nBooleanType, nCharType :     .tNotEqualB
+            | nIntegerType, nEnumType :     .tNotEqualI
+            | nPointerType, nUniversalPointerType :    .tNotEqualP
+            | nStringType :                 #eNotImplemented
             | * :                           #eNotAllowed
          ]
          oTypeSPop
@@ -2153,8 +2168,10 @@ ExprAllowCF( out Label falseLabel ):
          @PromoteToIntOptional
          @MatchTypes
          [ oTypeSNodeType
-            | nIntegerType, nEnumType, nBooleanType :  .tLessI
-            | nCharType, nStringType :      #eNotImplemented
+            | nBooleanType, nCharType :     .tLessB
+            | nIntegerType, nEnumType :     .tLessI
+            | nPointerType, nUniversalPointerType :   .tLessP
+            | nStringType :                 #eNotImplemented
             | * :                           #eNotAllowed
          ]
          oTypeSPop
@@ -2168,8 +2185,10 @@ ExprAllowCF( out Label falseLabel ):
          @PromoteToIntOptional
          @MatchTypes
          [ oTypeSNodeType
-            | nIntegerType, nEnumType, nBooleanType :  .tGreaterI
-            | nCharType, nStringType :      #eNotImplemented
+            | nBooleanType, nCharType :     .tGreaterB
+            | nIntegerType, nEnumType :     .tGreaterI
+            | nPointerType, nUniversalPointerType :   .tGreaterP
+            | nStringType :                 #eNotImplemented
             | * :                           #eNotAllowed
          ]
          oTypeSPop
@@ -2183,8 +2202,10 @@ ExprAllowCF( out Label falseLabel ):
          @PromoteToIntOptional
          @MatchTypes
          [ oTypeSNodeType
-            | nIntegerType, nEnumType, nBooleanType :  .tLessEqualI
-            | nCharType, nStringType :      #eNotImplemented
+            | nBooleanType, nCharType :     .tLessEqualB
+            | nIntegerType, nEnumType :     .tLessEqualI
+            | nPointerType, nUniversalPointerType :   .tLessEqualP
+            | nStringType :                 #eNotImplemented
             | * :                           #eNotAllowed
          ]
          oTypeSPop
@@ -2198,8 +2219,10 @@ ExprAllowCF( out Label falseLabel ):
          @PromoteToIntOptional
          @MatchTypes
          [ oTypeSNodeType
-            | nIntegerType, nEnumType, nBooleanType :  .tGreaterEqualI
-            | nCharType, nStringType :      #eNotImplemented
+            | nBooleanType, nCharType :     .tGreaterEqualB
+            | nIntegerType, nEnumType :     .tGreaterEqualI
+            | nPointerType, nUniversalPointerType :   .tGreaterEqualP
+            | nStringType :                 #eNotImplemented
             | * :                           #eNotAllowed
          ]
          oTypeSPop
@@ -2352,7 +2375,7 @@ ArithExprAllowCF( out Label falseLabel ):
             | nStringType, nCharType :
                % String concatenation
                #eNotImplemented
-            | nPointerType :
+            | nPointerType, nUniversalPointerType :
                Node elementType = oNodeGet( oTypeSTop, qBaseType )
                int elementSize = oNodeGetInt( elementType, qSize )
                @TermAllowCF( falseLabel )  % actually not allowing CF
@@ -2547,7 +2570,7 @@ VarExpr( Node decl ):
       | nStringType, nFileType :
          #eNotImplemented
 
-      | nPointerType :
+      | nPointerType, nUniversalPointerType :
          [ oNodeType( decl )
             | nGlobalVar, nTypedConst :   .tPushGlobalP @EmitValue( decl )
             | nLocalVar :
@@ -2568,12 +2591,17 @@ VarExpr( Node decl ):
                         | true :  .tPushParamP  @EmitValue( decl )
                         | * :     .tPushUpParamP  oEmitInt( uplevels )  @EmitValue( decl )
                      ]
-               ]
+               ]               
          ]
          [
             | '^' :             % dereferenced
                oTypeSPop
                oTypeSPush( oNodeGet( theType, qBaseType ) )
+               @LValueIndexes
+               @FetchVar
+            | '[' :             % dereferencing pointer like an array [0..] of baseType
+               @PointerArraySubscript
+               % modify addr for any subsequent subscripts, field references, etc
                @LValueIndexes
                @FetchVar
             | * :               % just ptr value alone
@@ -2620,6 +2648,7 @@ FetchVar:
       | nBooleanType, nByteType, nCharType :  .tFetchB
       | nStringType, nFileType :   #eNotImplemented
       | nPointerType :             .tFetchP
+      | nUniversalPointerType :    #eCantDereference
       | nArrayType, nRecordType :  % compound type; leave as addr
    ];
 
@@ -2630,9 +2659,16 @@ FetchVar:
 
 LValueIndexes:
    {[
-      | '[' :       @ArraySubscripts
+      | '[' :
+         [ oTypeSNodeType
+            | nArrayType :    @ArraySubscripts
+            | nPointerType :  @PointerArraySubscript
+            | * :             #eNotArray
+         ]
       | '.' :       @RecordFieldRef
-      | '^' :       @PointerDeref
+      | '^' :       @PointerDeref   % TO DO: I suspect I don't have logic right here
+                                    % about precondition and using .tFetchP
+                                    % Ideally this should take over for the ^ in VarExpr too.
       | * :         >
    ]};
 
@@ -2682,6 +2718,36 @@ ArraySubscripts:
    };
 
 
+% pointer[index] - similar to array[index] where index counts from 0.
+% On entry, the pointer value is on the stack, and pointer type is on the type stack.
+% We've already accepted the '['.
+% On exit, the address of the pointed-to element is on the stack,
+% and the element type is on the type stack.
+%
+PointerArraySubscript:
+   [ oTypeSNodeType
+      | nPointerType :
+      | * :    #eCantDereference
+   ]
+   % replace type stack with base type
+   Node baseType = oNodeGet( oTypeSTop, qBaseType )
+   oTypeSPop
+   oTypeSPush( baseType )
+   
+   @Expr
+   @RequireIntPop
+   % multiply by element size
+   int size = oNodeGetInt( baseType, qSize )
+   [ equal( size, 1 )
+      | false :
+         .tPushConstI  oEmitInt( size )  .tMultI
+      | * :
+   ]
+   % update start address
+   .tAddPI
+   ']';
+
+
 RecordFieldRef:
    [ oTypeSNodeType
       | nRecordType :
@@ -2715,6 +2781,7 @@ RecordFieldRef:
 PointerDeref:
    [ oTypeSNodeType
       | nPointerType :
+      | nUniversalPointerType :   #eCantDereference
       | * :       #eNotPointer
    ]
    .tFetchP           % now addr on stack is addr of what we're pointing to
@@ -2746,6 +2813,15 @@ CoerceType:
                [ nt
                   | nIntegerType :   .tCastItoB  >>
                   | * :
+               ]
+            | nPointerType :
+               [ nt
+                  | nUniversalPointerType :  >>
+                  | * :
+               ]
+            | nUniversalPointerType :
+               [ nt
+                  | nPointerType :  >>
                ]
             | * :
          ]
@@ -2891,7 +2967,7 @@ Call( Node method ):
                              | nIntegerType, nEnumType : .tAssignI
                              | nBooleanType, nByteType, nCharType :  .tAssignB
                              | nStringType, nFileType :   #eNotImplemented
-                             | nPointerType :            .tAssignP
+                             | nPointerType, nUniversalPointerType :  .tAssignP
                              | nArrayType, nRecordType :
                                  % compound types: copy value into actuals space
                                  int size = oNodeGetInt( oTypeSTop, qSize )
@@ -2945,7 +3021,7 @@ Call( Node method ):
             | nIntegerType, nEnumType :   .tPushLocalI  oEmitInt( tempOffset )
             | nBooleanType, nByteType, nCharType :   .tPushLocalB  oEmitInt( tempOffset )
             | nStringType, nFileType :  #eNotImplemented
-            | nPointerType :   .tPushLocalP  oEmitInt( tempOffset )
+            | nPointerType, nUniversalPointerType :   .tPushLocalP  oEmitInt( tempOffset )
             | nArrayType, nRecordType :   % compound type: push address
                                .tPushAddrLocal  oEmitInt( tempOffset )
          ]
@@ -3113,7 +3189,7 @@ AssignStmt( Node decl ):
 
 
 % Performs a raw assignment.
-% Given lvalue 2nd on stack, and expr value top of stack,
+% Given lvalue 2nd on stack, and expr value top of stack (already coerced to the lvalue type),
 % and type of both of these on the type stack,
 % perform the assignment and pop the type off the type stack.
 %
@@ -3122,7 +3198,7 @@ Assign:
       | nIntegerType, nEnumType :  .tAssignI
       | nBooleanType, nByteType, nCharType :  .tAssignB
       | nStringType, nFileType :   #eNotImplemented
-      | nPointerType :             .tAssignP
+      | nPointerType, nUniversalPointerType :  .tAssignP
       % compound var assigns; addrs of src, dest on stack
       | nArrayType, nRecordType :
           int size = oNodeGetInt( oTypeSTop, qSize )
@@ -3152,7 +3228,7 @@ AssignResultStmt( Node funcDecl ):
       | nIntegerType, nEnumType : .tAssignI
       | nBooleanType, nByteType, nCharType :  .tAssignB
       | nStringType, nFileType :   #eNotImplemented
-      | nPointerType :            .tAssignP
+      | nPointerType, nUniversalPointerType :  .tAssignP
       % compound var assigns; addrs of src, dest on stack
       | nArrayType, nRecordType :
           int size = oNodeGetInt( oTypeSTop, qSize )
@@ -3406,7 +3482,7 @@ WriteStmt:
                   % write name via table lookup
                   .tPushAddrGlobal  oEmitInt( oNodeGetInt( oTypeSTop, qNameTable ) )
                   .tWriteEnum
-               | nPointerType :             .tWriteP
+               | nPointerType, nUniversalPointerType :   .tWriteP
                | * :                        #eNotAllowed
             ]
             oTypeSPop
@@ -3454,6 +3530,20 @@ MatchTypes:
    oTypeSPop
    [ equal_node_type( nt, oTypeSNodeType )
       | false :
+         % Some implicit conversion is allowed even here
+         [ oTypeSNodeType
+            | nPointerType :
+               [ nt
+                  | nUniversalPointerType :  >>
+                  | * :
+               ]
+            | nUniversalPointerType :
+               [ nt
+                  | nPointerType :  >>
+                  | * :
+               ]
+            | * :
+         ]
          #eTypeMismatch
       | * :
    ];
@@ -3629,6 +3719,10 @@ installBuiltIns:
    BooleanCFType = @newType( nBooleanCFType, 1 )
    CharType = @newType( nCharType, 1 )
    ByteType = @newType( nByteType, 1 )
+   % Universal pointer says base type Byte, but this is only for the sake of
+   % pointer arithmetic.  It doesn't matter otherwise, because this type cannot be dereferened.
+   UniversalPointerType = @newType( nUniversalPointerType, 8 )
+   oNodeSet( UniversalPointerType, qBaseType, ByteType )
    StringType = @newType( nStringType, 256 )    % string with default length 256
 
    % Declare those type identifiers.
@@ -3654,6 +3748,10 @@ installBuiltIns:
 
    t = @newIdent( nTypeDecl, oIdAdd_Byte )
    oNodeSet( t, qType, ByteType )
+   oScopeDeclare( t )
+
+   t = @newIdent( nTypeDecl, oIdAdd_Pointer )
+   oNodeSet( t, qType, UniversalPointerType )
    oScopeDeclare( t )
 
    t = @newIdent( nTypeDecl, oIdAdd_String )

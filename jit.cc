@@ -623,6 +623,9 @@ extern void runlibWriteStr( char* ptr );
 extern void runlibWriteP( char* ptr );
 extern void runlibWriteEnum( int val, EnumNameTable* table );
 extern void runlibWriteCR();
+extern void* runlibMalloc( int size );
+extern void* runlibRealloc( void* ptr, int size );
+extern void runlibFree( void* ptr );
 
 extern void grInit();
 extern void grTerm();
@@ -637,6 +640,9 @@ extern int  runlibWaitKey();
 // For now, I have a hardcoded list of available external methods.
 //
 std::unordered_map<std::string, void*> runlibMethods = {
+  { "runlibMalloc", (void*) runlibMalloc },
+  { "runlibRealloc", (void*) runlibRealloc },
+  { "runlibFree", (void*) runlibFree },
   { "runlibClearScreen", (void*) runlibClearScreen },
   { "runlibUpdateScreen", (void*) runlibUpdateScreen },
   { "runlibSetPixel", (void*) runlibSetPixel },
@@ -1843,6 +1849,85 @@ generateCode()
           }
         }
         break;
+
+      // Type "B" and "P" are unsigned, so tGreaterB and tGreaterP etc are unsigned comparisons.
+      // Type "I" is signed, so tGreaterI etc are signed comparisons.
+      // operandCompare() and emitCmp() don't care about that, they handle everything.
+      // It just affects the Flag* that we say is a true result.
+
+      case tEqualB : {
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
+          if ( doConst && x.isConst() && y.isConst() ) {
+            operandStack.emplace_back( x._kind, x._value == y._value ? 1 : 0 );
+          } else {
+            operandStack.push_back( operandCompare( x, y, FlagE ) );
+          }
+          x.release();
+          y.release();
+        }
+        break;
+      case tNotEqualB : {
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
+          if ( doConst && x.isConst() && y.isConst() ) {
+            operandStack.emplace_back( x._kind, x._value != y._value ? 1 : 0 );
+          } else {
+            operandStack.push_back( operandCompare( x, y, FlagNE ) );
+          }
+          x.release();
+          y.release();
+        }
+        break;
+      case tGreaterB : {
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
+          if ( doConst && x.isConst() && y.isConst() ) {
+            operandStack.emplace_back( x._kind, uint8_t(x._value) > uint8_t(y._value) ? 1 : 0 );
+          } else {
+            operandStack.push_back( operandCompare( x, y, FlagA ) );
+          }
+          x.release();
+          y.release();
+        }
+        break;
+      case tLessB : {
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
+          if ( doConst && x.isConst() && y.isConst() ) {
+            operandStack.emplace_back( x._kind, uint8_t(x._value) < uint8_t(y._value) ? 1 : 0 );
+          } else {
+            operandStack.push_back( operandCompare( x, y, FlagB ) );
+          }
+          x.release();
+          y.release();
+        }
+        break;
+      case tGreaterEqualB : {
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
+          if ( doConst && x.isConst() && y.isConst() ) {
+            operandStack.emplace_back( x._kind, uint8_t(x._value) >= uint8_t(y._value) ? 1 : 0 );
+          } else {
+            operandStack.push_back( operandCompare( x, y, FlagAE ) );
+          }
+          x.release();
+          y.release();
+        }
+        break;
+      case tLessEqualB : {
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
+          if ( doConst && x.isConst() && y.isConst() ) {
+            operandStack.emplace_back( x._kind, uint8_t(x._value) <= uint8_t(y._value) ? 1 : 0 );
+          } else {
+            operandStack.push_back( operandCompare( x, y, FlagBE ) );
+          }
+          x.release();
+          y.release();
+        }
+        break;
+
       case tEqualI : {
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
@@ -1915,6 +2000,7 @@ generateCode()
           y.release();
         }
         break;
+
       case tEqualP : {
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
@@ -1931,6 +2017,39 @@ generateCode()
           y.release();
         }
         break;
+      case tGreaterP : {
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
+          operandStack.push_back( operandCompare( x, y, FlagA ) );
+          x.release();
+          y.release();
+        }
+        break;
+      case tLessP : {
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
+          operandStack.push_back( operandCompare( x, y, FlagB ) );
+          x.release();
+          y.release();
+        }
+        break;
+      case tGreaterEqualP : {
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
+          operandStack.push_back( operandCompare( x, y, FlagAE ) );
+          x.release();
+          y.release();
+        }
+        break;
+      case tLessEqualP : {
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
+          operandStack.push_back( operandCompare( x, y, FlagBE ) );
+          x.release();
+          y.release();
+        }
+        break;
+
       case tAllocActuals : {
           int size = *tCodePc++;
           // As noted in finishMethod(), we will bump only by a multiple of 16
@@ -4057,6 +4176,29 @@ void
 runlibWriteCR()
 {
   printf( "\n" );
+}
+
+
+// Runlib methods declared in unit mysystem
+
+void*
+runlibMalloc( int size )
+{
+  return malloc( size );
+}
+
+
+void*
+runlibRealloc( void* ptr, int size )
+{
+  return realloc( ptr, size );
+}
+
+
+void
+runlibFree( void* ptr )
+{
+  free( ptr );
 }
 
 

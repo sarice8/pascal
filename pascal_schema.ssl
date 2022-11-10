@@ -37,6 +37,7 @@ type node_type:
 	nCharType
 	nStringType
 	nPointerType
+	nUniversalPointerType
 	nArrayType
 	nSubrangeType
 	nRecordType

@@ -40,6 +40,7 @@ typedef enum {
     nCharType,
     nStringType,
     nPointerType,
+    nUniversalPointerType,
     nArrayType,
     nSubrangeType,
     nRecordType,
@@ -217,6 +218,7 @@ typedef enum {
 #define NewnCharType()		NewNode(nCharType)
 #define NewnStringType()		NewNode(nStringType)
 #define NewnPointerType()		NewNode(nPointerType)
+#define NewnUniversalPointerType()		NewNode(nUniversalPointerType)
 #define NewnArrayType()		NewNode(nArrayType)
 #define NewnSubrangeType()		NewNode(nSubrangeType)
 #define NewnRecordType()		NewNode(nRecordType)
