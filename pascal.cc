@@ -1143,18 +1143,17 @@ Node dNode;  // temporary for several mechanisms
             }
      case oStringAllocShortStringLit : {
             // The input is a C-style null-terminated string.
-            // Store it in global memory as a ShortString, which is a length byte followed by the text
-            // (not null-terminated).
-            // Just in case it is helpful, we will store a null termination anyway for these literals.
+            // Store it in global memory as a ShortString, which is a length byte followed by the text.
+            // In addition, unlike a normal ShortString, we will also null-terminate the string,
+            // A strlit may be assigned to either a ShortString or a PChar.
+            // Note: the strlit may be longer than 255 characters, but will appear truncated if referenced
+            // as a ShortString.
             const char* sourceStr = (const char*) ssl_param;
             int sourceLen = strlen( sourceStr );
-            if ( sourceLen > 255 ) {
-                ssl_fatal( "We don't support string literals longer than 255 characters" );
-            }
             // Set up the data as we want it to appear in global memory.
             int dataSize = sourceLen + 2;
             char* shortStr = new char[dataSize];
-            shortStr[0] = (char) sourceLen;
+            shortStr[0] = (char) std::min( sourceLen, 255 );
             strcpy( &shortStr[1], sourceStr );
             ssl_result = createGlobalData( shortStr, dataSize );
             delete[] shortStr;

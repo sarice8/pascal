@@ -232,40 +232,76 @@
  388	tWriteShortStr
  389	tWriteCR
  390	tReturn
- 391	tLabel	   1
+ 391	tLabel	  23
  393	tEnter	   0
- 395	tAllocActuals	   0
- 397	tCall	  21
- 399	tFreeActuals	   0
- 401	tPushAddrGlobal	 373
- 403	tWriteShortStr
- 404	tWriteCR
- 405	tPushAddrGlobal	 112
- 407	tPushAddrGlobal	 405
- 409	tCopy	 256
- 411	tPushAddrGlobal	 112
- 413	tWriteShortStr
- 414	tWriteCR
- 415	tPushAddrGlobal	 368
- 417	tPushAddrGlobal	 421
- 419	tPushConstI	   2
- 421	tAddPI
- 422	tFetchB
- 423	tAssignB
- 424	tPushGlobalB	 368
- 426	tWriteChar
- 427	tWriteCR
- 428	tPushAddrGlobal	 369
- 430	tPushAddrGlobal	 429
- 432	tPushConstI	   0
- 434	tAddPI
- 435	tFetchB
- 436	tCastBtoI
- 437	tAssignI
- 438	tPushGlobalI	 369
- 440	tWriteI
- 441	tWriteCR
- 442	tAllocActuals	   0
- 444	tCall	  22
- 446	tFreeActuals	   0
- 448	tReturn
+ 395	tPushAddrGlobal	 381
+ 397	tWriteShortStr
+ 398	tPushAddrParam	   0
+ 400	tWriteShortStr
+ 401	tWriteCR
+ 402	tReturn
+ 403	tLabel	   1
+ 405	tEnter	   0
+ 407	tAllocActuals	   0
+ 409	tCall	  21
+ 411	tFreeActuals	   0
+ 413	tPushAddrGlobal	 397
+ 415	tWriteShortStr
+ 416	tWriteCR
+ 417	tPushAddrGlobal	 112
+ 419	tPushAddrGlobal	 429
+ 421	tCopy	 256
+ 423	tPushAddrGlobal	 112
+ 425	tWriteShortStr
+ 426	tWriteCR
+ 427	tPushAddrGlobal	 368
+ 429	tPushAddrGlobal	 445
+ 431	tPushConstI	   2
+ 433	tAddPI
+ 434	tFetchB
+ 435	tAssignB
+ 436	tPushGlobalB	 368
+ 438	tWriteChar
+ 439	tWriteCR
+ 440	tPushAddrGlobal	 369
+ 442	tPushAddrGlobal	 453
+ 444	tPushConstI	   0
+ 446	tAddPI
+ 447	tFetchB
+ 448	tCastBtoI
+ 449	tAssignI
+ 450	tPushGlobalI	 369
+ 452	tWriteI
+ 453	tWriteCR
+ 454	tPushAddrGlobal	 373
+ 456	tPushAddrGlobal	 461
+ 458	tPushConstI	   1
+ 460	tAddPI
+ 461	tAssignP
+ 462	tPushAddrGlobal	 368
+ 464	tPushGlobalP	 373
+ 466	tPushConstI	   2
+ 468	tAddPI
+ 469	tFetchB
+ 470	tAssignB
+ 471	tPushGlobalB	 368
+ 473	tWriteChar
+ 474	tWriteCR
+ 475	tPushAddrGlobal	 373
+ 477	tPushAddrGlobal	 469
+ 479	tPushConstI	   1
+ 481	tAddPI
+ 482	tAssignP
+ 483	tPushGlobalP	 373
+ 485	tWritePChar
+ 486	tWriteCR
+ 487	tAllocActuals	 256
+ 489	tPushAddrActual	   0
+ 491	tPushAddrGlobal	 481
+ 493	tCopy	 256
+ 495	tCall	  23
+ 497	tFreeActuals	 256
+ 499	tAllocActuals	   0
+ 501	tCall	  22
+ 503	tFreeActuals	   0
+ 505	tReturn

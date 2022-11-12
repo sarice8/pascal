@@ -216,6 +216,12 @@ nRecordType =>
         % the record field declarations, each with a relative offset
         qScope:         Node            (nScope)                [Pri]
 
+% We have a separate type for StrLit, because it can be assigned to both
+% ShortString and PChar, which is not the case for ShortString.
+% I will store StrLit to have both a length byte and null termination,
+% to work for both cases.
+%
+nType ::= nStrLitType
 
 nType ::= nShortStringType
 nShortStringType =>

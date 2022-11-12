@@ -620,6 +620,7 @@ extern void runlibWriteI( int val );
 extern void runlibWriteBool( bool val );
 extern void runlibWriteChar( char val );
 extern void runlibWriteShortStr( char* ptr );
+extern void runlibWritePChar( char* ptr );
 extern void runlibWriteP( char* ptr );
 extern void runlibWriteEnum( int val, EnumNameTable* table );
 extern void runlibWriteCR();
@@ -2255,6 +2256,14 @@ generateCode()
           Register* paramReg1 = paramRegs[0];
           operandIntoSpecificReg( x, paramReg1, 8 );
           emitCallExtern( (char*) runlibWriteShortStr );
+          x.release();
+        }
+        break;
+      case tWritePChar : {
+          Operand x = operandStack.back();   operandStack.pop_back();
+          Register* paramReg1 = paramRegs[0];
+          operandIntoSpecificReg( x, paramReg1, 8 );
+          emitCallExtern( (char*) runlibWritePChar );
           x.release();
         }
         break;
@@ -4155,6 +4164,12 @@ runlibWriteShortStr( char* ptr )
   for ( int i = 1; i <= len; ++i ) {
     printf( "%c", ptr[i] );
   }
+}
+
+void
+runlibWritePChar( char* ptr )
+{
+  printf( "%s", ptr );
 }
 
 void

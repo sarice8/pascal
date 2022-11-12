@@ -171,6 +171,7 @@ struct instrInfo_s tCodeInstrs[] = {
   { "tWriteBool", 0 },
   { "tWriteChar", 0 },
   { "tWriteShortStr", 0 },
+  { "tWritePChar", 0 },
   { "tWriteP", 0 },
   { "tWriteEnum", 0 },
   { "tWriteCR", 0 }
@@ -669,6 +670,9 @@ walkTable()
                 printf( "%c", shortStr[i] );
               }
               }
+              continue;
+       case tWritePChar :
+              printf( "%s", (char*) stack[sp--] );
               continue;
        case tWriteP :
               printf(" <%p>", (void*) stack[sp--]);

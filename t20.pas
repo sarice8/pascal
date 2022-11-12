@@ -9,6 +9,17 @@ program t20;
   var c: char;
   var i1: integer;
 
+  procedure proc1( var s1: ShortString );
+    begin
+      writeln( 'proc1 sees ', s1 );
+    end;
+
+  procedure proc2( s1: ShortString );
+    begin
+      writeln( 'proc2 sees ', s1 );
+    end;
+
+
 begin
 
   // can a strlit be dereferenced? Yes.
@@ -25,6 +36,22 @@ begin
   p1 := 'Hello';
   c := p1[2];
   writeln( c );
+
+  // Does fpc see a null termination after assigning to PChar ??
+  for i1 := 0 to 260 do
+    write( ord( p1[i1] ), ' ' );
+  writeln;
+  s1 := 'Hello';
+
+  // p1 := s1;
+  //   -- fpc: Error: incompatible types, got ShortStr, expected PChar
+  //      Note that fpc did allow  p1 := <strlit> above
+  //      so it must differentiate between strlit and ShortString
+  p1 := @s1[1];
+  for i1 := 0 to 260 do
+    write( ord( p1[i1] ), ' ' );
+  writeln;
+
 
   a1 := 'Hello There';
   writeln( a1 );
@@ -56,5 +83,12 @@ begin
   //  -- fpc: Error, operation + not supported for types PChar and PChar
   //     This makes me think that fpc treats strlit as ShortString
   // writeln( s1 );
+
+  // Passing a strlit into a VAR shortstring parameter.  Not allowed.
+  // proc1( 'A Strlit' );
+  //   fpc: Error: variable identifier expected
+
+  // Ok to pass a strlit to a non-VAR shortstring parameter
+  proc2( 'A Strlit' );
 
 end.

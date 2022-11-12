@@ -43,6 +43,7 @@ typedef enum {
     nArrayType,
     nSubrangeType,
     nRecordType,
+    nStrLitType,
     nShortStringType,
     nEnumType,
     nSetType,
@@ -224,6 +225,7 @@ typedef enum {
 #define NewnArrayType()		NewNode(nArrayType)
 #define NewnSubrangeType()		NewNode(nSubrangeType)
 #define NewnRecordType()		NewNode(nRecordType)
+#define NewnStrLitType()		NewNode(nStrLitType)
 #define NewnShortStringType()		NewNode(nShortStringType)
 #define NewnEnumType()		NewNode(nEnumType)
 #define NewnSetType()		NewNode(nSetType)

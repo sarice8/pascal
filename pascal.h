@@ -1,4 +1,4 @@
-#define SSL_CODE_TABLE_SIZE 11400
+#define SSL_CODE_TABLE_SIZE 11500
 
 #define oJumpForward 0
 #define oJumpBack 1
@@ -171,10 +171,11 @@
 #define tWriteBool 72
 #define tWriteChar 73
 #define tWriteShortStr 74
-#define tWriteP 75
-#define tWriteEnum 76
-#define tWriteCR 77
-#define tSpace 78
+#define tWritePChar 75
+#define tWriteP 76
+#define tWriteEnum 77
+#define tWriteCR 78
+#define tSpace 79
 #define eBadStatement 0
 #define eNotConst 1
 #define eNotType 2
@@ -243,9 +244,10 @@
 #define nArrayType 35
 #define nSubrangeType 36
 #define nRecordType 37
-#define nShortStringType 38
-#define nEnumType 39
-#define nSetType 40
+#define nStrLitType 38
+#define nShortStringType 39
+#define nEnumType 40
+#define nSetType 41
 #define qINVALID 0
 #define qUnits 1
 #define qProgram 2

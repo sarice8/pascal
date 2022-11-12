@@ -210,6 +210,7 @@ output:
    tWriteBool        %  "     "    : write TRUE/FALSE, pop
    tWriteChar        %  "     "    : write char, pop
    tWriteShortStr    %  "     "    : write ShortString whose addr is on tos, pop
+   tWritePChar       %  "     "    : write a null-terminated string whose addr is on tos, pop
    tWriteP           %  "     "    : write ptr var whose addr is on tos, pop
    tWriteEnum        %  "     "    : write enum name.  Name table on tos, value under it, pop both
    tWriteCR          %  "     "    : write cr
@@ -512,6 +513,7 @@ Node    CharType
 Node    PCharType
 Node    ByteType
 Node    UniversalPointerType
+Node    StrLitType
 Node    ShortStringType
 
 % nBuiltInFunc
@@ -2139,7 +2141,7 @@ ExprAllowCF( out Label falseLabel ):
             | nBooleanType, nCharType :     .tEqualB
             | nIntegerType, nEnumType :     .tEqualI
             | nPointerType, nUniversalPointerType :    .tEqualP
-            | nShortStringType :            #eNotImplemented
+            | nShortStringType, nStrLitType :            #eNotImplemented
             | * :                           #eNotAllowed
          ]
          oTypeSPop
@@ -2156,7 +2158,7 @@ ExprAllowCF( out Label falseLabel ):
             | nBooleanType, nCharType :     .tNotEqualB
             | nIntegerType, nEnumType :     .tNotEqualI
             | nPointerType, nUniversalPointerType :    .tNotEqualP
-            | nShortStringType :            #eNotImplemented
+            | nShortStringType, nStrLitType :            #eNotImplemented
             | * :                           #eNotAllowed
          ]
          oTypeSPop
@@ -2173,7 +2175,7 @@ ExprAllowCF( out Label falseLabel ):
             | nBooleanType, nCharType :     .tLessB
             | nIntegerType, nEnumType :     .tLessI
             | nPointerType, nUniversalPointerType :   .tLessP
-            | nShortStringType :            #eNotImplemented
+            | nShortStringType, nStrLitType :            #eNotImplemented
             | * :                           #eNotAllowed
          ]
          oTypeSPop
@@ -2190,7 +2192,7 @@ ExprAllowCF( out Label falseLabel ):
             | nBooleanType, nCharType :     .tGreaterB
             | nIntegerType, nEnumType :     .tGreaterI
             | nPointerType, nUniversalPointerType :   .tGreaterP
-            | nShortStringType :            #eNotImplemented
+            | nShortStringType, nStrLitType :            #eNotImplemented
             | * :                           #eNotAllowed
          ]
          oTypeSPop
@@ -2207,7 +2209,7 @@ ExprAllowCF( out Label falseLabel ):
             | nBooleanType, nCharType :     .tLessEqualB
             | nIntegerType, nEnumType :     .tLessEqualI
             | nPointerType, nUniversalPointerType :   .tLessEqualP
-            | nShortStringType :            #eNotImplemented
+            | nShortStringType, nStrLitType :            #eNotImplemented
             | * :                           #eNotAllowed
          ]
          oTypeSPop
@@ -2224,7 +2226,7 @@ ExprAllowCF( out Label falseLabel ):
             | nBooleanType, nCharType :     .tGreaterEqualB
             | nIntegerType, nEnumType :     .tGreaterEqualI
             | nPointerType, nUniversalPointerType :   .tGreaterEqualP
-            | nShortStringType :            #eNotImplemented
+            | nShortStringType, nStrLitType :            #eNotImplemented
             | * :                           #eNotAllowed
          ]
          oTypeSPop
@@ -2374,7 +2376,7 @@ ArithExprAllowCF( out Label falseLabel ):
                @TermAllowCF( falseLabel )  % actually not allowing CF, will be caught by type check
                @PromoteToInt
                .tAddI
-            | nShortStringType, nCharType :
+            | nShortStringType, nStrLitType, nCharType :
                % String concatenation
                #eNotImplemented
             | nPointerType, nUniversalPointerType :
@@ -2455,7 +2457,7 @@ PrimaryAllowCF( out Label falseLabel ):
          .tPushAddrGlobal oEmitInt( addr )
          % TO DO: consider defining a ShortString type with the exact capacity used.
          % But, I don't think it should matter here, since nobody should be assigning to this string.
-         oTypeSPush( ShortStringType )
+         oTypeSPush( StrLitType )
          % This seems unlikely, but the strlit may be followed by
          % array indexing.  Handle this the same way we would with a variable expression (see VarExpr)
          % First, advance the pointer by index if any
@@ -2658,7 +2660,7 @@ FetchVar:
       | nFileType :   #eNotImplemented
       | nPointerType :             .tFetchP
       | nUniversalPointerType :    #eCantDereference
-      | nArrayType, nRecordType, nShortStringType :  % compound type; leave as addr
+      | nArrayType, nRecordType, nStrLitType, nShortStringType :  % compound type; leave as addr
    ];
 
 
@@ -2672,7 +2674,7 @@ LValueIndexes:
          [ oTypeSNodeType
             | nArrayType :    @ArraySubscripts
             | nPointerType :  @PointerArraySubscript
-            | nShortStringType :  @ShortStringArraySubscript
+            | nStrLitType, nShortStringType :  @ShortStringArraySubscript
             | * :             #eNotArray
          ]
       | '.' :       @RecordFieldRef
@@ -2764,7 +2766,7 @@ PointerArraySubscript:
 %
 ShortStringArraySubscript:
    [ oTypeSNodeType
-      | nShortStringType :
+      | nStrLitType, nShortStringType :
       | * :    #eCantDereference
    ]
    oTypeSPop
@@ -2844,11 +2846,24 @@ CoerceType:
             | nPointerType :
                [ nt
                   | nUniversalPointerType :  >>
+                  | nStrLitType :
+                     [ equal_node( oTypeSTop, PCharType )
+                        | true :
+                           % PChar := 'strlit' i.e. point at strlit[1]
+                           .tPushConstI  oEmitInt(1)  .tAddPI  >>
+                        | * :
+                     ]
                   | * :
                ]
             | nUniversalPointerType :
                [ nt
                   | nPointerType :  >>
+                  | * :
+               ]
+            | nShortStringType :
+               [ nt
+                  | nStrLitType :  >>
+                  | * :
                ]
             | * :
          ]
@@ -2993,9 +3008,9 @@ Call( Node method ):
                           [ oTypeSNodeType
                              | nIntegerType, nEnumType : .tAssignI
                              | nBooleanType, nByteType, nCharType :  .tAssignB
-                             | nShortStringType, nFileType :   #eNotImplemented
+                             | nFileType :   #eNotImplemented
                              | nPointerType, nUniversalPointerType :  .tAssignP
-                             | nArrayType, nRecordType :
+                             | nArrayType, nRecordType, nShortStringType :
                                  % compound types: copy value into actuals space
                                  int size = oNodeGetInt( oTypeSTop, qSize )
                                  .tCopy  oEmitInt( size )    % multi-word copy
@@ -3047,9 +3062,9 @@ Call( Node method ):
          [ oTypeSNodeType
             | nIntegerType, nEnumType :   .tPushLocalI  oEmitInt( tempOffset )
             | nBooleanType, nByteType, nCharType :   .tPushLocalB  oEmitInt( tempOffset )
-            | nShortStringType, nFileType :  #eNotImplemented
+            | nFileType :  #eNotImplemented
             | nPointerType, nUniversalPointerType :   .tPushLocalP  oEmitInt( tempOffset )
-            | nArrayType, nRecordType :   % compound type: push address
+            | nArrayType, nRecordType, nShortStringType :   % compound type: push address
                                .tPushAddrLocal  oEmitInt( tempOffset )
          ]
       | * :
@@ -3256,10 +3271,10 @@ AssignResultStmt( Node funcDecl ):
    [ oTypeSNodeType
       | nIntegerType, nEnumType : .tAssignI
       | nBooleanType, nByteType, nCharType :  .tAssignB
-      | nShortStringType, nFileType :   #eNotImplemented
+      | nFileType :   #eNotImplemented
       | nPointerType, nUniversalPointerType :  .tAssignP
       % compound var assigns; addrs of src, dest on stack
-      | nArrayType, nRecordType :
+      | nArrayType, nRecordType, nShortStringType :
           int size = oNodeGetInt( oTypeSTop, qSize )
           .tCopy  oEmitInt( size )    % multi-word copy
    ]
@@ -3505,13 +3520,18 @@ WriteStmt:
                | nBooleanType :             .tWriteBool
                | nByteType :                .tCastBtoI  .tWriteI
                | nCharType :                .tWriteChar
-               | nShortStringType :         .tWriteShortStr
+               | nShortStringType, nStrLitType :   .tWriteShortStr
                | nFileType :                #eNotImplemented
                | nEnumType :
                   % write name via table lookup
                   .tPushAddrGlobal  oEmitInt( oNodeGetInt( oTypeSTop, qNameTable ) )
                   .tWriteEnum
-               | nPointerType, nUniversalPointerType :   .tWriteP
+               | nPointerType :
+                  [ equal_node( oTypeSTop, PCharType )
+                     | true :               .tWritePChar
+                     | * :                  .tWriteP
+                  ]
+               | nUniversalPointerType :    .tWriteP
                | * :                        #eNotAllowed
             ]
             oTypeSPop
@@ -3753,6 +3773,10 @@ installBuiltIns:
    % pointer arithmetic.  It doesn't matter otherwise, because this type cannot be dereferened.
    UniversalPointerType = @newType( nUniversalPointerType, 8 )
    oNodeSet( UniversalPointerType, qBaseType, ByteType )
+   % StrLitType is stored with both a length byte and null termination, so it can be assigned to
+   % both a ShortString and a PChar.  StrLits longer than 255 characters appear truncated when
+   % referenced as a ShortString, but not when referenced as a PChar.
+   StrLitType = @newType( nStrLitType, 256 )
    % ShortString is the original Pascal string type: an array of characters, not null-terminated,
    % with the first byte recording the current length.
    % The default ShortString type has capacity for 255 characters.  The user may define

@@ -1,4 +1,4 @@
-3821
+3845
 -1
 -1
 -1
@@ -45,6 +45,7 @@
 2
 2
 2
+2
 -1
 2
 2
@@ -93,7 +94,6 @@
 2
 2
 -1
-2
 2
 2
 2
@@ -214,6 +214,7 @@
 2
 2
 2
+2
 -1
 -1
 -1
@@ -505,6 +506,7 @@
 2
 -1
 -1
+2
 2
 2
 2
@@ -2142,1152 +2144,1143 @@
 5300
 5304
 5308
-5327
-5327
-5328
+5329
+5329
+5330
 -1
-5334
 5336
-5343
+5338
 5345
-5352
-5359
+5347
+5354
 5361
 5363
 5365
-5368
-5372
-5376
-5380
-5399
-5399
-5400
+5367
+5370
+5374
+5378
+5382
+5403
+5403
+5404
 -1
-5406
-5408
-5415
-5417
-5424
-5431
-5433
+5410
+5412
+5419
+5421
+5428
 5435
 5437
-5440
+5439
+5441
 5444
 5448
 5452
-5471
-5471
-5472
--1
+5456
+5477
+5477
 5478
-5480
-5487
-5489
-5496
-5503
-5505
-5507
-5509
-5512
-5516
-5520
-5524
-5543
-5543
-5544
 -1
-5550
+5484
+5486
+5493
+5495
+5502
+5509
+5511
+5513
+5515
+5518
+5522
+5526
+5530
+5551
+5551
 5552
-5559
-5561
-5568
-5575
-5577
-5579
-5581
-5584
-5588
+-1
+5558
+5560
+5567
+5569
+5576
+5583
+5585
+5587
+5589
 5592
 5596
-5615
-5615
-5616
+5600
+5604
+5625
+5625
+5626
 -1
-5622
-5624
-5631
-5633
-5640
-5647
-5649
-5651
-5653
-5656
-5660
-5664
-5668
-5687
-5687
-5688
+5632
+5634
+5641
+5643
+5650
+5657
+5659
+5661
+5663
+5666
+5670
+5674
+5678
+5699
+5699
+5700
 -1
-5694
-5709
-5711
+5706
+5721
+5723
 -1
 -1
-5714
-5716
--1
-5722
-5729
-5729
-5731
-5733
+5726
+5728
 -1
 5734
-5744
-5750
-5755
-5755
-5763
-5765
+5741
+5741
+5743
+5745
 -1
-5772
-5782
-5788
-5793
-5793
-5801
-5810
-5810
+5746
+5756
+5762
+5767
+5767
+5775
+5777
+-1
+5784
+5794
+5800
+5805
+5805
+5813
+5822
+5822
 -1
 -1
-5811
+5823
 -1
 -1
-5819
-5825
--1
-5832
-5834
-5835
+5831
 5837
+-1
 5844
-5853
--1
-5853
-5854
--1
-5860
+5846
+5847
+5849
+5856
 5865
-5867
 -1
+5865
+5866
 -1
-5869
+5872
+5877
 5879
-5880
-5888
-5893
-5894
 -1
 -1
-5894
-5896
+5881
+5891
+5892
+5900
+5905
+5906
 -1
-5902
-5909
-5909
-5911
-5913
+-1
+5906
+5908
+-1
 5914
-5916
+5921
+5921
 5923
-5930
-5932
-5932
--1
--1
--1
--1
--1
--1
--1
--1
--1
--1
-5933
-5943
+5925
+5926
+5928
+5935
+5942
 5944
-5949
-5963
-5969
-5974
+5944
 -1
-5974
-5980
 -1
-5987
-5989
-5990
+-1
+-1
+-1
+-1
+-1
+-1
+-1
+-1
+5945
+5955
+5956
+5961
+5975
+5981
+5986
+-1
+5986
 5992
+-1
 5999
-6008
-6008
+6001
+6002
+6004
+6011
+6020
+6020
 -1
-6022
-6027
-6029
--1
-6032
 6034
-6034
-6036
+6039
+6041
 -1
-6042
-6049
-6051
+6044
+6046
+6046
+6048
 -1
-6052
-6057
+6054
+6061
+6063
 -1
-6065
--1
-6073
--1
--1
-6075
+6064
+6069
 -1
 6077
-6086
 -1
-6086
-6091
+6085
+-1
+-1
+6087
+-1
+6089
 6098
 -1
-6099
-6101
-6108
-6108
+6098
+6103
 6110
-6112
+-1
+6111
 6113
-6115
+6120
+6120
 6122
 6124
-6126
+6125
+6127
+6134
+6136
+6138
 -1
-6128
-6130
-6132
+6140
+6142
 6144
-6157
-6164
-6166
+6156
+6169
 6176
-6177
-6185
-6187
-6192
-6192
-6194
-6209
-6211
+6178
+6188
+6189
+6197
+6199
+6204
+6204
+6206
+6223
+6225
 -1
-6211
+6225
 -1
 -1
-6213
-6215
-6222
-6224
-6226
-6233
-6235
--1
+6227
+6229
+6236
 6238
 6240
 6247
-6247
 6249
-6251
-6258
-6260
-6262
-6264
-6266
-6273
-6275
-6277
-6284
-6286
 -1
+6252
+6254
+6261
+6261
+6263
+6265
+6272
+6274
+6276
+6278
+6280
+6287
 6289
 6291
-6291
-6293
--1
+6298
 6300
-6302
-6304
 -1
-6311
-6313
-6315
-6322
+6303
+6305
+6305
+6307
+-1
+6314
+6316
+6318
+-1
+6325
+6327
 6329
+6336
+6343
 -1
-6330
-6332
-6332
-6334
-6341
+6344
+6346
+6346
+6348
+6355
 -1
-6347
-6349
-6356
+6361
+6363
+6370
 -1
-6362
-6364
-6371
+6376
+6378
+6385
 -1
-6373
-6375
-6384
--1
--1
-6392
--1
--1
--1
+6387
+6389
 6398
 -1
-6400
 -1
-6402
-6404
-6409
-6416
+6406
+-1
+-1
+-1
+6412
+-1
+6414
 -1
 6416
+6418
 6423
-6424
+6430
 -1
-6431
-6433
+6430
+6437
+6438
 -1
-6440
-6442
-6455
-6461
-6463
-6464
-6473
-6482
-6484
+6445
+6447
 -1
-6484
-6486
+6454
+6456
+6469
+6475
+6477
+6478
+6487
+6496
+6498
 -1
-6493
-6512
-6514
-6520
+6498
+6500
 -1
-6520
-6522
+6507
+6526
+6528
+6534
 -1
-6524
-6529
+6534
 6536
 -1
--1
--1
-6536
--1
--1
--1
-6546
-6551
-6552
-6563
--1
-6569
-6584
-6586
-6592
+6538
+6543
+6550
 -1
 -1
 -1
+6550
 -1
 -1
 -1
-6593
-6595
+6560
+6565
+6566
+6577
 -1
-6608
+6583
+6598
+6600
+6606
 -1
-6619
-6625
-6627
-6628
-6635
-6645
-6647
-6654
-6664
-6684
-6684
-6686
-6696
-6697
-6704
-6714
-6734
-6734
-6736
-6741
+-1
+-1
+-1
+-1
+-1
+6607
+6609
+-1
+6622
+-1
+6633
+6639
+6641
+6642
+6649
+6659
+6661
+6668
+6678
+6698
+6698
+6700
+6710
+6711
+6718
+6728
 6748
-6758
-6778
-6778
-6778
--1
-6790
+6748
+6750
+6755
+6762
+6772
 6792
-6799
-6809
-6811
-6818
-6828
-6848
-6848
-6850
-6860
-6861
-6868
-6878
-6898
-6898
-6900
-6905
-6912
-6922
-6942
-6942
-6942
+6792
+6792
 -1
-6954
+6804
+6806
+6813
+6823
+6825
+6832
+6842
+6862
+6862
+6864
+6874
+6875
+6882
+6892
+6912
+6912
+6914
+6919
+6926
+6936
+6956
+6956
 6956
 -1
-6958
-6960
-6967
-6977
-6979
-6986
-6996
-7016
-7016
-7018
-7028
-7029
-7036
-7046
-7066
-7066
-7068
-7073
+6968
+6970
+-1
+6972
+6974
+6981
+6991
+6993
+7000
+7010
+7030
+7030
+7032
+7042
+7043
+7050
+7060
 7080
-7090
-7110
-7110
-7110
-7122
-7122
+7080
+7082
+7087
+7094
+7104
 7124
-7125
+7124
+7124
+7136
+7136
 7138
-7140
-7142
-7144
+7139
+7152
+7154
+7156
+7158
 -1
-7146
-7148
-7150
-7157
+7160
+7162
+7164
+7171
 -1
-7157
+7171
 -1
 -1
-7159
-7166
-7176
-7178
-7185
-7195
-7215
-7215
-7217
-7227
-7228
-7235
-7245
-7265
-7265
-7270
-7277
-7287
-7307
-7307
-7307
--1
-7319
--1
+7173
+7180
+7190
+7192
+7199
+7209
+7229
+7229
+7231
+7241
+7242
+7249
+7259
+7279
+7279
+7284
+7291
+7301
 7321
-7323
+7321
+7321
+-1
+7333
+-1
+7335
+7337
 -1
 -1
 -1
 -1
 -1
 -1
-7350
-7352
-7354
-7357
-7361
-7365
-7369
-7373
+7364
+7366
+7368
+7371
 7375
+7379
+7383
+7387
+7389
 -1
 -1
 -1
 -1
 -1
 -1
-7402
-7404
-7404
-7406
-7408
-7411
-7415
-7419
-7430
-7430
-7434
--1
--1
-7438
-7449
--1
+7418
+7420
+7420
+7422
+7424
+7427
+7431
+7435
+7448
+7448
 7452
-7454
+-1
+-1
 7456
-7457
-7464
-7464
-7464
-7466
 7467
+-1
+7470
+7472
 7474
+7475
+7482
+7482
+7482
+7484
+7485
+7492
 -1
 -1
-7474
+7492
 -1
 -1
-7491
-7491
-7503
-7504
--1
-7510
-7512
--1
-7514
+7509
+7509
 7521
 7522
+-1
+7528
+7530
+-1
 7532
-7537
--1
--1
-7537
+7539
+7540
 7550
-7560
-7561
-7571
-7576
+7555
 -1
 -1
-7576
+7555
+7568
 7578
-7578
-7582
-7584
-7592
+7579
+7589
+7594
 -1
 -1
--1
--1
--1
--1
--1
--1
-7595
-7597
-7599
+7594
+7596
+7596
 7600
-7607
+7602
+7610
 -1
-7607
-7619
-7620
 -1
-7626
-7628
 -1
-7630
-7643
-7653
-7654
-7664
-7669
 -1
-7669
+-1
+-1
+-1
+-1
+7613
+7615
+7617
+7618
+7625
+-1
+7625
+7637
+7638
+-1
+7644
+7646
+-1
+7648
+7661
 7671
--1
--1
--1
--1
--1
--1
-7674
-7676
-7678
-7679
-7686
-7686
+7672
+7682
 7687
-7693
-7695
+-1
+7687
+7689
+-1
+-1
+-1
+-1
+-1
+-1
+7692
+7694
+7696
 7697
-7699
--1
--1
-7702
-7704
+7706
 7706
 7707
-7714
-7714
+7713
+7715
+7717
+7719
+-1
+-1
+7722
+7724
 7726
-7728
+7727
+7734
+7734
+7746
+7748
 -1
 -1
-7733
-7740
-7741
-7748
-7748
-7749
-7762
+7753
+7760
+7761
+7768
+7768
 7769
-7770
-7780
-7785
--1
--1
-7785
-7786
+7782
+7789
+7790
 7800
--1
--1
--1
--1
-7800
-7802
-7804
 7805
-7809
-7818
-7818
+-1
+-1
+7805
+7806
+7820
+-1
+-1
+-1
 -1
 7820
+7822
+7824
 7825
-7826
-7840
--1
--1
--1
--1
--1
--1
+7829
+7838
+7838
 -1
 7840
-7842
-7847
-7848
-7857
--1
-7858
+7845
+7846
 7860
-7861
-7864
+-1
+-1
+-1
+-1
+-1
+-1
+-1
+7860
+7862
+7867
 7868
-7873
-7873
-7875
+7877
+-1
 7878
-7882
-7887
-7887
-7889
-7892
-7894
-7899
-7899
-7901
-7904
-7906
+7880
+7881
+7884
+7888
+7893
+7893
+7895
+7898
+7902
+7907
+7907
+7909
 7912
-7923
-7923
+7914
+7916
 7925
-7930
 -1
--1
--1
--1
-7931
--1
-7933
-7933
-7946
+7926
+7937
+7942
+7942
+7949
+7949
+7951
+7954
 7956
-7957
-7978
-7980
-7990
-7998
-8014
+7961
+7961
+7963
+7966
+7968
+7973
+7973
+7986
+7986
+7988
+7993
+-1
+-1
+-1
+-1
+7994
+-1
+7996
+7996
+8009
+8019
+8020
+8041
+8043
+8053
+8061
+8077
 -1
 -1
 -1
 -1
 -1
 -1
-8014
+8077
 -1
 -1
 -1
-8016
-8026
-8027
-8037
--1
-8038
-8045
-8050
-8050
-8055
-8055
--1
--1
--1
--1
--1
--1
--1
--1
--1
--1
--1
-8067
--1
--1
--1
--1
-8080
-8080
--1
-8080
--1
-8097
+8079
+8089
+8090
 8100
+-1
 8101
-8114
+8108
+8113
+8113
+8118
+8118
 -1
 -1
-8124
-8129
 -1
 -1
-8129
-8142
-8155
-8158
-8167
+-1
+-1
+-1
+-1
+-1
+-1
+-1
+8130
+-1
+-1
+-1
+-1
+8143
+8143
+-1
+8143
+-1
+8160
+8163
+8164
 8177
 -1
 -1
+8187
+8192
 -1
 -1
--1
--1
--1
--1
--1
--1
--1
--1
--1
--1
-8185
-8200
-8201
-8209
-8228
+8192
+8205
+8218
+8221
 8230
-8235
+8240
 -1
 -1
-8235
+-1
+-1
+-1
+-1
+-1
+-1
+-1
+-1
+-1
+-1
+-1
+-1
 8248
-8258
-8258
--1
-8260
-8260
-8267
-8270
-8275
--1
-8275
+8263
+8264
+8272
+8291
+8293
+8298
 -1
 -1
-8288
-8296
+8298
+8311
+8321
+8321
 -1
-8309
-8319
+8323
+8323
+8330
+8333
+8338
+-1
+8338
 -1
 -1
+8351
+8359
 -1
-8320
--1
--1
--1
--1
--1
--1
-8327
--1
-8329
--1
-8331
-8335
+8372
+8382
 -1
 -1
 -1
-8337
-8339
-8342
-8346
-8350
-8354
+8383
 -1
-8356
-8368
-8376
+-1
+-1
+-1
+-1
+-1
+8390
+-1
+8392
+-1
+8394
+8398
+-1
+-1
+-1
+8400
 8402
-8410
--1
-8411
+8405
+8409
+8413
 8417
-8427
-8434
-8437
+-1
+8419
+8431
 8439
--1
-8447
-8449
--1
-8451
--1
-8453
-8458
--1
-8458
 8465
-8468
 8473
 -1
-8473
-8476
--1
-8477
-8492
+8474
+8480
+8490
+8497
 8500
 8502
-8507
 -1
-8507
 8510
-8511
-8520
-8522
+8512
+-1
+8514
+-1
+8516
+8521
+-1
+8521
+8528
 8531
+8536
 -1
+8536
 8539
-8542
 -1
-8543
--1
-8549
-8551
-8560
+8540
+8555
+8563
+8565
 8570
+-1
+8570
+8573
 8574
-8584
-8586
+8583
+8585
 8594
-8620
-8625
 -1
-8625
-8634
+8602
+8605
 -1
+8606
 -1
--1
--1
--1
--1
-8634
--1
--1
-8636
-8646
--1
--1
+8612
+8614
+8623
+8633
+8637
 8647
 8649
-8651
-8653
-8654
-8658
-8673
-8673
-8674
-8680
-8682
+8657
 8683
 8688
 -1
--1
 8688
-8698
+8697
+-1
+-1
+-1
+-1
+-1
+-1
+8697
 -1
 -1
 8699
-8701
-8703
-8705
-8708
+8709
+-1
+-1
 8710
-8719
-8719
-8720
-8726
-8728
-8729
-8734
--1
--1
-8734
-8744
--1
--1
+8712
+8714
+8716
+8717
+8721
+8736
+8736
+8737
+8743
 8745
-8747
-8749
+8746
 8751
 -1
 -1
-8752
+8751
 8761
+-1
+-1
+8762
 8764
-8769
-8769
-8776
-8776
-8778
-8780
-8781
-8786
--1
--1
-8786
-8796
+8766
+8768
+8771
+8773
+8782
+8782
+8783
+8789
+8791
+8792
+8797
 -1
 -1
 8797
-8799
-8801
-8803
+8807
 -1
 -1
-8804
-8813
-8816
-8821
-8821
-8828
-8828
-8830
+8808
+8810
+8812
+8814
+-1
+-1
+8815
+8824
+8827
 8832
-8833
-8838
--1
-8838
-8841
--1
--1
--1
--1
+8832
+8839
+8839
 8841
 8843
-8843
-8847
-8851
-8855
+8844
+8849
+-1
+-1
+8849
 8859
-8863
+-1
+-1
+8860
+8862
+8864
+8866
+-1
+-1
 8867
-8871
-8875
+8876
 8879
-8883
-8887
+8884
+8884
 8891
+8891
+8893
 8895
-8897
-8898
-8900
-8931
+8896
+8901
+-1
+8901
+8904
 -1
 -1
-8932
+-1
+-1
+8904
+8906
+8906
+8910
+8914
+8918
+8922
+8926
+8930
 8934
-8939
+8938
+8942
 8946
-8953
+8950
+8954
+8958
+8960
 8961
 8963
-8972
-8981
-8990
-9007
+8994
 -1
 -1
--1
--1
-9008
-9010
-9020
-9023
-9028
-9028
-9043
-9055
-9058
--1
--1
--1
--1
-9058
--1
-9060
+8995
+8997
+9002
+9009
+9016
+9024
+9026
+9035
+9044
+9053
 9070
-9072
-9074
-9076
-9079
 -1
 -1
 -1
 -1
--1
--1
--1
-9079
-9081
+9071
+9073
 9083
 9086
-9090
-9094
+9091
+9091
+9106
+9118
+9121
 -1
-9098
 -1
 -1
-9100
-9112
-9120
+-1
+9121
+-1
+9123
+9133
+9135
+9137
+9139
+9142
+-1
+-1
+-1
+-1
+-1
+-1
+-1
+9142
+9144
 9146
-9148
+9149
+9153
+9157
+-1
+9161
+-1
+-1
+9163
+9175
+9183
+9209
+9211
 -1
 -1
 -1
 -1
-9148
+9211
 -1
-9150
-9166
-9169
-9174
--1
--1
-9174
-9189
--1
-9202
-9204
-9206
-9208
-9210
 9213
-9217
-9221
+9229
+9232
+9237
 -1
-9225
-9227
-9239
-9247
+-1
+9237
+9252
+-1
+9265
+9267
+9269
+9271
 9273
-9275
--1
--1
--1
--1
--1
--1
--1
--1
--1
--1
-9275
--1
--1
-9277
-9279
+9276
+9280
 9284
-9291
-9298
-9299
-9312
-9312
-9323
+-1
+9288
+9290
+9302
+9310
+9336
+9338
 -1
 -1
 -1
@@ -3295,814 +3288,846 @@
 -1
 -1
 -1
-9323
-9325
-9332
+-1
+-1
+-1
+9338
+-1
+-1
+9340
 9342
-9353
-9355
-9365
-9366
+9347
+9354
+9361
+9362
 9375
-9389
-9389
-9391
-9394
-9404
-9411
-9411
-9424
--1
-9424
-9437
-9440
+9375
+9386
 -1
 -1
-9440
-9442
+-1
+-1
+-1
+-1
+-1
+9386
+9388
+9395
+9405
+9416
+9418
+9428
+9429
+9438
+9452
 9452
 9454
-9461
-9462
-9464
--1
+9457
 9467
-9469
-9479
-9481
-9488
-9489
-9491
+9474
+9474
+9487
+-1
+9487
+9500
+9503
 -1
 -1
-9494
-9496
--1
-9502
-9509
-9511
-9513
-9513
+9503
+9505
 9515
+9517
+9524
+9525
+9527
 -1
-9520
-9528
-9536
-9538
--1
-9546
+9530
+9532
+9542
+9544
 9551
+9552
+9554
+-1
+-1
+9557
 9559
 -1
--1
-9560
-9562
--1
-9564
--1
--1
--1
--1
-9569
-9579
--1
-9581
+9565
+9572
+9574
+9576
+9576
+9578
 -1
 9583
-9585
-9587
--1
-9589
--1
-9594
+9591
 9599
+9601
 -1
-9607
-9612
-9620
-9620
+9609
+9614
 9622
-9629
-9637
-9645
-9647
-9649
-9651
-9659
-9661
-9668
-9676
-9684
-9686
-9688
-9690
-9698
-9706
-9715
-9717
-9719
-9727
-9735
 -1
 -1
-9737
+9623
+9625
+-1
+9627
+-1
+-1
+-1
+-1
+9632
+9642
+-1
+9644
+-1
+9646
+9648
+9650
+-1
+9652
+-1
+9657
+9662
+-1
+9670
+9675
+9683
+9683
+9685
+9692
+9700
+9708
+9710
+9712
+9714
+9722
+9724
+9731
 9739
-9744
+9747
+9749
+9751
+9753
+9761
+9769
+9778
+9780
+9782
+9790
+9798
 -1
-9752
 -1
-9757
-9766
-9768
-9768
-9770
-9772
-9774
-9774
-9781
-9795
-9797
+9800
+9802
 9807
+-1
 9815
 -1
--1
-9817
-9819
-9824
--1
-9832
-9832
--1
-9839
-9848
-9850
-9852
+9820
+9829
+9831
+9831
+9833
+9835
+9837
+9837
+9844
+9858
 9860
-9868
--1
--1
 9870
-9872
-9881
-9882
-9884
-9886
-9893
+9878
 -1
+-1
+9880
+9882
+9887
+-1
+9895
+9895
 -1
 9902
-9904
+9911
 9913
-9914
-9916
-9918
-9925
+9915
+9923
+9931
 -1
 -1
-9934
-9936
-9936
-9938
--1
-9940
-9941
--1
--1
--1
--1
--1
--1
--1
--1
--1
--1
--1
+9933
+9935
+9944
+9945
+9947
 9949
-9958
-9970
-9986
+9956
 -1
 -1
-9986
+9965
+9967
+9976
+9977
+9979
+9981
 9988
-9990
-9990
-9994
-9998
 -1
 -1
-10009
-10011
-10013
+9997
+9999
+9999
+10001
+-1
+10003
+10004
 -1
 -1
-10016
-10018
-10018
-10020
-10020
-10022
-10024
-10027
-10031
-10037
-10041
-10045
+-1
+-1
+-1
+-1
+-1
+-1
+-1
+-1
+-1
+10012
+10021
+10033
 10049
 -1
+-1
+10049
 10051
-10065
-10067
-10071
+10053
+10053
+10057
+10061
+-1
+-1
+10072
+10074
+10076
+-1
+-1
+10079
+10081
+10081
+10083
+10083
+10085
+10087
+10090
 10094
-10094
-10095
-10095
-10099
-10101
-10109
-10111
-10116
+10100
+10104
+10108
+10112
 -1
--1
-10117
--1
-10120
--1
-10120
--1
-10123
--1
--1
--1
--1
--1
-10123
-10125
--1
--1
--1
-10135
-10137
--1
--1
--1
--1
+10114
+10128
+10130
+10132
+10141
+10144
+10151
+10151
 10155
-10157
--1
--1
--1
--1
--1
-10173
-10175
+10180
 10180
 10181
-10190
--1
-10191
-10193
-10194
+10181
+10185
+10187
+10195
 10197
-10199
-10204
-10204
+10202
+-1
+-1
+10203
+-1
 10206
+-1
+10206
+-1
+10209
+-1
+-1
+-1
+-1
+-1
 10209
 10211
-10216
-10216
+-1
+-1
+-1
+10221
 10223
-10223
-10225
-10230
 -1
 -1
 -1
 -1
--1
-10231
-10233
-10235
-10236
-10243
+10241
 10243
 -1
-10245
-10247
-10249
-10250
-10257
 -1
 -1
 -1
 -1
--1
--1
-10258
-10260
-10262
-10263
+10259
+10261
+10266
 10267
 10276
-10276
 -1
--1
--1
--1
--1
-10278
+10277
+10279
 10280
-10282
 10283
-10287
-10288
-10294
-10303
--1
--1
--1
--1
--1
-10304
-10306
-10308
+10285
+10290
+10290
+10292
+10295
+10297
+10302
+10302
+10309
+10309
 10311
-10312
-10318
-10323
+10316
 -1
 -1
 -1
 -1
-10324
-10326
-10328
+-1
+10317
+10319
+10321
+10322
 10329
-10336
-10336
+10329
 -1
-10338
-10340
-10342
+10331
+10333
+10335
+10336
 10343
-10350
 -1
 -1
 -1
 -1
-10351
+-1
+-1
+10344
+10346
+10348
+10349
 10353
-10363
-10375
-10381
-10385
+10362
+10362
 -1
 -1
 -1
 -1
 -1
-10385
-10387
+10364
+10366
+10368
+10369
+10373
+10374
+10380
+10389
+-1
+-1
+-1
+-1
+-1
+10390
+10392
+10394
 10397
+10398
+10404
 10409
-10413
 -1
 -1
 -1
 -1
--1
-10413
+10410
+10412
+10414
 10415
+10422
+10422
+-1
+10424
+10426
 10428
-10435
+10429
 10436
-10446
-10458
-10470
-10476
-10488
-10493
-10493
 -1
 -1
 -1
 -1
-10497
+10437
+10439
+10449
+10461
+10467
+10471
+-1
+-1
+-1
+-1
+-1
+10471
+10473
+10483
+10495
 10499
-10506
-10509
+-1
+-1
+-1
+-1
+-1
+10499
+10501
 10514
-10519
 10521
-10534
-10551
-10561
-10573
-10588
-10591
+10522
+10532
+10544
+10556
+10562
+10574
+10579
+10579
 -1
 -1
 -1
 -1
+10583
+10585
 10592
-10594
-10601
-10604
-10609
-10614
-10616
-10629
-10646
-10656
-10668
-10683
-10686
+10595
+10600
+10605
+10607
+10620
+10637
+10647
+10659
+10674
+10677
 -1
 -1
 -1
 -1
--1
--1
--1
+10678
+10680
 10687
-10689
+10690
+10695
+10700
+10702
+10715
+10732
+10742
+10754
+10769
+10772
 -1
 -1
-10703
-10705
-10719
-10725
--1
--1
-10729
 -1
 -1
 -1
-10731
 -1
 -1
-10736
-10750
-10764
-10778
-10792
-10806
+10773
+10775
+-1
+-1
+10789
+10791
+10805
+10811
+-1
+-1
+10815
+-1
+-1
+-1
 10817
 -1
 -1
-10831
-10845
+10822
+10836
+10850
+10864
+10878
+10892
+10903
+-1
+-1
+10917
+10931
+-1
+-1
+-1
+10943
 -1
 -1
 -1
 -1
 -1
-10857
-10871
+10957
+10971
 -1
 -1
 -1
 -1
-10883
+10983
 -1
-10883
-10896
-10908
+10983
+10996
+11008
 -1
-10914
-10927
-10939
+11014
+11027
+11039
 -1
-10945
-10958
-10970
+11045
+11058
+11070
 -1
-10976
-10989
-11001
+11076
+11089
+11101
 -1
-11007
-11020
-11032
+11107
+11120
+11132
 -1
-11038
-11051
-11063
+11138
+11151
+11163
 -1
-11069
-11082
-11094
--1
--1
--1
-11100
-11113
-11125
-11137
--1
-11143
-11156
-11168
-11180
+11169
+11182
+11194
 -1
 -1
+-1
+11200
+11213
+11225
+11237
+-1
+11243
+11256
+11268
+11280
 -1
 -1
 -1
 -1
-11186
-11196
-11206
-11216
-11227
 -1
-11227
+-1
+11286
+11296
+11306
+11316
+11327
+-1
+11327
 -1
 28 int nType
 29 token nType
-210 node_type nType
-252 node_attribute nType
-297 Node nType
-299 NodeIter nType
-301 NodeVec nType
-303 boolean nType
-306 typ nType
-318 Label nType
-320 Code nType
-323 String nType
-325 AllocMode nType
-713 workspace nGlobal 297 1
-714 globalScope nGlobal 297 2
-715 initScope nGlobal 297 3
-716 mysystemId nGlobal 28 4
-717 FileType nGlobal 297 5
-718 IntegerType nGlobal 297 6
-719 BooleanType nGlobal 297 7
-720 BooleanCFType nGlobal 297 8
-721 CharType nGlobal 297 9
-722 PCharType nGlobal 297 10
-723 ByteType nGlobal 297 11
-724 UniversalPointerType nGlobal 297 12
-725 ShortStringType nGlobal 297 13
-726 BuiltIn_Ord nGlobal 297 14
-727 BuiltIn_Chr nGlobal 297 15
-728 BuiltIn_Pred nGlobal 297 16
-729 BuiltIn_Succ nGlobal 297 17
-730 Block nRule 1435
-732 varNodeType nInParam 210 2
-733 labelForBody nInParam 318 1
-735 BlockDecls nRule 1459
-737 varNodeType nInParam 210 1
-738 BlockStmt nRule 1780
-740 labelForBody nInParam 318 3
-741 varScope nInParam 297 2
-743 isMain nInParam 303 1
-1141 patchLS nLocal 28 1
-1144 initCode nLocal 320 2
-1148 localSpace nLocal 28 3
-744 VarDecl nRule 3664
-746 varNodeType nInParam 210 1
-747 newType nRule 10351
-749 nt nInParam 210 2
-750 size nInParam 28 1
-1899 node nLocal 297 1
-752 newIdent nRule 10385
-754 nt nInParam 210 2
-755 id nInParam 28 1
-1901 t nLocal 297 1
-757 EmitValue nRule 10687
-759 decl nInParam 297 1
-760 TypeRef nRule 3963
-762 resultType nOutParam 297 1
-763 EnumTypeRef nRule 4458
-765 resultType nOutParam 297 1
-1366 value nLocal 28 1
-1367 numValues nLocal 28 2
-1369 first nLocal 303 3
-1370 outerScope nLocal 297 4
-1386 size nLocal 28 8
-1387 addr nLocal 28 9
-1388 it nLocal 299 10
-766 PointerTypeTo nRule 10413
-768 theType nInParam 297 1
-1903 ptrType nLocal 297 1
-769 OrdinalLow nRule 10497
-771 theType nInParam 297 1
-772 OrdinalHigh nRule 10592
-774 theType nInParam 297 1
-775 AssignStmt nRule 9058
-777 decl nInParam 297 1
-778 BooleanExprControlFlow nRule 5115
-780 falseLabel nOutParam 318 1
-781 ExprAllowCF nRule 5253
-783 falseLabel nOutParam 318 1
-784 BoolExprAllowCF nRule 5714
-786 falseLabel nOutParam 318 1
-1453 trueLabel nLocal 318 1
-787 BoolTermAllowCF nRule 5894
-789 falseLabel nOutParam 318 1
-1470 overallFalseLabel nLocal 318 1
-790 BoolFactorAllowCF nRule 6032
-792 falseLabel nOutParam 318 1
-793 ArithExprAllowCF nRule 6099
-795 falseLabel nOutParam 318 1
-796 TermAllowCF nRule 6238
-798 falseLabel nOutParam 318 1
-799 FactorAllowCF nRule 6289
-801 falseLabel nOutParam 318 1
-802 PrimaryAllowCF nRule 6330
-804 falseLabel nOutParam 318 1
-805 VarExpr nRule 6593
-807 decl nInParam 297 1
-1537 theType nLocal 297 1
-1538 uplevels nLocal 28 2
-808 LValueVar nRule 9323
-810 decl nInParam 297 2
-811 writeable nInParam 303 1
-813 IncVar nRule 9440
-815 decl nInParam 297 1
-816 DecVar nRule 9467
-818 decl nInParam 297 1
-819 CFToVal nRule 5153
-821 falseLabel nInOutParam 318 1
-822 ValToCF nRule 5222
-824 falseLabel nOutParam 318 1
-825 DeclLevel nRule 10135
-827 decl nInParam 297 1
-828 DeclUpLevels nRule 10155
-830 decl nInParam 297 1
-831 Program nRule 2
-1008 t nLocal 297 1
-1009 rootScope nLocal 297 2
-1011 mainLabel nLocal 318 3
-1012 program nLocal 297 4
-1017 isMain nLocal 303 5
-833 UsesClause nRule 306
-835 user nInParam 297 1
-836 UsesMySystem nRule 333
-838 user nInParam 297 1
-839 Uses nRule 370
-841 id nInParam 28 2
-842 user nInParam 297 1
-1026 unit nLocal 297 1
-844 ResolveUnitRef nRule 466
-846 decl nInOutParam 297 1
-847 EnterUsedUnits nRule 509
-849 user nInParam 297 1
-1035 unitIt nLocal 299 1
-850 EndUsedUnits nRule 571
-852 user nInParam 297 1
-1041 unitIt nLocal 299 1
-853 FindOrCompileUnit nRule 650
-855 id nInParam 28 1
-1049 unit nLocal 297 1
-1052 ok nLocal 303 2
-856 Unit nRule 725
-1057 unit nLocal 297 1
-1058 unitImpl nLocal 297 2
-858 UnitInterface nRule 1060
-860 unit nInParam 297 1
-861 UnitImplementation nRule 1145
-863 unit nInParam 297 1
-864 UnitInitialization nRule 1155
-866 unit nInParam 297 2
-867 hasStmts nInParam 303 1
-1084 label nLocal 318 1
-1085 patchLS nLocal 28 2
-1087 scope nLocal 297 3
-1088 initCode nLocal 320 4
-1094 localSpace nLocal 28 5
-869 UnitFinalization nRule 1341
-871 unit nInParam 297 2
-872 hasStmts nInParam 303 1
-1096 label nLocal 318 1
-1097 patchLS nLocal 28 2
-1104 localSpace nLocal 28 3
-874 CheckForUndefinedMethods nRule 1512
-876 CheckForUndefinedLabels nRule 1515
-1117 it nLocal 299 1
-878 InitializeUnits nRule 1610
-1129 it nLocal 299 1
-880 FinalizeUnits nRule 1695
-1135 it nLocal 299 1
-882 MethodModifiers nRule 1878
-884 decl nInParam 297 1
-885 GetOrCreateInitCode nRule 1906
-887 scope nInParam 297 1
-1154 initCode nLocal 320 1
-888 ExternalDecl nRule 1958
-890 decl nInParam 297 1
-891 ProcHeaderDecl nRule 2020
-1165 redeclaring nLocal 303 1
-1166 decl nLocal 297 2
-1176 level nLocal 28 3
-1177 nested nLocal 303 4
-1178 paramScope nLocal 297 5
-893 ProcDecl nRule 2276
-1185 decl nLocal 297 1
-895 FuncHeaderDecl nRule 2394
-1194 redeclaring nLocal 303 1
-1195 decl nLocal 297 2
-1203 level nLocal 28 3
-1204 nested nLocal 303 4
-1205 paramScope nLocal 297 5
-1209 theType nLocal 297 7
-1210 ptrType nLocal 297 8
-897 FuncDecl nRule 2711
-1214 decl nLocal 297 1
-899 FormalArgDecl nRule 2829
-901 ConstDecl nRule 3053
-903 UntypedConstDecl nRule 3078
-1252 decl nLocal 297 1
-1253 val nLocal 28 2
-905 TypedConstDecl nRule 3136
-1256 decl nLocal 297 1
-1257 theType nLocal 297 2
-907 TypedConstInit nRule 3302
-909 theType nInParam 297 2
-910 addr nInParam 28 1
-912 TypeDecl nRule 3608
-914 LabelDecl nRule 3898
-916 ConstExpr nRule 5019
-918 Expr nRule 5092
-1401 falseLabel nLocal 318 1
-920 FetchVar nRule 7350
-922 LValueIndexes nRule 7402
-924 ArraySubscripts nRule 7452
-926 PointerArraySubscript nRule 7595
-1628 baseType nLocal 297 1
-1629 size nLocal 28 2
-928 ShortStringArraySubscript nRule 7674
-930 RecordFieldRef nRule 7702
-1639 field nLocal 297 1
-1642 offset nLocal 28 2
-932 PointerDeref nRule 7800
-1650 theType nLocal 297 1
-934 CoerceType nRule 7840
-1652 nt nLocal 210 1
-936 DefineExternLabel nRule 7931
-938 method nInParam 297 1
-1668 strAddr nLocal 28 1
-1669 externalName nLocal 323 2
-939 Call nRule 8014
-941 method nInParam 297 1
-1678 cdecl nLocal 303 1
-1679 resultType nLocal 297 2
-1681 tempOffset nLocal 28 3
-1682 isFunc nLocal 303 4
-1685 paramScope nLocal 297 5
-1686 actualsSize nLocal 28 6
-1691 paramIter nLocal 299 7
-1692 param nLocal 297 8
-942 CallBuiltInFunc nRule 8634
-944 method nInParam 297 1
-945 Statement nRule 8841
-947 LabelOrAssignOrCallStmt nRule 8932
-1762 decl nLocal 297 1
-949 LabelDefinition nRule 9008
-951 decl nInParam 297 1
-952 Assign nRule 9079
-954 AssignResultStmt nRule 9148
-956 funcDecl nInParam 297 1
-957 LValueExpr nRule 9275
-959 writeable nInParam 303 1
-1789 decl nLocal 297 1
-960 IfStmt nRule 9494
-1805 falseLabel nLocal 318 1
-962 ForStmt nRule 9560
-1810 decl nLocal 297 1
-1811 breakLabel nLocal 318 2
-1813 checkLabel nLocal 318 3
-1814 continueLabel nLocal 318 4
-964 RepeatStmt nRule 9737
-1818 continueLabel nLocal 318 1
-1819 breakLabel nLocal 318 2
-966 WhileStmt nRule 9817
-1826 continueLabel nLocal 318 1
-1827 breakLabel nLocal 318 2
-968 ContinueStmt nRule 9870
-970 BreakStmt nRule 9902
-972 GotoStmt nRule 9934
-1838 decl nLocal 297 1
-974 BeginStmt nRule 9986
-976 WritelnStmt nRule 10009
-978 WriteStmt nRule 10016
-980 ReadlnStmt nRule 10117
-982 ReadStmt nRule 10120
-984 ScopeLevel nRule 10123
-986 MatchTypes nRule 10173
-1865 nt nLocal 210 1
-988 RequireIntPop nRule 10231
-990 RequireInt nRule 10245
-992 PromoteToIntPop nRule 10258
-994 PromoteToInt nRule 10278
-996 PromoteToIntOptional nRule 10304
-998 RequireBoolPop nRule 10324
-1000 RequireBool nRule 10338
-1002 DeclareBuiltInFunc nRule 10703
-1004 id nInParam 28 1
-1928 decl nLocal 297 1
-1005 installBuiltIns nRule 10729
-1930 t nLocal 297 1
+211 node_type nType
+254 node_attribute nType
+299 Node nType
+301 NodeIter nType
+303 NodeVec nType
+305 boolean nType
+308 typ nType
+320 Label nType
+322 Code nType
+325 String nType
+327 AllocMode nType
+715 workspace nGlobal 299 1
+716 globalScope nGlobal 299 2
+717 initScope nGlobal 299 3
+718 mysystemId nGlobal 28 4
+719 FileType nGlobal 299 5
+720 IntegerType nGlobal 299 6
+721 BooleanType nGlobal 299 7
+722 BooleanCFType nGlobal 299 8
+723 CharType nGlobal 299 9
+724 PCharType nGlobal 299 10
+725 ByteType nGlobal 299 11
+726 UniversalPointerType nGlobal 299 12
+727 StrLitType nGlobal 299 13
+728 ShortStringType nGlobal 299 14
+729 BuiltIn_Ord nGlobal 299 15
+730 BuiltIn_Chr nGlobal 299 16
+731 BuiltIn_Pred nGlobal 299 17
+732 BuiltIn_Succ nGlobal 299 18
+733 Block nRule 1435
+735 varNodeType nInParam 211 2
+736 labelForBody nInParam 320 1
+738 BlockDecls nRule 1459
+740 varNodeType nInParam 211 1
+741 BlockStmt nRule 1780
+743 labelForBody nInParam 320 3
+744 varScope nInParam 299 2
+746 isMain nInParam 305 1
+1144 patchLS nLocal 28 1
+1147 initCode nLocal 322 2
+1151 localSpace nLocal 28 3
+747 VarDecl nRule 3664
+749 varNodeType nInParam 211 1
+750 newType nRule 10437
+752 nt nInParam 211 2
+753 size nInParam 28 1
+1912 node nLocal 299 1
+755 newIdent nRule 10471
+757 nt nInParam 211 2
+758 id nInParam 28 1
+1914 t nLocal 299 1
+760 EmitValue nRule 10773
+762 decl nInParam 299 1
+763 TypeRef nRule 3963
+765 resultType nOutParam 299 1
+766 EnumTypeRef nRule 4458
+768 resultType nOutParam 299 1
+1369 value nLocal 28 1
+1370 numValues nLocal 28 2
+1372 first nLocal 305 3
+1373 outerScope nLocal 299 4
+1389 size nLocal 28 8
+1390 addr nLocal 28 9
+1391 it nLocal 301 10
+769 PointerTypeTo nRule 10499
+771 theType nInParam 299 1
+1916 ptrType nLocal 299 1
+772 OrdinalLow nRule 10583
+774 theType nInParam 299 1
+775 OrdinalHigh nRule 10678
+777 theType nInParam 299 1
+778 AssignStmt nRule 9121
+780 decl nInParam 299 1
+781 BooleanExprControlFlow nRule 5115
+783 falseLabel nOutParam 320 1
+784 ExprAllowCF nRule 5253
+786 falseLabel nOutParam 320 1
+787 BoolExprAllowCF nRule 5726
+789 falseLabel nOutParam 320 1
+1456 trueLabel nLocal 320 1
+790 BoolTermAllowCF nRule 5906
+792 falseLabel nOutParam 320 1
+1473 overallFalseLabel nLocal 320 1
+793 BoolFactorAllowCF nRule 6044
+795 falseLabel nOutParam 320 1
+796 ArithExprAllowCF nRule 6111
+798 falseLabel nOutParam 320 1
+799 TermAllowCF nRule 6252
+801 falseLabel nOutParam 320 1
+802 FactorAllowCF nRule 6303
+804 falseLabel nOutParam 320 1
+805 PrimaryAllowCF nRule 6344
+807 falseLabel nOutParam 320 1
+808 VarExpr nRule 6607
+810 decl nInParam 299 1
+1540 theType nLocal 299 1
+1541 uplevels nLocal 28 2
+811 LValueVar nRule 9386
+813 decl nInParam 299 2
+814 writeable nInParam 305 1
+816 IncVar nRule 9503
+818 decl nInParam 299 1
+819 DecVar nRule 9530
+821 decl nInParam 299 1
+822 CFToVal nRule 5153
+824 falseLabel nInOutParam 320 1
+825 ValToCF nRule 5222
+827 falseLabel nOutParam 320 1
+828 DeclLevel nRule 10221
+830 decl nInParam 299 1
+831 DeclUpLevels nRule 10241
+833 decl nInParam 299 1
+834 Program nRule 2
+1011 t nLocal 299 1
+1012 rootScope nLocal 299 2
+1014 mainLabel nLocal 320 3
+1015 program nLocal 299 4
+1020 isMain nLocal 305 5
+836 UsesClause nRule 306
+838 user nInParam 299 1
+839 UsesMySystem nRule 333
+841 user nInParam 299 1
+842 Uses nRule 370
+844 id nInParam 28 2
+845 user nInParam 299 1
+1029 unit nLocal 299 1
+847 ResolveUnitRef nRule 466
+849 decl nInOutParam 299 1
+850 EnterUsedUnits nRule 509
+852 user nInParam 299 1
+1038 unitIt nLocal 301 1
+853 EndUsedUnits nRule 571
+855 user nInParam 299 1
+1044 unitIt nLocal 301 1
+856 FindOrCompileUnit nRule 650
+858 id nInParam 28 1
+1052 unit nLocal 299 1
+1055 ok nLocal 305 2
+859 Unit nRule 725
+1060 unit nLocal 299 1
+1061 unitImpl nLocal 299 2
+861 UnitInterface nRule 1060
+863 unit nInParam 299 1
+864 UnitImplementation nRule 1145
+866 unit nInParam 299 1
+867 UnitInitialization nRule 1155
+869 unit nInParam 299 2
+870 hasStmts nInParam 305 1
+1087 label nLocal 320 1
+1088 patchLS nLocal 28 2
+1090 scope nLocal 299 3
+1091 initCode nLocal 322 4
+1097 localSpace nLocal 28 5
+872 UnitFinalization nRule 1341
+874 unit nInParam 299 2
+875 hasStmts nInParam 305 1
+1099 label nLocal 320 1
+1100 patchLS nLocal 28 2
+1107 localSpace nLocal 28 3
+877 CheckForUndefinedMethods nRule 1512
+879 CheckForUndefinedLabels nRule 1515
+1120 it nLocal 301 1
+881 InitializeUnits nRule 1610
+1132 it nLocal 301 1
+883 FinalizeUnits nRule 1695
+1138 it nLocal 301 1
+885 MethodModifiers nRule 1878
+887 decl nInParam 299 1
+888 GetOrCreateInitCode nRule 1906
+890 scope nInParam 299 1
+1157 initCode nLocal 322 1
+891 ExternalDecl nRule 1958
+893 decl nInParam 299 1
+894 ProcHeaderDecl nRule 2020
+1168 redeclaring nLocal 305 1
+1169 decl nLocal 299 2
+1179 level nLocal 28 3
+1180 nested nLocal 305 4
+1181 paramScope nLocal 299 5
+896 ProcDecl nRule 2276
+1188 decl nLocal 299 1
+898 FuncHeaderDecl nRule 2394
+1197 redeclaring nLocal 305 1
+1198 decl nLocal 299 2
+1206 level nLocal 28 3
+1207 nested nLocal 305 4
+1208 paramScope nLocal 299 5
+1212 theType nLocal 299 7
+1213 ptrType nLocal 299 8
+900 FuncDecl nRule 2711
+1217 decl nLocal 299 1
+902 FormalArgDecl nRule 2829
+904 ConstDecl nRule 3053
+906 UntypedConstDecl nRule 3078
+1255 decl nLocal 299 1
+1256 val nLocal 28 2
+908 TypedConstDecl nRule 3136
+1259 decl nLocal 299 1
+1260 theType nLocal 299 2
+910 TypedConstInit nRule 3302
+912 theType nInParam 299 2
+913 addr nInParam 28 1
+915 TypeDecl nRule 3608
+917 LabelDecl nRule 3898
+919 ConstExpr nRule 5019
+921 Expr nRule 5092
+1404 falseLabel nLocal 320 1
+923 FetchVar nRule 7364
+925 LValueIndexes nRule 7418
+927 ArraySubscripts nRule 7470
+929 PointerArraySubscript nRule 7613
+1631 baseType nLocal 299 1
+1632 size nLocal 28 2
+931 ShortStringArraySubscript nRule 7692
+933 RecordFieldRef nRule 7722
+1642 field nLocal 299 1
+1645 offset nLocal 28 2
+935 PointerDeref nRule 7820
+1653 theType nLocal 299 1
+937 CoerceType nRule 7860
+1655 nt nLocal 211 1
+939 DefineExternLabel nRule 7994
+941 method nInParam 299 1
+1678 strAddr nLocal 28 1
+1679 externalName nLocal 325 2
+942 Call nRule 8077
+944 method nInParam 299 1
+1688 cdecl nLocal 305 1
+1689 resultType nLocal 299 2
+1691 tempOffset nLocal 28 3
+1692 isFunc nLocal 305 4
+1695 paramScope nLocal 299 5
+1696 actualsSize nLocal 28 6
+1701 paramIter nLocal 301 7
+1702 param nLocal 299 8
+945 CallBuiltInFunc nRule 8697
+947 method nInParam 299 1
+948 Statement nRule 8904
+950 LabelOrAssignOrCallStmt nRule 8995
+1772 decl nLocal 299 1
+952 LabelDefinition nRule 9071
+954 decl nInParam 299 1
+955 Assign nRule 9142
+957 AssignResultStmt nRule 9211
+959 funcDecl nInParam 299 1
+960 LValueExpr nRule 9338
+962 writeable nInParam 305 1
+1799 decl nLocal 299 1
+963 IfStmt nRule 9557
+1815 falseLabel nLocal 320 1
+965 ForStmt nRule 9623
+1820 decl nLocal 299 1
+1821 breakLabel nLocal 320 2
+1823 checkLabel nLocal 320 3
+1824 continueLabel nLocal 320 4
+967 RepeatStmt nRule 9800
+1828 continueLabel nLocal 320 1
+1829 breakLabel nLocal 320 2
+969 WhileStmt nRule 9880
+1836 continueLabel nLocal 320 1
+1837 breakLabel nLocal 320 2
+971 ContinueStmt nRule 9933
+973 BreakStmt nRule 9965
+975 GotoStmt nRule 9997
+1848 decl nLocal 299 1
+977 BeginStmt nRule 10049
+979 WritelnStmt nRule 10072
+981 WriteStmt nRule 10079
+983 ReadlnStmt nRule 10203
+985 ReadStmt nRule 10206
+987 ScopeLevel nRule 10209
+989 MatchTypes nRule 10259
+1878 nt nLocal 211 1
+991 RequireIntPop nRule 10317
+993 RequireInt nRule 10331
+995 PromoteToIntPop nRule 10344
+997 PromoteToInt nRule 10364
+999 PromoteToIntOptional nRule 10390
+1001 RequireBoolPop nRule 10410
+1003 RequireBool nRule 10424
+1005 DeclareBuiltInFunc nRule 10789
+1007 id nInParam 28 1
+1941 decl nLocal 299 1
+1008 installBuiltIns nRule 10815
+1943 t nLocal 299 1
