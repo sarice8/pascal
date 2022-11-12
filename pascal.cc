@@ -986,8 +986,8 @@ Node dNode;  // temporary for several mechanisms
     case oIdAdd_Pointer:
             ssl_result = ssl_add_id( "pointer", pIdent );
             continue;
-    case oIdAdd_String:
-            ssl_result = ssl_add_id( "string", pIdent );
+    case oIdAdd_ShortString:
+            ssl_result = ssl_add_id( "ShortString", pIdent );
             continue;
     case oIdAdd_True:
             ssl_result = ssl_add_id( "true", pIdent );
@@ -1139,6 +1139,25 @@ Node dNode;  // temporary for several mechanisms
             const char* sourceStr = (const char*) ssl_param;
             int sourceLen = strlen( sourceStr ) + 1;  // +1 for '\0'
             ssl_result = createGlobalData( sourceStr, sourceLen );
+            continue;
+            }
+     case oStringAllocShortStringLit : {
+            // The input is a C-style null-terminated string.
+            // Store it in global memory as a ShortString, which is a length byte followed by the text
+            // (not null-terminated).
+            // Just in case it is helpful, we will store a null termination anyway for these literals.
+            const char* sourceStr = (const char*) ssl_param;
+            int sourceLen = strlen( sourceStr );
+            if ( sourceLen > 255 ) {
+                ssl_fatal( "We don't support string literals longer than 255 characters" );
+            }
+            // Set up the data as we want it to appear in global memory.
+            int dataSize = sourceLen + 2;
+            char* shortStr = new char[dataSize];
+            shortStr[0] = (char) sourceLen;
+            strcpy( &shortStr[1], sourceStr );
+            ssl_result = createGlobalData( shortStr, dataSize );
+            delete[] shortStr;
             continue;
             }
 

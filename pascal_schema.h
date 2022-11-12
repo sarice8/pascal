@@ -38,12 +38,12 @@ typedef enum {
     nBooleanType,
     nBooleanCFType,
     nCharType,
-    nStringType,
     nPointerType,
     nUniversalPointerType,
     nArrayType,
     nSubrangeType,
     nRecordType,
+    nShortStringType,
     nEnumType,
     nSetType,
 } ObjectType;
@@ -90,6 +90,7 @@ typedef enum {
     qLow,
     qHigh,
     qScope,
+    qCapacity,
     qNameTable,
     qHasGap,
 } AttrCode;
@@ -136,6 +137,7 @@ typedef enum {
 #define GetqLow(N)		(Integer4)	(intptr_t) GetAttr(N, qLow)
 #define GetqHigh(N)		(Integer4)	(intptr_t) GetAttr(N, qHigh)
 #define GetqScope(N)		(Node)	GetAttr(N, qScope)
+#define GetqCapacity(N)		(Integer4)	(intptr_t) GetAttr(N, qCapacity)
 #define GetqNameTable(N)		(Integer4)	(intptr_t) GetAttr(N, qNameTable)
 #define GetqHasGap(N)		(Boolean1)	(intptr_t) GetAttr(N, qHasGap)
 
@@ -180,6 +182,7 @@ typedef enum {
 #define SetqLow(N,V)		SetAttr(N, qLow, (void*)(intptr_t)(V))
 #define SetqHigh(N,V)		SetAttr(N, qHigh, (void*)(intptr_t)(V))
 #define SetqScope(N,V)		SetAttr(N, qScope, V)
+#define SetqCapacity(N,V)		SetAttr(N, qCapacity, (void*)(intptr_t)(V))
 #define SetqNameTable(N,V)		SetAttr(N, qNameTable, (void*)(intptr_t)(V))
 #define SetqHasGap(N,V)		SetAttr(N, qHasGap, (void*)(intptr_t)(V))
 
@@ -216,12 +219,12 @@ typedef enum {
 #define NewnBooleanType()		NewNode(nBooleanType)
 #define NewnBooleanCFType()		NewNode(nBooleanCFType)
 #define NewnCharType()		NewNode(nCharType)
-#define NewnStringType()		NewNode(nStringType)
 #define NewnPointerType()		NewNode(nPointerType)
 #define NewnUniversalPointerType()		NewNode(nUniversalPointerType)
 #define NewnArrayType()		NewNode(nArrayType)
 #define NewnSubrangeType()		NewNode(nSubrangeType)
 #define NewnRecordType()		NewNode(nRecordType)
+#define NewnShortStringType()		NewNode(nShortStringType)
 #define NewnEnumType()		NewNode(nEnumType)
 #define NewnSetType()		NewNode(nSetType)
 

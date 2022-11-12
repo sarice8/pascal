@@ -35,12 +35,12 @@ type node_type:
 	nBooleanType
 	nBooleanCFType
 	nCharType
-	nStringType
 	nPointerType
 	nUniversalPointerType
 	nArrayType
 	nSubrangeType
 	nRecordType
+	nShortStringType
 	nEnumType
 	nSetType
 	;
@@ -87,6 +87,7 @@ type node_attribute:
 	qLow
 	qHigh
 	qScope
+	qCapacity
 	qNameTable
 	qHasGap
 	;

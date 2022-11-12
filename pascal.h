@@ -1,4 +1,4 @@
-#define SSL_CODE_TABLE_SIZE 11300
+#define SSL_CODE_TABLE_SIZE 11400
 
 #define oJumpForward 0
 #define oJumpBack 1
@@ -170,7 +170,7 @@
 #define tWriteI 71
 #define tWriteBool 72
 #define tWriteChar 73
-#define tWriteStr 74
+#define tWriteShortStr 74
 #define tWriteP 75
 #define tWriteEnum 76
 #define tWriteCR 77
@@ -238,12 +238,12 @@
 #define nBooleanType 30
 #define nBooleanCFType 31
 #define nCharType 32
-#define nStringType 33
-#define nPointerType 34
-#define nUniversalPointerType 35
-#define nArrayType 36
-#define nSubrangeType 37
-#define nRecordType 38
+#define nPointerType 33
+#define nUniversalPointerType 34
+#define nArrayType 35
+#define nSubrangeType 36
+#define nRecordType 37
+#define nShortStringType 38
 #define nEnumType 39
 #define nSetType 40
 #define qINVALID 0
@@ -287,8 +287,9 @@
 #define qLow 38
 #define qHigh 39
 #define qScope 40
-#define qNameTable 41
-#define qHasGap 42
+#define qCapacity 41
+#define qNameTable 42
+#define qHasGap 43
 #define Null 0
 #define NullIter 0
 #define NullVec 0
@@ -390,7 +391,7 @@
 #define oIdAdd_Char 100
 #define oIdAdd_Byte 101
 #define oIdAdd_Pointer 102
-#define oIdAdd_String 103
+#define oIdAdd_ShortString 103
 #define oIdAdd_True 104
 #define oIdAdd_False 105
 #define oIdAdd_Ord 106
@@ -414,15 +415,16 @@
 #define oValueTop 124
 #define oValuePop 125
 #define oStringAllocLit 126
-#define oLoopPush 127
-#define oLoopContinueLabel 128
-#define oLoopBreakLabel 129
-#define oLoopPop 130
-#define oMsg 131
-#define oMsgTrace 132
-#define oMsgNode 133
-#define oMsgNodeLong 134
-#define oMsgNodeVec 135
+#define oStringAllocShortStringLit 127
+#define oLoopPush 128
+#define oLoopContinueLabel 129
+#define oLoopBreakLabel 130
+#define oLoopPop 131
+#define oMsg 132
+#define oMsgTrace 133
+#define oMsgNode 134
+#define oMsgNodeLong 135
+#define oMsgNodeVec 136
 
 #ifdef SSL_INCLUDE_ERR_TABLE
 

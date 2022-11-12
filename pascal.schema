@@ -185,8 +185,6 @@ nType ::= nBooleanCFType
 
 nType ::= nCharType
 
-nType ::= nStringType
-
 nType ::= nPointerType
 nPointerType =>
         qBaseType:      Node            (nType)                 [Alt]
@@ -198,7 +196,6 @@ nPointerType =>
 % But, universal pointer cannot be dereferenced.
 %
 nPointerType ::= nUniversalPointerType
-
 
 nType ::= nArrayType
 nArrayType =>
@@ -219,6 +216,10 @@ nRecordType =>
         % the record field declarations, each with a relative offset
         qScope:         Node            (nScope)                [Pri]
 
+
+nType ::= nShortStringType
+nShortStringType =>
+        qCapacity:      Integer4
 
 nType ::= nEnumType
 nEnumType =>

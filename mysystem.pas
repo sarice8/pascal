@@ -11,6 +11,10 @@ type PChar = ^Char;   // by convention, PChar is expected to point to null-termi
 type PByte = ^Byte;
 type PInteger = ^Integer;
 
+// For now, type String always means ShortString.
+type String = ShortString;
+
+
 // My version of AnsiString is similar to C++ std::string
 // As with the latest std::string, it doesn't use reference counting.
 // I don't yet have small-string optimization.

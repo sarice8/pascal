@@ -223,155 +223,49 @@
  373	tLabel	  21
  375	tEnter	   0
  377	tPushAddrGlobal	  44
- 379	tWriteStr
+ 379	tWriteShortStr
  380	tWriteCR
  381	tReturn
  382	tLabel	  22
  384	tEnter	   0
  386	tPushAddrGlobal	  80
- 388	tWriteStr
+ 388	tWriteShortStr
  389	tWriteCR
  390	tReturn
- 391	tLabel	  23
- 393	tEnter	   8
- 395	tPushAddrLocal	  -4
- 397	tPushConstI	   0
- 399	tAssignI
- 400	tPushAddrLocal	  -8
- 402	tPushConstI	   0
- 404	tAssignI
- 405	tLabel	  24
- 407	tPushParamP	   0
- 409	tPushLocalI	  -4
- 411	tAddPI
- 412	tFetchB
- 413	tPushConstI	   0
- 415	tNotEqualB
- 416	tJumpFalse	  25
- 418	tPushParamP	   0
- 420	tPushLocalI	  -4
- 422	tAddPI
- 423	tFetchB
- 424	tPushConstI	  65
- 426	tGreaterEqualB
- 427	tJumpFalse	  26
- 429	tLabelAlias	  26	  27
- 432	tPushParamP	   0
- 434	tPushLocalI	  -4
- 436	tAddPI
- 437	tFetchB
- 438	tPushConstI	  90
- 440	tLessEqualB
- 441	tJumpFalse	  28
- 443	tLabelAlias	  28	  27
- 446	tPushAddrLocal	  -8
- 448	tPushLocalI	  -8
- 450	tPushConstI	   1
- 452	tAddI
- 453	tAssignI
- 454	tLabel	  27
- 456	tPushAddrLocal	  -4
- 458	tPushLocalI	  -4
- 460	tPushConstI	   1
- 462	tAddI
- 463	tAssignI
- 464	tJump	  24
- 466	tLabel	  25
- 468	tPushParamP	   8
- 470	tPushLocalI	  -4
- 472	tAssignI
- 473	tPushAddrGlobal	 112
- 475	tWriteStr
- 476	tPushLocalI	  -8
- 478	tWriteI
- 479	tPushAddrGlobal	 128
- 481	tWriteStr
- 482	tWriteCR
- 483	tReturn
- 484	tLabel	   1
- 486	tEnter	   4
- 488	tAllocActuals	   0
- 490	tCall	  21
- 492	tFreeActuals	   0
- 494	tPushAddrGlobal	 189
- 496	tWriteStr
- 497	tWriteCR
- 498	tPushAddrGlobal	 152
- 500	tPushConstI	   0
- 502	tAddPI
- 503	tPushConstI	  72
- 505	tAssignB
- 506	tPushAddrGlobal	 152
- 508	tPushConstI	   1
- 510	tAddPI
- 511	tPushConstI	 101
- 513	tAssignB
- 514	tPushAddrGlobal	 152
- 516	tPushConstI	   2
- 518	tAddPI
- 519	tPushConstI	 108
- 521	tAssignB
- 522	tPushAddrGlobal	 152
- 524	tPushConstI	   3
- 526	tAddPI
- 527	tPushConstI	 108
- 529	tAssignB
- 530	tPushAddrGlobal	 152
- 532	tPushConstI	   4
- 534	tAddPI
- 535	tPushConstI	 111
- 537	tAssignB
- 538	tPushAddrGlobal	 152
- 540	tPushConstI	   5
- 542	tAddPI
- 543	tPushConstI	  32
- 545	tAssignB
- 546	tPushAddrGlobal	 152
- 548	tPushConstI	   6
- 550	tAddPI
- 551	tPushConstI	  84
- 553	tAssignB
- 554	tPushAddrGlobal	 152
- 556	tPushConstI	   7
- 558	tAddPI
- 559	tPushConstI	 104
- 561	tAssignB
- 562	tPushAddrGlobal	 152
- 564	tPushConstI	   8
- 566	tAddPI
- 567	tPushConstI	 101
- 569	tAssignB
- 570	tPushAddrGlobal	 152
- 572	tPushConstI	   9
- 574	tAddPI
- 575	tPushConstI	 114
- 577	tAssignB
- 578	tPushAddrGlobal	 152
- 580	tPushConstI	  10
- 582	tAddPI
- 583	tPushConstI	 101
- 585	tAssignB
- 586	tPushAddrGlobal	 152
- 588	tPushConstI	  11
- 590	tAddPI
- 591	tPushConstI	   0
- 593	tCastItoB
- 594	tAssignB
- 595	tAllocActuals	  16
- 597	tPushAddrActual	   0
- 599	tPushAddrGlobal	 152
- 601	tPushConstI	   0
- 603	tAddPI
- 604	tAssignP
- 605	tPushAddrActual	   8
- 607	tPushAddrLocal	  -4
- 609	tAssignP
- 610	tCall	  23
- 612	tPushLocalI	  -4
- 614	tFreeActuals	  16
- 616	tWriteI
- 617	tWriteCR
- 618	tAllocActuals	   0
- 620	tCall	  22
- 622	tFreeActuals	   0
- 624	tReturn
+ 391	tLabel	   1
+ 393	tEnter	   0
+ 395	tAllocActuals	   0
+ 397	tCall	  21
+ 399	tFreeActuals	   0
+ 401	tPushAddrGlobal	 373
+ 403	tWriteShortStr
+ 404	tWriteCR
+ 405	tPushAddrGlobal	 112
+ 407	tPushAddrGlobal	 405
+ 409	tCopy	 256
+ 411	tPushAddrGlobal	 112
+ 413	tWriteShortStr
+ 414	tWriteCR
+ 415	tPushAddrGlobal	 368
+ 417	tPushAddrGlobal	 421
+ 419	tPushConstI	   2
+ 421	tAddPI
+ 422	tFetchB
+ 423	tAssignB
+ 424	tPushGlobalB	 368
+ 426	tWriteChar
+ 427	tWriteCR
+ 428	tPushAddrGlobal	 369
+ 430	tPushAddrGlobal	 429
+ 432	tPushConstI	   0
+ 434	tAddPI
+ 435	tFetchB
+ 436	tCastBtoI
+ 437	tAssignI
+ 438	tPushGlobalI	 369
+ 440	tWriteI
+ 441	tWriteCR
+ 442	tAllocActuals	   0
+ 444	tCall	  22
+ 446	tFreeActuals	   0
+ 448	tReturn
