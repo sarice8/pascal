@@ -968,6 +968,9 @@ Node dNode;  // temporary for several mechanisms
     case oIdAdd_mysystem:
             ssl_result = ssl_add_id( "mysystem", pIdent );
             continue;
+    case oIdAdd_ShortStringAppendShortString:
+            ssl_result = ssl_add_id( "ShortStringAppendShortString", pIdent );
+            continue;
     case oIdAdd_File:
             ssl_result = ssl_add_id( "file", pIdent );
             continue;

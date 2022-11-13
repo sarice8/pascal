@@ -1,4 +1,5 @@
 // strings
+// ^
 
 program t20;
 
@@ -42,5 +43,11 @@ begin
   writeln( p1 );
 
   proc2( 'A Strlit' );
+
+
+  s1 := 'Did it work';
+  s1 := s1 + '??';
+  //s1 := s1 + '?';
+  writeln( s1 );
 
 end.

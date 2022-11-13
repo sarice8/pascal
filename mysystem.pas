@@ -53,6 +53,7 @@ function realloc( ptr: Pointer; size: integer ): Pointer; cdecl;
 procedure free( ptr: Pointer ); cdecl;
   external 'runlib' name 'runlibFree';
 
+procedure ShortStringAppendShortString( strA: ^ShortString; strB: ^ShortString );
 
 procedure ConstructAnsiString( var str: AnsiString );
 procedure DestroyAnsiString( var str: AnsiString );
@@ -61,6 +62,22 @@ procedure AssignAnsiStringFromPChar( var str: AnsiString; from: PChar );
 
 
 implementation
+
+procedure ShortStringAppendShortString( strA: ^ShortString; strB: ^ShortString );
+    var lengthA, lengthB : integer;
+        freeA : integer;
+        toCopy : integer;
+  begin
+    lengthA := ord( strA^[0] );
+    lengthB := ord( strB^[0] );
+
+    freeA := 255 - lengthA;  // assuming default size of ShortString
+    toCopy := lengthB;
+    if toCopy > freeA then
+      toCopy := freeA;
+    memcpy( @strA^[lengthA+1], @strB^[1], toCopy );
+    strA^[0] := chr( lengthA + toCopy );
+  end;
 
 procedure ConstructAnsiString( var str: AnsiString );
   begin

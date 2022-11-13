@@ -157,6 +157,7 @@ output:
    tPushAddrActual   % <offset> - push ptr to actual param, in actuals space (used by caller)
    tPushAddrUpLocal  % <uplevels> <offset> - push ptr to local var in a parent static scope
    tPushAddrUpParam  % <uplevels> <offset> - push ptr to formal param in a parent static scope
+   tSwap             % swap the top two entries on the stack
    tFetchI           % pop ptr from stack, and push int value it points to
    tFetchB           %    "      "      "     "     byte  "   "    "
    tFetchP           %    "      "      "     "     ptr   "   "    "   
@@ -421,6 +422,7 @@ mechanism type_stack_mech:
 mechanism id_mech:
     % adds a predefined id to the scanner's id table, and returns the id code
     oIdAdd_mysystem >> int
+    oIdAdd_ShortStringAppendShortString >> int
     oIdAdd_File >> int
     oIdAdd_Integer >> int
     oIdAdd_Boolean >> int
@@ -503,6 +505,7 @@ Node    initScope              % scope for temporaries global var init,
                                % and program main stmt / unit initialization stmts
 
 int     mysystemId               % id of identifier "mysystem"
+int     id_ShortStringAppendShortString
 
 % built-in nTypes
 Node    FileType
@@ -521,6 +524,10 @@ Node    BuiltIn_Ord
 Node    BuiltIn_Chr
 Node    BuiltIn_Pred
 Node    BuiltIn_Succ
+
+% Declarations in unit mysystem that the compiler may refer to directly.
+
+Node    System_ShortStringAppendShortString
 
 
 % -------------------------- Forward Declarations -------------------------
@@ -555,6 +562,7 @@ DecVar( Node decl );
 
 CFToVal( inout Label falseLabel );
 ValToCF( out Label falseLabel );
+MoveIntoTempShortString >> int;
 
 DeclLevel( Node decl ) >> int;
 DeclUpLevels( Node decl ) >> int;
@@ -687,6 +695,19 @@ UsesMySystem( Node user ):
       | * :
    ]
    @Uses( mysystemId, user )
+   ;
+
+
+% After processing the mysystem unit interface, grab certain declarations from it
+% that the compiler may want to refer to later.
+%
+FindSelectSystemDecls( Node unit ):
+   [ equal( oNodeGetInt( unit, qIdent ), mysystemId )
+      | true :
+         System_ShortStringAppendShortString = oNodeFind( oScopeCurrent, qDecls, qIdent, id_ShortStringAppendShortString )
+
+      | * :
+   ]
    ;
 
 
@@ -883,6 +904,7 @@ UnitInterface( Node unit ):
 
       | * :          >
    ]}
+   @FindSelectSystemDecls( unit )
    ;
 
 UnitImplementation( Node unit ):
@@ -2367,6 +2389,9 @@ BoolFactorAllowCF( out Label falseLabel ):
    ];
 
 ArithExprAllowCF( out Label falseLabel ):
+   boolean first = true
+   int tempStrOffset
+
    @TermAllowCF( falseLabel )
    {[
       | '+' :
@@ -2376,9 +2401,34 @@ ArithExprAllowCF( out Label falseLabel ):
                @TermAllowCF( falseLabel )  % actually not allowing CF, will be caught by type check
                @PromoteToInt
                .tAddI
+
             | nShortStringType, nStrLitType, nCharType :
                % String concatenation
-               #eNotImplemented
+               [ first
+                  | true :  % move into a temp string, so subsequent term(s) can further modify it.
+                            tempStrOffset = @MoveIntoTempShortString
+                            first = false
+                  | * :
+               ]
+               @TermAllowCF( falseLabel )  % actually not allowing CF, will be caught by type check
+               [ oTypeSNodeType
+                  | nShortStringType, nStrLitType :
+                     @ShortStringAppendShortString
+                     % Have to re-push the temp string.
+                     % If we ever have .tDup then the append method could do it and we wouldn't need this
+                     .tPushAddrLocal  oEmitInt( tempStrOffset )
+                     oTypeSPush( ShortStringType )
+                  | nCharType :
+                     @ShortStringAppendChar
+                     % Have to re-push the temp string.
+                     % If we ever have .tDup then the append method could do it and we wouldn't need this
+                     .tPushAddrLocal  oEmitInt( tempStrOffset )
+                     oTypeSPush( ShortStringType )
+                  | * :
+                     #eTypeMismatch
+                     oTypeSPop
+               ]
+
             | nPointerType, nUniversalPointerType :
                Node elementType = oNodeGet( oTypeSTop, qBaseType )
                int elementSize = oNodeGetInt( elementType, qSize )
@@ -2872,6 +2922,73 @@ CoerceType:
    ];
 
 
+% Given a ShortString, StrLit, or Char on the expression stack
+% (and type on the type stack).  Move the value into a new temporary ShortString.
+% Leave that temp string and type on the stacks.
+% Also returns the offset of the temp string.
+%
+MoveIntoTempShortString >> int:
+   int tempOffset = oScopeAllocType( ShortStringType )
+   % copy the value
+   [ oTypeSNodeType
+      | nShortStringType, nStrLitType :
+         .tPushAddrLocal  oEmitInt( tempOffset )
+         % put temp addr under value addr
+         .tSwap
+         % TO DO: we could just copy length + 1, but tCopy takes a fixed #bytes
+         .tCopy  oEmitInt( oNodeGetInt( ShortStringType, qSize ) )
+      | nCharType :
+         % temp[0] = 1
+         .tPushAddrLocal  oEmitInt( tempOffset )
+         .tPushConstI  oEmitInt( 1 )
+         .tAssignB
+         % temp[1] = value
+         .tPushAddrLocal  oEmitInt( add( tempOffset, 1 ) )
+         .tSwap
+         .tAssignB
+      | * :   #eTypeMismatch
+   ]
+   oTypeSPop
+   % Leave the temp ShortString on the expr stack and type stack
+   .tPushAddrLocal  oEmitInt( tempOffset )
+   oTypeSPush( ShortStringType )
+   >> tempOffset;
+
+
+% Top of expr stack / type stack is ShortString B.
+% Under it is ShortString A.
+% Change A to append the contents of B to it (truncating if necessary).
+% Removes both A and B from the expr stack / type stack.
+%
+ShortStringAppendShortString:
+   % TO DO: ideally I would do this directly with tcode.  But I think I need some more
+   % enhancements for that to work well.   Meanwhile, generate a call to a method.
+   % For the moment, I'll implement the method in Pascal, in the mysystem unit.
+   .tAllocActuals  oEmitInt( 16 )
+   .tPushAddrActual  oEmitInt( 8 )  .tSwap  .tAssignP
+   .tPushAddrActual  oEmitInt( 0 )  .tSwap  .tAssignP
+   .tCall   @EmitValue( System_ShortStringAppendShortString )
+   % TO DO: Ideally I would leave A on the expr stack / type stack.
+   %  But I can't really do that without dup, which I hesitate to add.
+   %  I'll have the caller push A again themselves.
+   .tFreeActuals  oEmitInt( 16 )
+   oTypeSPop
+   oTypeSPop
+   ;
+
+% Top of expr stack / type stack is Char B.
+% Under it is ShortString A.
+% Change A to append char B to it (truncating if necessary).
+% Removes both A and B from the expr stack / type stack.
+%
+ShortStringAppendChar:
+   #eNotImplemented
+   oTypeSPop
+   oTypeSPop
+   ;
+
+
+
 % Called on first use of an extern method
 %
 DefineExternLabel( Node method ):
@@ -3328,7 +3445,31 @@ LValueVar( Node decl, boolean writeable ):
    ]
 
    oTypeSPush( oNodeGet( decl, qType ) )
-   @LValueIndexes        % handle subscripts, if any
+
+   % handle subscripts, if any.
+   % There is one case that I'm not fitting into the pattern nicely, so need to
+   % check for specially here:  if lvalue var is a pointer variable, and is
+   % followed by [index], we need to dereference the pointer variable before applying
+   % the index.  This is different from handling of [index] on an rvalue expression.
+   % Right now I have LValueIndexes working for both lvalue and rvalue (composite types)
+   % so can't easily add this behavior in there.
+   % TO DO: probably I need separate rules LValueIndexes and RValueIndexes.
+   %    This might also explain my confusion about handling of deref operator in LValueIndexes vs rvalue expr,
+   %    and having separate rules might clear that up better.
+
+   [ oTypeSNodeType
+      | nPointerType :
+         [
+            | '[' :
+               % dereference the pointer var first
+               .tFetchP
+               @PointerArraySubscript
+            | * :
+         ]
+      | * :
+   ]
+   % additional subscripts, if any
+   @LValueIndexes
    ;
 
 
@@ -3760,6 +3901,9 @@ installBuiltIns:
    % "mysystem" is the name of a unit that will be available everywhere.
    % Add its name to the id table so we can easily spot the name later.
    mysystemId = oIdAdd_mysystem
+
+   % Some names we'll want to look up in mysystem unit
+   id_ShortStringAppendShortString = oIdAdd_ShortStringAppendShortString
 
    % install built-in types
    FileType = @newType( nFileType, 4 )

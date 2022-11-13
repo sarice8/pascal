@@ -118,6 +118,7 @@ struct instrInfo_s tCodeInstrs[] = {
   { "tPushAddrActual", 1 },
   { "tPushAddrUpLocal", 2 },
   { "tPushAddrUpParam", 2 },
+  { "tSwap", 0 },
   { "tFetchI", 0 },
   { "tFetchB", 0 },
   { "tFetchP", 0 },
@@ -431,6 +432,12 @@ walkTable()
               int uplevels = code[pc++];
               int offset = code[pc++];
               stack[sp] = (long) ( upStaticFrame( uplevels ) + offset + FRAME_PARAMS_OFFSET );
+              continue;
+              }
+       case tSwap : {
+              long temp = stack[sp];
+              stack[sp] = stack[sp-1];
+              stack[sp-1] = temp;
               continue;
               }
        case tFetchI :

@@ -1514,6 +1514,13 @@ generateCode()
           operandStack.emplace_back( jit_Operand_Kind_Addr_Reg_Offset, frameReg, offset + FPO );
         }
         break;
+      case tSwap : {
+          Operand y = operandStack.back();  operandStack.pop_back();
+          Operand x = operandStack.back();  operandStack.pop_back();
+          operandStack.push_back( y );
+          operandStack.push_back( x );
+        }
+        break;
       case tFetchI : {
           Operand x = operandStack.back();   operandStack.pop_back();
           // x is a pointer to a value of size 4.
