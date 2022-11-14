@@ -48,4 +48,13 @@ begin
     end;
   writeln;
 
+  // int + ptr
+  p1 := @c1[1];
+  for i1 := 1 to 10 do
+    begin
+      write( p1^, ' ' );
+      p1 := 1 + p1;
+    end;
+  writeln;
+
 end.

@@ -2402,8 +2402,17 @@ ArithExprAllowCF( out Label falseLabel ):
             | nIntegerType, nByteType :
                @PromoteToIntPop
                @TermAllowCF( falseLabel )  % actually not allowing CF, will be caught by type check
-               @PromoteToInt
-               .tAddI
+
+               [ oTypeSNodeType
+                  | nPointerType, nUniversalPointerType :
+                     % int + ptr
+                     .tSwap
+                     % leave only the ptr type on the type stack (int was already popped above)
+                     @PointerAddition
+                  | * :
+                     @PromoteToInt
+                     .tAddI
+               ]
 
             | nShortStringType, nStrLitType, nCharType :
                % String concatenation
@@ -2433,17 +2442,10 @@ ArithExprAllowCF( out Label falseLabel ):
                ]
 
             | nPointerType, nUniversalPointerType :
-               Node elementType = oNodeGet( oTypeSTop, qBaseType )
-               int elementSize = oNodeGetInt( elementType, qSize )
-               @TermAllowCF( falseLabel )  % actually not allowing CF
+               @TermAllowCF( falseLabel )   % actually not allowing CF
                @PromoteToIntPop
-               [ equal( elementSize, 1 )
-                  | false :
-                     .tPushConstI  oEmitInt( elementSize )
-                     .tMultI
-                  | * :
-               ]
-               .tAddPI
+               @PointerAddition
+
             | * :
                #eNotAllowed
          ]
@@ -2855,6 +2857,25 @@ RecordFieldRef:
    % replace the type on the type stack, with the field type
    oTypeSPop
    oTypeSPush( oNodeGet( field, qType ) )
+   ;
+
+
+% On entry, expr stack has ptr, and integer index above it.
+% The type stack has just the pointer type.
+% Pop those, and push the ptr advanced to that index
+% (scaled by the pointed-to element size).
+% Leaves the pointer type on the type stack.
+%
+PointerAddition:
+   Node elementType = oNodeGet( oTypeSTop, qBaseType )
+   int elementSize = oNodeGetInt( elementType, qSize )
+   [ equal( elementSize, 1 )
+      | false :
+         .tPushConstI  oEmitInt( elementSize )
+         .tMultI
+      | * :
+   ]
+   .tAddPI
    ;
 
 
