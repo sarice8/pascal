@@ -139,7 +139,7 @@ FILE    *ssl_src_file;                    /* application's input file       */
 char     ssl_input_filename [256];        /* application's input file       */
 int      ssl_debug;                       /* debug mode                     */
 int      ssl_case_sensitive;              /* scanner is case sensitive      */
-void   (*ssl_listing_callback)();         /* func provided to list source   */
+void   (*ssl_listing_callback)( char* source_line, int token_accepted );         /* func provided to list source   */
 void   (*ssl_init_operations_callback)(); /* func provided to init operations */
 
 int      ssl_recovery_token;              /* synch token for error recovery */
@@ -238,7 +238,7 @@ ssl_set_case_sensitive ( int case_sensitive )
 
 
 void
-ssl_set_listing_callback ( void (*listing_callback)() )
+ssl_set_listing_callback ( void (*listing_callback)( char* source_line, int token_accepted ) )
 {
     ssl_listing_callback = listing_callback;
 }

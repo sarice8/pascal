@@ -158,7 +158,7 @@ void ssl_set_case_sensitive ( int yes_no );
  *       (*listing_callback) (char *line, int token_accepted);
  *  Note, token_accepted == FALSE for blank/comment lines.
  */
-void ssl_set_listing_callback ( void (*listing_callback)() );
+void ssl_set_listing_callback ( void (*listing_callback)( char* line, int token_accepted ) );
 
 /*
  *  Register a function to initialize application semantic operations
