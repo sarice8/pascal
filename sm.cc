@@ -29,8 +29,9 @@
 
 
 #include "pascal.h"
+#include "tcode.h"
 
-FILE *src,*dmp;
+FILE *src;
 
 #define PTR_SIZE (sizeof(void*))
 
@@ -89,96 +90,6 @@ void cleanup();
 void defineLabels();
 void defineLabel( int label, int addr );
 void defineLabelAlias( int label, int aliasToLabel );
-
-struct instrInfo_s {
-  const char* name;
-  int args;
-};
-
-struct instrInfo_s tCodeInstrs[] = {
-  { "tPushGlobalI", 1 },
-  { "tPushGlobalB", 1 },
-  { "tPushGlobalP", 1 },
-  { "tPushLocalI", 1 },
-  { "tPushLocalB", 1 }, 
-  { "tPushLocalP", 1 },
-  { "tPushParamI", 1 },
-  { "tPushParamB", 1 }, 
-  { "tPushParamP", 1 },
-  { "tPushUpLocalI", 2 },
-  { "tPushUpLocalB", 2 }, 
-  { "tPushUpLocalP", 2 },
-  { "tPushUpParamI", 2 },
-  { "tPushUpParamB", 2 }, 
-  { "tPushUpParamP", 2 },
-  { "tPushConstI", 1 },
-  { "tPushAddrGlobal", 1 },
-  { "tPushAddrLocal", 1 },
-  { "tPushAddrParam", 1 },
-  { "tPushAddrActual", 1 },
-  { "tPushAddrUpLocal", 2 },
-  { "tPushAddrUpParam", 2 },
-  { "tSwap", 0 },
-  { "tFetchI", 0 },
-  { "tFetchB", 0 },
-  { "tFetchP", 0 },
-  { "tAssignI", 0 },
-  { "tAssignB", 0 },
-  { "tAssignP", 0 },
-  { "tCopy", 1 },
-  { "tCastBtoI", 0 },
-  { "tCastItoB", 0 },
-  { "tIncI", 0 },
-  { "tDecI", 0 },
-  { "tMultI", 0 },
-  { "tDivI", 0 },
-  { "tAddPI", 0 },
-  { "tAddI", 0 },
-  { "tSubI", 0 },
-  { "tNegI", 0 },
-  { "tNot", 0 },
-  { "tEqualB", 0 },
-  { "tNotEqualB", 0 },
-  { "tGreaterB", 0 },
-  { "tLessB", 0 },
-  { "tGreaterEqualB", 0 },
-  { "tLessEqualB", 0 },
-  { "tEqualI", 0 },
-  { "tNotEqualI", 0 },
-  { "tGreaterI", 0 },
-  { "tLessI", 0 },
-  { "tGreaterEqualI", 0 },
-  { "tLessEqualI", 0 },
-  { "tEqualP", 0 },
-  { "tNotEqualP", 0 },
-  { "tGreaterP", 0 },
-  { "tLessP", 0 },
-  { "tGreaterEqualP", 0 },
-  { "tLessEqualP", 0 },
-  { "tAllocActuals", 1 },
-  { "tAllocActualsCdecl", 1 },
-  { "tFreeActuals", 1 },
-  { "tCall", 1 },
-  { "tCallCdecl", 1 },
-  { "tReturn", 0 },
-  { "tEnter", 1 },
-  { "tJump", 1 },
-  { "tJumpTrue", 1 },
-  { "tJumpFalse", 1 },
-  { "tLabel", 1 },
-  { "tLabelAlias", 2 },
-  { "tLabelExtern", 2 },
-  { "tWriteI", 0 },
-  { "tWriteBool", 0 },
-  { "tWriteChar", 0 },
-  { "tWriteShortStr", 0 },
-  { "tWritePChar", 0 },
-  { "tWriteP", 0 },
-  { "tWriteEnum", 0 },
-  { "tWriteCR", 0 }
-};
-int numtCodeInstrs = sizeof(tCodeInstrs) / sizeof(tCodeInstrs[0]);
-
 
 std::unordered_map<int, int> labels;   // label# -> tcode addr
 std::unordered_map<int, int> labelAliases;  // label# -> aliasToLabel#
@@ -283,7 +194,7 @@ defineLabels()
     } else if ( instr == tLabelAlias ) {
       defineLabelAlias( code[pc+1], code[pc+2] );
     }
-    pc += 1 + tCodeInstrs[instr].args;
+    pc += tcodeInstrSize( instr );
   }
 }
 
@@ -708,6 +619,12 @@ walkTable()
        case tWriteCR :
               printf("\n");
               continue;
+       case tFile :
+              // no-op, for debugging
+              continue;
+       case tLine :
+              // no-op, for debugging
+              continue;
 
        default:
               pc--;
@@ -721,26 +638,18 @@ walkTable()
 void
 dumpTable()
 {
+  FILE* dmp;
   if((dmp=fopen("a.dmp","w"))==NULL) {
     printf("Can't open dump file a.dmp\n");
     exit(5);
   }
 
-  for ( pc = 0; pc < codeWords; ) {
-    fprintf( dmp, "%4d\t", pc );
+  int dumpedTo = tcodeDump( dmp, code, 0, codeWords );
 
-    int instr = code[pc++];
-    if ( instr >= 0 && instr < numtCodeInstrs ) {
-      fprintf( dmp, "%s", tCodeInstrs[instr].name );
-      for ( int a = 0; a < tCodeInstrs[instr].args; ++a ) {
-        fprintf( dmp, "\t%4d", code[pc++] );
-      }
-      fprintf( dmp, "\n" );
-    } else {
-      fprintf( dmp, "?\n" );
-      pc++;
-    }
+  if ( dumpedTo != codeWords ) {
+    fprintf( dmp, "...additional incomplete instruction\n" );
   }
+
   fclose( dmp );
 }
 

@@ -176,7 +176,9 @@
 #define tWriteP 77
 #define tWriteEnum 78
 #define tWriteCR 79
-#define tSpace 80
+#define tFile 80
+#define tLine 81
+#define tSpace 82
 #define eBadStatement 0
 #define eNotConst 1
 #define eNotType 2

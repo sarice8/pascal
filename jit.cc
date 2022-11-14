@@ -2296,6 +2296,12 @@ generateCode()
           emitCallExtern( (char*) runlibWriteCR );
         }
         break;
+      case tFile :
+        // no-op, for debugging
+        continue;
+      case tLine :
+        // no-op, for debugging
+        continue;
 
       default:
         --tCodePc;

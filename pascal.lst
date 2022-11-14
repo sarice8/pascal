@@ -215,6 +215,8 @@
    2:    tWriteP           %  "     "    : write ptr var whose addr is on tos, pop
    2:    tWriteEnum        %  "     "    : write enum name.  Name table on tos, value under it, pop both
    2:    tWriteCR          %  "     "    : write cr
+   2:    tFile             % <file#> - pascal source file id, for debugging.  I haven't decided yet how I will communicate the corresponding filename.
+   2:    tLine             % <line#> - pascal source line number, for debugging
       
       %  Other:
       
@@ -4903,7 +4905,7 @@ Generated code:
 1253: oPushResult
 1254: Here
 1255: oAssign
-1256: oEmit 80
+1256: oEmit 82
 1258: oGetAddrLocal 3
 1260: oPushResult
 1261: oGetParam 2
@@ -5027,7 +5029,7 @@ Generated code:
 1439: oPushResult
 1440: Here
 1441: oAssign
-1442: oEmit 80
+1442: oEmit 82
 1444: oSetResult 0
 1446: oPushResult
 1447: oSetResult 1
@@ -5292,7 +5294,7 @@ Generated code:
 1861: oPushResult
 1862: Here
 1863: oAssign
-1864: oEmit 80
+1864: oEmit 82
 1866: oGetParam 1
 1868: oChoice 1874
 1870: oCall 1677

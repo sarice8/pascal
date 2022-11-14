@@ -215,6 +215,8 @@ output:
    tWriteP           %  "     "    : write ptr var whose addr is on tos, pop
    tWriteEnum        %  "     "    : write enum name.  Name table on tos, value under it, pop both
    tWriteCR          %  "     "    : write cr
+   tFile             % <file#> - pascal source file id, for debugging.  I haven't decided yet how I will communicate the corresponding filename.
+   tLine             % <line#> - pascal source line number, for debugging
 
 %  Other:
 

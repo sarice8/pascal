@@ -49,6 +49,7 @@ extern "C" {
 // SSL code generated for this program
 #include "pascal.tbl"
 
+#include "tcode.h"
 
 /* The scanner is part of ssl_rt 2.0
    with configuration done here to (ideally) match pascal requirements.
@@ -81,7 +82,8 @@ FILE *t_out,*t_doc,*t_lst;
 
 #define t_lineSize 256
 char   t_lineBuffer[t_lineSize];
-char   t_listing;                  /* do we want a listing file? */
+int    optionList;                  /* do we want a listing file? */
+int    listing_prev_pc = 0;
 
 std::vector<std::string> search_path;
 
@@ -90,6 +92,7 @@ void open_my_files();
 void close_my_files();
 void init_my_scanner();
 void init_my_operations();
+void my_listing_function( char* source_line, int token_accepted );
 
 void t_printToken();
 void t_dumpTables();
@@ -235,12 +238,12 @@ main( int argc, char* argv[] )
   int entries,temp;
   int arg;
 
-  t_listing = 0;
+  optionList = 0;
   search_path.push_back( "." );
 
   for ( arg = 1; ( arg < argc ) && ( argv[arg][0] == '-' ); ++arg ) {
     if ( strcmp( argv[arg], "-l" ) == 0 ) {
-      t_listing = 1;
+      optionList = 1;
     } else if ( strcmp( argv[arg], "-d" ) == 0 ) {
       optionDebug = 1;
     } else if ( strncmp( argv[arg], "-I", 2 ) == 0 ) {
@@ -278,6 +281,10 @@ main( int argc, char* argv[] )
 
 
   open_my_files();
+
+  if ( optionList ) {
+    ssl_set_listing_callback( my_listing_function );
+  }
 
   ssl_set_init_operations_callback( init_my_operations );
 
@@ -412,6 +419,37 @@ init_my_scanner()
 }
 
 
+/*  Callback when first token of each source line accepted.
+ *  Used to list source file, intermixed with generated tcode.
+ *
+ *  Line supplied to us contains '\n' for now.
+ */
+
+void
+my_listing_function( char* source_line, int token_accepted )
+{
+  int     line_number;
+  int     addr;
+
+  // First, dump any tcode issued since the previous source line was printed.
+  // We're only dumping the default code stream.  We'll probably incorporate temp streams into it
+  // before this listing function is called, though.
+  CodeStream* code = codeStreams[1];
+  if ( code->size() != listing_prev_pc ) {
+    fprintf( t_lst, "\n" );
+    listing_prev_pc = tcodeDump( t_lst, code->data(), listing_prev_pc, (int) code->size() );
+    fprintf( t_lst, "\n" );
+  }
+
+  bool print_address_on_source_lines = false;  // lean towards not doing this.  a bit noisy.
+
+  if ( token_accepted && print_address_on_source_lines ) {
+    fprintf ( t_lst, "%4d: %s", (int) code->size(), source_line );
+  } else {
+    /*  "blank" line  */
+    fprintf ( t_lst, "      %s", source_line );
+  }
+}
 
 
 /*********** S e m a n t i c   O p e r a t i o n s ***********/
@@ -1241,7 +1279,7 @@ open_my_files()
     printf("Can't open output file a.doc\n");
     exit(10);
   }
-  if (t_listing) {
+  if ( optionList ) {
     if((t_lst=fopen("a.lst","w"))==NULL) {
       printf("Can't open listing file a.lst\n");
       exit(10);
@@ -1258,7 +1296,7 @@ close_my_files()
 
   fclose(t_out);
   fclose(t_doc);
-  if (t_listing) fclose(t_lst);
+  if ( optionList ) fclose(t_lst);
 }
 
 

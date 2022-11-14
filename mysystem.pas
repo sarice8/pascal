@@ -188,7 +188,7 @@ initialization
 
 finalization
   begin
-    writeln( 'Hello from system.finalization' );
+    writeln( 'Goodbye from system.finalization' );
   end
 
 end.

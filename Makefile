@@ -40,6 +40,9 @@ BACK_SRCS = \
 JIT_SRCS = \
   jit.cc \
 
+TCODE_SRCS = \
+  tcode.cc \
+
 
 # Temp to do - improve.
 # Need multiple substitution steps because I have both cc and c
@@ -49,6 +52,7 @@ FRONT_OBJS = $(FRONT_OBJS_1:%.c=$(OBJDIR)/%.o)
 
 BACK_OBJS = $(BACK_SRCS:%.cc=$(OBJDIR)/%.o)
 JIT_OBJS = $(JIT_SRCS:%.cc=$(OBJDIR)/%.o)
+TCODE_OBJS = $(TCODE_SRCS:%.cc=$(OBJDIR)/%.o)
 
 FRONT_LINK_OBJS = \
   $(SCHEMA_DIR)/obj-$(OSTYPE)/schema_db.o \
@@ -61,7 +65,7 @@ JIT_LINK_OBJS =
 
 
 ALL_OBJS = $(FRONT_OBJS) $(FRONT_LINK_OBJS) $(BACK_OBJS) $(BACK_LINK_OBJS) \
-           $(JIT_OBJS) $(JIT_LINK_OBJS)
+           $(JIT_OBJS) $(JIT_LINK_OBJS) $(TCODE_OBJS)
 
 # gcc -MMD will create .d files listing dependencies
 DEP = $(ALL_OBJS:%.o=%.d)
@@ -79,10 +83,10 @@ JIT_EXEC = $(BINDIR)/jit
 execs: $(FRONT_EXEC) $(BACK_EXEC) $(JIT_EXEC)
 
 # Note:  | $(BINDIR) means the exec depends on the existence of $BINDIR, but not its timestamp
-$(FRONT_EXEC): $(FRONT_OBJS) | $(BINDIR)
+$(FRONT_EXEC): $(FRONT_OBJS) $(TCODE_OBJS) | $(BINDIR)
 	g++ $^ $(DBG_OBJS) $(FRONT_LINK_OBJS) $(DBG_STUBS) -o $@
 
-$(BACK_EXEC): $(BACK_OBJS) | $(BINDIR)
+$(BACK_EXEC): $(BACK_OBJS) $(TCODE_OBJS) | $(BINDIR)
 	g++ $^ $(BACK_LINK_OBJS) -o $@
 
 $(JIT_EXEC): $(JIT_OBJS) | $(BINDIR)
