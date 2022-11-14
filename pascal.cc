@@ -965,50 +965,53 @@ Node dNode;  // temporary for several mechanisms
 
     /* Mechanism id_mech */
 
-    case oIdAdd_mysystem:
-            ssl_result = ssl_add_id( "mysystem", pIdent );
+    case oId_mysystem:
+            ssl_result = ssl_lookup_id( "mysystem", pIdent );
             continue;
-    case oIdAdd_ShortStringAppendShortString:
-            ssl_result = ssl_add_id( "ShortStringAppendShortString", pIdent );
+    case oId_ShortStringAppendShortString:
+            ssl_result = ssl_lookup_id( "ShortStringAppendShortString", pIdent );
             continue;
-    case oIdAdd_File:
-            ssl_result = ssl_add_id( "file", pIdent );
+    case oId_ShortStringAppendChar:
+            ssl_result = ssl_lookup_id( "ShortStringAppendChar", pIdent );
             continue;
-    case oIdAdd_Integer:
-            ssl_result = ssl_add_id( "integer", pIdent );
+    case oId_File:
+            ssl_result = ssl_lookup_id( "file", pIdent );
             continue;
-    case oIdAdd_Boolean:
-            ssl_result = ssl_add_id( "boolean", pIdent );
+    case oId_Integer:
+            ssl_result = ssl_lookup_id( "integer", pIdent );
             continue;
-    case oIdAdd_Char:
-            ssl_result = ssl_add_id( "char", pIdent );
+    case oId_Boolean:
+            ssl_result = ssl_lookup_id( "boolean", pIdent );
             continue;
-    case oIdAdd_Byte:
-            ssl_result = ssl_add_id( "byte", pIdent );
+    case oId_Char:
+            ssl_result = ssl_lookup_id( "char", pIdent );
             continue;
-    case oIdAdd_Pointer:
-            ssl_result = ssl_add_id( "pointer", pIdent );
+    case oId_Byte:
+            ssl_result = ssl_lookup_id( "byte", pIdent );
             continue;
-    case oIdAdd_ShortString:
-            ssl_result = ssl_add_id( "ShortString", pIdent );
+    case oId_Pointer:
+            ssl_result = ssl_lookup_id( "pointer", pIdent );
             continue;
-    case oIdAdd_True:
-            ssl_result = ssl_add_id( "true", pIdent );
+    case oId_ShortString:
+            ssl_result = ssl_lookup_id( "ShortString", pIdent );
             continue;
-    case oIdAdd_False:
-            ssl_result = ssl_add_id( "false", pIdent );
+    case oId_True:
+            ssl_result = ssl_lookup_id( "true", pIdent );
             continue;
-    case oIdAdd_Ord:
-            ssl_result = ssl_add_id( "ord", pIdent );
+    case oId_False:
+            ssl_result = ssl_lookup_id( "false", pIdent );
             continue;
-    case oIdAdd_Chr:
-            ssl_result = ssl_add_id( "chr", pIdent );
+    case oId_Ord:
+            ssl_result = ssl_lookup_id( "ord", pIdent );
             continue;
-    case oIdAdd_Pred:
-            ssl_result = ssl_add_id( "pred", pIdent );
+    case oId_Chr:
+            ssl_result = ssl_lookup_id( "chr", pIdent );
             continue;
-    case oIdAdd_Succ:
-            ssl_result = ssl_add_id( "succ", pIdent );
+    case oId_Pred:
+            ssl_result = ssl_lookup_id( "pred", pIdent );
+            continue;
+    case oId_Succ:
+            ssl_result = ssl_lookup_id( "succ", pIdent );
             continue;
     case oChangeIntLitToLabelIdent: {
             // change current token from pIntLit to pIdent "_label_<intlit>"

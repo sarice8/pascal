@@ -54,6 +54,7 @@ procedure free( ptr: Pointer ); cdecl;
   external 'runlib' name 'runlibFree';
 
 procedure ShortStringAppendShortString( strA: ^ShortString; strB: ^ShortString );
+procedure ShortStringAppendChar( strA: ^ShortString; c: Char );
 
 procedure ConstructAnsiString( var str: AnsiString );
 procedure DestroyAnsiString( var str: AnsiString );
@@ -70,7 +71,6 @@ procedure ShortStringAppendShortString( strA: ^ShortString; strB: ^ShortString )
   begin
     lengthA := ord( strA^[0] );
     lengthB := ord( strB^[0] );
-
     freeA := 255 - lengthA;  // assuming default size of ShortString
     toCopy := lengthB;
     if toCopy > freeA then
@@ -78,6 +78,19 @@ procedure ShortStringAppendShortString( strA: ^ShortString; strB: ^ShortString )
     memcpy( @strA^[lengthA+1], @strB^[1], toCopy );
     strA^[0] := chr( lengthA + toCopy );
   end;
+
+procedure ShortStringAppendChar( strA: ^ShortString; c: Char );
+    var lengthA : integer;
+  begin
+    lengthA := ord( strA^[0] );
+    // assuming default size of ShortString
+    if lengthA < 255 then
+      begin
+        strA^[lengthA+1] := c;
+        strA^[0] := chr( lengthA + 1 );
+      end;
+  end;
+
 
 procedure ConstructAnsiString( var str: AnsiString );
   begin

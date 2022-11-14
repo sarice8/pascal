@@ -420,22 +420,23 @@ mechanism type_stack_mech:
 
 
 mechanism id_mech:
-    % adds a predefined id to the scanner's id table, and returns the id code
-    oIdAdd_mysystem >> int
-    oIdAdd_ShortStringAppendShortString >> int
-    oIdAdd_File >> int
-    oIdAdd_Integer >> int
-    oIdAdd_Boolean >> int
-    oIdAdd_Char >> int
-    oIdAdd_Byte >> int
-    oIdAdd_Pointer >> int
-    oIdAdd_ShortString >> int
-    oIdAdd_True >> int
-    oIdAdd_False >> int
-    oIdAdd_Ord >> int
-    oIdAdd_Chr >> int
-    oIdAdd_Pred >> int
-    oIdAdd_Succ >> int
+    % gets/adds a predefined id to the scanner's id table, and returns the id code
+    oId_mysystem >> int
+    oId_ShortStringAppendShortString >> int
+    oId_ShortStringAppendChar >> int
+    oId_File >> int
+    oId_Integer >> int
+    oId_Boolean >> int
+    oId_Char >> int
+    oId_Byte >> int
+    oId_Pointer >> int
+    oId_ShortString >> int
+    oId_True >> int
+    oId_False >> int
+    oId_Ord >> int
+    oId_Chr >> int
+    oId_Pred >> int
+    oId_Succ >> int
     oChangeIntLitToLabelIdent    % change current token from pIntLit to pIdent "_label_<intlit>"
     ;
 
@@ -505,7 +506,6 @@ Node    initScope              % scope for temporaries global var init,
                                % and program main stmt / unit initialization stmts
 
 int     mysystemId               % id of identifier "mysystem"
-int     id_ShortStringAppendShortString
 
 % built-in nTypes
 Node    FileType
@@ -528,6 +528,7 @@ Node    BuiltIn_Succ
 % Declarations in unit mysystem that the compiler may refer to directly.
 
 Node    System_ShortStringAppendShortString
+Node    System_ShortStringAppendChar
 
 
 % -------------------------- Forward Declarations -------------------------
@@ -704,8 +705,8 @@ UsesMySystem( Node user ):
 FindSelectSystemDecls( Node unit ):
    [ equal( oNodeGetInt( unit, qIdent ), mysystemId )
       | true :
-         System_ShortStringAppendShortString = oNodeFind( oScopeCurrent, qDecls, qIdent, id_ShortStringAppendShortString )
-
+         System_ShortStringAppendShortString = oNodeFind( oScopeCurrent, qDecls, qIdent, oId_ShortStringAppendShortString )
+         System_ShortStringAppendChar = oNodeFind( oScopeCurrent, qDecls, qIdent, oId_ShortStringAppendChar )
       | * :
    ]
    ;
@@ -2982,11 +2983,15 @@ ShortStringAppendShortString:
 % Removes both A and B from the expr stack / type stack.
 %
 ShortStringAppendChar:
-   #eNotImplemented
+   % Note at the moment I don't align params
+   .tAllocActuals  oEmitInt( 12 )
+   .tPushAddrActual  oEmitInt( 8 )  .tSwap  .tAssignI
+   .tPushAddrActual  oEmitInt( 0 )  .tSwap  .tAssignP
+   .tCall  @EmitValue( System_ShortStringAppendChar )
+   .tFreeActuals  oEmitInt( 12 )
    oTypeSPop
    oTypeSPop
    ;
-
 
 
 % Called on first use of an extern method
@@ -3900,10 +3905,7 @@ installBuiltIns:
 
    % "mysystem" is the name of a unit that will be available everywhere.
    % Add its name to the id table so we can easily spot the name later.
-   mysystemId = oIdAdd_mysystem
-
-   % Some names we'll want to look up in mysystem unit
-   id_ShortStringAppendShortString = oIdAdd_ShortStringAppendShortString
+   mysystemId = oId_mysystem
 
    % install built-in types
    FileType = @newType( nFileType, 4 )
@@ -3930,46 +3932,46 @@ installBuiltIns:
    oNodeSetInt( ShortStringType, qCapacity, 255 )
 
    % Declare those type identifiers.
-   % SSL doesn't support strings, so need help from operations e.g. oIdAdd_File
+   % SSL doesn't support strings, so need help from operations e.g. oId_File
 
    Node t
 
-   t = @newIdent( nTypeDecl, oIdAdd_File )
+   t = @newIdent( nTypeDecl, oId_File )
    oNodeSet( t, qType, FileType )
    oScopeDeclare( t )
 
-   t = @newIdent( nTypeDecl, oIdAdd_Integer )
+   t = @newIdent( nTypeDecl, oId_Integer )
    oNodeSet( t, qType, IntegerType )
    oScopeDeclare( t )
 
-   t = @newIdent( nTypeDecl, oIdAdd_Boolean )
+   t = @newIdent( nTypeDecl, oId_Boolean )
    oNodeSet( t, qType, BooleanType )
    oScopeDeclare( t )
 
-   t = @newIdent( nTypeDecl, oIdAdd_Char )
+   t = @newIdent( nTypeDecl, oId_Char )
    oNodeSet( t, qType, CharType )
    oScopeDeclare( t )
 
-   t = @newIdent( nTypeDecl, oIdAdd_Byte )
+   t = @newIdent( nTypeDecl, oId_Byte )
    oNodeSet( t, qType, ByteType )
    oScopeDeclare( t )
 
-   t = @newIdent( nTypeDecl, oIdAdd_Pointer )
+   t = @newIdent( nTypeDecl, oId_Pointer )
    oNodeSet( t, qType, UniversalPointerType )
    oScopeDeclare( t )
 
-   t = @newIdent( nTypeDecl, oIdAdd_ShortString )
+   t = @newIdent( nTypeDecl, oId_ShortString )
    oNodeSet( t, qType, ShortStringType )
    oScopeDeclare( t )
 
    % Built-in constants
 
-   t = @newIdent( nConst, oIdAdd_True )
+   t = @newIdent( nConst, oId_True )
    oNodeSet( t, qType, BooleanType )
    oNodeSetInt( t, qValue, 1 )
    oScopeDeclare( t )
 
-   t = @newIdent( nConst, oIdAdd_False )
+   t = @newIdent( nConst, oId_False )
    oNodeSet( t, qType, BooleanType )
    oNodeSetInt( t, qValue, 0 )
    oScopeDeclare( t )
@@ -3979,10 +3981,10 @@ installBuiltIns:
    % special rules for parameter types (e.g. any scalar type).
    % Calls to these methods will be handled specially by the compiler.
 
-   BuiltIn_Ord = @DeclareBuiltInFunc( oIdAdd_Ord )
-   BuiltIn_Chr = @DeclareBuiltInFunc( oIdAdd_Chr )
-   BuiltIn_Pred = @DeclareBuiltInFunc( oIdAdd_Pred )
-   BuiltIn_Succ = @DeclareBuiltInFunc( oIdAdd_Succ )
+   BuiltIn_Ord = @DeclareBuiltInFunc( oId_Ord )
+   BuiltIn_Chr = @DeclareBuiltInFunc( oId_Chr )
+   BuiltIn_Pred = @DeclareBuiltInFunc( oId_Pred )
+   BuiltIn_Succ = @DeclareBuiltInFunc( oId_Succ )
    ;
 
 end

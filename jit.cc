@@ -3538,7 +3538,7 @@ emitCmp( const Operand& x, const Operand& y )
     InstrTempl( 32, 0x81 ).opc( 7 ).MI(),
     InstrTempl( 32, 0x83 ).opc( 7 ).MI().imm8(),
     InstrTempl(  8, 0x38 ).MR(),
-    InstrTempl( 32, 0x89 ).MR(),
+    InstrTempl( 32, 0x39 ).MR(),
     InstrTempl(  8, 0x3a ).RM(),
     InstrTempl( 32, 0x3b ).RM()
   };
