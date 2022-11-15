@@ -1757,20 +1757,30 @@ generateCode()
           // Specifically, move x while leaving y still on the stack, so y gets updated if needed.
           // Still need a solution for other instructions too.
           Operand x = operandStack[ operandStack.size()-2 ];
-          operandIntoSpecificReg( x, regRax, 4 );
-          forceAllocateReg( regRdx );
-          Operand y = operandStack.back();   operandStack.pop_back();
-          operandStack.pop_back();
-          if ( y.isConst() ) {
-            // emitDiv does not accept const y
-            operandIntoReg( y );
+          Operand y = operandStack[ operandStack.size()-1 ];
+          if ( doConst && x.isConst() && y.isConst() ) {
+            operandStack.pop_back();
+            operandStack.pop_back();
+            operandStack.emplace_back( x._kind, x._value / y._value );
+          } else if ( doConst && y.isConst() && y._value == 1 ) {
+            operandStack.pop_back();
+            // leave x on the stack as-is
+          } else {
+            operandIntoSpecificReg( x, regRax, 4 );
+            forceAllocateReg( regRdx );
+            y = operandStack.back();   operandStack.pop_back();
+            operandStack.pop_back();
+            if ( y.isConst() ) {
+              // emitDiv does not accept const y
+              operandIntoReg( y );
+            }
+            // cdq to sign extend from eax to edx::eax
+            emitCdq();
+            emitDiv( x, y );  // leaves quotient in x, remainder in edx
+            operandStack.push_back( x );
+            regRdx->release();
+            y.release();
           }
-          // cdq to sign extend from eax to edx::eax
-          emitCdq();
-          emitDiv( x, y );  // leaves quotient in x, remainder in edx
-          operandStack.push_back( x );
-          regRdx->release();
-          y.release();
         }
         break;
       case tAddPI : {
