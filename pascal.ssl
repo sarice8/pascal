@@ -437,6 +437,7 @@ mechanism id_mech:
     oId_ShortString >> int
     oId_True >> int
     oId_False >> int
+    oId_Nil >> int
     oId_Ord >> int
     oId_Chr >> int
     oId_Pred >> int
@@ -2557,6 +2558,10 @@ PrimaryAllowCF( out Label falseLabel ):
                [ oTypeSNodeType
                   | nIntegerType, nEnumType, nBooleanType :
                      .tPushConstI @EmitValue( decl )
+                  | nPointerType, nUniversalPointerType :
+                     % We have one pointer const, Nil.  It's pushed as I.
+                     % Sign-extending I to P won't hurt since it's 0.
+                     .tPushConstI @EmitValue( decl )
                   | * :
                      #eNotImplemented
                ]
@@ -4053,6 +4058,11 @@ installBuiltIns:
 
    t = @newIdent( nConst, oId_False )
    oNodeSet( t, qType, BooleanType )
+   oNodeSetInt( t, qValue, 0 )
+   oScopeDeclare( t )
+
+   t = @newIdent( nConst, oId_Nil )
+   oNodeSet( t, qType, UniversalPointerType )
    oNodeSetInt( t, qValue, 0 )
    oScopeDeclare( t )
 

@@ -73,5 +73,12 @@ begin
   p1b := @c1[1];
   writeln( 'Subtraction: ', p1 - p1b );
 
+  // nil
+  p1 := nil;
+  if p1 < @c1[10] then
+    writeln( 'Pointer comparison worked as expected' );
+
+  if nil < @c1[10] then
+    writeln( 'Second pointer comparison worked as expected' );
 
 end.

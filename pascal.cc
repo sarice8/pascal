@@ -1039,6 +1039,9 @@ Node dNode;  // temporary for several mechanisms
     case oId_False:
             ssl_result = ssl_lookup_id( "false", pIdent );
             continue;
+    case oId_Nil:
+            ssl_result = ssl_lookup_id( "nil", pIdent );
+            continue;
     case oId_Ord:
             ssl_result = ssl_lookup_id( "ord", pIdent );
             continue;
