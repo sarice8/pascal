@@ -428,6 +428,7 @@ mechanism id_mech:
     oId_mysystem >> int
     oId_ShortStringAppendShortString >> int
     oId_ShortStringAppendChar >> int
+    oId_ShortStringCmp >> int
     oId_File >> int
     oId_Integer >> int
     oId_Boolean >> int
@@ -534,6 +535,7 @@ Node    BuiltIn_Succ
 
 Node    System_ShortStringAppendShortString
 Node    System_ShortStringAppendChar
+Node    System_ShortStringCmp
 
 
 % -------------------------- Forward Declarations -------------------------
@@ -712,6 +714,7 @@ FindSelectSystemDecls( Node unit ):
       | true :
          System_ShortStringAppendShortString = oNodeFind( oScopeCurrent, qDecls, qIdent, oId_ShortStringAppendShortString )
          System_ShortStringAppendChar = oNodeFind( oScopeCurrent, qDecls, qIdent, oId_ShortStringAppendChar )
+         System_ShortStringCmp = oNodeFind( oScopeCurrent, qDecls, qIdent, oId_ShortStringCmp )
       | * :
    ]
    ;
@@ -2169,7 +2172,8 @@ ExprAllowCF( out Label falseLabel ):
             | nBooleanType, nCharType :     .tEqualB
             | nIntegerType, nEnumType :     .tEqualI
             | nPointerType, nUniversalPointerType :    .tEqualP
-            | nShortStringType, nStrLitType :            #eNotImplemented
+            | nShortStringType, nStrLitType :
+               @ShortStringCmp  .tPushConstI  oEmitInt( 0 )  .tEqualI
             | * :                           #eNotAllowed
          ]
          oTypeSPop
@@ -2186,7 +2190,8 @@ ExprAllowCF( out Label falseLabel ):
             | nBooleanType, nCharType :     .tNotEqualB
             | nIntegerType, nEnumType :     .tNotEqualI
             | nPointerType, nUniversalPointerType :    .tNotEqualP
-            | nShortStringType, nStrLitType :            #eNotImplemented
+            | nShortStringType, nStrLitType :
+               @ShortStringCmp  .tPushConstI  oEmitInt( 0 )  .tNotEqualI
             | * :                           #eNotAllowed
          ]
          oTypeSPop
@@ -2203,7 +2208,8 @@ ExprAllowCF( out Label falseLabel ):
             | nBooleanType, nCharType :     .tLessB
             | nIntegerType, nEnumType :     .tLessI
             | nPointerType, nUniversalPointerType :   .tLessP
-            | nShortStringType, nStrLitType :            #eNotImplemented
+            | nShortStringType, nStrLitType :
+               @ShortStringCmp  .tPushConstI  oEmitInt( 0 )  .tLessI
             | * :                           #eNotAllowed
          ]
          oTypeSPop
@@ -2220,7 +2226,8 @@ ExprAllowCF( out Label falseLabel ):
             | nBooleanType, nCharType :     .tGreaterB
             | nIntegerType, nEnumType :     .tGreaterI
             | nPointerType, nUniversalPointerType :   .tGreaterP
-            | nShortStringType, nStrLitType :            #eNotImplemented
+            | nShortStringType, nStrLitType :
+               @ShortStringCmp  .tPushConstI  oEmitInt( 0 )  .tGreaterI
             | * :                           #eNotAllowed
          ]
          oTypeSPop
@@ -2237,7 +2244,8 @@ ExprAllowCF( out Label falseLabel ):
             | nBooleanType, nCharType :     .tLessEqualB
             | nIntegerType, nEnumType :     .tLessEqualI
             | nPointerType, nUniversalPointerType :   .tLessEqualP
-            | nShortStringType, nStrLitType :            #eNotImplemented
+            | nShortStringType, nStrLitType :
+               @ShortStringCmp  .tPushConstI  oEmitInt( 0 )  .tLessEqualI
             | * :                           #eNotAllowed
          ]
          oTypeSPop
@@ -2254,7 +2262,8 @@ ExprAllowCF( out Label falseLabel ):
             | nBooleanType, nCharType :     .tGreaterEqualB
             | nIntegerType, nEnumType :     .tGreaterEqualI
             | nPointerType, nUniversalPointerType :   .tGreaterEqualP
-            | nShortStringType, nStrLitType :            #eNotImplemented
+            | nShortStringType, nStrLitType :
+               @ShortStringCmp  .tPushConstI  oEmitInt( 0 )  .tGreaterEqualI
             | * :                           #eNotAllowed
          ]
          oTypeSPop
@@ -3076,6 +3085,25 @@ ShortStringAppendChar:
    .tFreeActuals  oEmitInt( 12 )
    oTypeSPop
    oTypeSPop
+   ;
+
+% Expr stack has ShortString A, and ShortString B above it.
+% Type stack has just the type of ShortString A.
+% Replaces the expr stack with the integer value of string comparison:
+% -1 if A < B,  0 if A = B,  1 if A > B
+% Leaves Integer on the type stack.
+%
+ShortStringCmp:
+   .tAllocActuals  oEmitInt( 24 )
+   .tPushAddrActual  oEmitInt( 8 )  .tSwap  .tAssignP
+   .tPushAddrActual  oEmitInt( 0 )  .tSwap  .tAssignP
+   int tempOffset = oScopeAllocType( IntegerType )
+   .tPushAddrActual  oEmitInt( 16 )  .tPushAddrLocal  oEmitInt( tempOffset )  .tAssignP
+   .tCall  @EmitValue( System_ShortStringCmp )
+   .tPushLocalI  oEmitInt( tempOffset )
+   .tFreeActuals  oEmitInt( 24 )
+   oTypeSPop
+   oTypeSPush( IntegerType )
    ;
 
 

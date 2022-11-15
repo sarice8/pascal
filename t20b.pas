@@ -3,7 +3,7 @@
 
 program t20;
 
-  var s1: ShortString;
+  var s1, s2: ShortString;
   var c: char;
   var i1: integer;
   var p1: PChar;
@@ -49,5 +49,38 @@ begin
   s1 := '-' + '>' + ' ' + s1 + '??';
   //s1 := s1 + '?';
   writeln( s1 );
+
+  s1 := 'Alphabet';
+  s2 := 'Hot Dog';
+
+  if s1 < s2 then
+    writeln( s1, ' < ', s2 );
+  if s1 <= s2 then
+    writeln( s1, ' <= ', s2 );
+  if s1 = s2 then
+    writeln( s1, ' = ', s2 );
+  if s1 >= s2 then
+    writeln( s1, ' >= ', s2 );
+  if s1 > s2 then
+    writeln( s1, ' > ', s2 );
+  if s1 <> s2 then
+    writeln( s1, ' <> ', s2 );
+
+  s1 := 'Alphabetize';
+  s2 := 'Alphabet';
+
+  if s1 < s2 then
+    writeln( s1, ' < ', s2 );
+  if s1 <= s2 then
+    writeln( s1, ' <= ', s2 );
+  if s1 = s2 then
+    writeln( s1, ' = ', s2 );
+  if s1 >= s2 then
+    writeln( s1, ' >= ', s2 );
+  if s1 > s2 then
+    writeln( s1, ' > ', s2 );
+  if s1 <> s2 then
+    writeln( s1, ' <> ', s2 );
+
 
 end.

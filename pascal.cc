@@ -1012,6 +1012,9 @@ Node dNode;  // temporary for several mechanisms
     case oId_ShortStringAppendChar:
             ssl_result = ssl_lookup_id( "ShortStringAppendChar", pIdent );
             continue;
+    case oId_ShortStringCmp:
+            ssl_result = ssl_lookup_id( "ShortStringCmp", pIdent );
+            continue;
     case oId_File:
             ssl_result = ssl_lookup_id( "file", pIdent );
             continue;

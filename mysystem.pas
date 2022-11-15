@@ -56,6 +56,11 @@ procedure free( ptr: Pointer ); cdecl;
 procedure ShortStringAppendShortString( strA: ^ShortString; strB: ^ShortString );
 procedure ShortStringAppendChar( strA: ^ShortString; c: Char );
 
+// Compare two ShortStrings.
+// Returns -1 if A < B,  0 if A = B,  1 if A > B
+//
+function ShortStringCmp( strA: ^ShortString; strB: ^ShortString ) : integer;
+
 procedure ConstructAnsiString( var str: AnsiString );
 procedure DestroyAnsiString( var str: AnsiString );
 function  AnsiStringToPChar( var str: AnsiString ): PChar;
@@ -91,6 +96,42 @@ procedure ShortStringAppendChar( strA: ^ShortString; c: Char );
       end;
   end;
 
+
+// Compare two ShortStrings.
+// Returns -1 if A < B,  0 if A = B,  1 if A > B
+//
+function ShortStringCmp( strA: ^ShortString; strB: ^ShortString ) : integer;
+    var remainA, remainB : integer;
+        pA, pB : PChar;
+    label done;
+  begin
+    remainA := ord( strA^[0] );
+    remainB := ord( strB^[0] );
+    pA := @strA^[1];
+    pB := @strB^[1];
+    while remainA > 0 do
+      begin
+        if ( remainB = 0 ) or ( pA^ > pB^ ) then
+          begin
+            ShortStringCmp := 1;
+            goto done;
+          end;
+        if pA^ < pB^ then
+          begin
+            ShortStringCmp := -1;
+            goto done;
+          end;
+        remainA := remainA - 1;
+        remainB := remainB - 1;
+      end;
+
+    if remainB > 0 then
+      ShortStringCmp := -1
+    else
+      ShortStringCmp := 0;
+
+    done: ;
+  end;
 
 procedure ConstructAnsiString( var str: AnsiString );
   begin
