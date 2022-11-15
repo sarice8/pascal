@@ -57,4 +57,16 @@ begin
     end;
   writeln;
 
+  // ptr - int
+  p1 := @c1[10];
+  for i1 := 1 to 10 do
+    begin
+      write( p1^, ' ' );
+      p1 := p1 - 1;
+    end;
+  writeln;
+
+  // ptr - ptr
+  writeln( 'Subtraction: ', @c1[10] - @c1[1] );
+
 end.

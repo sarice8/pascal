@@ -173,6 +173,8 @@ output:
    tDivI
    tAddPI            % add ptr (2nd value) and int (top value), resulting in a ptr
    tAddI
+   tSubP
+   tSubPI
    tSubI
    tNegI             % top entry *= -1
    tNot              % negate top boolean
@@ -2451,12 +2453,29 @@ ArithExprAllowCF( out Label falseLabel ):
          ]
 
       | '-' :
-         % TO DO: pointer arithmetic, as above
+         [ oTypeSNodeType
+            | nIntegerType, nByteType :
+               @PromoteToIntPop
+               @TermAllowCF( falseLabel )
+               @PromoteToInt
+               .tSubI
 
-         @PromoteToIntPop
-         @TermAllowCF( falseLabel )
-         @PromoteToInt
-         .tSubI
+            | nPointerType, nUniversalPointerType :
+               @TermAllowCF( falseLabel )
+               [ oTypeSNodeType
+                  | nIntegerType, nByteType :
+                     @PromoteToIntPop
+                     @PointerSubInt
+                  | nPointerType, nUniversalPointerType :
+                     @MatchTypes
+                     @PointerSubPointer
+                  | * :
+                     #eNotAllowed
+               ]
+
+            | * :  #eNotAllowed
+
+         ]
       | * :
          >
    ]};
@@ -2878,6 +2897,44 @@ PointerAddition:
    .tAddPI
    ;
 
+
+% On entry, expr stack has ptr, and integer above it.
+% The type stack has just the pointer type.
+% Pop those, and push the ptr decremented by that integer
+% (scaled by the pointed-to element size).
+% Leaves the pointer type on the type stack.
+%
+PointerSubInt:
+   Node elementType = oNodeGet( oTypeSTop, qBaseType )
+   int elementSize = oNodeGetInt( elementType, qSize )
+   [ equal( elementSize, 1 )
+      | false :
+         .tPushConstI  oEmitInt( elementSize )
+         .tMultI
+      | * :
+   ]
+   .tSubPI
+   ;
+
+
+% On entry, expr stack has two pointers, P1 and P2 above it.
+% The type stack has the type of P1.  (The type of P2 was already matched to P1.)
+% Replace the pointers on the expression stack with P1 - P2, scaled by the
+% pointed-to element size.  Type stack switched to integer.
+% 
+PointerSubPointer:
+   .tSubP
+   Node elementType = oNodeGet( oTypeSTop, qBaseType )
+   int elementSize = oNodeGetInt( elementType, qSize )
+   [ equal( elementSize, 1 )
+      | false :
+         .tPushConstI  oEmitInt( elementSize )
+         .tDivI
+      | * :
+   ]
+   oTypeSPop
+   oTypeSPush( IntegerType )
+   ;
 
 % ptr deref on left side, i.e. BEFORE addr of ptr var is on stack,
 %                              AFTER addr of thing pointed to is on stack

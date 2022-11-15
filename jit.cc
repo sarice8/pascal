@@ -1810,6 +1810,38 @@ generateCode()
           y.release();
         }
         break;
+      case tSubP : {
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
+          if ( doConst && x.isAddrOfVar() && y.isAddrOfVar() && x._kind == y._kind ) {
+            operandStack.emplace_back( x._kind, x._value - y._value );
+          } else {
+            operandKindAddrIntoReg( x );
+            operandKindAddrIntoReg( y );
+            operandIntoReg( x );
+            emitSub( x, y );
+            operandStack.push_back( x );
+          }
+          y.release();
+        }
+        break;
+      case tSubPI : {
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
+          if ( doConst && x.isAddrOfVar() && y.isConst() ) {
+            operandStack.emplace_back( x._kind, x._value - y._value );
+          } else {
+            operandKindAddrIntoReg( x );
+            operandKindAddrIntoReg( y );
+            // Sign-extend y to 64-bits so we can subtract it directly from x.
+            operandExtendToP( y );
+            operandIntoReg( x );
+            emitSub( x, y );
+            operandStack.push_back( x );
+          }
+          y.release();
+        }
+        break;
       case tSubI : {
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();

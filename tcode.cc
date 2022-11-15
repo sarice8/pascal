@@ -64,6 +64,8 @@ struct instrInfo_s tCodeInstrs[] = {
   { "tDivI", 0 },
   { "tAddPI", 0 },
   { "tAddI", 0 },
+  { "tSubP", 0 },
+  { "tSubPI", 0 },
   { "tSubI", 0 },
   { "tNegI", 0 },
   { "tNot", 0 },

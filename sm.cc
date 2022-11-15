@@ -412,6 +412,14 @@ walkTable()
               stack[sp-1] += stack[sp];
               sp--;
               continue;
+       case tSubP :
+              stack[sp-1] -= stack[sp];
+              sp--;
+              continue;
+       case tSubPI :
+              stack[sp-1] -= stack[sp];
+              sp--;
+              continue;
        case tSubI :
               stack[sp-1] -= stack[sp];
               sp--;
