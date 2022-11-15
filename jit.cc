@@ -1811,16 +1811,17 @@ generateCode()
         }
         break;
       case tSubP : {
+          // P - P produces I, at least in my current definition.
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
           if ( doConst && x.isAddrOfVar() && y.isAddrOfVar() && x._kind == y._kind ) {
-            operandStack.emplace_back( x._kind, x._value - y._value );
+            operandStack.emplace_back( jit_Operand_Kind_ConstI, x._value - y._value );
           } else {
             operandKindAddrIntoReg( x );
             operandKindAddrIntoReg( y );
             operandIntoReg( x );
             emitSub( x, y );
-            operandStack.push_back( x );
+            operandStack.emplace_back( jit_Operand_Kind_RegI, x._reg );
           }
           y.release();
         }

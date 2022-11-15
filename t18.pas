@@ -11,6 +11,7 @@ program t18;
 
   var i1: integer;
   var p1: ^integer;
+  var p1b: ^integer;
 
   var ptr: pointer;
   var p2: ^byte;
@@ -68,5 +69,9 @@ begin
 
   // ptr - ptr
   writeln( 'Subtraction: ', @c1[10] - @c1[1] );
+  p1 := @c1[10];
+  p1b := @c1[1];
+  writeln( 'Subtraction: ', p1 - p1b );
+
 
 end.
