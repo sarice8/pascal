@@ -30,6 +30,7 @@
 
 #include "pascal.h"
 #include "tcode.h"
+#include "runlib.h"
 
 FILE *src;
 
@@ -59,7 +60,7 @@ long stack[stackMax],sp;
 
 
 // good grief, can't hardcode these
-#define dataSize 500000
+#define dataSize 5000000
 char data[dataSize];         /* Data memory */
 
 
@@ -70,7 +71,7 @@ char data[dataSize];         /* Data memory */
 // This is because in my runtime model, an 'address' is always an index into data.
 // e.g. so tAssignI can work equally on global var and local var.
 // 
-#define callStackSize 2000
+#define callStackSize 200000
 #define callStackLowerBound (&data[dataSize - callStackSize])
 char* call_sp;
 char* call_fp;
@@ -90,9 +91,13 @@ void cleanup();
 void defineLabels();
 void defineLabel( int label, int addr );
 void defineLabelAlias( int label, int aliasToLabel );
+void defineLabelExtern( int label, char* name );
+
+void callCdecl( const std::string& name );
 
 std::unordered_map<int, int> labels;   // label# -> tcode addr
 std::unordered_map<int, int> labelAliases;  // label# -> aliasToLabel#
+std::unordered_map<int, std::string> externLabels;  // label# -> name of extern method
 
 
 int
@@ -188,13 +193,20 @@ void
 defineLabels()
 {
   for ( pc = 0; pc < codeWords; ) {
-    int instr = code[pc];
-    if ( instr == tLabel ) {
-      defineLabel( code[pc+1], pc+2 );
-    } else if ( instr == tLabelAlias ) {
-      defineLabelAlias( code[pc+1], code[pc+2] );
+    switch ( code[pc] ) {
+      case tLabel:
+        defineLabel( code[pc+1], pc+2 );
+        break;
+      case tLabelAlias:
+        defineLabelAlias( code[pc+1], code[pc+2] );
+        break;
+      case tLabelExtern:
+        defineLabelExtern( code[pc+1], &data[code[pc+2]] );
+        break;
+      default:
+        break;
     }
-    pc += tcodeInstrSize( instr );
+    pc += tcodeInstrSize( code[pc] );
   }
 }
 
@@ -210,6 +222,13 @@ defineLabelAlias( int label, int aliasToLabel )
 {
   labelAliases[ label ] = aliasToLabel;
 }
+
+void
+defineLabelExtern( int label, char* name )
+{
+  externLabels[label] = std::string( name );
+}
+
 
 int
 findLabel( int label )
@@ -238,6 +257,45 @@ upStaticFrame( int uplevels )
     up_fp = *(char**)(up_fp + FRAME_STATIC_LINK_OFFSET);
   }
   return up_fp;
+}
+
+
+// Cdecl calls have to translate between the tcode calling convention
+// and the cdecl calling convention.
+// For example, tcode implements function return values by passing an
+// extra parameter that's a pointer to a temporary, in which the called method
+// is expected to place the return value.  We have to do that storing here.
+//
+void
+callCdecl( const std::string& name )
+{
+  // For now, need to hardcode calls to the available cdecl methods.
+
+  if ( name == "runlibMalloc" ) {
+    void** resultPtr = *(void***)( call_sp + 4 );
+    *resultPtr = runlibMalloc( *(int*)call_sp );
+  } else if ( name == "runlibRealloc" ) {
+    void** resultPtr = *(void***)( call_sp + 12 );  // Note params are not aligned today
+    *resultPtr = runlibRealloc( *(void**)call_sp, *(int*)(call_sp+8) );
+  } else if ( name == "runlibFree" ) {
+    runlibFree( *(void**)call_sp );
+  } else if ( name == "runlibClearScreen" ) {
+    runlibClearScreen();
+  } else if ( name == "runlibUpdateScreen" ) {
+    runlibUpdateScreen();
+  } else if ( name == "runlibSetPixel" ) {
+    runlibSetPixel( *(int*)call_sp, *(int*)(call_sp+4), *(int*)(call_sp+8) );
+  } else if ( name == "runlibGetPixel" ) {
+    int* resultPtr = *(int**)( call_sp + 8 );
+    *resultPtr = runlibGetPixel( *(int*)call_sp, *(int*)(call_sp+4) );
+  } else if ( name == "runlibDelay" ) {
+    runlibDelay( *(int*)call_sp );
+  } else if ( name == "runlibWaitKey" ) {
+    int* resultPtr = *(int**)( call_sp );
+    *resultPtr = runlibWaitKey();
+  } else {
+    printf( "Unresolved external method %s\n", name.c_str() );
+  }
 }
 
 
@@ -522,9 +580,10 @@ walkTable()
               stack[sp] = pc+1;
               pc = findLabel( code[pc] );
               continue;
-       case tCallCdecl :
-              printf( "sm: tCallCdecl not supported yet\n" );
-              pc++;
+       case tCallCdecl : {
+              int label = code[pc++];
+              callCdecl( externLabels[label] );
+              }
               continue;
        case tReturn :
               assert( call_fp );
