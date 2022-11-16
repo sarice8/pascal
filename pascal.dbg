@@ -4128,7 +4128,7 @@
 732 FileType nGlobal 304 5
 733 IntegerType nGlobal 304 6
 734 BooleanType nGlobal 304 7
-735 BooleanCFType nGlobal 304 8
+735 BooleanFlowType nGlobal 304 8
 736 CharType nGlobal 304 9
 737 PCharType nGlobal 304 10
 738 ByteType nGlobal 304 11
@@ -4188,25 +4188,25 @@
 796 decl nInParam 304 1
 797 BooleanExprControlFlow nRule 5199
 799 falseLabel nOutParam 325 1
-800 ExprAllowCF nRule 5337
+800 ExprAllowFlow nRule 5337
 802 falseLabel nOutParam 325 1
-803 BoolExprAllowCF nRule 5870
+803 BoolExprAllowFlow nRule 5870
 805 falseLabel nOutParam 325 1
 1492 trueLabel nLocal 325 1
-806 BoolTermAllowCF nRule 6050
+806 BoolTermAllowFlow nRule 6050
 808 falseLabel nOutParam 325 1
 1509 overallFalseLabel nLocal 325 1
-809 BoolFactorAllowCF nRule 6188
+809 BoolFactorAllowFlow nRule 6188
 811 falseLabel nOutParam 325 1
-812 ArithExprAllowCF nRule 6255
+812 ArithExprAllowFlow nRule 6255
 814 falseLabel nOutParam 325 1
 1530 first nLocal 310 1
 1531 tempStrOffset nLocal 28 2
-815 TermAllowCF nRule 6491
+815 TermAllowFlow nRule 6491
 817 falseLabel nOutParam 325 1
-818 FactorAllowCF nRule 6542
+818 FactorAllowFlow nRule 6542
 820 falseLabel nOutParam 325 1
-821 PrimaryAllowCF nRule 6583
+821 PrimaryAllowFlow nRule 6583
 823 falseLabel nOutParam 325 1
 824 VarExpr nRule 6861
 826 decl nInParam 304 1
@@ -4219,9 +4219,9 @@
 834 decl nInParam 304 1
 835 DecVar nRule 10290
 837 decl nInParam 304 1
-838 CFToVal nRule 5237
+838 FlowToVal nRule 5237
 840 falseLabel nInOutParam 325 1
-841 ValToCF nRule 5306
+841 ValToFlow nRule 5306
 843 falseLabel nOutParam 325 1
 844 MoveIntoTempShortString nRule 8423
 1744 tempOffset nLocal 28 1

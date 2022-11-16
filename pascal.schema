@@ -179,9 +179,9 @@ nType ::= nByteType       % uint8_t
 
 nType ::= nBooleanType
 
-% nBooleanCFType is an expression type that's represented by control flow rather than a value.
+% nBooleanFlowType is an expression type that's represented by control flow rather than a value.
 % It's not used in the symbol table.
-nType ::= nBooleanCFType
+nType ::= nBooleanFlowType
 
 nType ::= nCharType
 

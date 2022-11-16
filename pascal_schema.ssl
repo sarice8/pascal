@@ -33,7 +33,7 @@ type node_type:
 	nIntegerType
 	nByteType
 	nBooleanType
-	nBooleanCFType
+	nBooleanFlowType
 	nCharType
 	nPointerType
 	nUniversalPointerType

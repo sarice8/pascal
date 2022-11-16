@@ -180,7 +180,7 @@ char *dObjectName [42] = {
 	"nIntegerType",
 	"nByteType",
 	"nBooleanType",
-	"nBooleanCFType",
+	"nBooleanFlowType",
 	"nCharType",
 	"nPointerType",
 	"nUniversalPointerType",

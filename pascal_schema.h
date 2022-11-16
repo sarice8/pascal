@@ -36,7 +36,7 @@ typedef enum {
     nIntegerType,
     nByteType,
     nBooleanType,
-    nBooleanCFType,
+    nBooleanFlowType,
     nCharType,
     nPointerType,
     nUniversalPointerType,
@@ -218,7 +218,7 @@ typedef enum {
 #define NewnIntegerType()		NewNode(nIntegerType)
 #define NewnByteType()		NewNode(nByteType)
 #define NewnBooleanType()		NewNode(nBooleanType)
-#define NewnBooleanCFType()		NewNode(nBooleanCFType)
+#define NewnBooleanFlowType()		NewNode(nBooleanFlowType)
 #define NewnCharType()		NewNode(nCharType)
 #define NewnPointerType()		NewNode(nPointerType)
 #define NewnUniversalPointerType()		NewNode(nUniversalPointerType)

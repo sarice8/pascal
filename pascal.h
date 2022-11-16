@@ -242,7 +242,7 @@
 #define nIntegerType 28
 #define nByteType 29
 #define nBooleanType 30
-#define nBooleanCFType 31
+#define nBooleanFlowType 31
 #define nCharType 32
 #define nPointerType 33
 #define nUniversalPointerType 34

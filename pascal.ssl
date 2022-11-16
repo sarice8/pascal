@@ -517,7 +517,7 @@ int     mysystemId               % id of identifier "mysystem"
 Node    FileType
 Node    IntegerType
 Node    BooleanType
-Node    BooleanCFType
+Node    BooleanFlowType
 Node    CharType
 Node    PCharType
 Node    ByteType
@@ -554,22 +554,22 @@ OrdinalLow( Node theType ) >> int;
 OrdinalHigh( Node theType ) >> int;
 AssignStmt( Node decl );
 BooleanExprControlFlow( out Label falseLabel );
-ExprAllowCF( out Label falseLabel );
-BoolExprAllowCF( out Label falseLabel );
-BoolTermAllowCF( out Label falseLabel );
-BoolFactorAllowCF( out Label falseLabel );
-ArithExprAllowCF( out Label falseLabel );
-TermAllowCF( out Label falseLabel );
-FactorAllowCF( out Label falseLabel );
-PrimaryAllowCF( out Label falseLabel );
+ExprAllowFlow( out Label falseLabel );
+BoolExprAllowFlow( out Label falseLabel );
+BoolTermAllowFlow( out Label falseLabel );
+BoolFactorAllowFlow( out Label falseLabel );
+ArithExprAllowFlow( out Label falseLabel );
+TermAllowFlow( out Label falseLabel );
+FactorAllowFlow( out Label falseLabel );
+PrimaryAllowFlow( out Label falseLabel );
 
 VarExpr( Node decl );
 LValueVar( Node decl, boolean writeable );
 IncVar( Node decl );
 DecVar( Node decl );
 
-CFToVal( inout Label falseLabel );
-ValToCF( out Label falseLabel );
+FlowToVal( inout Label falseLabel );
+ValToFlow( out Label falseLabel );
 MoveIntoTempShortString >> int;
 
 DeclLevel( Node decl ) >> int;
@@ -2057,7 +2057,7 @@ ConstExpr:
 % as well as  "if bool_expr1 or bool_expr2 then ...".
 % If a subexpression rule produces control flow, it will allocate a
 % falseLabel and pass it back up.  And it will push the
-% result type as BooleanCFType, to distinguish from BooleanType
+% result type as BooleanFlowType, to distinguish from BooleanType
 % which corresponds with a boolean value on the expr stack.
 % 
 % Note that my expression parsing is broken into more levels than
@@ -2081,8 +2081,8 @@ ConstExpr:
 Expr:
    Label falseLabel = labelNull
 
-   @ExprAllowCF( falseLabel )
-   @CFToVal( falseLabel );
+   @ExprAllowFlow( falseLabel )
+   @FlowToVal( falseLabel );
 
 
 % Public entry point:
@@ -2097,9 +2097,9 @@ Expr:
 % The caller must do so.
 %
 BooleanExprControlFlow( out Label falseLabel ):
-   @ExprAllowCF( falseLabel )
+   @ExprAllowFlow( falseLabel )
    [ oTypeSNodeType
-      | nBooleanCFType :
+      | nBooleanFlowType :
       | nBooleanType :
          % convert value to control flow
          falseLabel = oLabelNew
@@ -2114,9 +2114,9 @@ BooleanExprControlFlow( out Label falseLabel ):
 % falseLabel is the label that had been used by the control flow.
 % On return it will be set to labelNull.
 %
-CFToVal( inout Label falseLabel ):
+FlowToVal( inout Label falseLabel ):
    [ oTypeSNodeType
-      | nBooleanCFType :
+      | nBooleanFlowType :
          Label doneLabel = oLabelNew
          .tPushConstI  oEmitInt( 1 )
          .tJump  oEmitLabel( doneLabel )
@@ -2134,13 +2134,13 @@ CFToVal( inout Label falseLabel ):
 % falseLabel will be allocated by this rule and passed back.
 % The caller must define its location.
 %
-ValToCF( out Label falseLabel ):
+ValToFlow( out Label falseLabel ):
    [ oTypeSNodeType
       | nBooleanType :
          falseLabel = oLabelNew
          .tJumpFalse  oEmitLabel( falseLabel )
          oTypeSPop
-         oTypeSPush( BooleanCFType )
+         oTypeSPush( BooleanFlowType )
       | * :
    ];
 
@@ -2150,22 +2150,22 @@ ValToCF( out Label falseLabel ):
 % Leaves the expression type on the type stack.
 %
 % If the expression produces control flow, the expression type will be
-% nBooleanCFType.  In this case, a true value falls through to Here,
+% nBooleanFlowType.  In this case, a true value falls through to Here,
 % and a false value jumps to falseLabel.  This rule will allocate falseLabel
 % and return it, but will not define its location; the caller must do so.
 %
 % If the expression produces a value, the value will be left on the
-% expression stack, and the type will be some type other than nBooleanCFType.
+% expression stack, and the type will be some type other than nBooleanFlowType.
 % In this case, falseLabel is ignored.
 %
-ExprAllowCF( out Label falseLabel ):
-   @BoolExprAllowCF( falseLabel )
+ExprAllowFlow( out Label falseLabel ):
+   @BoolExprAllowFlow( falseLabel )
    {[
       | '=' :
-         @CFToVal( falseLabel )
+         @FlowToVal( falseLabel )
          @PromoteToIntOptional
-         @BoolExprAllowCF( falseLabel )
-         @CFToVal( falseLabel )
+         @BoolExprAllowFlow( falseLabel )
+         @FlowToVal( falseLabel )
          @PromoteToIntOptional
          @MatchTypes
          [ oTypeSNodeType
@@ -2180,10 +2180,10 @@ ExprAllowCF( out Label falseLabel ):
          oTypeSPush( BooleanType )
 
       | '<>' :
-         @CFToVal( falseLabel )
+         @FlowToVal( falseLabel )
          @PromoteToIntOptional
-         @BoolExprAllowCF( falseLabel )
-         @CFToVal( falseLabel )
+         @BoolExprAllowFlow( falseLabel )
+         @FlowToVal( falseLabel )
          @PromoteToIntOptional
          @MatchTypes
          [ oTypeSNodeType
@@ -2198,10 +2198,10 @@ ExprAllowCF( out Label falseLabel ):
          oTypeSPush( BooleanType )
 
       | '<' :
-         @CFToVal( falseLabel )
+         @FlowToVal( falseLabel )
          @PromoteToIntOptional
-         @BoolExprAllowCF( falseLabel )
-         @CFToVal( falseLabel )
+         @BoolExprAllowFlow( falseLabel )
+         @FlowToVal( falseLabel )
          @PromoteToIntOptional
          @MatchTypes
          [ oTypeSNodeType
@@ -2216,10 +2216,10 @@ ExprAllowCF( out Label falseLabel ):
          oTypeSPush( BooleanType )
 
       | '>' :
-         @CFToVal( falseLabel )
+         @FlowToVal( falseLabel )
          @PromoteToIntOptional
-         @BoolExprAllowCF( falseLabel )
-         @CFToVal( falseLabel )
+         @BoolExprAllowFlow( falseLabel )
+         @FlowToVal( falseLabel )
          @PromoteToIntOptional
          @MatchTypes
          [ oTypeSNodeType
@@ -2234,10 +2234,10 @@ ExprAllowCF( out Label falseLabel ):
          oTypeSPush( BooleanType )
 
       | '<=' :
-         @CFToVal( falseLabel )
+         @FlowToVal( falseLabel )
          @PromoteToIntOptional
-         @BoolExprAllowCF( falseLabel )
-         @CFToVal( falseLabel )
+         @BoolExprAllowFlow( falseLabel )
+         @FlowToVal( falseLabel )
          @PromoteToIntOptional
          @MatchTypes
          [ oTypeSNodeType
@@ -2252,10 +2252,10 @@ ExprAllowCF( out Label falseLabel ):
          oTypeSPush( BooleanType )
 
       | '>=' :
-         @CFToVal( falseLabel )
+         @FlowToVal( falseLabel )
          @PromoteToIntOptional
-         @BoolExprAllowCF( falseLabel )
-         @CFToVal( falseLabel )
+         @BoolExprAllowFlow( falseLabel )
+         @FlowToVal( falseLabel )
          @PromoteToIntOptional
          @MatchTypes
          [ oTypeSNodeType
@@ -2274,14 +2274,14 @@ ExprAllowCF( out Label falseLabel ):
    ]};
 
 
-BoolExprAllowCF( out Label falseLabel ):
+BoolExprAllowFlow( out Label falseLabel ):
    Label trueLabel = labelNull
 
-   @BoolTermAllowCF( falseLabel )
+   @BoolTermAllowFlow( falseLabel )
    {[
       | pOr :
          [ oTypeSNodeType
-            | nBooleanCFType :
+            | nBooleanFlowType :
                % We are true here. Jump ahead to done
                [ equal_label( trueLabel, labelNull )
                   | true :  trueLabel = oLabelNew
@@ -2289,7 +2289,7 @@ BoolExprAllowCF( out Label falseLabel ):
                ]
                .tJump  oEmitLabel( trueLabel )
             | nBooleanType :
-               @ValToCF( falseLabel )
+               @ValToFlow( falseLabel )
                % We are true here. Jump ahead to done
                [ equal_label( trueLabel, labelNull )
                   | true :  trueLabel = oLabelNew
@@ -2305,17 +2305,17 @@ BoolExprAllowCF( out Label falseLabel ):
 
          % we'll get a new falseLabel for this term
          falseLabel = labelNull
-         @BoolTermAllowCF( falseLabel )
+         @BoolTermAllowFlow( falseLabel )
 
          [ oTypeSNodeType
-            | nBooleanCFType :
+            | nBooleanFlowType :
             | nBooleanType :
-               @ValToCF( falseLabel )
+               @ValToFlow( falseLabel )
             | * : #eNotBoolean
          ]
 
          oTypeSPop
-         oTypeSPush( BooleanCFType )
+         oTypeSPush( BooleanFlowType )
 
       | * :
          >
@@ -2330,16 +2330,16 @@ BoolExprAllowCF( out Label falseLabel ):
    ;
 
 
-BoolTermAllowCF( out Label falseLabel ):
+BoolTermAllowFlow( out Label falseLabel ):
    Label overallFalseLabel = labelNull
 
-   @BoolFactorAllowCF( falseLabel )
+   @BoolFactorAllowFlow( falseLabel )
    {[
       | pAnd :
          [ oTypeSNodeType
-            | nBooleanCFType :
+            | nBooleanFlowType :
             | nBooleanType :
-               @ValToCF( falseLabel )
+               @ValToFlow( falseLabel )
             | * :
                #eNotBoolean
          ]
@@ -2363,12 +2363,12 @@ BoolTermAllowCF( out Label falseLabel ):
          ]
 
          Label factorFalseLabel = labelNull
-         @BoolFactorAllowCF( factorFalseLabel )
+         @BoolFactorAllowFlow( factorFalseLabel )
 
          [ oTypeSNodeType
-            | nBooleanCFType :
+            | nBooleanFlowType :
             | nBooleanType :
-               @ValToCF( factorFalseLabel )
+               @ValToFlow( factorFalseLabel )
             | * : #eNotBoolean
          ]
         .tLabelAlias  oEmitLabel( factorFalseLabel )  oEmitLabel( overallFalseLabel )
@@ -2377,14 +2377,14 @@ BoolTermAllowCF( out Label falseLabel ):
          >
    ]};
 
-BoolFactorAllowCF( out Label falseLabel ):
+BoolFactorAllowFlow( out Label falseLabel ):
    [
       | pNot :
          Label factorFalseLabel = labelNull
 
-         @BoolFactorAllowCF( factorFalseLabel )
+         @BoolFactorAllowFlow( factorFalseLabel )
          [ oTypeSNodeType
-            | nBooleanCFType :
+            | nBooleanFlowType :
                % We have control flow, and are sitting at the point that has value false.
                falseLabel = oLabelNew
                .tJump  oEmitLabel( falseLabel )
@@ -2400,20 +2400,20 @@ BoolFactorAllowCF( out Label falseLabel ):
          ]
 
       | * :
-         @ArithExprAllowCF( falseLabel )
+         @ArithExprAllowFlow( falseLabel )
    ];
 
-ArithExprAllowCF( out Label falseLabel ):
+ArithExprAllowFlow( out Label falseLabel ):
    boolean first = true
    int tempStrOffset
 
-   @TermAllowCF( falseLabel )
+   @TermAllowFlow( falseLabel )
    {[
       | '+' :
          [ oTypeSNodeType
             | nIntegerType, nByteType :
                @PromoteToIntPop
-               @TermAllowCF( falseLabel )  % actually not allowing CF, will be caught by type check
+               @TermAllowFlow( falseLabel )  % actually not allowing CF, will be caught by type check
 
                [ oTypeSNodeType
                   | nPointerType, nUniversalPointerType :
@@ -2434,7 +2434,7 @@ ArithExprAllowCF( out Label falseLabel ):
                             first = false
                   | * :
                ]
-               @TermAllowCF( falseLabel )  % actually not allowing CF, will be caught by type check
+               @TermAllowFlow( falseLabel )  % actually not allowing CF, will be caught by type check
                [ oTypeSNodeType
                   | nShortStringType, nStrLitType :
                      @ShortStringAppendShortString
@@ -2454,7 +2454,7 @@ ArithExprAllowCF( out Label falseLabel ):
                ]
 
             | nPointerType, nUniversalPointerType :
-               @TermAllowCF( falseLabel )   % actually not allowing CF
+               @TermAllowFlow( falseLabel )   % actually not allowing CF
                @PromoteToIntPop
                @PointerAddition
 
@@ -2466,12 +2466,12 @@ ArithExprAllowCF( out Label falseLabel ):
          [ oTypeSNodeType
             | nIntegerType, nByteType :
                @PromoteToIntPop
-               @TermAllowCF( falseLabel )
+               @TermAllowFlow( falseLabel )
                @PromoteToInt
                .tSubI
 
             | nPointerType, nUniversalPointerType :
-               @TermAllowCF( falseLabel )
+               @TermAllowFlow( falseLabel )
                [ oTypeSNodeType
                   | nIntegerType, nByteType :
                      @PromoteToIntPop
@@ -2490,39 +2490,39 @@ ArithExprAllowCF( out Label falseLabel ):
          >
    ]};
 
-TermAllowCF( out Label falseLabel ):
-   @FactorAllowCF( falseLabel )
+TermAllowFlow( out Label falseLabel ):
+   @FactorAllowFlow( falseLabel )
    {[
       | pTimes :
          @PromoteToIntPop
-         @FactorAllowCF( falseLabel )  % actually not allowing CF, will be caught by type check
+         @FactorAllowFlow( falseLabel )  % actually not allowing CF, will be caught by type check
          @PromoteToInt
          .tMultI
       | pDivide :
          @PromoteToIntPop
-         @FactorAllowCF( falseLabel )
+         @FactorAllowFlow( falseLabel )
          @PromoteToInt
          .tDivI
       | * :
          >
    ]};
 
-FactorAllowCF( out Label falseLabel ):
+FactorAllowFlow( out Label falseLabel ):
    [
       | pPlus :
-         @PrimaryAllowCF( falseLabel )  % actually not allowing CF, will be caught by type check
+         @PrimaryAllowFlow( falseLabel )  % actually not allowing CF, will be caught by type check
          % TO DO: unary +/- is supposed to leave expression type as-is.
          @PromoteToInt
       | pMinus :
-         @PrimaryAllowCF( falseLabel )
+         @PrimaryAllowFlow( falseLabel )
          % TO DO: unary +/- is supposed to leave expression type as-is.
          @PromoteToInt
          .tNegI
       | * :
-         @PrimaryAllowCF( falseLabel )
+         @PrimaryAllowFlow( falseLabel )
    ];
 
-PrimaryAllowCF( out Label falseLabel ):
+PrimaryAllowFlow( out Label falseLabel ):
    [
       | pIntLit :
          .tPushConstI  oEmitInt( TOKEN_VALUE )
@@ -2533,7 +2533,7 @@ PrimaryAllowCF( out Label falseLabel ):
          oTypeSPush( CharType )
 
       | '(' :
-         @ExprAllowCF( falseLabel )
+         @ExprAllowFlow( falseLabel )
          ')'
 
       | pStrLit :
@@ -4024,7 +4024,7 @@ installBuiltIns:
    FileType = @newType( nFileType, 4 )
    IntegerType = @newType( nIntegerType, 4 )
    BooleanType = @newType( nBooleanType, 1 )
-   BooleanCFType = @newType( nBooleanCFType, 1 )
+   BooleanFlowType = @newType( nBooleanFlowType, 1 )
    CharType = @newType( nCharType, 1 )
    PCharType = @PointerTypeTo( CharType )
    ByteType = @newType( nByteType, 1 )
