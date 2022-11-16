@@ -1,0 +1,7 @@
+#!/bin/sh
+
+../bin-${OSTYPE}/pascal -l -I.. $*
+
+# Now execute
+../bin-${OSTYPE}/sm a.out
+#../bin-${OSTYPE}/jit a.out
