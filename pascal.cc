@@ -336,6 +336,8 @@ struct ssl_token_table_struct my_keyword_table[] = {
   "until",              pUntil,
   "continue",           pContinue,
   "break",              pBreak,
+  "case",               pCase,
+  "otherwise",          pOtherwise,
   "goto",               pGoto,
   "and",                pAnd,
   "or",                 pOr,

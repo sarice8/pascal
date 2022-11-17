@@ -109,6 +109,8 @@ input:
    pUntil
    pContinue
    pBreak
+   pCase
+   pOtherwise
    pGoto
    pAnd
    pOr
@@ -3425,6 +3427,7 @@ Statement:
       | pContinue :    @ContinueStmt
       | pBegin :       @BeginStmt
       | pIdent :       @LabelOrAssignOrCallStmt
+      | pCase :        @CaseStmt
       | pGoto :        @GotoStmt
       | pIntLit :      % should be an integer label
                        oChangeIntLitToLabelIdent
@@ -3736,6 +3739,65 @@ BreakStmt:
       | false :
          .tJump  oEmitLabel( oLoopBreakLabel )
    ];
+
+
+CaseStmt:
+   @Expr
+   pOf
+
+   {
+      [
+         | pOtherwise, pElse :
+
+            % A bit tricky:
+            % The otherwise clause allows multiple statements (unlike other cases).
+            % ';' might be separating statements in the otherwise clause,
+            % or might be an optional trailing ; after the last statement.
+            % I have to watch for End to know when the statements stop.
+            % (Note, the otherwise clause is the last part of the case statement.)
+            {[
+               | pEnd :  >
+               | * :
+                  @Statement
+                  [
+                     | ';' :
+                     | * :   pEnd  >
+                  ]
+            ]}
+            >
+
+         | pEnd :
+            % Reached end with no otherwise clause
+            >
+
+         | * :
+            {
+               @ConstExpr
+               [
+                  | '..' :  @ConstExpr
+                  | * :
+               ]
+               [
+                  | ',' :
+                  | * :  >
+               ]
+            }
+            ':'
+            @Statement
+            % Swallow optional trailing ';'
+            [
+               | ';' :
+               | * :
+            ]
+            
+      ]
+   
+   }
+   ;
+
+
+
+
 
 
 GotoStmt:
