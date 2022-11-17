@@ -82,5 +82,16 @@ begin
   if s1 <> s2 then
     writeln( s1, ' <> ', s2 );
 
+  s1 := 'E';
+  writeln( s1 );
+
+  c := 'F';
+  s1 := c;
+  writeln( s1 );
+  writeln( c + c );
+
+
+  // writeln( c + 1 );
+  //   -- fpc error:  no overload Char + ShortInt
 
 end.

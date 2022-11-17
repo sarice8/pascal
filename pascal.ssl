@@ -3008,6 +3008,12 @@ CoerceType:
             | nShortStringType :
                [ nt
                   | nStrLitType :  >>
+                  | nCharType :
+                     % Store char as a temp ShortString.
+                     oTypeSPush( CharType )
+                     int tempOffset = @MoveIntoTempShortString
+                     oTypeSPop
+                     >>
                   | * :
                ]
             | * :
