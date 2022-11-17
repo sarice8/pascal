@@ -2215,6 +2215,39 @@ generateCode()
           x.release();
         }
         break;
+      case tJumpCaseB : {
+          Operand x = operandStack.back();   operandStack.pop_back();
+          int label = *tCodePc++;
+          toDo( "tJumpCaseB\n" );
+        }
+        break;
+      case tJumpCaseI : {
+          Operand x = operandStack.back();   operandStack.pop_back();
+          int label = *tCodePc++;
+          toDo( "tJumpCaseI\n" );
+        }
+        break;
+      case tJumpCaseS : {
+          Operand x = operandStack.back();   operandStack.pop_back();
+          int label = *tCodePc++;
+          toDo( "tJumpCaseS\n" );
+        }
+        break;
+      case tCase : {
+          toDo( "tCase\n" );
+          tCodePc += 2;
+        }
+        break;
+      case tCaseRange : {
+          toDo( "tCaseRange\n" );
+          tCodePc += 3;
+        }
+        break;
+      case tCaseEnd : {
+          toDo( "tCaseEnd\n" );
+          tCodePc++;
+        }
+        break;
       case tLabel : {
           defineLabel( *tCodePc++, nativePc );
         }

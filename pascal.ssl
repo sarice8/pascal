@@ -208,6 +208,12 @@ output:
    tJump             % <label#>
    tJumpTrue         % <label#>  (pops top of stack, jumps if true)
    tJumpFalse        % <label#>  (pops top of stack, jumps if false)
+   tJumpCaseB        % <label#>  pops uint8_t, jumps to case indicated by table at label (consisting of tCase, tCaseRange, tCaseEnd)
+   tJumpCaseI        % <label#>  pops integer, jumps to case indicated by table at label
+   tJumpCaseS        % <label#>  pops pointer to ShortString, jumps to case indicated by table at label
+   tCase             % <int> <label#>  - case table entry: if match int, goto label.  For tJumpCaseS, int is offset into global data.
+   tCaseRange        % <lowint> <highint> <label#>  - case table entry: if lowint <= value <= highint, goto label.  For tJumpCaseS, offsets into global.
+   tCaseEnd          % <label#> - end of case table.  Label points to no-match code (otherwise clause or end of statement).
    tLabel            % <label#> - define label# at the current address
    tLabelAlias       % <label#> <aliasToLabel#> - defines label to be an alias of another label
    tLabelExtern      % <label#> <offsetToStrLit> - defines label to mean an extern symbol, whose name is in global data
@@ -1521,7 +1527,7 @@ TypedConstDecl:
 
    % TO DO: skip subranges, similar to oTypeSNodeType.
    [ oNodeType( theType )
-      | nBooleanType, nByteType, nCharType, nIntegerType, nEnumType:
+      | nBooleanType, nByteType, nCharType, nIntegerType, nEnumType :
          % Parse expression and store value in decl
          '='
 
@@ -3742,12 +3748,26 @@ BreakStmt:
 
 
 CaseStmt:
+   Code tableCode = oCodeNew
+   Label tableLabel = oLabelNew
+   Label doneLabel = oLabelNew
+   Label otherwiseLabel = doneLabel
+
    @Expr
+   Node theType = oTypeSTop
+   [ oTypeSNodeType
+      | nBooleanType, nByteType, nCharType :   .tJumpCaseB  oEmitLabel( tableLabel )
+      | nIntegerType, nEnumType :              .tJumpCaseI  oEmitLabel( tableLabel )
+      | nShortStringType, nStrLitType :        #eNotImplemented
+      | * :     #eNotAllowed
+   ]
    pOf
 
    {
       [
          | pOtherwise, pElse :
+            otherwiseLabel = oLabelNew
+            .tLabel  oEmitLabel( otherwiseLabel )
 
             % A bit tricky:
             % The otherwise clause allows multiple statements (unlike other cases).
@@ -3771,19 +3791,30 @@ CaseStmt:
             >
 
          | * :
+            Label caseLabel = oLabelNew
+            oCodePush( tableCode )
             {
                @ConstExpr
+               % TO DO: currently ConstExpr leaves int result on oValue stack, and doesn't indicate type
+               int val = oValueTop
+               oValuePop
                [
                   | '..' :  @ConstExpr
-                  | * :
+                            int highval = oValueTop
+                            oValuePop
+                            .tCaseRange  oEmitInt( val )  oEmitInt( highval )  oEmitLabel( caseLabel )
+                  | * :     .tCase  oEmitInt( val )  oEmitLabel( caseLabel )
                ]
                [
                   | ',' :
                   | * :  >
                ]
             }
+            oCodePop
             ':'
+            .tLabel  oEmitLabel( caseLabel )
             @Statement
+            .tJump  oEmitLabel( doneLabel )
             % Swallow optional trailing ';'
             [
                | ';' :
@@ -3793,11 +3824,12 @@ CaseStmt:
       ]
    
    }
+
+   .tLabel  oEmitLabel( tableLabel )
+   oEmitCode( tableCode )
+   .tCaseEnd  oEmitLabel( otherwiseLabel )
+   .tLabel  oEmitLabel( doneLabel )
    ;
-
-
-
-
 
 
 GotoStmt:

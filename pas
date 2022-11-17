@@ -2,4 +2,4 @@
 
 ./bin-${OSTYPE}/pascal -l $*
 
-./bin-${OSTYPE}/sm a.out | tee a.log
+./bin-${OSTYPE}/sm a.out

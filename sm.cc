@@ -625,6 +625,48 @@ walkTable()
               }
               pc++;
               continue;
+       case tJumpCaseB :
+       case tJumpCaseI : {
+              int value = stack[sp--];
+              int table = findLabel( code[pc] );
+              while ( true ) {
+                if ( code[table] == tCase ) {
+                  if ( value == code[table+1] ) {
+                    pc = findLabel( code[table+2] );
+                    break;
+                  }
+                  table += 3;
+                } else if ( code[table] == tCaseRange ) {
+                  if ( value >= code[table+1] && value <= code[table+2] ) {
+                    pc = findLabel( code[table+3] );
+                    break;
+                  }
+                  table += 4;
+                } else if ( code[table] == tCaseEnd ) {
+                  pc = findLabel( code[table+1] );
+                  break;
+                } else {
+                  fatal( "unexpected instruction in case table\n" );
+                }
+              }
+              continue;
+              }
+       case tJumpCaseS :
+              printf( "TO DO: tJumpCaseS\n" );
+              sp--;
+              continue;
+       case tCase:
+              // A no-op if we fall through to this case table
+              pc += 2;
+              break;
+       case tCaseRange:
+              // A no-op if we fall through to this case table
+              pc += 3;
+              break;
+       case tCaseEnd:
+              // A no-op if we fall through to this case table
+              pc++;
+              break;
        case tLabel :
               // Defines a label.  This is a no-op during execution.
               pc++;
