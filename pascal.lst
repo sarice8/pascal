@@ -3891,6 +3891,7 @@
 10922:             {
 10922:                @ConstExpr
                      % TO DO: currently ConstExpr leaves int result on oValue stack, and doesn't indicate type
+                     % TO DO: match type with earlier expr.  Including coercing char to string if necessary.
 10924:                int val = oValueTop
 10929:                oValuePop
 10930:                [

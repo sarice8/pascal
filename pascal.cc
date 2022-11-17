@@ -296,6 +296,11 @@ main( int argc, char* argv[] )
   // Execute SSL program
   int status = ssl_run_program();
 
+  if ( optionList ) {
+    // flush last bit of code after the last listed source line
+    my_listing_function( (char*) "\n", false );
+  }
+
   close_my_files();
 
   SCH_Term();

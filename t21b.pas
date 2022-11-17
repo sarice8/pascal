@@ -9,8 +9,7 @@ program t21;
   procedure proc1( i1: integer );
     begin
       case i1 of
-        //c1:  writeln( 'One' );
-        1:  writeln( 'One' );
+        c1:  writeln( 'One' );
         //c2:  writeln( 'Two' );
         //  -- fpc: error: constant expression required
         //     so, typed constant not considered a constant
