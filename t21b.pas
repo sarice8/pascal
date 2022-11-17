@@ -14,7 +14,7 @@ program t21;
         //  -- fpc: error: constant expression required
         //     so, typed constant not considered a constant
         // fpc does allow this:
-        // c1 + 1: writeln( 'Two' );
+        c1 + 1: writeln( 'Two' );
         3:  writeln( 'Three' );
         6, 7..8:  writeln( 'Six to Eight' );
         otherwise

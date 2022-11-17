@@ -1,4 +1,4 @@
-#define SSL_CODE_TABLE_SIZE 12600
+#define SSL_CODE_TABLE_SIZE 12800
 
 #define oJumpForward 0
 #define oJumpBack 1
@@ -430,20 +430,33 @@
 #define oCountIsZero 124
 #define oCountPop 125
 #define oValuePush 126
-#define oValueNegate 127
-#define oValueTop 128
-#define oValuePop 129
-#define oStringAllocLit 130
-#define oStringAllocShortStringLit 131
-#define oLoopPush 132
-#define oLoopContinueLabel 133
-#define oLoopBreakLabel 134
-#define oLoopPop 135
-#define oMsg 136
-#define oMsgTrace 137
-#define oMsgNode 138
-#define oMsgNodeLong 139
-#define oMsgNodeVec 140
+#define oValueTop 127
+#define oValuePop 128
+#define oValueNegate 129
+#define oValueEqual 130
+#define oValueNotEqual 131
+#define oValueLess 132
+#define oValueGreater 133
+#define oValueLessEqual 134
+#define oValueGreaterEqual 135
+#define oValueOr 136
+#define oValueAnd 137
+#define oValueNot 138
+#define oValueAdd 139
+#define oValueSub 140
+#define oValueMult 141
+#define oValueDiv 142
+#define oStringAllocLit 143
+#define oStringAllocShortStringLit 144
+#define oLoopPush 145
+#define oLoopContinueLabel 146
+#define oLoopBreakLabel 147
+#define oLoopPop 148
+#define oMsg 149
+#define oMsgTrace 150
+#define oMsgNode 151
+#define oMsgNodeLong 152
+#define oMsgNodeVec 153
 
 #ifdef SSL_INCLUDE_ERR_TABLE
 

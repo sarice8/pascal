@@ -1167,13 +1167,64 @@ Node dNode;  // temporary for several mechanisms
             if (++dVSptr==dVSsize) ssl_fatal("VS overflow");
             dVS[dVSptr] = ssl_param;
             continue;
-     case oValueNegate :
-            dVS[dVSptr] *= -1;
-            continue;
      case oValueTop:
             ssl_result = dVS[dVSptr];
             continue;
      case oValuePop :
+            dVSptr--;
+            continue;
+     case oValueNegate :
+            dVS[dVSptr] *= -1;
+            continue;
+     case oValueEqual :
+            dVS[dVSptr-1] = ( dVS[dVSptr-1] == dVS[dVSptr] );
+            dVSptr--;
+            continue;
+     case oValueNotEqual :
+            dVS[dVSptr-1] = ( dVS[dVSptr-1] != dVS[dVSptr] );
+            dVSptr--;
+            continue;
+     case oValueLess :
+            dVS[dVSptr-1] = ( dVS[dVSptr-1] < dVS[dVSptr] );
+            dVSptr--;
+            continue;
+     case oValueGreater :
+            dVS[dVSptr-1] = ( dVS[dVSptr-1] > dVS[dVSptr] );
+            dVSptr--;
+            continue;
+     case oValueLessEqual :
+            dVS[dVSptr-1] = ( dVS[dVSptr-1] <= dVS[dVSptr] );
+            dVSptr--;
+            continue;
+     case oValueGreaterEqual :
+            dVS[dVSptr-1] = ( dVS[dVSptr-1] >= dVS[dVSptr] );
+            dVSptr--;
+            continue;
+     case oValueOr :
+            dVS[dVSptr-1] = ( dVS[dVSptr-1] || dVS[dVSptr] );
+            dVSptr--;
+            continue;
+     case oValueAnd :
+            dVS[dVSptr-1] = ( dVS[dVSptr-1] && dVS[dVSptr] );
+            dVSptr--;
+            continue;
+     case oValueNot :
+            dVS[dVSptr] = !dVS[dVSptr];
+            continue;
+     case oValueAdd :
+            dVS[dVSptr-1] += dVS[dVSptr];
+            dVSptr--;
+            continue;
+     case oValueSub :
+            dVS[dVSptr-1] -= dVS[dVSptr];
+            dVSptr--;
+            continue;
+     case oValueMult :
+            dVS[dVSptr-1] *= dVS[dVSptr];
+            dVSptr--;
+            continue;
+     case oValueDiv :
+            dVS[dVSptr-1] /= dVS[dVSptr];
             dVSptr--;
             continue;
 

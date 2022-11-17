@@ -483,9 +483,23 @@ mechanism count :
 
 mechanism value :              % value stack, to calc. const expr's
    oValuePush(int)             % push an explicit int lit
-   oValueNegate                % negate top value
    oValueTop >> int            % get top value on value stack
-   oValuePop;
+   oValuePop
+   oValueNegate                % negate top numeric value
+   oValueEqual
+   oValueNotEqual
+   oValueLess
+   oValueGreater
+   oValueLessEqual
+   oValueGreaterEqual
+   oValueOr                    % boolean or
+   oValueAnd
+   oValueNot                   % boolean not
+   oValueAdd
+   oValueSub
+   oValueMult
+   oValueDiv
+   ;
 
 mechanism string :
    oStringAllocLit( String ) >> int      % alloc global space for strlit, return address
@@ -1480,17 +1494,20 @@ ConstDecl:
             | ':' :
                @TypedConstDecl
             | * :
-               @UntypedConstDecl
+               @TrueConstDecl
          ]
       | * :
          >
    ]};
 
 
-% Parse an untyped const declaration.
+% Parse a true const declaration (as opposed to a typed const declaration).
+% The "true" terminology comes from Delphi docs.  It refers to a const that is
+% evaluated at compile time, rather than at program startup time.
+%
 % We've just accepted the identifier.
 %
-UntypedConstDecl:
+TrueConstDecl:
    Node decl = @newIdent( nConst, LAST_ID )
    '='
 
@@ -2019,26 +2036,133 @@ EnumTypeRef( out Node resultType ):
 % Constant expressions: currently, only literal integers or previously
 % named constant integers are supported, possibly with a negation.
 % Constant expressions are evaluated at compile time.
+%
+% The value of a constant expression is left on the Value Stack.
+% Currently we don't return the type of the constant expression.  TO DO: leave it on the type stack.
 
 ConstExpr:
+   @ConstBoolExpr
+   {[
+      | '=' :
+         @ConstBoolTerm
+         oValueEqual
+      | '<>' :
+         @ConstBoolExpr
+         oValueNotEqual
+      | '<' :
+         @ConstBoolExpr
+         oValueLess
+      | '>' :
+         @ConstBoolExpr
+         oValueGreater
+      | '<=' :
+         @ConstBoolExpr
+         oValueLessEqual
+      | '>=' :
+         @ConstBoolExpr
+         oValueGreaterEqual
+      | * :  >
+   ]};
+
+
+ConstBoolExpr:
+   @ConstBoolTerm
+   {[
+      | pOr :
+         @ConstBoolTerm
+         oValueOr
+      | * :  >
+   ]};
+
+
+ConstBoolTerm:
+   @ConstBoolFactor
+   {[
+      | pAnd :
+         @ConstBoolFactor
+         oValueAnd
+      | * :  >
+   ]};
+
+
+ConstBoolFactor:
+   [
+      | pNot :
+         @ConstBoolFactor
+         oValueNot
+      | * :
+         @ConstArithExpr
+   ];
+
+
+ConstArithExpr:
+   @ConstTerm
+   {[
+      | '+' :
+         @ConstTerm
+         oValueAdd
+      | '-' :
+         @ConstTerm
+         oValueSub
+      | * :  >
+   ]};
+
+
+ConstTerm:
+   @ConstFactor
+   {[
+      | pTimes :
+         @ConstFactor
+         oValueMult
+      | pDivide :
+         @ConstFactor
+         oValueDiv
+      | * :  >
+   ]};
+
+
+ConstFactor:
+   [
+      | pPlus :
+         @ConstPrimary
+      | pMinus :
+         @ConstPrimary
+         oValueNegate
+      | * :
+         @ConstPrimary
+   ];
+
+
+ConstPrimary:
    [
       | pIntLit :
          oValuePush( TOKEN_VALUE )
+      | pCharLit, pStrLit :  #eNotImplemented
+      | '(' :
+         @ConstExpr
+         ')'
       | pIdent :
          Node decl = oScopeFindRequire
          @ResolveUnitRef( decl )
          [ oNodeType( decl )
-            | nConst :
+            | nBuiltInFunc :
+               @ConstBuiltInFunc( decl )
+            | nConst, nEnumValue :
                oValuePush( oNodeGetInt( decl, qValue ) )
             | * :
                #eNotConst
                oValuePush( 0 )
          ]
-      | pMinus :
-         @ConstExpr
-         oValueNegate
+      | '@' :
+         #eNotImplemented
+      | * :
+         #eNotConst
    ];
 
+
+ConstBuiltInFunc( Node decl ):
+   #eNotImplemented
+   ;
 
 
 % ------------------------------ Expressions -----------------------------
