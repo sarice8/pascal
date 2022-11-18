@@ -1501,8 +1501,8 @@ ConstDecl:
    ]};
 
 
-% Parse a true const declaration (as opposed to a typed const declaration).
-% The "true" terminology comes from Delphi docs.  It refers to a const that is
+% Parse a true constant declaration (as opposed to a typed const declaration).
+% The "true constant" terminology comes from Delphi docs.  It refers to a const that is
 % evaluated at compile time, rather than at program startup time.
 %
 % We've just accepted the identifier.
@@ -1512,15 +1512,11 @@ TrueConstDecl:
    '='
 
    @ConstExpr
-   % TO DO: currently ConstExpr leaves int result on oValue stack
-   int val = oValueTop
+   % TO DO: string type
+   oNodeSetInt( decl, qValue, oValueTop )
    oValuePop
-   oNodeSetInt( decl, qValue, val )
-
-   % TO DO: different types.  Currently assumes int!
-   % Untyped const decl is supposed to allow:
-   %   ordinal types, set types, pointer types (but only Nil), real types, char, string.
-   oNodeSet( decl, qType, IntegerType )
+   oNodeSet( decl, qType, oTypeSTop )
+   oTypeSPop
 
    oScopeDeclare( decl )
    ';'
@@ -1537,26 +1533,33 @@ TypedConstDecl:
    @TypeRef( theType )
    oNodeSet( decl, qType, theType )
 
-   % TO DO: array and record consts are allocated in global memory,
+   % Array and record consts are allocated in global memory,
    % with global offset stored as decl value.
    % Scalar consts are not allocated in memory, and their value is
-   % stored directly as the decl value.
+   % stored directly as the decl value, as I do with "true constants".
+   %
+   % TO DO: I probably should store scalar consts in memory too, in case somebody
+   % wants to get a pointer to them.  And anyway, typed constants can't be used in
+   % constant expressions, so less need to store value in decl node.
 
    % TO DO: skip subranges, similar to oTypeSNodeType.
    [ oNodeType( theType )
-      | nBooleanType, nByteType, nCharType, nIntegerType, nEnumType :
+      | nBooleanType, nByteType, nCharType, nIntegerType, nEnumType,
+        nPointerType, nUniversalPointerType :
          % Parse expression and store value in decl
          '='
 
+         oTypeSPush( theType )
          @ConstExpr
-         % TO DO: currently ConstExpr leaves int result on oValue stack
-         int val = oValueTop
+         @ConstMatchTypes
+
+         oNodeSetInt( decl, qValue, oValueTop )
          oValuePop
-         oNodeSetInt( decl, qValue, val )
+         oTypeSPop
          oScopeDeclare( decl )
          ';'
 
-      | nShortStringType, nFileType, nPointerType, nUniversalPointerType :
+      | nShortStringType, nFileType :
          #eNotImplemented
 
       | nArrayType, nRecordType :
@@ -1634,19 +1637,33 @@ TypedConstInit( Node theType, int addr ):
 
       | nBooleanType, nByteType, nCharType:
          .tPushAddrGlobal  oEmitInt( addr )
+         oTypeSPush( theType )
          @ConstExpr
+         @ConstMatchTypes
          .tPushConstI  oEmitInt( oValueTop )
          oValuePop
+         oTypeSPop
          .tAssignB
 
       | nIntegerType, nEnumType:
          .tPushAddrGlobal  oEmitInt( addr )
+         oTypeSPush( theType )
          @ConstExpr
          .tPushConstI  oEmitInt( oValueTop )
          oValuePop
+         oTypeSPop
          .tAssignI
 
-      | nShortStringType, nFileType, nPointerType, nUniversalPointerType :
+      | nPointerType, nUniversalPointerType :
+         .tPushAddrGlobal  oEmitInt( addr )
+         oTypeSPush( theType )
+         @ConstExpr
+         .tPushConstI  oEmitInt( oValueTop )   % only allowing ptr constant Nil so don't need tPushConstP or link redirection
+         oValuePop
+         oTypeSPop
+         .tAssignP
+
+      | nShortStringType, nFileType :
          #eNotImplemented
    ]
    ;
@@ -1807,10 +1824,7 @@ TypeRef( out Node resultType ):
             %   Not necessary to be a subrange.
 
             Node subrange = oNodeNew( nSubrangeType )
-            % TO DO: currently assuming subrange of integer
-            oNodeSet( subrange, qBaseType, IntegerType )
 
-            % TO DO: currently ConstExpr leaves int result on oValue stack
             @ConstExpr
             oNodeSetInt( subrange, qLow, oValueTop )
             oValuePop
@@ -1818,8 +1832,11 @@ TypeRef( out Node resultType ):
             @ConstExpr
             oNodeSetInt( subrange, qHigh, oValueTop )
             oValuePop
-            oNodeSetInt( subrange, qSize, 4 )   % maybe don't need
 
+            @ConstMatchTypes
+            oNodeSet( subrange, qBaseType, oTypeSTop )
+            oNodeSetInt( subrange, qSize, oNodeGetInt( oTypeSTop, qSize ) )
+            oTypeSPop
             oTypeAdd( subrange )
 
             Node a = oNodeNew( nArrayType )
@@ -1903,8 +1920,11 @@ TypeRef( out Node resultType ):
          pOf
          Node theType
          @TypeRef( theType )
+         #eNotImplemented
       | * :       % this works for cases except where expr starts with an id
          @ConstExpr '..' @ConstExpr
+         @ConstMatchTypes
+         #eNotImplemented
    ];
 
 
@@ -1940,7 +1960,10 @@ EnumTypeRef( out Node resultType ):
       oNodeSetInt( decl2, qNameOffset, nameOffset )
       [
          | '=', ':=' :
+            oTypeSPush( IntegerType )
             @ConstExpr
+            @ConstMatchTypes
+            oTypeSPop
             % value must be ascending
             % this obviously doesn't apply to the first value
             [ equal_zero( numValues )
@@ -2033,33 +2056,45 @@ EnumTypeRef( out Node resultType ):
 
 % --------------------------- Const Expressions --------------------------
 
-% Constant expressions: currently, only literal integers or previously
-% named constant integers are supported, possibly with a negation.
 % Constant expressions are evaluated at compile time.
+% They are limited to constant literals, declared constants (not including TypedConstants!)
+% and a small selection of built-in functions. 
 %
 % The value of a constant expression is left on the Value Stack.
-% Currently we don't return the type of the constant expression.  TO DO: leave it on the type stack.
+% The type is left on the Type Stack.
 
 ConstExpr:
    @ConstBoolExpr
    {[
       | '=' :
          @ConstBoolTerm
+         @ConstMatchTypes
+         oTypeSPop  oTypeSPush( BooleanType )
          oValueEqual
       | '<>' :
          @ConstBoolExpr
+         @ConstMatchTypes
+         oTypeSPop  oTypeSPush( BooleanType )
          oValueNotEqual
       | '<' :
          @ConstBoolExpr
+         @ConstMatchTypes
+         oTypeSPop  oTypeSPush( BooleanType )
          oValueLess
       | '>' :
          @ConstBoolExpr
+         @ConstMatchTypes
+         oTypeSPop  oTypeSPush( BooleanType )
          oValueGreater
       | '<=' :
          @ConstBoolExpr
+         @ConstMatchTypes
+         oTypeSPop  oTypeSPush( BooleanType )
          oValueLessEqual
       | '>=' :
          @ConstBoolExpr
+         @ConstMatchTypes
+         oTypeSPop  oTypeSPush( BooleanType )
          oValueGreaterEqual
       | * :  >
    ]};
@@ -2069,7 +2104,9 @@ ConstBoolExpr:
    @ConstBoolTerm
    {[
       | pOr :
+         @ConstRequireBool
          @ConstBoolTerm
+         @ConstRequireBoolPop
          oValueOr
       | * :  >
    ]};
@@ -2079,7 +2116,9 @@ ConstBoolTerm:
    @ConstBoolFactor
    {[
       | pAnd :
+         @ConstRequireBool
          @ConstBoolFactor
+         @ConstRequireBoolPop
          oValueAnd
       | * :  >
    ]};
@@ -2089,6 +2128,7 @@ ConstBoolFactor:
    [
       | pNot :
          @ConstBoolFactor
+         @ConstRequireBool
          oValueNot
       | * :
          @ConstArithExpr
@@ -2100,9 +2140,11 @@ ConstArithExpr:
    {[
       | '+' :
          @ConstTerm
+         @ConstMatchTypes
          oValueAdd
       | '-' :
          @ConstTerm
+         @ConstMatchTypes
          oValueSub
       | * :  >
    ]};
@@ -2113,9 +2155,11 @@ ConstTerm:
    {[
       | pTimes :
          @ConstFactor
+         @ConstMatchTypes
          oValueMult
       | pDivide :
          @ConstFactor
+         @ConstMatchTypes
          oValueDiv
       | * :  >
    ]};
@@ -2137,7 +2181,14 @@ ConstPrimary:
    [
       | pIntLit :
          oValuePush( TOKEN_VALUE )
-      | pCharLit, pStrLit :  #eNotImplemented
+         oTypeSPush( IntegerType )
+      | pCharLit :
+         oValuePush( TOKEN_VALUE )
+         oTypeSPush( CharType )
+      | pStrLit :
+         #eNotImplemented
+         oValuePush( 0 )
+         oTypeSPush( ShortStringType )
       | '(' :
          @ConstExpr
          ')'
@@ -2149,20 +2200,79 @@ ConstPrimary:
                @ConstBuiltInFunc( decl )
             | nConst, nEnumValue :
                oValuePush( oNodeGetInt( decl, qValue ) )
+               oTypeSPush( oNodeGet( decl, qType ) )
             | * :
                #eNotConst
                oValuePush( 0 )
+               oTypeSPush( IntegerType )
          ]
       | '@' :
          #eNotImplemented
+         oValuePush( 0 )
+         oTypeSPush( UniversalPointerType )
       | * :
          #eNotConst
+         oValuePush( 0 )
+         oTypeSPush( IntegerType )
    ];
 
 
 ConstBuiltInFunc( Node decl ):
    #eNotImplemented
    ;
+
+
+ConstRequireBoolPop:
+   [ oTypeSNodeType
+      | nBooleanType :
+      | * :          #eNotBoolean
+   ]
+   oTypeSPop;
+
+
+ConstRequireBool:
+   [ oTypeSNodeType
+      | nBooleanType :
+      | * :          #eNotBoolean
+   ];
+
+
+% Require that the top two types on the type stack are matching (ignoring subranges).
+% Pop one of them, leaving only one.
+% The types refer to constant values on the Value Stack,
+% so any implicit conversion would occur there, not in code.
+%
+% TO DO: maybe I should say, require that the top type is compatible with the type under it.
+%        And always leave the type under it as the final type?
+%
+% TO DO: should be more strict about what I mean by MatchTypes vs
+%        CoerceTypes.  And when is either used.
+%
+ConstMatchTypes:
+   % TO DO: implicit conversion from Char to String
+   node_type nt = oTypeSNodeType
+   oTypeSPop
+   [ equal_node_type( nt, oTypeSNodeType )
+      | false :
+         % Some implicit conversion is allowed even here
+         [ oTypeSNodeType
+            | nPointerType :
+               [ nt
+                  | nUniversalPointerType :  >>
+                  | * :
+               ]
+            | nUniversalPointerType :
+               [ nt
+                  | nPointerType :  >>
+                  | * :
+               ]
+            | * :
+         ]
+         #eTypeMismatch
+      | * :
+   ];
+
+
 
 
 % ------------------------------ Expressions -----------------------------
@@ -3878,7 +3988,7 @@ CaseStmt:
    Label otherwiseLabel = doneLabel
 
    @Expr
-   Node theType = oTypeSTop
+   % Leave the expr type on the type stack throughout case statement
    [ oTypeSNodeType
       | nBooleanType, nByteType, nCharType :   .tJumpCaseB  oEmitLabel( tableLabel )
       | nIntegerType, nEnumType :              .tJumpCaseI  oEmitLabel( tableLabel )
@@ -3919,12 +4029,12 @@ CaseStmt:
             oCodePush( tableCode )
             {
                @ConstExpr
-               % TO DO: currently ConstExpr leaves int result on oValue stack, and doesn't indicate type
-               % TO DO: match type with earlier expr.  Including coercing char to string if necessary.
+               @ConstMatchTypes
                int val = oValueTop
                oValuePop
                [
                   | '..' :  @ConstExpr
+                            @ConstMatchTypes
                             int highval = oValueTop
                             oValuePop
                             .tCaseRange  oEmitInt( val )  oEmitInt( highval )  oEmitLabel( caseLabel )
@@ -3954,6 +4064,7 @@ CaseStmt:
    oEmitCode( tableCode )
    .tCaseEnd  oEmitLabel( otherwiseLabel )
    .tLabel  oEmitLabel( doneLabel )
+   oTypeSPop
    ;
 
 
