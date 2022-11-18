@@ -152,7 +152,15 @@ struct ValueEntry
   std::string _string;
   bool  _isString;
 };
-std::vector<ValueEntry> valueStack;
+
+class ValueStack : public std::vector<ValueEntry>
+{
+public:
+  ValueEntry& top() { return (*this)[ this->size()-1 ]; }
+  ValueEntry& down1() { return (*this)[ this->size()-2 ]; }
+  void pop() { pop_back(); }
+};
+ValueStack valueStack;
 
 #define dSLsize 400
 int dSL[dSLsize], dSLptr;        /* string literal table */
@@ -1184,23 +1192,23 @@ Node dNode;  // temporary for several mechanisms
             valueStack.emplace_back( (const char*) ssl_param );
             continue;
      case oValueTop:
-            ssl_result = valueStack.back()._int;
+            ssl_result = valueStack.top()._int;
             continue;
      case oValueTopString:
-            ssl_result = (long) valueStack.back()._string.c_str();
+            ssl_result = (long) valueStack.top()._string.c_str();
             continue;
      case oValueSwap: {
-            ValueEntry y = valueStack.back();  valueStack.pop_back();
-            ValueEntry x = valueStack.back();  valueStack.pop_back();
+            ValueEntry y = valueStack.top();  valueStack.pop();
+            ValueEntry x = valueStack.top();  valueStack.pop();
             valueStack.push_back( y );
             valueStack.push_back( x );
             }
             continue;
      case oValuePop :
-            valueStack.pop_back();
+            valueStack.pop();
             continue;
      case oValueCharToString: {
-            ValueEntry x = valueStack.back();  valueStack.pop_back();
+            ValueEntry x = valueStack.top();  valueStack.pop();
             char temp[2];
             temp[0] = (char) x._int;
             temp[1] = '\0';
@@ -1208,67 +1216,98 @@ Node dNode;  // temporary for several mechanisms
             }
             continue;
      case oValueNegate :
-            valueStack.back()._int *= -1;
+            valueStack.top()._int *= -1;
             continue;
-     case oValueEqual :
-            valueStack[valueStack.size()-2]._int =
-                ( valueStack[valueStack.size()-2]._int == valueStack[valueStack.size()-1]._int );
-            valueStack.pop_back();
+     case oValueEqual : {
+            ValueEntry y = valueStack.top();  valueStack.pop();
+            ValueEntry x = valueStack.top();  valueStack.pop();
+            valueStack.emplace_back( x._int == y._int );
+            }
             continue;
-     case oValueNotEqual :
-            valueStack[valueStack.size()-2]._int =
-                ( valueStack[valueStack.size()-2]._int != valueStack[valueStack.size()-1]._int );
-            valueStack.pop_back();
+     case oValueNotEqual : {
+            ValueEntry y = valueStack.top();  valueStack.pop();
+            ValueEntry x = valueStack.top();  valueStack.pop();
+            valueStack.emplace_back( x._int != y._int );
+            }
             continue;
-     case oValueLess :
-            valueStack[valueStack.size()-2]._int =
-                ( valueStack[valueStack.size()-2]._int < valueStack[valueStack.size()-1]._int );
-            valueStack.pop_back();
+     case oValueLess : {
+            ValueEntry y = valueStack.top();  valueStack.pop();
+            ValueEntry x = valueStack.top();  valueStack.pop();
+            valueStack.emplace_back( x._int < y._int );
+            }
             continue;
-     case oValueGreater :
-            valueStack[valueStack.size()-2]._int =
-                ( valueStack[valueStack.size()-2]._int > valueStack[valueStack.size()-1]._int );
-            valueStack.pop_back();
+     case oValueGreater : {
+            ValueEntry y = valueStack.top();  valueStack.pop();
+            ValueEntry x = valueStack.top();  valueStack.pop();
+            valueStack.emplace_back( x._int > y._int );
+            }
             continue;
-     case oValueLessEqual :
-            valueStack[valueStack.size()-2]._int =
-                ( valueStack[valueStack.size()-2]._int <= valueStack[valueStack.size()-1]._int );
-            valueStack.pop_back();
+     case oValueLessEqual : {
+            ValueEntry y = valueStack.top();  valueStack.pop();
+            ValueEntry x = valueStack.top();  valueStack.pop();
+            valueStack.emplace_back( x._int <= y._int );
+            }
             continue;
-     case oValueGreaterEqual :
-            valueStack[valueStack.size()-2]._int =
-                ( valueStack[valueStack.size()-2]._int >= valueStack[valueStack.size()-1]._int );
-            valueStack.pop_back();
+     case oValueGreaterEqual : {
+            ValueEntry y = valueStack.top();  valueStack.pop();
+            ValueEntry x = valueStack.top();  valueStack.pop();
+            valueStack.emplace_back( x._int >= y._int );
+            }
             continue;
-     case oValueOr :
-            valueStack[valueStack.size()-2]._int =
-                ( valueStack[valueStack.size()-2]._int || valueStack[valueStack.size()-1]._int );
-            valueStack.pop_back();
+     case oValueOr : {
+            ValueEntry y = valueStack.top();  valueStack.pop();
+            ValueEntry x = valueStack.top();  valueStack.pop();
+            valueStack.emplace_back( x._int || y._int );
+            }
             continue;
-     case oValueAnd :
-            valueStack[valueStack.size()-2]._int =
-                ( valueStack[valueStack.size()-2]._int && valueStack[valueStack.size()-1]._int );
-            valueStack.pop_back();
+     case oValueAnd : {
+            ValueEntry y = valueStack.top();  valueStack.pop();
+            ValueEntry x = valueStack.top();  valueStack.pop();
+            valueStack.emplace_back( x._int && y._int );
+            }
             continue;
-     case oValueNot :
-            valueStack.back()._int = !valueStack.back()._int;
+     case oValueNot : {
+            ValueEntry x = valueStack.top();  valueStack.pop();
+            valueStack.emplace_back( !x._int );
+            }
             continue;
-     case oValueAdd :
-            valueStack[valueStack.size()-2]._int += valueStack[valueStack.size()-1]._int;
-            valueStack.pop_back();
+     case oValueAdd : {
+            ValueEntry y = valueStack.top();  valueStack.pop();
+            ValueEntry x = valueStack.top();  valueStack.pop();
+            valueStack.emplace_back( x._int + y._int );
+            }
             continue;
-     case oValueSub :
-            valueStack[valueStack.size()-2]._int -= valueStack[valueStack.size()-1]._int;
-            valueStack.pop_back();
+     case oValueSub : {
+            ValueEntry y = valueStack.top();  valueStack.pop();
+            ValueEntry x = valueStack.top();  valueStack.pop();
+            valueStack.emplace_back( x._int - y._int );
+            }
             continue;
-     case oValueMult :
-            valueStack[valueStack.size()-2]._int *= valueStack[valueStack.size()-1]._int;
-            valueStack.pop_back();
+     case oValueMult : {
+            ValueEntry y = valueStack.top();  valueStack.pop();
+            ValueEntry x = valueStack.top();  valueStack.pop();
+            valueStack.emplace_back( x._int * y._int );
+            }
             continue;
-     case oValueDiv :
-            valueStack[valueStack.size()-2]._int /= valueStack[valueStack.size()-1]._int;
-            valueStack.pop_back();
+     case oValueDiv : {
+            ValueEntry y = valueStack.top();  valueStack.pop();
+            ValueEntry x = valueStack.top();  valueStack.pop();
+            valueStack.emplace_back( x._int / y._int );
+            }
             continue;
+     case oValueStringCmp : {
+            ValueEntry y = valueStack.top();  valueStack.pop();
+            ValueEntry x = valueStack.top();  valueStack.pop();
+            valueStack.emplace_back( x._string.compare( y._string ) );
+            }
+            continue;
+     case oValueStringConcat : {
+            ValueEntry y = valueStack.top();  valueStack.pop();
+            ValueEntry x = valueStack.top();  valueStack.pop();
+            valueStack.emplace_back( ( x._string + y._string ).c_str() );
+            }
+            continue;
+
 
      /* Mechanism string */
 

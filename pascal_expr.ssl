@@ -551,6 +551,30 @@ PrimaryAllowFlow( out Label falseLabel ):
                      #eNotImplemented
                ]
 
+            | nConstStr :
+               % This is a non-typed const defined as a strlit.
+               % So far, the value is held in the compiler's symbol table.
+               % Referencing the constant in the code will work the same as directly giving a strlit.
+               % (See pStrLit above).  We store the strlit in global memory, and set expr type to StrLitType.
+
+               % Storage in global memory only happens the first time the const is referenced.
+               % The global offset is stored in qValue.
+               int addr = oNodeGetInt( decl, qValue )
+               [ equal_zero( addr )
+                  | true :
+                     addr = oStringAllocShortStringLit( oNodeGetString( decl, qValueStr ) )
+                     oNodeSetInt( decl, qValue, addr )
+                  | * :
+               ]
+               .tPushAddrGlobal oEmitInt( addr )
+               oTypeSPush( StrLitType )
+               % This seems unlikely, but the strlit may be followed by
+               % array indexing.  Handle this the same way we would with a variable expression (see VarExpr)
+               % First, advance the pointer by index if any
+               @LValueIndexes
+               % get final value of dereferencing, if any
+               @FetchVar
+
             | nGlobalVar, nLocalVar, nParam, nTypedConst :
                @VarExpr( decl )
 

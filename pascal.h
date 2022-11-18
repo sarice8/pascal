@@ -1,4 +1,4 @@
-#define SSL_CODE_TABLE_SIZE 13300
+#define SSL_CODE_TABLE_SIZE 13700
 
 #define oJumpForward 0
 #define oJumpBack 1
@@ -452,17 +452,19 @@
 #define oValueSub 144
 #define oValueMult 145
 #define oValueDiv 146
-#define oStringAllocLit 147
-#define oStringAllocShortStringLit 148
-#define oLoopPush 149
-#define oLoopContinueLabel 150
-#define oLoopBreakLabel 151
-#define oLoopPop 152
-#define oMsg 153
-#define oMsgTrace 154
-#define oMsgNode 155
-#define oMsgNodeLong 156
-#define oMsgNodeVec 157
+#define oValueStringCmp 147
+#define oValueStringConcat 148
+#define oStringAllocLit 149
+#define oStringAllocShortStringLit 150
+#define oLoopPush 151
+#define oLoopContinueLabel 152
+#define oLoopBreakLabel 153
+#define oLoopPop 154
+#define oMsg 155
+#define oMsgTrace 156
+#define oMsgNode 157
+#define oMsgNodeLong 158
+#define oMsgNodeVec 159
 
 #ifdef SSL_INCLUDE_ERR_TABLE
 

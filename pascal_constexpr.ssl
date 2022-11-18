@@ -18,33 +18,51 @@ ConstExpr:
       | '=' :
          @ConstBoolTerm
          @ConstMatchTypes
+         [ oTypeSNodeType
+            | nStrLitType :   oValueStringCmp  oValuePush( 0 )  oValueEqual
+            | * :             oValueEqual
+         ]
          oTypeSPop  oTypeSPush( BooleanType )
-         oValueEqual
       | '<>' :
          @ConstBoolExpr
          @ConstMatchTypes
+         [ oTypeSNodeType
+            | nStrLitType :   oValueStringCmp  oValuePush( 0 )  oValueNotEqual
+            | * :             oValueNotEqual
+         ]
          oTypeSPop  oTypeSPush( BooleanType )
-         oValueNotEqual
       | '<' :
          @ConstBoolExpr
          @ConstMatchTypes
+         [ oTypeSNodeType
+            | nStrLitType :   oValueStringCmp  oValuePush( 0 )  oValueLess
+            | * :             oValueLess
+         ]
          oTypeSPop  oTypeSPush( BooleanType )
-         oValueLess
       | '>' :
          @ConstBoolExpr
          @ConstMatchTypes
+         [ oTypeSNodeType
+            | nStrLitType :   oValueStringCmp  oValuePush( 0 )  oValueGreater
+            | * :             oValueGreater
+         ]
          oTypeSPop  oTypeSPush( BooleanType )
-         oValueGreater
       | '<=' :
          @ConstBoolExpr
          @ConstMatchTypes
+         [ oTypeSNodeType
+            | nStrLitType :   oValueStringCmp  oValuePush( 0 )  oValueLessEqual
+            | * :             oValueLessEqual
+         ]
          oTypeSPop  oTypeSPush( BooleanType )
-         oValueLessEqual
       | '>=' :
          @ConstBoolExpr
          @ConstMatchTypes
+         [ oTypeSNodeType
+            | nStrLitType :   oValueStringCmp  oValuePush( 0 )  oValueGreaterEqual
+            | * :             oValueGreaterEqual
+         ]
          oTypeSPop  oTypeSPush( BooleanType )
-         oValueGreaterEqual
       | * :  >
    ]};
 
@@ -90,11 +108,17 @@ ConstArithExpr:
       | '+' :
          @ConstTerm
          @ConstMatchTypes
-         oValueAdd
+         [ oTypeSNodeType
+            | nStrLitType :   oValueStringConcat
+            | * :             oValueAdd
+         ]
       | '-' :
          @ConstTerm
          @ConstMatchTypes
-         oValueSub
+         [ oTypeSNodeType
+            | nStrLitType :   #eNotAllowed
+            | * :             oValueSub
+         ]
       | * :  >
    ]};
 
@@ -105,11 +129,17 @@ ConstTerm:
       | pTimes :
          @ConstFactor
          @ConstMatchTypes
-         oValueMult
+         [ oTypeSNodeType
+            | nStrLitType :   #eNotAllowed
+            | * :             oValueMult
+         ]
       | pDivide :
          @ConstFactor
          @ConstMatchTypes
-         oValueDiv
+         [ oTypeSNodeType
+            | nStrLitType :   #eNotAllowed
+            | * :             oValueDiv
+         ]
       | * :  >
    ]};
 
@@ -149,6 +179,9 @@ ConstPrimary:
             | nConst :
                oValuePush( oNodeGetInt( decl, qValue ) )
                oTypeSPush( oNodeGet( decl, qType ) )
+            | nConstStr :
+               oValuePushString( oNodeGetString( decl, qValueStr ) )
+               oTypeSPush( oNodeGet( decl, qType ) )
             | nEnumValue :
                oValuePush( oNodeGetInt( decl, qValue ) )
                oTypeSPush( oNodeGet( decl, qType ) )
@@ -166,12 +199,6 @@ ConstPrimary:
          oValuePush( 0 )
          oTypeSPush( IntegerType )
    ];
-
-
-ConstBuiltInFunc( Node decl ):
-   #eNotImplemented
-   ;
-
 
 ConstRequireBoolPop:
    [ oTypeSNodeType
@@ -271,4 +298,97 @@ ConstCoerceType:
          #eTypeMismatch
       | * :
    ];
+
+
+% These are the methods that Pascal allows in a constant expression:
+%   Abs( x: integer_or_real ) : integer_or_real
+%   Round( x: real ) : integer
+%   Trunc( x: real ) : integer
+%   Chr( x: integer ) : char
+%   Ord( x: ordinal ) : integer
+%   Length( s: string ) : integer
+%   Pred( x: ordinal ) : ordinal
+%   Succ( x: ordinal ) : ordinal
+%   SizeOf( var, expr, or typename ) : integer
+%   Odd( x: integer ) : boolean  - true if the argument is odd
+%
+ConstBuiltInFunc( Node method ):
+
+   % Ord(x)
+   [ oNodeEqual( method, BuiltIn_Ord )
+      | true :
+         '('
+         @ConstExpr
+         ')'
+         [ oTypeSNodeType
+            | nIntegerType, nEnumType :
+            | nBooleanType, nByteType, nCharType :
+            | * :  #eTypeMismatch
+         ]
+         oTypeSPop
+         oTypeSPush( IntegerType )
+         ')'
+         >>
+      | * :
+   ]
+
+   % Chr(x)
+   [ oNodeEqual( method, BuiltIn_Chr )
+      | true :
+         '('
+         @ConstExpr
+         ')'
+         [ oTypeSNodeType
+            | nIntegerType :
+            | nByteType :
+            | * :  #eTypeMismatch
+         ]
+         oTypeSPop
+         oTypeSPush( CharType )
+         ')'
+         >>
+      | * :
+   ]
+
+   % Pred(x)
+   [ oNodeEqual( method, BuiltIn_Pred )
+      | true :
+         '('
+         @ConstExpr
+         [ oTypeSNodeType
+            | nEnumType :
+               [ oNodeGetBoolean( oTypeSTop, qHasGap )
+                  | true :   #eCantUsePredSuccOnEnumWithValueGaps
+                  | * :
+               ]
+            | * :  #eTypeMismatch
+         ]
+         oValuePush( 1 )  oValueSub
+         ')'
+         >>
+      | * :
+   ]
+
+   % Succ(x)
+   [ oNodeEqual( method, BuiltIn_Succ )
+      | true :
+         '('
+         @ConstExpr
+         [ oTypeSNodeType
+            | nEnumType :
+               [ oNodeGetBoolean( oTypeSTop, qHasGap )
+                  | true :   #eCantUsePredSuccOnEnumWithValueGaps
+                  | * :
+               ]
+            | * :  #eTypeMismatch
+         ]
+         oValuePush( 1 )  oValueAdd
+         ')'
+         >>
+      | * :
+   ]
+
+   #eNotImplemented
+   ;
+
 

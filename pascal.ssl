@@ -503,6 +503,8 @@ mechanism value :              % value stack, to calc. const expr's
    oValueSub
    oValueMult
    oValueDiv
+   oValueStringCmp             % compare top two strings. replace with negative, 0, or positive
+   oValueStringConcat
    ;
 
 mechanism string :
