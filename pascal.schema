@@ -126,11 +126,22 @@ nIdent ::= nBuiltInFunc
 nIdent ::= nBuiltInProc
 
 
+% nConst is an ordinal "true constant" (as opposed to a typed constant).
+% This includes integer types, enum types, boolean, char.  qValue is the value.
+%
 nIdent ::= nConst
 
 nConst ::= nEnumValue
 nEnumValue =>
         qNameOffset:    Integer4    % offset of name in global data, for building name table
+
+
+% nConstStr is a string "true constant".  qValueStr is the null-terminated string value.
+%
+nIdent ::= nConstStr
+nConstStr =>
+        qValueStr:      StringN
+
 
 nIdent ::= nTypeDecl
 

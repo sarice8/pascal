@@ -137,8 +137,22 @@ int dTypeStackPtr;
 #define dCSsize 30
 int dCS[dCSsize], dCSptr;        /* count stack */
 
-#define dVSsize 30
-int dVS[dVSsize], dVSptr;        /* value stack */
+// Value stack
+// This is mainly used for constant expressions
+//
+struct ValueEntry
+{
+  ValueEntry( int i )
+    : _int( i ), _isString( false )
+  {}
+  ValueEntry( const char* str )
+    : _int( 0 ), _string( str ), _isString( true )
+  {}
+  int   _int;
+  std::string _string;
+  bool  _isString;
+};
+std::vector<ValueEntry> valueStack;
 
 #define dSLsize 400
 int dSL[dSLsize], dSLptr;        /* string literal table */
@@ -1164,68 +1178,96 @@ Node dNode;  // temporary for several mechanisms
      /* Mechanism value */
 
      case oValuePush :
-            if (++dVSptr==dVSsize) ssl_fatal("VS overflow");
-            dVS[dVSptr] = ssl_param;
+            valueStack.emplace_back( (int) ssl_param );
+            continue;
+     case oValuePushString :
+            valueStack.emplace_back( (const char*) ssl_param );
             continue;
      case oValueTop:
-            ssl_result = dVS[dVSptr];
+            ssl_result = valueStack.back()._int;
+            continue;
+     case oValueTopString:
+            ssl_result = (long) valueStack.back()._string.c_str();
+            continue;
+     case oValueSwap: {
+            ValueEntry y = valueStack.back();  valueStack.pop_back();
+            ValueEntry x = valueStack.back();  valueStack.pop_back();
+            valueStack.push_back( y );
+            valueStack.push_back( x );
+            }
             continue;
      case oValuePop :
-            dVSptr--;
+            valueStack.pop_back();
+            continue;
+     case oValueCharToString: {
+            ValueEntry x = valueStack.back();  valueStack.pop_back();
+            char temp[2];
+            temp[0] = (char) x._int;
+            temp[1] = '\0';
+            valueStack.emplace_back( temp );
+            }
             continue;
      case oValueNegate :
-            dVS[dVSptr] *= -1;
+            valueStack.back()._int *= -1;
             continue;
      case oValueEqual :
-            dVS[dVSptr-1] = ( dVS[dVSptr-1] == dVS[dVSptr] );
-            dVSptr--;
+            valueStack[valueStack.size()-2]._int =
+                ( valueStack[valueStack.size()-2]._int == valueStack[valueStack.size()-1]._int );
+            valueStack.pop_back();
             continue;
      case oValueNotEqual :
-            dVS[dVSptr-1] = ( dVS[dVSptr-1] != dVS[dVSptr] );
-            dVSptr--;
+            valueStack[valueStack.size()-2]._int =
+                ( valueStack[valueStack.size()-2]._int != valueStack[valueStack.size()-1]._int );
+            valueStack.pop_back();
             continue;
      case oValueLess :
-            dVS[dVSptr-1] = ( dVS[dVSptr-1] < dVS[dVSptr] );
-            dVSptr--;
+            valueStack[valueStack.size()-2]._int =
+                ( valueStack[valueStack.size()-2]._int < valueStack[valueStack.size()-1]._int );
+            valueStack.pop_back();
             continue;
      case oValueGreater :
-            dVS[dVSptr-1] = ( dVS[dVSptr-1] > dVS[dVSptr] );
-            dVSptr--;
+            valueStack[valueStack.size()-2]._int =
+                ( valueStack[valueStack.size()-2]._int > valueStack[valueStack.size()-1]._int );
+            valueStack.pop_back();
             continue;
      case oValueLessEqual :
-            dVS[dVSptr-1] = ( dVS[dVSptr-1] <= dVS[dVSptr] );
-            dVSptr--;
+            valueStack[valueStack.size()-2]._int =
+                ( valueStack[valueStack.size()-2]._int <= valueStack[valueStack.size()-1]._int );
+            valueStack.pop_back();
             continue;
      case oValueGreaterEqual :
-            dVS[dVSptr-1] = ( dVS[dVSptr-1] >= dVS[dVSptr] );
-            dVSptr--;
+            valueStack[valueStack.size()-2]._int =
+                ( valueStack[valueStack.size()-2]._int >= valueStack[valueStack.size()-1]._int );
+            valueStack.pop_back();
             continue;
      case oValueOr :
-            dVS[dVSptr-1] = ( dVS[dVSptr-1] || dVS[dVSptr] );
-            dVSptr--;
+            valueStack[valueStack.size()-2]._int =
+                ( valueStack[valueStack.size()-2]._int || valueStack[valueStack.size()-1]._int );
+            valueStack.pop_back();
             continue;
      case oValueAnd :
-            dVS[dVSptr-1] = ( dVS[dVSptr-1] && dVS[dVSptr] );
-            dVSptr--;
+            valueStack[valueStack.size()-2]._int =
+                ( valueStack[valueStack.size()-2]._int && valueStack[valueStack.size()-1]._int );
+            valueStack.pop_back();
             continue;
      case oValueNot :
-            dVS[dVSptr] = !dVS[dVSptr];
+            valueStack.back()._int = !valueStack.back()._int;
             continue;
      case oValueAdd :
-            dVS[dVSptr-1] += dVS[dVSptr];
-            dVSptr--;
+            valueStack[valueStack.size()-2]._int += valueStack[valueStack.size()-1]._int;
+            valueStack.pop_back();
             continue;
      case oValueSub :
-            dVS[dVSptr-1] -= dVS[dVSptr];
-            dVSptr--;
+            valueStack[valueStack.size()-2]._int -= valueStack[valueStack.size()-1]._int;
+            valueStack.pop_back();
             continue;
      case oValueMult :
-            dVS[dVSptr-1] *= dVS[dVSptr];
-            dVSptr--;
+            valueStack[valueStack.size()-2]._int *= valueStack[valueStack.size()-1]._int;
+            valueStack.pop_back();
             continue;
      case oValueDiv :
-            dVS[dVSptr-1] /= dVS[dVSptr];
-            dVSptr--;
+            valueStack[valueStack.size()-2]._int /= valueStack[valueStack.size()-1]._int;
+            valueStack.pop_back();
             continue;
 
      /* Mechanism string */

@@ -483,8 +483,12 @@ mechanism count :
 
 mechanism value :              % value stack, to calc. const expr's
    oValuePush(int)             % push an explicit int lit
+   oValuePushString(String)    % push string onto value stack
    oValueTop >> int            % get top value on value stack
+   oValueTopString >> String
+   oValueSwap                  % swap top two
    oValuePop
+   oValueCharToString          % convert top value from char to string
    oValueNegate                % negate top numeric value
    oValueEqual
    oValueNotEqual
@@ -1508,16 +1512,25 @@ ConstDecl:
 % We've just accepted the identifier.
 %
 TrueConstDecl:
-   Node decl = @newIdent( nConst, LAST_ID )
+   int id = LAST_ID
    '='
 
    @ConstExpr
-   % TO DO: string type
-   oNodeSetInt( decl, qValue, oValueTop )
+
+   Node decl
+   [ oTypeSNodeType
+      | nBooleanType, nByteType, nCharType, nIntegerType, nEnumType,
+        nPointerType, nUniversalPointerType :
+         decl = @newIdent( nConst, id )
+         oNodeSetInt( decl, qValue, oValueTop )
+      | nStrLitType :
+         decl = @newIdent( nConstStr, id )
+         oNodeSetString( decl, qValueStr, oValueTopString )
+      | * :  #eNotAllowed
+   ]
    oValuePop
    oNodeSet( decl, qType, oTypeSTop )
    oTypeSPop
-
    oScopeDeclare( decl )
    ';'
    ;
@@ -1551,7 +1564,7 @@ TypedConstDecl:
 
          oTypeSPush( theType )
          @ConstExpr
-         @ConstMatchTypes
+         @ConstCoerceType
 
          oNodeSetInt( decl, qValue, oValueTop )
          oValuePop
@@ -1639,7 +1652,7 @@ TypedConstInit( Node theType, int addr ):
          .tPushAddrGlobal  oEmitInt( addr )
          oTypeSPush( theType )
          @ConstExpr
-         @ConstMatchTypes
+         @ConstCoerceType
          .tPushConstI  oEmitInt( oValueTop )
          oValuePop
          oTypeSPop
@@ -1649,6 +1662,7 @@ TypedConstInit( Node theType, int addr ):
          .tPushAddrGlobal  oEmitInt( addr )
          oTypeSPush( theType )
          @ConstExpr
+         @ConstCoerceType
          .tPushConstI  oEmitInt( oValueTop )
          oValuePop
          oTypeSPop
@@ -1658,6 +1672,7 @@ TypedConstInit( Node theType, int addr ):
          .tPushAddrGlobal  oEmitInt( addr )
          oTypeSPush( theType )
          @ConstExpr
+         @ConstCoerceType
          .tPushConstI  oEmitInt( oValueTop )   % only allowing ptr constant Nil so don't need tPushConstP or link redirection
          oValuePop
          oTypeSPop
@@ -1962,7 +1977,7 @@ EnumTypeRef( out Node resultType ):
          | '=', ':=' :
             oTypeSPush( IntegerType )
             @ConstExpr
-            @ConstMatchTypes
+            @ConstCoerceType
             oTypeSPop
             % value must be ascending
             % this obviously doesn't apply to the first value
@@ -2186,9 +2201,8 @@ ConstPrimary:
          oValuePush( TOKEN_VALUE )
          oTypeSPush( CharType )
       | pStrLit :
-         #eNotImplemented
-         oValuePush( 0 )
-         oTypeSPush( ShortStringType )
+         oValuePushString( CURRENT_STRLIT )
+         oTypeSPush( StrLitType )
       | '(' :
          @ConstExpr
          ')'
@@ -2198,7 +2212,10 @@ ConstPrimary:
          [ oNodeType( decl )
             | nBuiltInFunc :
                @ConstBuiltInFunc( decl )
-            | nConst, nEnumValue :
+            | nConst :
+               oValuePush( oNodeGetInt( decl, qValue ) )
+               oTypeSPush( oNodeGet( decl, qType ) )
+            | nEnumValue :
                oValuePush( oNodeGetInt( decl, qValue ) )
                oTypeSPush( oNodeGet( decl, qType ) )
             | * :
@@ -2242,14 +2259,10 @@ ConstRequireBool:
 % The types refer to constant values on the Value Stack,
 % so any implicit conversion would occur there, not in code.
 %
-% TO DO: maybe I should say, require that the top type is compatible with the type under it.
-%        And always leave the type under it as the final type?
-%
-% TO DO: should be more strict about what I mean by MatchTypes vs
-%        CoerceTypes.  And when is either used.
+% Some implicit conversion is allowed for either of the types.
+% See also ConstCoerceType where only the top type may change.
 %
 ConstMatchTypes:
-   % TO DO: implicit conversion from Char to String
    node_type nt = oTypeSNodeType
    oTypeSPop
    [ equal_node_type( nt, oTypeSNodeType )
@@ -2266,12 +2279,64 @@ ConstMatchTypes:
                   | nPointerType :  >>
                   | * :
                ]
+            | nStrLitType :
+               [ nt
+                  | nCharType :
+                     oValueCharToString
+                     >>
+                  | * :
+               ]
+            | nCharType :
+               [ nt
+                  | nStrLitType :
+                     oValueSwap
+                     oValueCharToString
+                     oValueSwap
+                     oTypeSPop
+                     oTypeSPush( StrLitType )
+                     >>
+                  | * :
+               ]
             | * :
          ]
          #eTypeMismatch
       | * :
    ];
 
+
+% Given two constant values on the value stack, and two types on the type stack.
+% Perform any necessary implicit conversions so the second value is the type of the
+% value under it.  Pop the top type, leaving only the desired type.
+%
+ConstCoerceType:
+   node_type nt = oTypeSNodeType
+   oTypeSPop
+   [ equal_node_type( nt, oTypeSNodeType )
+      | false :
+         % Some implicit conversion is allowed even here
+         [ oTypeSNodeType
+            | nPointerType :
+               [ nt
+                  | nUniversalPointerType :  >>
+                  | * :
+               ]
+            | nUniversalPointerType :
+               [ nt
+                  | nPointerType :  >>
+                  | * :
+               ]
+            | nStrLitType :
+               [ nt
+                  | nCharType :
+                     oValueCharToString
+                     >>
+                  | * :
+               ]
+            | * :
+         ]
+         #eTypeMismatch
+      | * :
+   ];
 
 
 
@@ -4029,12 +4094,12 @@ CaseStmt:
             oCodePush( tableCode )
             {
                @ConstExpr
-               @ConstMatchTypes
+               @ConstCoerceType
                int val = oValueTop
                oValuePop
                [
                   | '..' :  @ConstExpr
-                            @ConstMatchTypes
+                            @ConstCoerceType
                             int highval = oValueTop
                             oValuePop
                             .tCaseRange  oEmitInt( val )  oEmitInt( highval )  oEmitLabel( caseLabel )

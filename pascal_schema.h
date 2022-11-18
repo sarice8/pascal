@@ -23,6 +23,7 @@ typedef enum {
     nBuiltInProc,
     nConst,
     nEnumValue,
+    nConstStr,
     nTypeDecl,
     nVar,
     nGlobalVar,
@@ -83,6 +84,7 @@ typedef enum {
     qOldType,
     qResultOffset,
     qNameOffset,
+    qValueStr,
     qInOut,
     qDefined,
     qPointerType,
@@ -130,6 +132,7 @@ typedef enum {
 #define GetqOldType(N)		(Node)	GetAttr(N, qOldType)
 #define GetqResultOffset(N)		(Integer4)	(intptr_t) GetAttr(N, qResultOffset)
 #define GetqNameOffset(N)		(Integer4)	(intptr_t) GetAttr(N, qNameOffset)
+#define GetqValueStr(N)		(StringN)	GetAttr(N, qValueStr)
 #define GetqInOut(N)		(Boolean1)	(intptr_t) GetAttr(N, qInOut)
 #define GetqDefined(N)		(Boolean1)	(intptr_t) GetAttr(N, qDefined)
 #define GetqPointerType(N)		(Node)	GetAttr(N, qPointerType)
@@ -175,6 +178,7 @@ typedef enum {
 #define SetqOldType(N,V)		SetAttr(N, qOldType, V)
 #define SetqResultOffset(N,V)		SetAttr(N, qResultOffset, (void*)(intptr_t)(V))
 #define SetqNameOffset(N,V)		SetAttr(N, qNameOffset, (void*)(intptr_t)(V))
+#define SetqValueStr(N,V)		SetAttr(N, qValueStr, V)
 #define SetqInOut(N,V)		SetAttr(N, qInOut, (void*)(intptr_t)(V))
 #define SetqDefined(N,V)		SetAttr(N, qDefined, (void*)(intptr_t)(V))
 #define SetqPointerType(N,V)		SetAttr(N, qPointerType, V)
@@ -205,6 +209,7 @@ typedef enum {
 #define NewnBuiltInProc()		NewNode(nBuiltInProc)
 #define NewnConst()		NewNode(nConst)
 #define NewnEnumValue()		NewNode(nEnumValue)
+#define NewnConstStr()		NewNode(nConstStr)
 #define NewnTypeDecl()		NewNode(nTypeDecl)
 #define NewnVar()		NewNode(nVar)
 #define NewnGlobalVar()		NewNode(nGlobalVar)

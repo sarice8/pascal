@@ -20,6 +20,7 @@ type node_type:
 	nBuiltInProc
 	nConst
 	nEnumValue
+	nConstStr
 	nTypeDecl
 	nVar
 	nGlobalVar
@@ -80,6 +81,7 @@ type node_attribute:
 	qOldType
 	qResultOffset
 	qNameOffset
+	qValueStr
 	qInOut
 	qDefined
 	qPointerType
