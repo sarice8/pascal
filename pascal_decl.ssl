@@ -1,0 +1,648 @@
+%
+% Pascal Compiler
+%
+
+% ----------------------------- Declarations ----------------------------
+
+
+
+% modifers that may appear on a proc/function declaration.
+%
+MethodModifiers( Node decl ):
+   {[
+      | pCdecl :
+         oNodeSetBoolean( decl, qCdecl, true )
+         ';'
+
+      | * : >
+   ]}
+   ;
+
+
+% external method resides in an external object file
+% (or in my system, the built-in runtime library).
+% The method has a label, as usual, which callers will use.
+% But we define that label with .tLabelExtern rather than .tLabel.
+%
+% Note, I'll hold off on issuing the .tLabelExtern until we see that
+% the external method is actually called.  Otherwise we'd fill each output file
+% with all the external method names in my included libraries, which seems dumb.
+%
+% Note this is fpc syntax.  I'm not sure about other Pascals.
+%
+ExternalDecl( Node decl ):
+   [ equal_zero( @DeclLevel( decl ) )
+      | false :  #eExternalMethodCannotBeNested
+      | * :
+   ]
+   oNodeSetBoolean( decl, qExternal, true )
+   [
+      | pStrLit :
+         % that was the optional library name containing the method.
+         % TO DO: I'm currently ignoring this.
+         [
+            | pName :
+               pStrLit
+               % that was the optional method name defined in that library,
+               % which might differ from the Pascal name.
+               oNodeSetString( decl, qExternalName, CURRENT_STRLIT )
+            | * :
+         ]
+      | * :
+   ]
+   ;
+
+
+ProcHeaderDecl >> Node:
+   pIdent
+
+   % If we already have a forward declaration, we'll modify that decl
+   % instead of creating a second symbol table entry.
+   % (Alternatively could delete or hide the old entry.)
+   boolean redeclaring = false
+   Node decl = oScopeFindInCurrentScope
+
+   [ oNodeNull( decl )
+      | true :
+         % first declaration
+         decl = @newIdent( nProc, LAST_ID )
+         oNodeSetLabel( decl, qValue, oLabelNew )
+
+      | false :
+         % we already have a declaration.
+         % Keep it, and its label.
+         redeclaring = true
+         [ oNodeGetBoolean( decl, qBodyDefined )
+            | true : #eAlreadyDefined
+            | * :
+         ]
+         [ oNodeGetBoolean( decl, qExternal )
+            | true : #eAlreadyDefined
+            | * :
+         ]
+         [ oNodeType( decl )
+            | nProc :
+            | * : #eAlreadyDefined   % wrong kind
+         ]
+         % Move the existing param scope aside, so we can check that the
+         % new one is consistent.  And, the body will want to see the new one
+         % since the names might differ.
+         % TO DO: If qOldParams already set, we have multiple forward decls,
+         % which I believe is supposed to be an error.
+         oNodeSet( decl, qOldParams, oNodeGet( decl, qParams ) )
+         oNodeSet( decl, qParams, Null )
+   ]
+
+   int level = @ScopeLevel
+   boolean nested = greater( level, 0 )
+   inc( level )
+   oScopeBegin( level, allocUp )
+   Node paramScope = oScopeCurrent
+
+   % A nested method has a hidden first param for the parent static scope.
+   % This won't appear in the param decls list, just reserve space for it.
+   % It's first so the static chain is always at a fixed offset from the frame pointer.
+   [ nested
+      | true :
+         int offset = oScopeAllocType( @PointerTypeTo( IntegerType ) )   % arbitrary ptr type
+      | * :
+   ]
+
+   @FormalArgDecl
+   oNodeSet( decl, qParams, paramScope )
+   oScopeEnd
+   ';'
+
+   [ redeclaring
+      | false : oScopeDeclare( decl )
+      | true :  % TO DO: check that qParams is consistent with qOldParams
+   ]
+
+   @MethodModifiers( decl )
+   >> decl;
+
+
+ProcDecl:
+   Node decl = @ProcHeaderDecl
+
+   % Body may be a statement, "forward", "external".
+   % Note, this syntax is based on FPC, and I'm not sure if other Pascals are similar.
+   % FPC says that forward, external, cdecl, name, etc are not reserved words -
+   % I think this means the user may declare other things with those names, but if so the
+   % original meaning is lost.  I'll make them keywords for simplicity, for now
+   % (just not too happy about "name").
+
+   [
+      | pForward :
+         % Nothing to do.  We simply won't set qBodyDefined.
+
+      | pExternal : @ExternalDecl( decl )
+
+      | * :
+         % Body statement
+
+         % Enter the params scope again, so params are visible in body.
+         % TO DO: Perhaps I could mark the scope read-only at this point.
+         Node paramScope = oNodeGet( decl, qParams )
+         oScopeEnter( paramScope )
+
+         % Start scope for declarations within the proc
+         int level = oNodeGetInt( paramScope, qLevel )
+         oScopeBegin( level, allocDown )
+         oNodeSet( decl, qChildScope, oScopeCurrent )
+
+         Label label = oNodeGetLabel( decl, qValue )
+         @Block( nLocalVar, label )
+         oNodeSetBoolean( decl, qBodyDefined, true )
+         oScopeEnd
+
+         oScopeEnd  % paramScope
+   ]
+   ';';
+
+
+
+FuncHeaderDecl >> Node:
+   pIdent
+
+   % If we already have a forward declaration, we'll modify that decl
+   % instead of creating a second symbol table entry.
+   % (Alternatively could delete or hide the old entry.)
+   boolean redeclaring = false
+   Node decl = oScopeFindInCurrentScope
+
+   [ oNodeNull( decl )
+      | true :
+         % first declaration
+         decl = @newIdent( nFunc, LAST_ID )
+         oNodeSetLabel( decl, qValue, oLabelNew )
+
+      | false :
+         % we already have a declaration.
+         % Keep it, and its label.
+         redeclaring = true
+         [ oNodeGetBoolean( decl, qBodyDefined )
+            | true : #eAlreadyDefined
+            | * :
+         ]
+         [ oNodeType( decl )
+            | nFunc :
+            | * : #eAlreadyDefined   % wrong kind
+         ]
+         % Move the existing param scope and return value aside,
+         % so we can check that the new one is consistent.
+         % And, the body will want to see the new one since the names might differ.
+         % TO DO: If qOldParams already set, we have multiple forward decls,
+         % which I believe is supposed to be an error.
+         oNodeSet( decl, qOldParams, oNodeGet( decl, qParams ) )
+         oNodeSet( decl, qParams, Null )
+         oNodeSet( decl, qOldType, oNodeGet( decl, qType ) )
+         oNodeSet( decl, qType, Null )
+   ]
+
+   int level = @ScopeLevel
+   boolean nested = greater( level, 0 )
+   inc( level )
+   oScopeBegin( level, allocUp )
+   Node paramScope = oScopeCurrent
+
+   % A nested method has a hidden first param for the parent static scope.
+   % This won't appear in the param decls list, just reserve space for it.
+   % It's first so the static chain is always at a fixed offset from the frame pointer.
+   [ nested
+      | true :
+         int offset = oScopeAllocType( @PointerTypeTo( IntegerType ) )   % arbitrary ptr type
+      | * :
+   ]
+
+   @FormalArgDecl
+   oNodeSet( decl, qParams, paramScope )
+
+   ':'
+
+   Node theType
+   @TypeRef( theType )
+   oNodeSet( decl, qType, theType )
+
+   % The function's param space gets an additional pointer,
+   % which will point to a temporary in the caller's scope.
+   % This pointer is essentially a VAR param, but I won't create an nParam for it.
+
+   Node ptrType = @PointerTypeTo( theType )
+   oNodeSetInt( decl, qResultOffset, oScopeAllocType( ptrType ) )
+   oScopeEnd
+   ';'
+
+   [ redeclaring
+      | false : oScopeDeclare( decl )
+      | true :  % TO DO: check that qParams is consistent with qOldParams
+                % and qType is consistent with qOldType
+   ]
+
+   @MethodModifiers( decl )
+
+   >> decl;
+
+
+FuncDecl:
+   Node decl = @FuncHeaderDecl
+
+   % Body may be a statement, "forward", "external".
+   [
+      | pForward :
+         % Nothing to do.  We simply won't set qBodyDefined.
+
+      | pExternal : @ExternalDecl( decl )
+
+      | * :
+         % Body statement
+
+         % Enter the params scope again, so params are visible in body.
+         % TO DO: Perhaps I could mark the scope read-only at this point.
+         Node paramScope = oNodeGet( decl, qParams )
+         oScopeEnter( paramScope )
+
+         % Start scope for declarations within the func
+         int level = oNodeGetInt( paramScope, qLevel )
+         oScopeBegin( level, allocDown )
+         oNodeSet( decl, qChildScope, oScopeCurrent )
+
+         Label label = oNodeGetLabel( decl, qValue )
+         @Block( nLocalVar, label )
+         oNodeSetBoolean( decl, qBodyDefined, true )
+         oScopeEnd
+
+         oScopeEnd  % paramScope
+   ]
+   ';';
+
+
+FormalArgDecl:
+   [
+      | '(' :
+         {
+            NodeVec decls = oNodeVecNew
+            Node decl
+            boolean isInOut = false
+
+            [
+               | pVar : isInOut = true
+               | * :
+            ]
+
+            {  pIdent
+
+               decl = @newIdent( nParam, LAST_ID )
+               oNodeSetBoolean( decl, qInOut, isInOut )
+               oNodeVecAppend( decls, decl )
+
+               [
+                  | ':' : >
+                  | ',' :
+               ]
+            }
+
+            Node theType
+            @TypeRef( theType )
+
+            % VAR param is declared with its given type, but allocated as a pointer.
+            Node allocType
+            [ isInOut
+               | true :   allocType = @PointerTypeTo( theType )
+               | * :      allocType = theType
+            ]
+
+            int i = 0
+            {[ equal( i, oNodeVecSize( decls ) )
+               | false :
+                  decl = oNodeVecElement( decls, i )
+
+                  oNodeSet( decl, qType, theType )
+                  oScopeDeclare( decl )
+                  oNodeSetInt( decl, qValue, oScopeAllocType( allocType ) )
+                  inc( i )
+               | * :
+                  >
+            ]}
+
+            oNodeVecDelete( decls )
+
+            [
+               | ')' : >
+               | ';' :
+            ]
+         }
+      | * :
+   ];
+
+
+ConstDecl:
+   {[
+      | pIdent :
+         [
+            | ':' :
+               @TypedConstDecl
+            | * :
+               @TrueConstDecl
+         ]
+      | * :
+         >
+   ]};
+
+
+% Parse a true constant declaration (as opposed to a typed const declaration).
+% The "true constant" terminology comes from Delphi docs.  It refers to a const that is
+% evaluated at compile time, rather than at program startup time.
+%
+% We've just accepted the identifier.
+%
+TrueConstDecl:
+   int id = LAST_ID
+   '='
+
+   @ConstExpr
+
+   Node decl
+   [ oTypeSNodeType
+      | nBooleanType, nByteType, nCharType, nIntegerType, nEnumType,
+        nPointerType, nUniversalPointerType :
+         decl = @newIdent( nConst, id )
+         oNodeSetInt( decl, qValue, oValueTop )
+      | nStrLitType :
+         decl = @newIdent( nConstStr, id )
+         oNodeSetString( decl, qValueStr, oValueTopString )
+      | * :  #eNotAllowed
+   ]
+   oValuePop
+   oNodeSet( decl, qType, oTypeSTop )
+   oTypeSPop
+   oScopeDeclare( decl )
+   ';'
+   ;
+
+
+% Parse a typed const declaration.
+% We've just accepted the identifier and ':'
+%
+TypedConstDecl:
+   Node decl = @newIdent( nTypedConst, LAST_ID )
+
+   Node theType
+   @TypeRef( theType )
+   oNodeSet( decl, qType, theType )
+
+   % Array and record consts are allocated in global memory,
+   % with global offset stored as decl value.
+   % Scalar consts are not allocated in memory, and their value is
+   % stored directly as the decl value, as I do with "true constants".
+   %
+   % TO DO: I probably should store scalar consts in memory too, in case somebody
+   % wants to get a pointer to them.  And anyway, typed constants can't be used in
+   % constant expressions, so less need to store value in decl node.
+
+   % TO DO: skip subranges, similar to oTypeSNodeType.
+   [ oNodeType( theType )
+      | nBooleanType, nByteType, nCharType, nIntegerType, nEnumType,
+        nPointerType, nUniversalPointerType :
+         % Parse expression and store value in decl
+         '='
+
+         oTypeSPush( theType )
+         @ConstExpr
+         @ConstCoerceType
+
+         oNodeSetInt( decl, qValue, oValueTop )
+         oValuePop
+         oTypeSPop
+         oScopeDeclare( decl )
+         ';'
+
+      | nShortStringType, nFileType :
+         #eNotImplemented
+
+      | nArrayType, nRecordType :
+         % Allocate global space, store address in decl.
+         % Push into global scope init code stream (since we'll be issuing code
+         % rather than creating static data, at the moment).
+         % Parse expression and store in global memory.
+         oScopeEnter( globalScope )
+         int addr = oScopeAllocType( theType )
+         oScopeEnd
+         oCodePush( @GetOrCreateInitCode( globalScope ) )
+         oNodeSetInt( decl, qValue, addr )
+         '='
+         @TypedConstInit( theType, addr )
+         oCodePop
+         oScopeDeclare( decl )
+         ';'
+   ]
+   ;
+
+
+% Parse the initial value of a constant that's being stored in global memory.
+% (An array or record constant, and recursively all its elements.)
+% Given the type, and the address in global memory for the const value.
+% The caller has already pushed into the global init code stream.
+%
+TypedConstInit( Node theType, int addr ):
+
+   % TO DO: skip subranges, similar to oTypeSNodeTYpe
+   [ oNodeType( theType )
+      | nArrayType :
+         Node baseType = oNodeGet( theType, qBaseType )
+         Node indexType = oNodeGet( theType, qIndexType )
+         int low = @OrdinalLow( indexType )
+         int high = @OrdinalHigh( indexType )
+         int elementSize = oNodeGetInt( baseType, qSize )
+
+         '('
+         % Loop over elements
+         int i = low
+         {
+            @TypedConstInit( baseType, addr )
+            [ equal( i, high )
+               | true : >
+               | false :
+            ]
+            ','
+            addr = add( addr, elementSize )
+            inc( i )
+         }
+         ')'
+
+      | nRecordType :
+         '('
+         Node fieldScope = oNodeGet( theType, qScope )
+         % Loop over zero or more named fields.  It's not necessary to name them all.
+         % fpc says the names that are given should be in order, but I'm not requiring that.
+         % Since this is global memory, uninitialized fields will be left as 0.
+         {
+            [
+               | pIdent :
+               | * :  >
+            ]
+            Node field = oScopeFindRequireInScope( fieldScope )
+            ':'
+            Node fieldType = oNodeGet( field, qType )
+            int fieldAddr = add( addr, oNodeGetInt( field, qValue ) )
+            @TypedConstInit( fieldType, fieldAddr )
+            [
+               | ';' :
+               | * :  >
+            ]
+         }
+         ')'
+
+      | nBooleanType, nByteType, nCharType:
+         .tPushAddrGlobal  oEmitInt( addr )
+         oTypeSPush( theType )
+         @ConstExpr
+         @ConstCoerceType
+         .tPushConstI  oEmitInt( oValueTop )
+         oValuePop
+         oTypeSPop
+         .tAssignB
+
+      | nIntegerType, nEnumType:
+         .tPushAddrGlobal  oEmitInt( addr )
+         oTypeSPush( theType )
+         @ConstExpr
+         @ConstCoerceType
+         .tPushConstI  oEmitInt( oValueTop )
+         oValuePop
+         oTypeSPop
+         .tAssignI
+
+      | nPointerType, nUniversalPointerType :
+         .tPushAddrGlobal  oEmitInt( addr )
+         oTypeSPush( theType )
+         @ConstExpr
+         @ConstCoerceType
+         .tPushConstI  oEmitInt( oValueTop )   % only allowing ptr constant Nil so don't need tPushConstP or link redirection
+         oValuePop
+         oTypeSPop
+         .tAssignP
+
+      | nShortStringType, nFileType :
+         #eNotImplemented
+   ]
+   ;
+
+
+TypeDecl:
+   {[
+      | pIdent :
+         Node decl = @newIdent( nTypeDecl, LAST_ID )
+         '='
+         Node theType
+         @TypeRef( theType )
+         oNodeSet( decl, qType, theType )
+         oScopeDeclare( decl )
+         ';'
+      | * :
+         >
+   ]};
+
+VarDecl( node_type varNodeType ):
+   {[
+      | pIdent :
+         NodeVec decls = oNodeVecNew
+         Node decl
+         {
+            decl = @newIdent( varNodeType, LAST_ID )
+            oNodeVecAppend( decls, decl )
+            [
+               | ',' :
+                  pIdent
+               | * :
+                  >
+            ]
+         }
+         ':'
+         Node theType
+         @TypeRef( theType )
+
+         int i = 0
+         {[ equal( i, oNodeVecSize( decls ) )
+            | false :
+               decl = oNodeVecElement( decls, i )
+               oNodeSet( decl, qType, theType )
+               oScopeDeclareAlloc( decl )
+               inc( i )
+            | * :
+              >
+         ]}
+
+         % optional initialization
+         [
+            | '=' :
+               [ oNodeVecSize( decls )
+                  | 1 :
+                  | * :  #eOnlyOneVarCanBeInitialized
+               ]
+
+               % we need an initCode stream for this scope
+               Code initCode = @GetOrCreateInitCode( oScopeCurrent )
+               oCodePush( initCode )
+
+               % currently the global level has two scopes:
+               % the one for declarations e.g. vars and methods,
+               % and a second one for temporaries needed by the main block stmt.
+               % During evaluation of the init expr, we need to be in the 2nd scope
+               % in case the expression requires temporaries
+               % (so the temporaries get allocated in the right scope).
+               % TO DO: Maybe I should make the global scope the special case, instead.
+               boolean changedScope = false
+               [ equal_zero( @ScopeLevel )
+                  | true : oScopeEnter( initScope )
+                           changedScope = true
+                  | * :
+               ]
+               % generate assignment in initCode stream
+               @LValueVar( decl, true )
+               @Expr
+               @CoerceType
+               @Assign
+               [ changedScope
+                  | true : oScopeEnd
+                  | * :
+               ]
+               oCodePop
+             
+            | * :
+         ]
+
+         oNodeVecDelete( decls )
+         ';'
+      | * :
+         >
+   ]};
+
+
+% Parse a list of label declarations.
+% We'll create a tcode label at declaration time, for each user label.
+% If the user label is an integer, we'll record it as _label_<int> in the decl.
+%
+LabelDecl:
+   {
+      Node decl
+      [
+         | pIdent :
+         | pIntLit :
+            % Replace token with identifier "_label_<intlit>"
+            oChangeIntLitToLabelIdent
+      ]
+      decl = @newIdent( nLabel, LAST_ID )
+      % TO DO: ensure not already declared in this scope.
+      %        Or maybe that can be part of oScopeDeclare.
+      Label label = oLabelNew
+      oNodeSetLabel( decl, qValue, label )
+      oScopeDeclare( decl )
+      [
+         | ',' :
+         | * :
+            >
+      ]
+   }
+   ';'
+   ;

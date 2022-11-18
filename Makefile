@@ -34,6 +34,19 @@ FRONT_SRCS = \
   pascal.cc \
   pascal_schema.c \
 
+FRONT_SSL = \
+  pascal.ssl \
+  pascal_schema.ssl \
+  pascal_unit.ssl \
+  pascal_decl.ssl \
+  pascal_constexpr.ssl \
+  pascal_expr.ssl \
+  pascal_stmt.ssl \
+  pascal_str.ssl \
+  pascal_call.ssl \
+  pascal_type.ssl \
+
+
 BACK_SRCS = \
   sm.cc \
 
@@ -128,7 +141,7 @@ pascal_schema.c pascal_schema.ssl: pascal.schema
 
 # Compile SSL code
 #
-pascal.h:  pascal.ssl pascal_schema.ssl
+pascal.h:  $(FRONT_SSL)
 	$(SSL_DIR)/bin-$(OSTYPE)/ssl -l -d -c -r pascal
 	- rm -f pascal.h
 	- rm -f pascal.tbl

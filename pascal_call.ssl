@@ -1,0 +1,304 @@
+%
+% Pascal Compiler
+%
+
+% ------------------------------ Method Calls -----------------------------
+
+
+% Parse a call, given an nProc or nFunc for the just-accepted identifier.
+% If a func, this will also generate the code to push the return value on the expr stack,
+% and push the return type on the type stack.
+%
+Call( Node method ):
+
+   % Prior to first call, issue extern label for a called method.
+   % I don't want to issue .tLabelExtern for unused methods, that seems inefficient.
+   [ oNodeGetBoolean( method, qExternal )
+      | true :
+         [ oNodeGetBoolean( method, qUsed )
+            | false :
+               % define the extern label on first use
+               @DefineExternLabel( method )
+            | * :
+         ]
+     | * :
+   ]
+   oNodeSetBoolean( method, qUsed, true )
+
+   % If the method has a cdecl modifier, the back end will need to use the native
+   % calling convention, instead of my own.  But, the convention varies by platform,
+   % so the front end won't assume what it needs.  I'll still generate the normal tcode
+   % that copies values into actuals space on the stack.
+   % However, to help the back end, I will at least use a different instruction for the
+   % allocation of the actuals space, and for the actual call.
+   %
+   % p.s. I only support cdecl on external methods, because I don't have a way
+   % to let my own Pascal methods read params passed in with the cdecl calling convention.
+   %
+   boolean cdecl = oNodeGetBoolean( method, qCdecl )
+
+   % If this is a function, we will allocate a temporary
+   % in the current scope, to hold the result value.
+   % And pass a pointer to that temporary as an extra parameter.
+   Node resultType
+   int tempOffset
+
+   boolean isFunc = equal_node_type( oNodeType( method ), nFunc )
+
+   [ isFunc
+      | true :
+         resultType = oNodeGet( method, qType )
+         tempOffset = oScopeAllocType( resultType )
+         % TO DO: we could manage temp allocation, so temp space can be reused
+         %        by different code branches.
+      | * :
+   ]
+   
+
+   Node paramScope = oNodeGet( method, qParams )
+   int actualsSize = oNodeGetInt( paramScope, qSize )
+   [ cdecl
+      | true : .tAllocActualsCdecl  oEmitInt( actualsSize )
+      | false :  .tAllocActuals  oEmitInt( actualsSize )
+   ]
+
+   % If method is nested, it takes a hidden first parameter:
+   % a pointer to the frame of the static scope in which the method is declared.
+   % The location of a scope's frame is equivalent to offset 0 in the scope's locals space
+   % (since local offsets are relative to the scope's frame pointer).
+   %
+   % The nested method may be in a higher scope (upLevels > 1),
+   % or a sibling of the method we're in (upLevels = 1),
+   % or an immediate child of the current method (upLevels = 0).
+   %
+   % To understand the upLevels computation, remember that a method's declaration
+   % and its contents (variables, nested functions, and body statement)
+   % are in two different scopes.
+
+   [ greater( @DeclLevel( method ), 0 )
+      | true :
+         .tPushAddrActual  oEmitInt( 0 )    % hidden param is at param offset 0
+         .tPushAddrUpLocal  oEmitInt( @DeclUpLevels( method ) )  oEmitInt( 0 )
+         .tAssignP
+      | * :
+   ]
+
+
+   NodeIter paramIter = oNodeGetIter( paramScope, qDecls )
+   Node param = oNodeIterValue( paramIter )
+   [
+      | '(' :
+      
+         {
+            [ oNodeNull( param )
+               | true : >
+               | * :
+            ]
+
+            int offset = oNodeGetInt( param, qValue )
+
+            % Assign actual value to spot in actuals space
+            .tPushAddrActual oEmitInt( offset )
+            oTypeSPush( oNodeGet( param, qType ) )
+
+            [ oNodeGetBoolean( param, qInOut )
+               | true :   % A VAR param.
+                          % The actual is a pointer to the value.
+                          % The type on the type stack (pushed above) is for the pointed-to value.
+
+                          @LValueExpr( true )
+                          % Addr of the referenced variable is on the expr stack,
+                          % type of the variable is on the type stack.
+
+                          % Match types more exactly. It's not sufficient to be assign compatible
+                          % since the method will be assigning to the actual using the param type.
+                          % Maybe something like type contents must match, incl subrange bounds.
+                          @MatchTypes
+
+                          .tAssignP
+
+               | false :  @Expr
+                          @CoerceType
+                          
+                          % Assign to offset in actuals space
+
+                          [ oTypeSNodeType
+                             | nIntegerType, nEnumType : .tAssignI
+                             | nBooleanType, nByteType, nCharType :  .tAssignB
+                             | nFileType :   #eNotImplemented
+                             | nPointerType, nUniversalPointerType :  .tAssignP
+                             | nArrayType, nRecordType, nShortStringType :
+                                 % compound types: copy value into actuals space
+                                 int size = oNodeGetInt( oTypeSTop, qSize )
+                                 .tCopy  oEmitInt( size )    % multi-word copy
+                          ]
+            ]
+            oTypeSPop
+
+            oNodeIterNext( paramIter )
+            param = oNodeIterValue( paramIter )
+            [ oNodeNull( param )
+               | true :  >
+               | false :
+            ]
+
+            ','
+         }
+
+         ')'
+
+      | * :
+   ]
+
+   [ oNodeNull( param )
+      | false :    #eMissingParameter
+      | * :
+   ]
+
+   [ isFunc
+      | true :
+         % Pass result temp as an additional VAR parameter.
+         .tPushAddrActual oEmitInt( oNodeGetInt( method, qResultOffset ) )
+         .tPushAddrLocal  oEmitInt( tempOffset )
+         .tAssignP
+      | * :
+   ]
+
+   [ cdecl
+      | true :
+         .tCallCdecl  @EmitValue( method )
+      | false :
+         .tCall   @EmitValue( method )
+   ]
+
+   [ isFunc
+      | true :
+         % push return value from temp
+         oTypeSPush( resultType )
+
+         [ oTypeSNodeType
+            | nIntegerType, nEnumType :   .tPushLocalI  oEmitInt( tempOffset )
+            | nBooleanType, nByteType, nCharType :   .tPushLocalB  oEmitInt( tempOffset )
+            | nFileType :  #eNotImplemented
+            | nPointerType, nUniversalPointerType :   .tPushLocalP  oEmitInt( tempOffset )
+            | nArrayType, nRecordType, nShortStringType :   % compound type: push address
+                               .tPushAddrLocal  oEmitInt( tempOffset )
+         ]
+      | * :
+   ]
+   
+   .tFreeActuals  oEmitInt( actualsSize )
+   ;
+
+
+
+% Called on first use of an extern method
+%
+DefineExternLabel( Node method ):
+   % The extern name might be given explicitly, otherwise the pascal method name.
+   int strAddr
+   String externalName = oNodeGetString( method, qExternalName )
+   [ equal_string( externalName, stringNull )
+      | true :
+         strAddr = oStringAllocLit( ID_STRING( oNodeGetInt( method, qIdent ) ) )
+      | false :
+         strAddr = oStringAllocLit( externalName )
+   ]
+   .tLabelExtern  @EmitValue( method )  oEmitInt( strAddr )
+   ;
+
+
+
+% Parse a call to a built-in function, identified by the just-accepted identifier.
+% This will also generate the code to push the return value on the expr stack,
+% and push the return type on the type stack.
+%
+CallBuiltInFunc( Node method ):
+
+   % Ord(x)
+   [ oNodeEqual( method, BuiltIn_Ord )
+      | true :
+         % parameter is any scalar type (including boolean, enum, char)
+         % result is integer
+         '('
+         @Expr
+         [ oTypeSNodeType
+            | nIntegerType, nEnumType :
+            | nBooleanType, nByteType, nCharType :  .tCastBtoI
+            | * :  #eTypeMismatch
+         ]
+         oTypeSPop
+         oTypeSPush( IntegerType )
+         ')'
+         >>
+      | * :
+   ]
+
+   % Chr(x)
+   [ oNodeEqual( method, BuiltIn_Chr )
+      | true :
+         % parameter is integer
+         % result is char
+         '('
+         @Expr
+         [ oTypeSNodeType
+            | nIntegerType :    .tCastItoB
+            | nByteType :
+            | * :  #eTypeMismatch
+         ]
+         oTypeSPop
+         oTypeSPush( CharType )
+         ')'
+         >>
+      | * :
+   ]
+
+   % Pred(x)
+   [ oNodeEqual( method, BuiltIn_Pred )
+      | true :
+         % parameter is any enum type, as long as it has values 0..N-1
+         % result is the same enum type
+         '('
+         @Expr
+         [ oTypeSNodeType
+            | nEnumType :
+               % TO DO: does this skip past type aliases?
+               % TO DO: what if using pred/succ on a subrange type?
+               [ oNodeGetBoolean( oTypeSTop, qHasGap )
+                  | true :   #eCantUsePredSuccOnEnumWithValueGaps
+                  | * :
+               ]
+            | * :  #eTypeMismatch
+         ]
+         .tDecI
+         ')'
+         >>
+      | * :
+   ]
+
+   % Succ(x)
+   [ oNodeEqual( method, BuiltIn_Succ )
+      | true :
+         % parameter is any enum type, as long as it has values 0..N-1
+         % result is the same enum type
+         '('
+         @Expr
+         [ oTypeSNodeType
+            | nEnumType :
+               % TO DO: does this skip past type aliases?
+               % TO DO: what if using pred/succ on a subrange type?
+               [ oNodeGetBoolean( oTypeSTop, qHasGap )
+                  | true :   #eCantUsePredSuccOnEnumWithValueGaps
+                  | * :
+               ]
+            | * :  #eTypeMismatch
+         ]
+         .tIncI
+         ')'
+         >>
+      | * :
+   ]
+
+   #eNotImplemented
+   ;
+

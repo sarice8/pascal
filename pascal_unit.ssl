@@ -1,0 +1,354 @@
+
+%
+%  Pascal Compiler
+%
+
+% ------------------------------ Units -----------------------------
+
+
+% The uses clause is a list of units required by the user program or unit.
+% We will find and compile the named units (unless already loaded).
+% We do not make the unit interface visible to the user, the caller will do so later.
+UsesClause( Node user ):
+   {
+      pIdent
+      @Uses( LAST_ID, user )
+      [
+         | ',' :
+         | * :  >
+      ]
+   }   
+   ';'
+   ;
+
+
+% Process an implicit "uses mysystem" in every module, except in the mysystem unit itself.
+% (I'm calling the unit mysystem rather than system, so fpc doesn't use it to replace its own system unit.)
+%
+UsesMySystem( Node user ):
+   [ equal( oNodeGetInt( user, qIdent ), mysystemId )
+      | true :  >>
+      | * :
+   ]
+   @Uses( mysystemId, user )
+   ;
+
+
+% After processing the mysystem unit interface, grab certain declarations from it
+% that the compiler may want to refer to later.
+%
+FindSelectSystemDecls( Node unit ):
+   [ equal( oNodeGetInt( unit, qIdent ), mysystemId )
+      | true :
+         System_ShortStringAppendShortString = oNodeFind( oScopeCurrent, qDecls, qIdent, oId_ShortStringAppendShortString )
+         System_ShortStringAppendChar = oNodeFind( oScopeCurrent, qDecls, qIdent, oId_ShortStringAppendChar )
+         System_ShortStringCmp = oNodeFind( oScopeCurrent, qDecls, qIdent, oId_ShortStringCmp )
+      | * :
+   ]
+   ;
+
+
+% The given user module uses a unit with the given id,
+% which may or may not have been loaded already.
+%
+Uses( int id, Node user ):
+   Node unit = @FindOrCompileUnit( id )
+   [ equal_node( unit, Null )
+      | false :
+         oNodeAddLast( user, qUsedUnits, unit )
+
+         % Put a declaration in the current scope, naming the unit and pointing to it.
+         % This is to allow references to  <unit>.<identifier_in_unit>
+         Node unitRef = oNodeNew( nUnitRef )
+         oNodeSetInt( unitRef, qIdent, oNodeGetInt( unit, qIdent ) )
+         oNodeSet( unitRef, qPublicScope, oNodeGet( unit, qPublicScope ) )
+         oScopeDeclare( unitRef )
+      | * :
+   ];
+
+
+% If the given decl is for an nUnitRef, the program is using syntax <unit>.<identifier>
+% Parse the rest of that to find the intended decl.
+%
+ResolveUnitRef( inout Node decl ):
+   [ oNodeType( decl )
+      | nUnitRef :
+         Node scope = oNodeGet( decl, qPublicScope )
+         '.'
+         pIdent
+         decl = oScopeFindRequireInScope( scope )
+      | * :
+   ];
+
+
+EnterUsedUnits( Node user ):
+   % Make the used units' public scopes directly visible.
+   % This is done after the units are all compiled, so they don't interfere with each other incorrectly.
+   % Units later in the list have priority.
+   NodeIter unitIt = oNodeGetIter( user, qUsedUnits )
+   {
+      Node unit = oNodeIterValue( unitIt )
+      [ oNodeNull( unit )
+         | false :
+            oScopeEnter( oNodeGet( unit, qPublicScope ) )
+         | * :
+            >
+      ]
+      oNodeIterNext( unitIt )
+   }
+   ;
+
+EndUsedUnits( Node user ):
+   % Leave the units' public scopes, so no longer visible.
+   NodeIter unitIt = oNodeGetIterLast( user, qUsedUnits )
+   {
+      Node unit = oNodeIterValue( unitIt )
+      [ oNodeNull( unit )
+         | false :
+            % Consistency check.  Make sure our scope enter / end have lined up correctly.
+            [ oNodeEqual( oScopeCurrent, oNodeGet( unit, qPublicScope ) )
+               | true :
+               | false :  #eInternalScopeMismatch
+            ]
+            oScopeEnd
+         | * :
+            >
+      ]
+      oNodeIterPrev( unitIt )
+   }
+   ;
+
+
+FindOrCompileUnit( int id ) >> Node:
+   % We might have this unit loaded already
+   Node unit = oNodeFind( workspace, qUnits, qIdent, id )
+   [ equal_node( unit, Null )
+      | false :  >> unit
+      | * :
+   ]
+
+   % If not, search for the source file on disk
+   boolean ok = oIncludeUnitFile( id )
+   [ ok
+      | false :  #eCantFindUnitFile  >> Null
+      | * :
+   ]
+
+   % compile it, adding it into the workspace
+   % then return it.
+   unit = @Unit
+
+   % TO DO: ensure we are at pEof
+   % end the include
+   oIncludeEnd
+   >> unit;
+
+
+
+Unit >> Node:
+   pUnit
+   pIdent
+   Node unit = oNodeNew( nUnit )
+   oNodeSetInt( unit, qIdent, LAST_ID )
+   Node unitImpl = oNodeNew( nUnitImpl )
+   oNodeSetInt( unitImpl, qIdent, LAST_ID )
+   oNodeSet( unit, qImpl, unitImpl )
+   ';'
+
+   % mandatory sections
+
+   pInterface
+   @UsesMySystem( unit )
+   [
+      | pUses :   @UsesClause( unit )
+      | * :
+   ]
+   @EnterUsedUnits( unit )
+
+   oScopeBegin( 0, allocGlobal )
+   oNodeSet( unit, qPublicScope, oScopeCurrent )
+   globalScope = oScopeCurrent
+
+   % A scope for temporaries needed by variable initialization
+   oScopeBegin( 0, allocDown )
+   initScope = oScopeCurrent
+   oNodeSet( unit, qInitRoutineScope, initScope )
+   oScopeEnd
+
+   @UnitInterface( unit )
+   oScopeEnd  % interface scope
+
+   pImplementation
+   @UsesMySystem( unitImpl )
+   [
+      | pUses :   @UsesClause( unitImpl )
+      | * :
+   ]
+   @EnterUsedUnits( unitImpl )
+   % re-enter interface scope after impl's uses.  interface still has priority.
+   oScopeEnter( oNodeGet( unit, qPublicScope ) )
+   
+   oScopeBegin( 0, allocGlobal )
+   oNodeSet( unit, qPrivateScope, oScopeCurrent )
+   oNodeSet( oScopeCurrent, qExtends, oNodeGet( unit, qPublicScope ) )
+   globalScope = oScopeCurrent
+   @UnitImplementation( unit )
+
+   [
+      | pInitialization :  @UnitInitialization( unit, true )   % init routine with statements from init section
+      | * :                @UnitInitialization( unit, false )  % implicit init routine
+   ]
+   [
+      | pFinalization :  @UnitFinalization( unit, true )
+      | * :              @UnitFinalization( unit, false )   % implicit final routine, may be handy later
+   ]
+   pEnd  '.'
+
+   oScopeEnd  % impl scope
+   oScopeEnd  % interface scope
+   @EndUsedUnits( unitImpl )  % used units scopes
+   @EndUsedUnits( unit )
+   oNodeAddLast( workspace, qUnits, unit )
+   >> unit;
+
+
+UnitInterface( Node unit ):
+   {[
+      | pConst :     @ConstDecl
+      | pType :      @TypeDecl
+      | pVar :       @VarDecl( nGlobalVar )
+      % label declaration not allowed in interface
+
+      | pProcedure :
+         Node decl = @ProcHeaderDecl
+         % despite syntax diagrams, fpc does allow external clause on methods in unit interface,
+         % even though this clause is an alternative for the body statement.
+         [
+            | pExternal :
+               @ExternalDecl( decl )
+               ';'
+            | * :
+         ]
+
+      | pFunction :
+         Node decl = @FuncHeaderDecl
+         [
+            | pExternal :
+               @ExternalDecl( decl )
+               ';'
+            | * :
+         ]
+
+      | * :          >
+   ]}
+   @FindSelectSystemDecls( unit )
+   ;
+
+UnitImplementation( Node unit ):
+   @BlockDecls( nGlobalVar )
+   ;
+
+
+UnitInitialization( Node unit, boolean hasStmts ):
+   Label label = oLabelNew
+   .tLabel  oEmitLabel( label )
+   oNodeSetLabel( unit, qInitLabel, label )
+
+   int patchLS
+   .tEnter  patchLS = Here  .tSpace
+
+   % insert any code for initialization of this unit's variables.
+   
+   Node scope
+   Code initCode
+
+   scope = oNodeGet( unit, qPublicScope )
+   initCode = oNodeGetCode( scope, qInitCode )
+   oEmitCode( initCode )
+   oNodeSetCode( scope, qInitCode, codeNull )
+
+   scope = oNodeGet( unit, qPrivateScope )
+   initCode = oNodeGetCode( scope, qInitCode )
+   oEmitCode( initCode )
+   oNodeSetCode( scope, qInitCode, codeNull )
+
+   oScopeEnter( oNodeGet( unit, qInitRoutineScope ) )
+
+   [ hasStmts
+      | true :     
+         @Statement
+         {[
+            | ';' :  @Statement
+            | * :    >
+         ]}
+      | * :
+   ]
+
+   .tReturn
+
+   int localSpace = oNodeGetInt( oScopeCurrent, qSize )
+   oPatch( patchLS, localSpace )
+   oScopeEnd   % init routine scope, for temporaries
+   ;
+
+
+UnitFinalization( Node unit, boolean hasStmts ):
+   Label label = oLabelNew
+   .tLabel  oEmitLabel( label )
+   oNodeSetLabel( unit, qFinalLabel, label )
+
+   int patchLS
+   .tEnter  patchLS = Here  .tSpace
+
+   % final routine scope, for temporaries
+   oScopeBegin( 0, allocDown )
+
+   [ hasStmts
+      | true :     
+         @Statement
+         {[
+            | ';' :  @Statement
+            | * :    >
+         ]}
+      | * :
+   ]
+
+   .tReturn
+
+   int localSpace = oNodeGetInt( oScopeCurrent, qSize )
+   oPatch( patchLS, localSpace )
+   oScopeEnd   % final routine scope, for temporaries
+   ;
+
+
+InitializeUnits:
+   % call init routine of each loaded unit, in the order they were loaded
+   % (used directly or indirectly by the main program).
+   NodeIter it = oNodeGetIter( workspace, qUnits )
+   {
+      Node unit = oNodeIterValue( it )
+      [ oNodeNull( unit )
+         | true :  >
+         | false :
+            .tAllocActuals  oEmitInt( 0 )  % not sure I need this. maybe for stack alignment.
+            .tCall  oEmitLabel( oNodeGetLabel( unit, qInitLabel ) )
+            .tFreeActuals  oEmitInt( 0 )
+            oNodeIterNext( it )
+      ]
+   };
+
+
+FinalizeUnits:
+   NodeIter it = oNodeGetIterLast( workspace, qUnits )
+   {
+      Node unit = oNodeIterValue( it )
+      [ oNodeNull( unit )
+         | true :  >
+         | false :
+            .tAllocActuals  oEmitInt( 0 )  % not sure I need this. maybe for stack alignment.
+            .tCall  oEmitLabel( oNodeGetLabel( unit, qFinalLabel ) )
+            .tFreeActuals  oEmitInt( 0 )
+            oNodeIterPrev( it )
+      ]
+   };
+
