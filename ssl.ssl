@@ -818,6 +818,8 @@ OperationDefinition >> boolean:
 RuleSectionDefinition >> boolean:
     Node  i
     [
+        | pInclude:  @Include
+                     >> true
         | pIdent:
         | * :        >> false
     ]
