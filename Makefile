@@ -106,7 +106,7 @@ $(FRONT_EXEC): $(FRONT_OBJS) $(TCODE_OBJS) | $(BINDIR)
 $(BACK_EXEC): $(BACK_OBJS) $(TCODE_OBJS) $(RUNLIB_OBJS) | $(BINDIR)
 	g++ $^ $(BACK_LINK_OBJS) $(SDL2_LIBS) -o $@
 
-$(JIT_EXEC): $(JIT_OBJS) $(RUNLIB_OBJS) | $(BINDIR)
+$(JIT_EXEC): $(JIT_OBJS) $(TCODE_OBJS) $(RUNLIB_OBJS) | $(BINDIR)
 	g++ $^ $(JIT_LINK_OBJS) $(SDL2_LIBS) -o $@
 
 # Include all .d files

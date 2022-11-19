@@ -56,22 +56,11 @@ I have these problems.
 MISSING LANGUAGE FEATURES
 
 real type not implemented.
-char and byte types not implemented.
-   - note both of these are unsigned, so I need careful handling of extension to int.
-     Currently all my 1-byte operations would sign-extend to int.
-   - note char and byte are not assignment compatible, but can convert between them with
-     chr(byte) and ord(char).   Literal one-character string is type char.
 file type not implemented.
-enum type not implemented.
 set type not implemented.
 unions ( "case" inside record definition )
-case statement
 
-goto / label
 exit[(value)] - an extension to leave a procedure / function (with optional return value) / program.
-
-boolean variables may not be fully fleshed out, depending on what operators are allowed on them
-(aside from and or not equal not-equal).
 
 Support other flavors of integer - unsigned int, int64, int8.  (Look up the complete set).
 These need their own tcode operators and jit operand types, e.g. to produce different comparision flags.
@@ -86,14 +75,6 @@ that folks apparently use is that must have the same type declaration, not just 
 the type declaration.
 
 Add missing standard functions like sin().
-
-Maybe add in some of the graphics functions that I think Turbo Pascal had.
-Or, at least some simple modern graphics library, so I can make some mini game/toy programs.
-
-Support units, for multiple source files in project, and a way to package extern library methods
-e.g. whatever graphical utility I want to make available.
-Note, I should have a way to mark the method with cdecl or similar, to know that I need to use
-the native calling convention, in addition to absolute code address.
 
 If multiple pascal units (as opposed to native units) are used together,
 those units need to be allocated within 2GB of each other so they can access
@@ -163,6 +144,7 @@ e.g. ++var  is currently  push addr var, push val var, inc, assign.  But could b
 // which I could resolve  by not using preprocessor symbols.
 // Meanwhile as long as I include this after the std headers, it's ok.
 #include "pascal.h"
+#include "tcode.h"
 
 #include "runlib.h"
 
@@ -524,16 +506,20 @@ Operand allocateTemp( int size );
 void preserveRegsAcrossCall();
 jitOperandKind operandKindReg( int size );
 
-
 std::unordered_map<int, char*> labels;
+std::unordered_map<int, int> labelTCodeAddrs;
 std::unordered_map<int, int> labelAliases;
 std::unordered_map<int, char*> unresolvedExternLabels;
 std::vector< std::pair< int*, int> > patches;
+int nextLabel = 0;
 
-void defineLabel( int label, char* addr );
+void defineLabels();
+void defineLabel( int label, char* nativeAddr );
 void defineLabelAlias( int label, int aliasToLabel );
+void defineLabelTCode( int label, int tCodeAddr );
 void defineLabelExtern( int label, char* name );
 char* findLabel( int label );
+int findLabelTCode( int label );
 void requestPatch( int* patchAt, int label );
 void makePatches();
 int isPowerOf2( int x );
@@ -625,6 +611,7 @@ main( int argc, char* argv[] )
     }
   }
   loadTCodeAndAllocNativeCode();
+  defineLabels();
   generateCode();
   protectNativeCode();
 
@@ -673,6 +660,59 @@ usage( int status )
   printf( "  -l : create listing\n" );
   printf( "  -u : dump machine code\n" );
   exit( status );
+}
+
+
+// ----------------------------------------------------------------------------
+
+// A quick initial pass through the tCode.
+// Define the tCode address of each label.  We'll need these to find case tables.
+// Knowing all the tCode label definitions up front will also help us
+// simplify jump chains when we generate code.
+
+void
+defineLabels()
+{
+  int maxLabel = 0;
+
+  for ( int pc = 0; pc < tCodeLen; ) {
+    switch ( tCode[pc] ) {
+      case tLabel: {
+          int label = tCode[pc+1];
+          maxLabel = std::max( maxLabel, label );
+          defineLabelTCode( label, pc+2 );
+        }
+        break;
+      case tLabelAlias: {
+          int label = tCode[pc+1];
+          maxLabel = std::max( maxLabel, label );
+          defineLabelAlias( label, tCode[pc+2] );
+        }
+        break;
+      case tLabelExtern: {
+          int label = tCode[pc+1];
+          maxLabel = std::max( maxLabel, label );
+          defineLabelExtern( label, data + tCode[pc+2] );
+        }
+        break;
+      default:
+        break;
+    }
+    pc += tcodeInstrSize( tCode[pc] );
+  }
+
+  // Jit may issue additional labels itself, starting with this
+  nextLabel = maxLabel + 1;
+}
+
+
+// Create a new label for use by Jit.
+// The label has no tcode address, or native address at this time.
+//
+int
+labelNew()
+{
+  return nextLabel++;
 }
 
 
@@ -2223,8 +2263,35 @@ generateCode()
         break;
       case tJumpCaseI : {
           Operand x = operandStack.back();   operandStack.pop_back();
-          int label = *tCodePc++;
-          toDo( "tJumpCaseI\n" );
+          int table = findLabelTCode( *tCodePc++ );
+          operandIntoReg( x );
+          while ( true ) {
+            if ( tCode[table] == tCase ) {
+              Operand y( jit_Operand_Kind_ConstI, tCode[table+1] );
+              Operand c = operandCompare( x, y, FlagE );
+              int label = tCode[table+2];
+              emitJccToLabel( label, c._flags );
+              table += 3;
+            } else if ( tCode[table] == tCaseRange ) {
+              Operand low( jit_Operand_Kind_ConstI, tCode[table+1] );
+              Operand cLow = operandCompare( x, low, FlagL );
+              int labelSkip = labelNew();
+              emitJccToLabel( labelSkip, cLow._flags );
+              Operand high( jit_Operand_Kind_ConstI, tCode[table+2] );
+              Operand cHigh = operandCompare( x, high, FlagLE );
+              int label = tCode[table+3];
+              emitJccToLabel( label, cHigh._flags );
+              defineLabel( labelSkip, nativePc );
+              table += 4;
+            } else if ( tCode[table] == tCaseEnd ) {
+              int label = tCode[table+1];
+              emitJmpToLabel( label );
+              break;
+            } else {
+              fatal( "unexpected instruction in case table\n" );
+            }
+          }
+          x.release();
         }
         break;
       case tJumpCaseS : {
@@ -2234,37 +2301,34 @@ generateCode()
         }
         break;
       case tCase : {
-          toDo( "tCase\n" );
+          // A no-op if we fall through to this case table
           tCodePc += 2;
         }
         break;
       case tCaseRange : {
-          toDo( "tCaseRange\n" );
+          // A no-op if we fall through to this case table
           tCodePc += 3;
         }
         break;
       case tCaseEnd : {
-          toDo( "tCaseEnd\n" );
+          // A no-op if we fall through to this case table
           tCodePc++;
         }
         break;
       case tLabel : {
-          defineLabel( *tCodePc++, nativePc );
+          // We already defined the tCode address of this label,
+          // but now we can fill in the native address.
+          int label = *tCodePc++;
+          defineLabel( label, nativePc );
         }
         break;
-      case tLabelAlias : {
-          int label = *tCodePc++;
-          int aliasToLabel = *tCodePc++;
-          defineLabelAlias( label, aliasToLabel );
-        }
+      case tLabelAlias :
+        // Already handled in defineLabels().
+        tCodePc += 2;
         break;
-      case tLabelExtern : {
-          int label = *tCodePc++;
-          int nameOffset = *tCodePc++;
-          // Note: I need to see this prior to any calls,
-          // but that should happen since this is issued just prior to first call to the method.
-          defineLabelExtern( label, &data[nameOffset] );
-        }
+      case tLabelExtern :
+        // Already handled in defineLabels().
+        tCodePc += 2;
         break;
       case tWriteI : {
           Operand x = operandStack.back();   operandStack.pop_back();
@@ -2687,14 +2751,25 @@ allocateTemp( int size )
 // Define the given label to mean the given native address.
 //
 void
-defineLabel( int label, char* addr )
+defineLabel( int label, char* nativeAddr )
 {
-  labels[label] = addr;
+  labels[label] = nativeAddr;
 
   if ( listingFile ) {
-    fprintf( listingFile, "%p\tLabel %d\n", addr, label );
+    fprintf( listingFile, "%p\tLabel %d\n", nativeAddr, label );
   }
 }
+
+
+// Define the given label to mean the given tCode address.
+// (THe address after the label instruction.)
+//
+void
+defineLabelTCode( int label, int tCodeAddr )
+{
+  labelTCodeAddrs[label] = tCodeAddr;
+}
+
 
 // Define the given label to be an alias of another label aliasToLabel
 // (which might itself be defined as an alias).
@@ -2733,6 +2808,25 @@ findLabel( int label )
   }
   // This label has not yet been defined
   return nullptr;
+}
+
+
+// Find the tCode address of the label.
+// (This is the address of the instruction after the label.)
+//
+int
+findLabelTCode( int label )
+{
+  auto it = labelTCodeAddrs.find( label );
+  if ( it != labelTCodeAddrs.end() ) {
+    return it->second;
+  }
+  auto it2 = labelAliases.find( label );
+  if ( it2 != labelAliases.end() ) {
+    return findLabelTCode( it2->second );
+  }
+  // This label has not yet been defined
+  return 0;
 }
 
 
