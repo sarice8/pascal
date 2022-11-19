@@ -2256,12 +2256,42 @@ generateCode()
         }
         break;
       case tJumpCaseB : {
+          // Same as tJumpCaseI, except we use unsigned comparison flags (e.g. FlagBE rather than FlagLE)
           Operand x = operandStack.back();   operandStack.pop_back();
-          int label = *tCodePc++;
-          toDo( "tJumpCaseB\n" );
+          int table = findLabelTCode( *tCodePc++ );
+          operandIntoReg( x );
+          while ( true ) {
+            if ( tCode[table] == tCase ) {
+              Operand y( jit_Operand_Kind_ConstI, tCode[table+1] );
+              Operand c = operandCompare( x, y, FlagE );
+              int label = tCode[table+2];
+              emitJccToLabel( label, c._flags );
+              table += 3;
+            } else if ( tCode[table] == tCaseRange ) {
+              Operand low( jit_Operand_Kind_ConstI, tCode[table+1] );
+              Operand cLow = operandCompare( x, low, FlagB );
+              int labelSkip = labelNew();
+              emitJccToLabel( labelSkip, cLow._flags );
+              Operand high( jit_Operand_Kind_ConstI, tCode[table+2] );
+              Operand cHigh = operandCompare( x, high, FlagBE );
+              int label = tCode[table+3];
+              emitJccToLabel( label, cHigh._flags );
+              defineLabel( labelSkip, nativePc );
+              table += 4;
+            } else if ( tCode[table] == tCaseEnd ) {
+              int label = tCode[table+1];
+              emitJmpToLabel( label );
+              break;
+            } else {
+              fatal( "unexpected instruction in case table\n" );
+            }
+          }
+          x.release();
         }
         break;
       case tJumpCaseI : {
+          // TO DO: we could choose to create a jump table
+          //        if the set of choices looks suitable.s
           Operand x = operandStack.back();   operandStack.pop_back();
           int table = findLabelTCode( *tCodePc++ );
           operandIntoReg( x );

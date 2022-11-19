@@ -275,8 +275,18 @@ ConstCoerceType:
    oTypeSPop
    [ equal_node_type( nt, oTypeSNodeType )
       | false :
-         % Some implicit conversion is allowed even here
+         % Can we implicitly convert the value to the desired type?
          [ oTypeSNodeType
+            | nIntegerType :
+               [ nt
+                  | nByteType :  >>
+                  | * :
+               ]
+            | nByteType :
+               [ nt
+                  | nIntegerType :  >>
+                  | * :
+               ]
             | nPointerType :
                [ nt
                   | nUniversalPointerType :  >>

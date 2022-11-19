@@ -628,7 +628,32 @@ walkTable()
               }
               pc++;
               continue;
-       case tJumpCaseB :
+       case tJumpCaseB : {
+              // same as tJumpCaseI but with unsigned comparisons
+              uint8_t value = stack[sp--];
+              int table = findLabel( code[pc] );
+              while ( true ) {
+                if ( code[table] == tCase ) {
+                  if ( value == uint8_t( code[table+1] ) ) {
+                    pc = findLabel( code[table+2] );
+                    break;
+                  }
+                  table += 3;
+                } else if ( code[table] == tCaseRange ) {
+                  if ( value >= uint8_t( code[table+1] ) && value <= uint8_t( code[table+2] ) ) {
+                    pc = findLabel( code[table+3] );
+                    break;
+                  }
+                  table += 4;
+                } else if ( code[table] == tCaseEnd ) {
+                  pc = findLabel( code[table+1] );
+                  break;
+                } else {
+                  fatal( "unexpected instruction in case table\n" );
+                }
+              }
+              continue;
+              }
        case tJumpCaseI : {
               int value = stack[sp--];
               int table = findLabel( code[pc] );
