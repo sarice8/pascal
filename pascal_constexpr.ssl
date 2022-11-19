@@ -265,9 +265,10 @@ ConstMatchTypes:
    ];
 
 
-% Given two constant values on the value stack, and two types on the type stack.
-% Perform any necessary implicit conversions so the second value is the type of the
-% value under it.  Pop the top type, leaving only the desired type.
+% Given a constant value on the value stack, its type on the type stack,
+% and the desired type under it on the type stack.
+% Perform any necessary implicit conversions so the value is the desired type.
+% Pop the top type, leaving only the desired type.
 %
 ConstCoerceType:
    node_type nt = oTypeSNodeType
@@ -288,6 +289,14 @@ ConstCoerceType:
                ]
             | nStrLitType :
                [ nt
+                  | nCharType :
+                     oValueCharToString
+                     >>
+                  | * :
+               ]
+            | nShortStringType :
+               [ nt
+                  | nStrLitType :  >>
                   | nCharType :
                      oValueCharToString
                      >>

@@ -26,6 +26,7 @@
 #include <unordered_map>
 #include <string>
 #include <vector>
+#include <cstring>
 
 
 #include "pascal.h"
@@ -94,6 +95,8 @@ void defineLabelAlias( int label, int aliasToLabel );
 void defineLabelExtern( int label, char* name );
 
 void callCdecl( const std::string& name );
+int shortStrCmp( const char* shortStrA, const char* shortStrB );
+void printShortStr( const char* shortStr );
 
 std::unordered_map<int, int> labels;   // label# -> tcode addr
 std::unordered_map<int, int> labelAliases;  // label# -> aliasToLabel#
@@ -651,10 +654,35 @@ walkTable()
               }
               continue;
               }
-       case tJumpCaseS :
-              printf( "TO DO: tJumpCaseS\n" );
-              sp--;
+       case tJumpCaseS : {
+              const char* valueShortStr = (const char*) stack[sp--];
+              int table = findLabel( code[pc] );
+              while ( true ) {
+                if ( code[table] == tCase ) {
+                  const char* tableShortStr = (const char*) ( data + code[table+1] );
+                  if ( shortStrCmp( valueShortStr, tableShortStr ) == 0 ) {
+                    pc = findLabel( code[table+2] );
+                    break;
+                  }
+                  table += 3;
+                } else if ( code[table] == tCaseRange ) {
+                  const char* tableLowShortStr = (const char*) ( data + code[table+1] );
+                  const char* tableHighShortStr = (const char*) ( data + code[table+2] );
+                  if ( shortStrCmp( valueShortStr, tableLowShortStr ) >= 0 &&
+                       shortStrCmp( valueShortStr, tableHighShortStr ) <= 0 ) {
+                    pc = findLabel( code[table+3] );
+                    break;
+                  }
+                  table += 4;
+                } else if ( code[table] == tCaseEnd ) {
+                  pc = findLabel( code[table+1] );
+                  break;
+                } else {
+                  fatal( "unexpected instruction in case table\n" );
+                }
+              }
               continue;
+              }
        case tCase:
               // A no-op if we fall through to this case table
               pc += 2;
@@ -692,10 +720,7 @@ walkTable()
               continue;
        case tWriteShortStr : {
               const char* shortStr = (const char*) stack[sp--];
-              int len = (uint8_t) shortStr[0];
-              for ( int i = 1; i <= len; ++i ) {
-                printf( "%c", shortStr[i] );
-              }
+              printShortStr( shortStr );
               }
               continue;
        case tWritePChar :
@@ -742,6 +767,35 @@ walkTable()
    }
 }
 
+
+void
+printShortStr( const char* shortStr )
+{
+  int len = (uint8_t) shortStr[0];
+  for ( int i = 1; i <= len; ++i ) {
+    printf( "%c", shortStr[i] );
+  }
+}
+
+
+// Compare two Pascal ShortStrings.
+// Return negative if A < B,  0 if A = B,  positive if A > B
+//
+int
+shortStrCmp( const char* shortStrA, const char* shortStrB )
+{
+  int lengthA = shortStrA[0];
+  int lengthB = shortStrB[0];
+  int result = strncmp( &shortStrA[1], &shortStrB[1], std::min( lengthA, lengthB ) );
+  if ( result == 0 ) {
+    if ( lengthA < lengthB ) {
+       result = -1;
+    } else if ( lengthA > lengthB ) {
+       result = 1;
+    }
+  }
+  return result;
+}
 
 
 void

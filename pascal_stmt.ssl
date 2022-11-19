@@ -338,13 +338,15 @@ CaseStmt:
    Label tableLabel = oLabelNew
    Label doneLabel = oLabelNew
    Label otherwiseLabel = doneLabel
+   boolean isString = false
 
    @Expr
    % Leave the expr type on the type stack throughout case statement
    [ oTypeSNodeType
       | nBooleanType, nByteType, nCharType :   .tJumpCaseB  oEmitLabel( tableLabel )
       | nIntegerType, nEnumType :              .tJumpCaseI  oEmitLabel( tableLabel )
-      | nShortStringType, nStrLitType :        #eNotImplemented
+      | nShortStringType, nStrLitType :        isString = true
+                                               .tJumpCaseS  oEmitLabel( tableLabel )
       | * :     #eNotAllowed
    ]
    pOf
@@ -382,12 +384,20 @@ CaseStmt:
             {
                @ConstExpr
                @ConstCoerceType
-               int val = oValueTop
+               int val
+               [ isString
+                  | true :    val = oStringAllocShortStringLit( oValueTopString )
+                  | false :   val = oValueTop
+               ]
                oValuePop
                [
                   | '..' :  @ConstExpr
                             @ConstCoerceType
-                            int highval = oValueTop
+                            int highval
+                            [ isString
+                               | true :   highval = oStringAllocShortStringLit( oValueTopString )
+                               | false :  highval = oValueTop
+                            ]
                             oValuePop
                             .tCaseRange  oEmitInt( val )  oEmitInt( highval )  oEmitLabel( caseLabel )
                   | * :     .tCase  oEmitInt( val )  oEmitLabel( caseLabel )

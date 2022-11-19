@@ -6,6 +6,8 @@ program t21;
   const c1 = 1;
   const c2 : integer = 2;
 
+  type Direction = ( North, East, South, West );
+
   procedure proc1( i1: integer );
     begin
       case i1 of
@@ -50,6 +52,11 @@ begin
   proc2( '94555' );
   proc2( 'E' );
   proc2( '' );
+
+  case South of
+    North, East: writeln( 'NorthEast' );
+    South..West: writeln( 'SouthWest' );
+  end;
 
   writeln( 'The End' );
 end.
