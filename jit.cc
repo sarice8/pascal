@@ -494,6 +494,7 @@ void operandIntoRegCommutative( Operand& x, Operand& y );
 void operandIntoSpecificReg( Operand& x, Register* reg, int size );
 void operandKindAddrIntoReg( Operand& x );
 void operandNotMem( Operand& x );
+void operandNotRegOrDeref( Operand& x );
 void operandDeref( Operand& x, int valueSize );
 void operandExtendToP( Operand& x );
 Operand operandCompare( Operand& x, Operand& y, ConditionFlags flags );
@@ -2326,8 +2327,70 @@ generateCode()
         break;
       case tJumpCaseS : {
           Operand x = operandStack.back();   operandStack.pop_back();
-          int label = *tCodePc++;
-          toDo( "tJumpCaseS\n" );
+          int table = findLabelTCode( *tCodePc++ );
+          // x is a pointer to ShortString.
+          // I don't want x itself in register since that might be trashed by strcmp.
+          // Essentially I want to preserve x around that method call.
+          // The simple way I'll do it here is to force x out of any register.
+          operandNotRegOrDeref( x );
+          while ( true ) {
+            if ( tCode[table] == tCase ) {
+              Operand y( jit_Operand_Kind_Addr_Global, tCode[table+1] );
+              // runlibShortStrCmp( x, y ) == 0
+              Operand xTemp = x;   // must leave x unchanged
+              operandIntoSpecificReg( xTemp, paramRegs[0], 8 );
+              operandIntoSpecificReg( y, paramRegs[1], 8 );
+              emitCallExtern( (char*) runlibShortStrCmp );
+              xTemp.release();
+              y.release();
+              Operand result( jit_Operand_Kind_RegI, regRax );
+              Operand zero( jit_Operand_Kind_ConstI, 0 );
+              Operand c = operandCompare( result, zero, FlagE );
+              int label = tCode[table+2];
+              emitJccToLabel( label, c._flags );
+              table += 3;
+            } else if ( tCode[table] == tCaseRange ) {
+              int labelSkip = labelNew();
+              {
+                Operand low( jit_Operand_Kind_Addr_Global, tCode[table+1] );
+                // runlibShortStrCmp( x, low ) < 0
+                Operand xTemp = x;   // must leave x unchanged
+                operandIntoSpecificReg( xTemp, paramRegs[0], 8 );
+                operandIntoSpecificReg( low, paramRegs[1], 8 );
+                emitCallExtern( (char*) runlibShortStrCmp );
+                xTemp.release();
+                low.release();
+                Operand result( jit_Operand_Kind_RegI, regRax );
+                Operand zero( jit_Operand_Kind_ConstI, 0 );
+                Operand cLow = operandCompare( result, zero, FlagL );
+                emitJccToLabel( labelSkip, cLow._flags );
+              }
+              {
+                Operand high( jit_Operand_Kind_Addr_Global, tCode[table+2] );
+                // runlibShortStrCmp( x, high ) <= 0
+                Operand xTemp = x;   // must leave x unchanged
+                operandIntoSpecificReg( xTemp, paramRegs[0], 8 );
+                operandIntoSpecificReg( high, paramRegs[1], 8 );
+                emitCallExtern( (char*) runlibShortStrCmp );
+                xTemp.release();
+                high.release();
+                Operand result( jit_Operand_Kind_RegI, regRax );
+                Operand zero( jit_Operand_Kind_ConstI, 0 );
+                Operand cHigh = operandCompare( result, zero, FlagLE );
+                int label = tCode[table+3];
+                emitJccToLabel( label, cHigh._flags );
+              }
+              defineLabel( labelSkip, nativePc );
+              table += 4;
+            } else if ( tCode[table] == tCaseEnd ) {
+              int label = tCode[table+1];
+              emitJmpToLabel( label );
+              break;
+            } else {
+              fatal( "unexpected instruction in case table\n" );
+            }
+          }
+          x.release();
         }
         break;
       case tCase : {
@@ -3063,6 +3126,20 @@ operandNotMem( Operand& x )
 {
   if ( x.isMem() ) {
     operandIntoReg( x );
+  }
+}
+
+
+// Ensure operand is not in a register or dereference of a register.
+//
+void
+operandNotRegOrDeref( Operand& x )
+{
+  if ( x.isReg() || x.isDeref() ) {
+    Operand newX = allocateTemp( x.size() );
+    emitMov( newX, x );
+    x.release();
+    x = newX;
   }
 }
 

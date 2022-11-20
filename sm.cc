@@ -95,8 +95,6 @@ void defineLabelAlias( int label, int aliasToLabel );
 void defineLabelExtern( int label, char* name );
 
 void callCdecl( const std::string& name );
-int shortStrCmp( const char* shortStrA, const char* shortStrB );
-void printShortStr( const char* shortStr );
 
 std::unordered_map<int, int> labels;   // label# -> tcode addr
 std::unordered_map<int, int> labelAliases;  // label# -> aliasToLabel#
@@ -274,7 +272,10 @@ callCdecl( const std::string& name )
 {
   // For now, need to hardcode calls to the available cdecl methods.
 
-  if ( name == "runlibMalloc" ) {
+  if ( name == "runlibShortStrCmp" ) {
+    int* resultPtr = *(int**)( call_sp + 16 );
+    *resultPtr = runlibShortStrCmp( *(const char**)call_sp, *(const char**)(call_sp+8) );
+  } else if ( name == "runlibMalloc" ) {
     void** resultPtr = *(void***)( call_sp + 4 );
     *resultPtr = runlibMalloc( *(int*)call_sp );
   } else if ( name == "runlibRealloc" ) {
@@ -296,8 +297,10 @@ callCdecl( const std::string& name )
   } else if ( name == "runlibWaitKey" ) {
     int* resultPtr = *(int**)( call_sp );
     *resultPtr = runlibWaitKey();
+  } else if ( runlibLookupMethod( name.c_str() ) != nullptr ) {
+    printf( "SM callCdecl() needs to be taught how to call %s\n", name.c_str() );
   } else {
-    printf( "Unresolved external method %s\n", name.c_str() );
+    printf( "Unknown external method %s\n", name.c_str() );
   }
 }
 
@@ -685,7 +688,7 @@ walkTable()
               while ( true ) {
                 if ( code[table] == tCase ) {
                   const char* tableShortStr = (const char*) ( data + code[table+1] );
-                  if ( shortStrCmp( valueShortStr, tableShortStr ) == 0 ) {
+                  if ( runlibShortStrCmp( valueShortStr, tableShortStr ) == 0 ) {
                     pc = findLabel( code[table+2] );
                     break;
                   }
@@ -693,8 +696,8 @@ walkTable()
                 } else if ( code[table] == tCaseRange ) {
                   const char* tableLowShortStr = (const char*) ( data + code[table+1] );
                   const char* tableHighShortStr = (const char*) ( data + code[table+2] );
-                  if ( shortStrCmp( valueShortStr, tableLowShortStr ) >= 0 &&
-                       shortStrCmp( valueShortStr, tableHighShortStr ) <= 0 ) {
+                  if ( runlibShortStrCmp( valueShortStr, tableLowShortStr ) >= 0 &&
+                       runlibShortStrCmp( valueShortStr, tableHighShortStr ) <= 0 ) {
                     pc = findLabel( code[table+3] );
                     break;
                   }
@@ -735,24 +738,24 @@ walkTable()
               pc++;
               continue;
        case tWriteI :
-              printf("%d", (int) stack[sp--]);
+              runlibWriteI( (int) stack[sp--] );
               continue;
        case tWriteBool :
-              printf(stack[sp--] ? "TRUE" : "FALSE");
+              runlibWriteBool( stack[sp--] );
               continue;
        case tWriteChar :
-              printf( "%c", (char) stack[sp--] );
+              runlibWriteChar( (char) stack[sp--] );
               continue;
        case tWriteShortStr : {
               const char* shortStr = (const char*) stack[sp--];
-              printShortStr( shortStr );
+              runlibWriteShortStr( shortStr );
               }
               continue;
        case tWritePChar :
-              printf( "%s", (char*) stack[sp--] );
+              runlibWritePChar( (const char*) stack[sp--] );
               continue;
        case tWriteP :
-              printf(" <%p>", (void*) stack[sp--]);
+              runlibWriteP( (const void*) stack[sp--] );
               continue;
        case tWriteEnum: {
               struct nameTableEntryT {
@@ -792,35 +795,6 @@ walkTable()
    }
 }
 
-
-void
-printShortStr( const char* shortStr )
-{
-  int len = (uint8_t) shortStr[0];
-  for ( int i = 1; i <= len; ++i ) {
-    printf( "%c", shortStr[i] );
-  }
-}
-
-
-// Compare two Pascal ShortStrings.
-// Return negative if A < B,  0 if A = B,  positive if A > B
-//
-int
-shortStrCmp( const char* shortStrA, const char* shortStrB )
-{
-  int lengthA = shortStrA[0];
-  int lengthB = shortStrB[0];
-  int result = strncmp( &shortStrA[1], &shortStrB[1], std::min( lengthA, lengthB ) );
-  if ( result == 0 ) {
-    if ( lengthA < lengthB ) {
-       result = -1;
-    } else if ( lengthA > lengthB ) {
-       result = 1;
-    }
-  }
-  return result;
-}
 
 
 void

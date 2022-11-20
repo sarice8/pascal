@@ -24,10 +24,6 @@ MethodModifiers( Node decl ):
 % The method has a label, as usual, which callers will use.
 % But we define that label with .tLabelExtern rather than .tLabel.
 %
-% Note, I'll hold off on issuing the .tLabelExtern until we see that
-% the external method is actually called.  Otherwise we'd fill each output file
-% with all the external method names in my included libraries, which seems dumb.
-%
 % Note this is fpc syntax.  I'm not sure about other Pascals.
 %
 ExternalDecl( Node decl ):
@@ -50,6 +46,7 @@ ExternalDecl( Node decl ):
          ]
       | * :
    ]
+   @DefineExternLabel( decl )
    ;
 
 

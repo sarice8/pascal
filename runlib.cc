@@ -28,6 +28,7 @@
 // For now, I have a hardcoded list of available external methods.
 //
 std::unordered_map<std::string, void*> runlibMethods = {
+  { "runlibShortStrCmp", (void*) runlibShortStrCmp },
   { "runlibMalloc", (void*) runlibMalloc },
   { "runlibRealloc", (void*) runlibRealloc },
   { "runlibFree", (void*) runlibFree },
@@ -71,7 +72,7 @@ runlibWriteChar( char val )
 }
 
 void
-runlibWriteShortStr( char* ptr )
+runlibWriteShortStr( const char* ptr )
 {
   int len = uint8_t( ptr[0] );
   for ( int i = 1; i <= len; ++i ) {
@@ -80,19 +81,19 @@ runlibWriteShortStr( char* ptr )
 }
 
 void
-runlibWritePChar( char* ptr )
+runlibWritePChar( const char* ptr )
 {
   printf( "%s", ptr );
 }
 
 void
-runlibWriteP( char* ptr )
+runlibWriteP( const void* ptr )
 {
   printf( " <%p>", ptr );
 }
 
 void
-runlibWriteEnum( int val, EnumNameTable* table )
+runlibWriteEnum( int val, const EnumNameTable* table )
 {
   for ( int i = 0; table[i].name != nullptr; ++i ) {
     if ( table[i].value == val ) {
@@ -108,6 +109,27 @@ runlibWriteCR()
 {
   printf( "\n" );
 }
+
+
+// Compare two Pascal ShortStrings.
+// Return negative if A < B,  0 if A = B,  positive if A > B
+//
+int
+runlibShortStrCmp( const char* shortStrA, const char* shortStrB )
+{
+  int lengthA = shortStrA[0];
+  int lengthB = shortStrB[0];
+  int result = strncmp( &shortStrA[1], &shortStrB[1], std::min( lengthA, lengthB ) );
+  if ( result == 0 ) {
+    if ( lengthA < lengthB ) {
+       result = -1;
+    } else if ( lengthA > lengthB ) {
+       result = 1;
+    }
+  }
+  return result;
+}
+
 
 
 // Runlib methods declared in unit mysystem

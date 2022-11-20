@@ -10,19 +10,6 @@
 % and push the return type on the type stack.
 %
 Call( Node method ):
-
-   % Prior to first call, issue extern label for a called method.
-   % I don't want to issue .tLabelExtern for unused methods, that seems inefficient.
-   [ oNodeGetBoolean( method, qExternal )
-      | true :
-         [ oNodeGetBoolean( method, qUsed )
-            | false :
-               % define the extern label on first use
-               @DefineExternLabel( method )
-            | * :
-         ]
-     | * :
-   ]
    oNodeSetBoolean( method, qUsed, true )
 
    % If the method has a cdecl modifier, the back end will need to use the native

@@ -59,7 +59,8 @@ procedure ShortStringAppendChar( strA: ^ShortString; c: Char );
 // Compare two ShortStrings.
 // Returns -1 if A < B,  0 if A = B,  1 if A > B
 //
-function ShortStringCmp( strA: ^ShortString; strB: ^ShortString ) : integer;
+function ShortStringCmp( strA: ^ShortString; strB: ^ShortString ) : integer; cdecl;
+  external 'runlib' name 'runlibShortStrCmp';
 
 procedure ConstructAnsiString( var str: AnsiString );
 procedure DestroyAnsiString( var str: AnsiString );
@@ -97,6 +98,9 @@ procedure ShortStringAppendChar( strA: ^ShortString; c: Char );
   end;
 
 
+{
+  // This was moved into runlib, since needed by string case statement
+
 // Compare two ShortStrings.
 // Returns -1 if A < B,  0 if A = B,  1 if A > B
 //
@@ -132,6 +136,7 @@ function ShortStringCmp( strA: ^ShortString; strB: ^ShortString ) : integer;
 
     done: ;
   end;
+}
 
 procedure ConstructAnsiString( var str: AnsiString );
   begin

@@ -67,7 +67,7 @@ ShortStringAppendShortString:
 ShortStringAppendChar:
    % Note at the moment I don't align params
    .tAllocActuals  oEmitInt( 12 )
-   .tPushAddrActual  oEmitInt( 8 )  .tSwap  .tAssignI
+   .tPushAddrActual  oEmitInt( 8 )  .tSwap  .tAssignB
    .tPushAddrActual  oEmitInt( 0 )  .tSwap  .tAssignP
    .tCall  @EmitValue( System_ShortStringAppendChar )
    .tFreeActuals  oEmitInt( 12 )
@@ -81,13 +81,18 @@ ShortStringAppendChar:
 % -1 if A < B,  0 if A = B,  1 if A > B
 % Leaves Integer on the type stack.
 %
+% TO DO: kind of annoying that we need to hardcode the fact that the called method is cdecl extern.
+%   It would be nicer if that was noted only in the label.
+%   Alternatively, use a utility method in SSL to generate the appropriate call,
+%   given the method decl.
+%
 ShortStringCmp:
-   .tAllocActuals  oEmitInt( 24 )
+   .tAllocActualsCdecl  oEmitInt( 24 )
    .tPushAddrActual  oEmitInt( 8 )  .tSwap  .tAssignP
    .tPushAddrActual  oEmitInt( 0 )  .tSwap  .tAssignP
    int tempOffset = oScopeAllocType( IntegerType )
    .tPushAddrActual  oEmitInt( 16 )  .tPushAddrLocal  oEmitInt( tempOffset )  .tAssignP
-   .tCall  @EmitValue( System_ShortStringCmp )
+   .tCallCdecl  @EmitValue( System_ShortStringCmp )
    .tPushLocalI  oEmitInt( tempOffset )
    .tFreeActuals  oEmitInt( 24 )
    oTypeSPop

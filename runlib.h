@@ -12,11 +12,12 @@ struct EnumNameTable {
 void runlibWriteI( int val );
 void runlibWriteBool( bool val );
 void runlibWriteChar( char val );
-void runlibWriteShortStr( char* ptr );
-void runlibWritePChar( char* ptr );
-void runlibWriteP( char* ptr );
-void runlibWriteEnum( int val, EnumNameTable* table );
+void runlibWriteShortStr( const char* ptr );
+void runlibWritePChar( const char* ptr );
+void runlibWriteP( const void* ptr );
+void runlibWriteEnum( int val, const EnumNameTable* table );
 void runlibWriteCR();
+int runlibShortStrCmp( const char* shortStrA, const char* shortStrB );
 void* runlibMalloc( int size );
 void* runlibRealloc( void* ptr, int size );
 void runlibFree( void* ptr );
