@@ -541,7 +541,7 @@ PrimaryAllowFlow( out Label falseLabel ):
                theType = oNodeGet( decl, qType )
                oTypeSPush( theType )
                [ oTypeSNodeType
-                  | nIntegerType, nEnumType, nBooleanType :
+                  | nIntegerType, nEnumType, nBooleanType, nCharType, nByteType :
                      .tPushConstI @EmitValue( decl )
                   | nPointerType, nUniversalPointerType :
                      % We have one pointer const, Nil.  It's pushed as I.
@@ -577,6 +577,14 @@ PrimaryAllowFlow( out Label falseLabel ):
 
             | nGlobalVar, nLocalVar, nParam, nTypedConst :
                @VarExpr( decl )
+
+            | nTypeDecl :
+               % A type cast
+               oTypeSPush( oNodeGet( decl, qType ) )
+               '('
+               @Expr
+               ')'
+               @CastType
 
             | * :
                #eNotValue
@@ -1022,6 +1030,68 @@ CoerceType:
          #eTypeMismatch
       | * :
    ];
+
+
+% The expr stack contains a value whose type is on top of the type stack.
+% Generate code to cast the value to the type under it in the type stack
+% (pop the type stack, leaving only the desired type).
+%
+% This is stronger than CoerceType, since it isn't limited to implicit conversions.
+% There are still going to be limits on what is allowed though.
+%
+CastType:
+   node_type nt = oTypeSNodeType
+   oTypeSPop
+   [ equal_node_type( nt, oTypeSNodeType )
+      | false :
+         % Can we cast the value to the desired type?
+         [ oTypeSNodeType
+            | nIntegerType, nEnumType :
+               [ nt
+                  | nByteType, nCharType, nBooleanType :   .tCastBtoI  >>
+                  | nIntegerType, nEnumType :   >>
+                  | * :
+               ]
+            | nByteType, nCharType, nBooleanType :
+               [ nt
+                  | nByteType, nCharType, nBooleanType :   >>
+                  | nIntegerType, nEnumType :   .tCastItoB  >>
+                  | * :
+               ]
+            | nPointerType :
+               [ nt
+                  | nUniversalPointerType :  >>
+                  | nStrLitType :
+                     [ equal_node( oTypeSTop, PCharType )
+                        | true :
+                           % PChar := 'strlit' i.e. point at strlit[1]
+                           .tPushConstI  oEmitInt(1)  .tAddPI  >>
+                        | * :
+                     ]
+                  | * :
+               ]
+            | nUniversalPointerType :
+               [ nt
+                  | nPointerType :  >>
+                  | * :
+               ]
+            | nShortStringType :
+               [ nt
+                  | nStrLitType :  >>
+                  | nCharType :
+                     % Store char as a temp ShortString.
+                     oTypeSPush( CharType )
+                     int tempOffset = @MoveIntoTempShortString
+                     oTypeSPop
+                     >>
+                  | * :
+               ]
+            | * :
+         ]
+         #eTypeMismatch
+      | * :
+   ];
+
 
 
 % Require that the top two types on the type stack are matching (ignoring subranges).

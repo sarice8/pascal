@@ -185,6 +185,13 @@ ConstPrimary:
             | nEnumValue :
                oValuePush( oNodeGetInt( decl, qValue ) )
                oTypeSPush( oNodeGet( decl, qType ) )
+            | nTypeDecl :
+               % A type cast
+               oTypeSPush( oNodeGet( decl, qType ) )
+               '('
+               @ConstExpr
+               ')'
+               @ConstCastType
             | * :
                #eNotConst
                oValuePush( 0 )
@@ -285,6 +292,65 @@ ConstCoerceType:
             | nByteType :
                [ nt
                   | nIntegerType :  >>
+                  | * :
+               ]
+            | nPointerType :
+               [ nt
+                  | nUniversalPointerType :  >>
+                  | * :
+               ]
+            | nUniversalPointerType :
+               [ nt
+                  | nPointerType :  >>
+                  | * :
+               ]
+            | nStrLitType :
+               [ nt
+                  | nCharType :
+                     oValueCharToString
+                     >>
+                  | * :
+               ]
+            | nShortStringType :
+               [ nt
+                  | nStrLitType :  >>
+                  | nCharType :
+                     oValueCharToString
+                     >>
+                  | * :
+               ]
+            | * :
+         ]
+         #eTypeMismatch
+      | * :
+   ];
+
+
+% Given a constant value on the value stack, its type on the type stack,
+% and the desired type under it on the type stack.
+% Perform any necessary conversions so the value is cast to the desired type.
+% Pop the top type, leaving only the desired type.
+%
+% This is stronger than ConstCoerceType, since it isn't limited to implicit conversions.
+% There are still going to be limits on what is allowed though.
+%
+ConstCastType:
+   node_type nt = oTypeSNodeType
+   oTypeSPop
+   [ equal_node_type( nt, oTypeSNodeType )
+      | false :
+         % Can we cast the value to the desired type?
+         [ oTypeSNodeType
+            | nIntegerType, nEnumType :
+               [ nt
+                  | nByteType, nCharType, nBooleanType :  >>
+                  | nIntegerType, nEnumType :  >>
+                  | * :
+               ]
+            | nByteType, nCharType, nBooleanType :
+               [ nt
+                  | nByteType, nCharType, nBooleanType :  >>
+                  | nIntegerType, nEnumType :  >>
                   | * :
                ]
             | nPointerType :
