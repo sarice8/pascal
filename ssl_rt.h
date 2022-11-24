@@ -407,6 +407,7 @@ extern char   ssl_strlit_buffer [];
 void ssl_restart_scanner();
 void ssl_get_next_token();
 #define ssl_get_token()  { if (ssl_token.accepted) ssl_get_next_token(); }
+void ssl_unaccept_token();
 
 extern int   ssl_line_number;  /* Current line of scanner */
 extern char  ssl_line_listed;  /* Should be walker var, not scanner */

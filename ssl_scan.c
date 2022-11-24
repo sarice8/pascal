@@ -663,6 +663,16 @@ ssl_accept_token ()
 }
 
 
+// Unaccept the current token.
+// The next call to get_token() will return the same token.
+//
+void
+ssl_unaccept_token()
+{
+    ssl_token.accepted = 0;
+}
+
+
 /*  Reached end of source file.  May have just been end of 'include' file.  */
 void
 s_hit_eof ()
