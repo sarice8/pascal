@@ -1,4 +1,4 @@
-#define SSL_CODE_TABLE_SIZE 14200
+#define SSL_CODE_TABLE_SIZE 14500
 
 #define oJumpForward 0
 #define oJumpBack 1
@@ -219,6 +219,7 @@
 #define eUsedButNotDefined 27
 #define eCantUsePredSuccOnEnumWithValueGaps 28
 #define eCantDereference 29
+#define eSizeMismatch 30
 #define nINVALID 0
 #define Object 1
 #define nWorkspace 2
@@ -499,8 +500,9 @@ struct ssl_error_table_struct ssl_error_table[] = {
    "eUsedButNotDefined", 27,
    "eCantUsePredSuccOnEnumWithValueGaps", 28,
    "eCantDereference", 29,
+   "eSizeMismatch", 30,
    "", 0
 };
-int ssl_error_table_size = 30;
+int ssl_error_table_size = 31;
 
 #endif // SSL_INCLUDE_ERR_TABLE

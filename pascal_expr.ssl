@@ -586,6 +586,35 @@ PrimaryAllowFlow( out Label falseLabel ):
                ')'
                @CastType
 
+               % The expression can be further modified after the typecast.
+               % This is taken from VarExpr.  Try to consolidate.
+
+               [ oTypeSNodeType
+                  | nPointerType, nUniversalPointerType :
+                     [
+                        | '^' :             % dereferenced
+                           oTypeSPop
+                           oTypeSPush( oNodeGet( theType, qBaseType ) )
+                           @LValueIndexes
+                           @FetchVar
+                        | '[' :             % dereferencing pointer like an array [0..] of baseType
+                           @PointerArraySubscript
+                           % modify addr for any subsequent subscripts, field references, etc
+                           @LValueIndexes
+                           @FetchVar
+                        | * :               % just ptr value alone
+                     ]
+
+                  | nArrayType, nRecordType, nShortStringType :
+                     % So far we would have the addr of the compound value.
+                     % Modify addr for subscripts, field references, etc
+                     @LValueIndexes
+                     % get final value, if no longer compound
+                     @FetchVar
+
+                  | *:
+               ]
+
             | * :
                #eNotValue
                oTypeSPush( IntegerType )
@@ -599,8 +628,8 @@ PrimaryAllowFlow( out Label falseLabel ):
          Node theType
 
          % writeable is false because we're not on the left hand side of an assignment,
-         % or passign into a var parameter.  So it's ok to take the address of a typed const.
-         @LValueVar( decl, false )
+         % or passing into a var parameter.  So it's ok to take the address of a typed const.
+         @LValueFromDecl( decl, false )
 
          % The above leaves the pointed-to type on type stack.
          % Replace with ptr-to-<type>.
@@ -982,6 +1011,7 @@ PointerDeref:
 %
 CoerceType:
    node_type nt = oTypeSNodeType
+   Node given = oTypeSTop
    oTypeSPop
    [ equal_node_type( nt, oTypeSNodeType )
       | false :

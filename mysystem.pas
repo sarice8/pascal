@@ -14,6 +14,10 @@ type PInteger = ^Integer;
 // For now, type String always means ShortString.
 type String = ShortString;
 
+// In fpc, longint is int32 and integer is int16.
+// For me, both are int32.
+type LongInt = Integer;
+
 
 // My version of AnsiString is similar to C++ std::string
 // As with the latest std::string, it doesn't use reference counting.
@@ -218,23 +222,20 @@ function strlen( pc: PChar ): integer;
 // TO DO: this should be a builtin instead, so I can use faster machine code
 procedure memcpy( dest: Pointer; src: Pointer; size: integer );
     var i: integer;
-    var destB, srcB: ^byte;
   begin
-    destB := dest;   // TO DO: support typecast:   destB := PByte( dest )
-    srcB := src;
     for i := 0 to size - 1 do
-      destB[i] := srcB[i];
+      PByte(dest)[i] := PByte(src)[i];
   end;
 
 
 initialization
   begin
-    writeln( 'Hello from system.initialization' );
+    // writeln( 'Hello from system.initialization' );
   end;
 
 finalization
   begin
-    writeln( 'Goodbye from system.finalization' );
+    // writeln( 'Goodbye from system.finalization' );
   end
 
 end.

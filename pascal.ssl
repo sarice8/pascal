@@ -264,6 +264,7 @@ error:
    eUsedButNotDefined
    eCantUsePredSuccOnEnumWithValueGaps
    eCantDereference
+   eSizeMismatch
    ;
 
 include 'pascal_schema.ssl'
@@ -592,6 +593,7 @@ FactorAllowFlow( out Label falseLabel );
 PrimaryAllowFlow( out Label falseLabel );
 
 VarExpr( Node decl );
+LValueFromDecl( Node decl, boolean writeable );
 LValueVar( Node decl, boolean writeable );
 IncVar( Node decl );
 DecVar( Node decl );

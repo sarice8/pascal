@@ -192,6 +192,8 @@ ConstPrimary:
                @ConstExpr
                ')'
                @ConstCastType
+               % Constexprs are not compound types or dereferenceable pointers (I believe)
+               % so no need to check for additional suffixes here as we do in PrimaryAllowCF
             | * :
                #eNotConst
                oValuePush( 0 )

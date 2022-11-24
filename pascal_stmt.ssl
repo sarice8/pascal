@@ -35,7 +35,8 @@ LabelOrAssignOrCallStmt:
       | nLabel :                          @LabelDefinition( decl )
                                           @Statement
       | nProc :                           @Call( decl )
-      | nGlobalVar, nLocalVar, nParam :   @AssignStmt( decl )
+      | nGlobalVar, nLocalVar, nParam, nTypeDecl :
+                                          @AssignStmt( decl )
       | nFunc :                           @AssignResultStmt( decl )
       | * :                               #eBadStatement
    ];
@@ -57,8 +58,7 @@ LabelDefinition( Node decl ):
 % Given decl, the just-accepted first identifier on the left hand side.
 %
 AssignStmt( Node decl ):
-
-   @LValueVar( decl, true )
+   @LValueFromDecl( decl, true )
    ':=' 
    @Expr
    @CoerceType
@@ -127,17 +127,104 @@ AssignResultStmt( Node funcDecl ):
 % typed const.
 %
 LValueExpr( boolean writeable ):
-   % At the moment, all lvalue expressions start with a variable name.
-   % I think there can also be typecasts, not supported yet.  Check standard syntax.
+   % Al lvalue expressions start with a variable name,
+   % or a type name (for an lvalue typecast).
    pIdent
    Node decl = oScopeFindRequire
    @ResolveUnitRef( decl )
+   @LValueFromDecl( decl, writeable )
+   ;
+
+
+% Parse an lvalue expression, starting with the decl of the just accepted identifier.
+% Leaves the address of the value on the expr stack,
+% and the type of the value at that address on the type stack.
+% If writeable is false, the expression won't be written to, so may access a
+% typed const.
+%
+LValueFromDecl( Node decl, boolean writeable ):
    [ oNodeType( decl )
       | nGlobalVar, nLocalVar, nParam, nTypedConst :
+         @LValueVar( decl, writeable )
+
+      | nTypeDecl :
+         % lvalue typecast
+         % This is only allowed if the provided lvalue we're casting from has the same size.
+         % No conversion code occurs, it's just a different interpretation of the same bits.
+         oTypeSPush( oNodeGet( decl, qType ) )
+         '('
+         @LValueExpr( writeable )
+         ')'
+         @LValueCastType
+         % There can be further modifications of the lvalue after the cast.
+         % This is taken from LValueVar.  Try to consolidate.
+         [ oTypeSNodeType
+            | nPointerType :
+               [
+                  | '[' :
+                     % dereference the pointer var first
+                     .tFetchP
+                     @PointerArraySubscript
+                  | * :
+               ]
+            | * :
+         ]
+         % additional subscripts, if any
+         @LValueIndexes
+ 
       | * :  #eNotVar
    ]
-   @LValueVar( decl, writeable )
    ;
+
+
+% An lvalue is on the expression stack.
+% The type of the lvalue is on the type stack.
+% The desired type is under it on the type stack.
+% Perform an lvalue cast to the desired type, leaving just that type.
+%
+% An lvalue cast is allowed only if the data size is the same.
+% No conversion code occurs, it's just a different interpretation of the same bits.
+%
+LValueCastType:
+   node_type nt = oTypeSNodeType
+   oTypeSPop
+   [ equal_node_type( nt, oTypeSNodeType )
+      | false :
+         % Can we cast the value to the desired type?
+         [ oTypeSNodeType
+            | nIntegerType, nEnumType :
+               [ nt
+                  | nByteType, nCharType, nBooleanType :  #eSizeMismatch  >>
+                  | nIntegerType, nEnumType :   >>
+                  | * :
+               ]
+            | nByteType, nCharType, nBooleanType :
+               [ nt
+                  | nByteType, nCharType, nBooleanType :   >>
+                  | nIntegerType, nEnumType :  #eSizeMismatch  >>
+                  | * :
+               ]
+            | nPointerType :
+               [ nt
+                  | nUniversalPointerType :  >>
+                  | * :
+               ]
+            | nUniversalPointerType :
+               [ nt
+                  | nPointerType :  >>
+                  | * :
+               ]
+            | nShortStringType :
+               [ nt
+                  | nStrLitType :  >>
+                  | * :
+               ]
+            | * :
+         ]
+         #eTypeMismatch
+      | * :
+   ];
+
 
 
 % Parse an lvalue expression (e.g. left side of an assign statement)
