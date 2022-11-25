@@ -265,6 +265,7 @@ error:
    eCantUsePredSuccOnEnumWithValueGaps
    eCantDereference
    eSizeMismatch
+   eTypeNameNotAllowedHere
    ;
 
 include 'pascal_schema.ssl'
@@ -398,6 +399,7 @@ mechanism more_builtins:      % These should be built-in SSL operations
     LAST_ID >> int            % id number of last accepted identifier
     ID_STRING( int id ) >> String       % text name of identifier with given id
     CURRENT_STRLIT >> String            % text value of just-accepted string literal
+    UNACCEPT_TOKEN            % Unaccept the last accepted token.  The next input, inputchoice will see it again.
     ;
 
 mechanism workspace_mech:
@@ -452,6 +454,7 @@ mechanism id_mech:
     oId_Chr >> int
     oId_Pred >> int
     oId_Succ >> int
+    oId_Sizeof >> int
     oChangeIntLitToLabelIdent    % change current token from pIntLit to pIdent "_label_<intlit>"
     ;
 
@@ -465,6 +468,7 @@ mechanism code_mech:
    oCodeNew >> Code         % create a new empty code stream
    oCodePush( Code )        % change the current output code stream to the given one
    oCodePop                 % restore the current code stream to the previous one
+   oCodeDiscard( Code )     % discard the given code stream
    ;
 
 mechanism include_mech:
@@ -559,12 +563,17 @@ Node    BuiltIn_Ord
 Node    BuiltIn_Chr
 Node    BuiltIn_Pred
 Node    BuiltIn_Succ
+Node    BuiltIn_Sizeof
 
 % Declarations in unit mysystem that the compiler may refer to directly.
 
 Node    System_ShortStringAppendShortString
 Node    System_ShortStringAppendChar
 Node    System_ShortStringCmp
+
+
+% Expr has a corner case flag, needed for sizeof()
+boolean flagExprAllowTypeName
 
 
 % -------------------------- Forward Declarations -------------------------
@@ -885,6 +894,9 @@ DeclareBuiltInFunc( int id ) >> Node:
 
 installBuiltIns:
 
+   % initialize some other globals too
+   flagExprAllowTypeName = false
+
    % "mysystem" is the name of a unit that will be available everywhere.
    % Add its name to the id table so we can easily spot the name later.
    mysystemId = oId_mysystem
@@ -972,6 +984,7 @@ installBuiltIns:
    BuiltIn_Chr = @DeclareBuiltInFunc( oId_Chr )
    BuiltIn_Pred = @DeclareBuiltInFunc( oId_Pred )
    BuiltIn_Succ = @DeclareBuiltInFunc( oId_Succ )
+   BuiltIn_Sizeof = @DeclareBuiltInFunc( oId_Sizeof )
    ;
 
 end

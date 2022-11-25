@@ -286,6 +286,41 @@ CallBuiltInFunc( Node method ):
       | * :
    ]
 
+   % Sizeof(x)
+   [ oNodeEqual( method, BuiltIn_Sizeof )
+      | true :
+         % parameter is a type name (cannot be a general type description),
+         % or an expression (which is not evaluated).
+         %
+         % My initial thought was to look at the first token to see if it's a type name,
+         % and if not, unaccept it and run @Expr  (with the code stream set to a dummy stream).
+         % But that's not completely sufficient.
+         % First, the typename might be   unit.name  so unaccepting one token wouldn't be good enough.
+         % Also, an expression can start with a typename e.g.  integer(1+2) * 3
+         %
+         % So, instead of looking for a type name at this level, and going to Expr if not,
+         % I'll just go into Expr.  But I'll turn on an option to accept type names in Primary.
+         % Since we're discarding the code anyway, I'll have that primary push a bogus value
+         % on the expr stack.  The main thing is just to get the type right.
+         
+         '('
+         % Parse expression but don't evaluate its code (so no side effects occur).
+         % I'll accomplish that by sending the code to a temp stream that I discard.
+         Code dummyCode = oCodeNew
+         oCodePush( dummyCode )
+         @ExprAllowTypeName
+         oCodePop
+         oCodeDiscard( dummyCode )
+         Node theType = oTypeSTop
+         oTypeSPop
+         .tPushConstI  oEmitInt( oNodeGetInt( theType, qSize ) )
+         oTypeSPush( IntegerType )
+         ')'
+         >>
+
+      | * :
+   ]
+
    #eNotImplemented
    ;
 

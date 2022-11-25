@@ -67,6 +67,18 @@ ConstExpr:
    ]};
 
 
+% Same as ConstExpr, but allow a typename as a primary.
+% This is for use within sizeof().
+% The value produced by that primary is bogus, but doesn't matter.
+%
+ConstExprAllowTypeName:
+   boolean oldAllowTypeName = flagExprAllowTypeName
+   flagExprAllowTypeName = true
+   @ConstExpr
+   flagExprAllowTypeName = oldAllowTypeName
+   ;
+
+
 ConstBoolExpr:
    @ConstBoolTerm
    {[
@@ -186,14 +198,27 @@ ConstPrimary:
                oValuePush( oNodeGetInt( decl, qValue ) )
                oTypeSPush( oNodeGet( decl, qType ) )
             | nTypeDecl :
-               % A type cast
+               % A type cast, or a typename primary when within sizeof()
                oTypeSPush( oNodeGet( decl, qType ) )
-               '('
-               @ConstExpr
-               ')'
-               @ConstCastType
-               % Constexprs are not compound types or dereferenceable pointers (I believe)
-               % so no need to check for additional suffixes here as we do in PrimaryAllowCF
+               [
+                  | '(' :
+                     % Type cast
+                     @ConstExpr
+                     ')'
+                     @ConstCastType
+                     % Constexprs are not compound types or dereferenceable pointers (I believe)
+                     % so no need to check for additional suffixes here as we do in PrimaryAllowCF
+                  | * :
+                     % Not a type cast
+                     % A raw typename is only allowed in expressions within sizeof
+                     [ flagExprAllowTypeName
+                        | true :
+                           % The value we produce is bogus.  Only the type stack matters.
+                           oValuePush( 0 )
+                        | * :   #eTypeNameNotAllowedHere
+                     ]
+               ]
+
             | * :
                #eNotConst
                oValuePush( 0 )
@@ -470,6 +495,23 @@ ConstBuiltInFunc( Node method ):
             | * :  #eTypeMismatch
          ]
          oValuePush( 1 )  oValueAdd
+         ')'
+         >>
+      | * :
+   ]
+
+   % Sizeof(x)
+   [ oNodeEqual( method, BuiltIn_Sizeof )
+      | true :
+         '('
+         % Parse expression but only for its type.
+         % And, allow use of typename as a primary in the expression.
+         @ConstExprAllowTypeName
+         oValuePop
+         Node theType = oTypeSTop
+         oTypeSPop
+         oValuePush( oNodeGetInt( theType, qSize ) )
+         oTypeSPush( IntegerType )
          ')'
          >>
       | * :

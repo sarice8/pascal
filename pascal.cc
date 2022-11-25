@@ -869,6 +869,9 @@ Node dNode;  // temporary for several mechanisms
     case CURRENT_STRLIT :
             ssl_result = (long) ssl_strlit_buffer;
             continue;
+    case UNACCEPT_TOKEN :
+            ssl_unaccept_token();
+            continue;
 
 
     /* Mechanism workspace_mech */
@@ -1086,6 +1089,9 @@ Node dNode;  // temporary for several mechanisms
     case oId_Succ:
             ssl_result = ssl_lookup_id( "succ", pIdent );
             continue;
+    case oId_Sizeof:
+            ssl_result = ssl_lookup_id( "sizeof", pIdent );
+            continue;
     case oChangeIntLitToLabelIdent: {
             // change current token from pIntLit to pIdent "_label_<intlit>"
             ssl_assert( ssl_token.code == pIntLit );   // intlit text is in ssl_token.name
@@ -1131,6 +1137,15 @@ Node dNode;  // temporary for several mechanisms
     case oCodePop : {
             codeStreamStack.pop_back();
             currentCodeStream = codeStreams[codeStreamStack.back()];
+            }
+            continue;
+    case oCodeDiscard : {
+            CodeStream* code = codeStreams[ssl_param];
+            if ( code ) {
+              // blank out the code stream, but don't delete it.
+              // I'll leave that cleanup to the owner of codeStreams, for now.
+              code->clear();
+            }
             }
             continue;
 

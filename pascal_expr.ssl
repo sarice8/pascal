@@ -58,6 +58,23 @@ Expr:
 
 % Public entry point:
 %
+% Parse an expression, just like Expr,
+% but also allows type names as Primary elements of the expression.
+% This is for use by sizeof().
+% The value produced by that primary is bogus, but this is ok because the
+% caller (sizeof) is going to discard all generated code for the expression.
+% It's only interested in the type produced by the expression.
+%
+ExprAllowTypeName:
+   boolean oldAllowTypeName = flagExprAllowTypeName
+   flagExprAllowTypeName = true
+   @Expr
+   flagExprAllowTypeName = oldAllowTypeName
+   ;
+
+
+% Public entry point:
+%
 % Parse a Boolean expression, producing control flow code rather than a value.
 % Does not leave a value on the runtime expr stack.
 % Does not leave a type on the type stack.
@@ -579,40 +596,56 @@ PrimaryAllowFlow( out Label falseLabel ):
                @VarExpr( decl )
 
             | nTypeDecl :
-               % A type cast
+               % A type name.
+               % This is normally a type cast.
+               % Or, if Expr is running within sizeof(), we do also allow type names as primaries.
                oTypeSPush( oNodeGet( decl, qType ) )
-               '('
-               @Expr
-               ')'
-               @CastType
+               [
+                  | '(' : 
+                     % Type cast
+                     @Expr
+                     ')'
+                     @CastType
 
-               % The expression can be further modified after the typecast.
-               % This is taken from VarExpr.  Try to consolidate.
+                     % The expression can be further modified after the typecast.
+                     % This is taken from VarExpr.  Try to consolidate.
 
-               [ oTypeSNodeType
-                  | nPointerType, nUniversalPointerType :
-                     [
-                        | '^' :             % dereferenced
-                           oTypeSPop
-                           oTypeSPush( oNodeGet( theType, qBaseType ) )
+                     [ oTypeSNodeType
+                        | nPointerType, nUniversalPointerType :
+                           [
+                              | '^' :             % dereferenced
+                                 oTypeSPop
+                                 oTypeSPush( oNodeGet( theType, qBaseType ) )
+                                 @LValueIndexes
+                                 @FetchVar
+                              | '[' :             % dereferencing pointer like an array [0..] of baseType
+                                 @PointerArraySubscript
+                                 % modify addr for any subsequent subscripts, field references, etc
+                                 @LValueIndexes
+                                 @FetchVar
+                              | * :               % just ptr value alone
+                           ]
+
+                        | nArrayType, nRecordType, nShortStringType :
+                           % So far we would have the addr of the compound value.
+                           % Modify addr for subscripts, field references, etc
                            @LValueIndexes
+                           % get final value, if no longer compound
                            @FetchVar
-                        | '[' :             % dereferencing pointer like an array [0..] of baseType
-                           @PointerArraySubscript
-                           % modify addr for any subsequent subscripts, field references, etc
-                           @LValueIndexes
-                           @FetchVar
-                        | * :               % just ptr value alone
+
+                        | *:
                      ]
 
-                  | nArrayType, nRecordType, nShortStringType :
-                     % So far we would have the addr of the compound value.
-                     % Modify addr for subscripts, field references, etc
-                     @LValueIndexes
-                     % get final value, if no longer compound
-                     @FetchVar
-
-                  | *:
+                  | * :
+                     % Not a type cast
+                     % A raw typename is only allowed in expressions within sizeof
+                     [ flagExprAllowTypeName
+                        | true :
+                           % The value we produce is bogus.  The caller will discard all code.
+                           % Only the type stack matters.
+                           .tPushConstI  oEmitInt( 0 )
+                        | * :    #eTypeNameNotAllowedHere
+                     ]
                ]
 
             | * :
