@@ -588,10 +588,29 @@ WriteStmt:
    ];
 
 
-ReadlnStmt:      % ***
-   % TO DO
-   ;
+ReadlnStmt:
+   @ReadStmt
+   .tReadCR;
+
 
 ReadStmt:
-   % TO DO
-   ;
+   [
+      | '(' :
+         {
+            @LValueExpr( true )
+            [ oTypeSNodeType
+               | nIntegerType :      .tReadI
+               | nCharType :         .tReadChar
+               | nShortStringType :  
+                   int capacity = subtract( oNodeGetInt( oTypeSTop, qSize ), 1 )
+                   .tReadShortStr  oEmitInt( capacity )
+               | * :                 #eNotAllowed
+            ]
+            oTypeSPop
+            [
+               | ')' : >
+               | ',' :
+            ]
+         }
+      | * :
+   ];

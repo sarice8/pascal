@@ -225,6 +225,10 @@ output:
    tWriteP           %  "     "    : write ptr var whose addr is on tos, pop
    tWriteEnum        %  "     "    : write enum name.  Name table on tos, value under it, pop both
    tWriteCR          %  "     "    : write cr
+   tReadI            % for readln : pointer to integer on tos.  Assign read value to it, and pop
+   tReadChar         %  "     "   : pointer to char on tos.  Asign read value to it, and pop
+   tReadShortStr     % <capacity>  "     "   : pointer to ShortString on tos, and given max capacity.  Assign read value to it, and pop
+   tReadCR           %  "     "   : read the end-of-line.  Will accept any platform's eoln sequence.
    tFile             % <file#> - pascal source file id, for debugging.  I haven't decided yet how I will communicate the corresponding filename.
    tLine             % <line#> - pascal source line number, for debugging
 

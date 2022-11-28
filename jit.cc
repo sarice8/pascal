@@ -2487,6 +2487,34 @@ generateCode()
           emitCallExtern( (char*) runlibWriteCR );
         }
         break;
+      case tReadI : {
+          Operand x = operandStack.back();   operandStack.pop_back();
+          operandIntoSpecificReg( x, paramRegs[0], 8 );
+          emitCallExtern( (char*) runlibReadI );
+          x.release();
+        }
+        break;
+      case tReadChar : {
+          Operand x = operandStack.back();   operandStack.pop_back();
+          operandIntoSpecificReg( x, paramRegs[0], 8 );
+          emitCallExtern( (char*) runlibReadChar );
+          x.release();
+        }
+        break;
+      case tReadShortStr : {
+          int capacity = *tCodePc++;
+          Operand x = operandStack.back();   operandStack.pop_back();
+          Operand y( jit_Operand_Kind_ConstI, capacity );
+          operandIntoSpecificReg( x, paramRegs[0], 8 );
+          operandIntoSpecificReg( y, paramRegs[1], 4 );
+          emitCallExtern( (char*) runlibReadShortStr );
+          x.release();
+        }
+        break;
+      case tReadCR : {
+          emitCallExtern( (char*) runlibReadCR );
+        }
+        break;
       case tFile :
         // no-op, for debugging
         continue;

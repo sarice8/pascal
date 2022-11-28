@@ -779,7 +779,21 @@ walkTable()
               }
               continue;
        case tWriteCR :
-              printf("\n");
+              runlibWriteCR();
+              continue;
+       case tReadI :
+              runlibReadI( (int*) stack[sp--] );
+              continue;
+       case tReadChar :
+              runlibReadChar( (char*) stack[sp--] );
+              continue;
+       case tReadShortStr : {
+              int capacity = code[pc++];
+              runlibReadShortStr( (char*) stack[sp--], capacity );
+              }
+              continue;
+       case tReadCR :
+              runlibReadCR();
               continue;
        case tFile :
               // no-op, for debugging

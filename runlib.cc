@@ -111,6 +111,95 @@ runlibWriteCR()
 }
 
 
+void
+runlibReadI( int* ptr )
+{
+  // Skip leading whitespace
+  // per fpc experiments: That whitespace may include newlines.
+  FILE* f = stdin;
+  int c = fgetc( f );
+  while ( isspace( c ) ) {
+    c = fgetc( f );
+  }
+  if ( c == EOF ) {
+    *ptr = 0;
+    return;
+  }
+  // per experiments with fpc: consume all characters up to but not including whitespace
+  std::string token;
+  token.push_back( char(c) );
+  c = fgetc( f );
+  while ( !isspace( c ) ) {
+    token.push_back( char(c) );
+    c = fgetc( f );
+  }
+  ungetc( c, f );
+  // Attempt to interpret that entire sequence as a signed integer.  Error if not entirely valid.
+  // TO DO: detect error
+  *ptr = atoi( token.c_str() );
+}
+
+void
+runlibReadChar( char* ptr )
+{
+  FILE* f = stdin;
+  int c;
+  c = fgetc( f );
+  if ( c == '\r' || c == '\n' ) {
+    // Doesn't read eoln
+    ungetc( c, f );
+    c = '\0';
+  } else if ( c == EOF ) {
+    c = 0;
+  }
+  *ptr = c;
+}
+
+
+void
+runlibReadShortStr( char* ptr, int capacity )
+{
+  // per fpc: Read all characters up to but not including newline, or until capacity filled.
+  // Does not consume the newline.
+  FILE* f = stdin;
+  int len = 0;
+  int c;
+  while ( len < capacity ) {
+    c = fgetc( f );
+    if ( c == '\r' || c == '\n' ) {
+      ungetc( c, f );
+      break;
+    } else if ( c == EOF ) {
+      break;
+    }
+    ++len;
+    ptr[len] = c;
+  }
+  ptr[0] = char( len );
+}
+
+void
+runlibReadCR()
+{
+  // per fpc experiments: consume -all- characters up to and including end-of-line sequence.
+  // Allow the end-of-line sequence for any platform, not just the native platform.
+  FILE* f = stdin;
+  int c;
+  c = fgetc( f );
+  while ( c != '\r' && c != '\n' && c != EOF ) {
+    c = fgetc( f );
+  }
+  if ( c == '\r' ) {
+    // Allow for windows sequence \r\n
+    c = fgetc( f );
+    if ( c != '\n' ) {
+      ungetc( c, f );
+    }
+  }
+}
+
+
+
 // Compare two Pascal ShortStrings.
 // Return negative if A < B,  0 if A = B,  positive if A > B
 //

@@ -114,6 +114,10 @@ struct instrInfo_s tCodeInstrs[] = {
   { "tWriteP", 0 },
   { "tWriteEnum", 0 },
   { "tWriteCR", 0 },
+  { "tReadI", 0 },
+  { "tReadChar", 0 },
+  { "tReadShortStr", 1 },
+  { "tReadCR", 0 },
   { "tFile", 1 },
   { "tLine", 1 }
 };
