@@ -129,6 +129,8 @@ e.g. ++var  is currently  push addr var, push val var, inc, assign.  But could b
 //  -- for mmap, mprotect
 #include <errno.h>
 
+#include <iostream>
+#include <sstream>
 #include <string>
 #include <stack>
 #include <vector>
@@ -455,6 +457,8 @@ public:
   int  size() const;  // valid size of the operand value in bytes (1, 4, or 8)
   void release();     // don't need this register anymore (if any)
 
+  std::string describe() const;
+
   bool operator==( const Operand& other ) const {
     return _kind == other._kind &&
            _value == other._value &&
@@ -472,6 +476,100 @@ public:
   Register* _reg = nullptr;    // for jit_Operand_Kind_Reg*
   ConditionFlags _flags = FlagInvalid;  // for jit_Operand_Kind_Flags
 };
+
+
+// For debugging
+//
+std::string
+Operand::describe() const
+{
+  std::ostringstream str;
+
+  switch ( _kind ) {
+    case jit_Operand_Kind_Illegal:
+    case jit_Operand_Kind_None:
+      return "?";
+
+    case jit_Operand_Kind_GlobalB:
+      str << "GlobalB(" << _value << ")";
+      return str.str();
+    case jit_Operand_Kind_GlobalI:
+      str << "GlobalI(" << _value << ")";
+      return str.str();
+    case jit_Operand_Kind_GlobalP:
+      str << "GlobalP(" << _value << ")";
+      return str.str();
+    case jit_Operand_Kind_LocalB:
+      str << "LocalB(" << _value << ")";
+      return str.str();
+    case jit_Operand_Kind_LocalI:
+      str << "LocalI(" << _value << ")";
+      return str.str();
+    case jit_Operand_Kind_LocalP:
+      str << "LocalP(" << _value << ")";
+      return str.str();
+    case jit_Operand_Kind_ParamB:
+      str << "ParamB(" << _value << ")";
+      return str.str();
+    case jit_Operand_Kind_ParamI:
+      str << "ParamI(" << _value << ")";
+      return str.str();
+    case jit_Operand_Kind_ParamP:
+      str << "ParamP(" << _value << ")";
+      return str.str();
+    case jit_Operand_Kind_ActualB:
+      str << "ActualB(" << _value << ")";
+      return str.str();
+    case jit_Operand_Kind_ActualI:
+      str << "ActualI(" << _value << ")";
+      return str.str();
+    case jit_Operand_Kind_ActualP:
+      str << "ActualP(" << _value << ")";
+      return str.str();
+    case jit_Operand_Kind_Addr_Global:
+      str << "Addr_Global(" << _value << ")";
+      return str.str();
+    case jit_Operand_Kind_Addr_Local:
+      str << "Addr_Local(" << _value << ")";
+      return str.str();
+    case jit_Operand_Kind_Addr_Param:
+      str << "Addr_Param(" << _value << ")";
+      return str.str();
+    case jit_Operand_Kind_Addr_Actual:
+      str << "Addr_Actual(" << _value << ")";
+      return str.str();
+    case jit_Operand_Kind_Addr_Reg_Offset:
+      str << "Addr_Reg_Offset(" << _reg->_name << "," << _value << ")";
+      return str.str();
+    case jit_Operand_Kind_ConstI:
+      str << "ConstI(" << _value << ")";
+      return str.str();
+    case jit_Operand_Kind_RegB:
+      str << "RegB(" << _reg->_name << ")";
+      return str.str();
+    case jit_Operand_Kind_RegI:
+      str << "RegI(" << _reg->_name << ")";
+      return str.str();
+    case jit_Operand_Kind_RegP:
+      str << "RegP(" << _reg->_name << ")";
+      return str.str();
+    case jit_Operand_Kind_RegP_DerefB:
+      str << "RegP_DerefB(" << _reg->_name << "," << _value << ")";
+      return str.str();
+    case jit_Operand_Kind_RegP_DerefI:
+      str << "RegP_DerefI(" << _reg->_name << "," << _value << ")";
+      return str.str();
+    case jit_Operand_Kind_RegP_DerefP:
+      str << "RegP_DerefP(" << _reg->_name << "," << _value << ")";
+      return str.str();
+    case jit_Operand_Kind_Flags:
+      str << "Flags(" << _flags << ")";
+      return str.str();
+
+    default:
+      return "?";
+  }
+}
 
 
 // Don't need this register anymore (if any)
@@ -1367,6 +1465,7 @@ InstrTempl::emit( const Operand& x ) const
 // I might not be able to avoid generation of dead code, but at least I can
 // jump around it, by turning conditional jumps into unconditional jumps.
 //
+int* tCodePc = nullptr;
 
 void
 generateCode()
@@ -1376,7 +1475,7 @@ generateCode()
 
   int jitSp = 0;
 
-  int* tCodePc = tCode;
+  tCodePc = tCode;
   int* tCodeEnd = tCode + tCodeLen;
 
   for ( tCodePc = tCode; tCodePc < tCodeEnd; ) {
@@ -4008,8 +4107,17 @@ emitMov( const Operand& x, const Operand& y )
       break;
 
 
+    // set reg, flags
+
+    case KindPair( jit_Operand_Kind_RegB, jit_Operand_Kind_Flags ):
+    case KindPair( jit_Operand_Kind_RegI, jit_Operand_Kind_Flags ):
+    case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_Flags ):
+      emitSet( x, y._flags );
+      break;
+
     default:
-      fatal( "emitMov: unexpected operands\n" );
+      fatal( "emitMov: unexpected operands %s, %s at %d\n",
+             x.describe().c_str(), y.describe().c_str(), (int)( tCodePc - tCode ) );
   }
 }
 
