@@ -1,0 +1,13 @@
+Pascal Compiler 1.1.5 -- Jan 01 '90
+Including ../mysystem.pas
+Including ./testing.pas
+
+Writing Files...
+Jit - program loaded (787 words)
+Executing code ...
+TEST: Starting test
+Hello There
+strlen sees 2 uppercase characters
+11
+TEST: Finished test
+Done

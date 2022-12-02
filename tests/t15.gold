@@ -1,0 +1,14 @@
+Pascal Compiler 1.1.5 -- Jan 01 '90
+Including ../mysystem.pas
+Including ./testing.pas
+
+Writing Files...
+Jit - program loaded (693 words)
+Executing code ...
+TEST: Starting test
+d1=East
+d1=East
+d1=East
+HeyHeyHey
+TEST: Finished test
+Done

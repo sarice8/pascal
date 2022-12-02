@@ -6,7 +6,7 @@
 #  -i : run interpreter (sm) rather than x86 code (jit)
 #
 
-ROOT=.
+ROOT=..
 
 use_sm=0
 if [ "$1" = "-i" ]; then

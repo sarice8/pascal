@@ -1,0 +1,15 @@
+# when using fpc, redirection doesn't capture messages from unit finalizations.
+
+TEST: Starting test
+Hello from t12_unit1.  x1=11
+Hello from t12_unit2
+Hello from main.  x1=1
+Hello from proc1.  p1x1=10 x1=1
+u1x1=9800
+u2x1=7500
+Hello from unit1_proc1.  p1x1=10 x1=11
+Hello from unit1_proc1.  p1x1=10 x1=11
+Hello from unit1_proc1.  p1x1=10 x1=16
+15
+16
+TEST: Finished test

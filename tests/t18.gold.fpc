@@ -1,0 +1,17 @@
+
+# I consider fpc to be wrong here, so not trying to match it.
+# The first "Subtraction: 18" appears to have treated the pointers in
+#    @c1[10] - @c1[1]    as universal pointers, rather than typed pointers.
+
+
+TEST: Starting test
+10 20 30 40 50 60 70 80 90 100 
+1 2 3 4 5 6 7 8 9 10 
+10 20 30 40 50 60 70 80 90 100 
+1 2 3 4 5 6 7 8 9 10 
+10 9 8 7 6 5 4 3 2 1 
+Subtraction: 18
+Subtraction: 9
+Pointer comparison worked as expected
+Second pointer comparison worked as expected
+TEST: Finished test

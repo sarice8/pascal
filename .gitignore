@@ -13,4 +13,7 @@ obj-*/
 
 # Temp output of unit tests
 a.*
-
+tmp.*
+*.diffs
+*.ppu
+*.o

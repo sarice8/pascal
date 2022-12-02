@@ -4,10 +4,7 @@
 
 
 program test (input, output);
-uses mygraph
- // TO DO: bug: have to put the ; on the next line after uses <unit>
- // due to scanner include behavior:
-;
+uses mygraph;
 
 // this procedure is never defined.  Should give an error, at least if we call it.
 procedure neverDefined( x: integer );

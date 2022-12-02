@@ -1,0 +1,20 @@
+Pascal Compiler 1.1.5 -- Jan 01 '90
+Including ../mysystem.pas
+Including ./testing.pas
+
+Writing Files...
+Jit - program loaded (1203 words)
+Executing code ...
+TEST: Starting test
+10,20,30
+1,2,3
+4,5,6
+7,8,9
+
+5
+3,2,1
+6,5,4
+9,8,7
+
+TEST: Finished test
+Done

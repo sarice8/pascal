@@ -1,0 +1,31 @@
+#!/bin/bash
+
+# Usage:   run_all  [-f] [-i]
+#
+#  -f: run all tests with -f option, to use fpc instead of my compiler
+#  -i: run all tests with -i option, to interpret rather than jit
+#
+
+options=""
+
+for i in "$@" ; do
+  if [ "$i" = "-f" ]; then
+    options="$options -f"
+  elif [ "$i" = "-i" ]; then
+    options="$options -i"
+  else
+    echo "Unknown option $i"
+    exit 0
+  fi
+done
+
+
+for i in *.pas ; do
+
+  if [ $i = testing.pas ]; then
+    # This is a unit file
+    continue
+  fi
+
+  run_one $options $i
+done

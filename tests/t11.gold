@@ -1,0 +1,13 @@
+Pascal Compiler 1.1.5 -- Jan 01 '90
+Including ../mysystem.pas
+Including ./testing.pas
+
+Writing Files...
+Jit - program loaded (681 words)
+Executing code ...
+TEST: Starting test
+Hello from main.  x1=1
+Hello from proc1.  p1x1=10 x1=1
+Hello from proc11.  p11x1=100 p1x1=10 x1=1
+TEST: Finished test
+Done
