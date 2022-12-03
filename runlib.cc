@@ -354,15 +354,23 @@ void
 runlibSetPixel( int x, int y, int color )
 {
   grLazyInit();
-  grPixels[ x + y * grBufferX ] = color;
-  grPixelsPending = true;
+  if ( x >= 0 && x < grBufferX &&
+       y >= 0 && y < grBufferY ) {
+    grPixels[ x + y * grBufferX ] = color;
+    grPixelsPending = true;
+  }
 }
 
 int
 runlibGetPixel( int x, int y )
 {
   grLazyInit();
-  return grPixels[ x + y * grBufferX ];
+  if ( x >= 0 && x < grBufferX &&
+       y >= 0 && y < grBufferY ) {
+    return grPixels[ x + y * grBufferX ];
+  } else {
+    return 0;
+  }
 }
 
 void
