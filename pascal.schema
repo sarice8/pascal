@@ -185,8 +185,10 @@ nType =>
 
 nType ::= nFileType
 
-nType ::= nIntegerType    % int32_t
 nType ::= nByteType       % uint8_t
+nType ::= nIntegerType    % int32_t
+nType ::= nSingleType     % float32_t
+nType ::= nDoubleType     % float64_t
 
 nType ::= nBooleanType
 

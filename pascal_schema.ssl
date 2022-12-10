@@ -31,8 +31,10 @@ type node_type:
 	nLabel
 	nType
 	nFileType
-	nIntegerType
 	nByteType
+	nIntegerType
+	nSingleType
+	nDoubleType
 	nBooleanType
 	nBooleanFlowType
 	nCharType

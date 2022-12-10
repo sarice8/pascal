@@ -187,6 +187,7 @@ int dLSptr = 0;
 // Integration with SSL debugger
 
 int optionDebug = 0;
+int optionVerboseErrors = 0;
 
 #ifdef INTEGRATE_SSL_DEBUGGER
 
@@ -248,6 +249,7 @@ usage()
   printf( "Usage:  pascal [-l] [-I<dir>]%s <file>\n", hasDebugger ? " [-d]" : "" );
   printf( "  -l : create listing\n" );
   printf( "  -I<dir> : add directory to unit search path\n" );
+  printf( "  -v : verbose error messages, giving internal details about errors\n" );
   if ( hasDebugger ) {
     printf( "  -d : run ssl debugger\n" );
   }
@@ -268,6 +270,8 @@ main( int argc, char* argv[] )
       optionList = 1;
     } else if ( strcmp( argv[arg], "-d" ) == 0 ) {
       optionDebug = 1;
+    } else if ( strcmp( argv[arg], "-v" ) == 0 ) {
+      optionVerboseErrors = 1;
     } else if ( strncmp( argv[arg], "-I", 2 ) == 0 ) {
       char* dir = argv[arg] + 2;
       if ( strlen( dir ) > 0 ) {
@@ -288,6 +292,8 @@ main( int argc, char* argv[] )
   /* Prepare Files */
 
   ssl_init();
+  ssl_set_verbose_errors( optionVerboseErrors );
+
   init_my_scanner();
 
 #ifdef INTEGRATE_SSL_DEBUGGER
@@ -437,6 +443,7 @@ init_my_scanner()
   ssl_init_scanner( my_keyword_table, my_operator_table, &my_special_codes );
   ssl_set_code_charlit( pCharLit );
   ssl_enable_pascal_char_codes( 1 );
+  ssl_set_code_double_lit( pDoubleLit );
 
   ssl_scanner_init_comment( "(*", "*)" );  // Original pascal comments
   ssl_scanner_init_comment( "{", "}" );    // Introduced by Turbo Pascal
@@ -1061,6 +1068,12 @@ Node dNode;  // temporary for several mechanisms
             continue;
     case oId_Byte:
             ssl_result = ssl_lookup_id( "byte", pIdent );
+            continue;
+    case oId_Single:
+            ssl_result = ssl_lookup_id( "single", pIdent );
+            continue;
+    case oId_Double:
+            ssl_result = ssl_lookup_id( "double", pIdent );
             continue;
     case oId_Pointer:
             ssl_result = ssl_lookup_id( "pointer", pIdent );

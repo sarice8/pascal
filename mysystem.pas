@@ -18,6 +18,8 @@ type String = ShortString;
 // For me, both are int32.
 type LongInt = Integer;
 
+// Real may be Single or Double.  Matching fpc.
+type Real = Double;
 
 // My version of AnsiString is similar to C++ std::string
 // As with the latest std::string, it doesn't use reference counting.

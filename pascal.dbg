@@ -1,4 +1,4 @@
-995
+996
 -1
 -1
 -1
@@ -620,15 +620,6 @@
 6610
 6612
 6614
-6616
--1
-6618
-6620
-6622
-6629
--1
-6629
--1
 8719
 10665
 10977
@@ -914,430 +905,441 @@
 14121
 14135
 14146
--1
--1
 14160
 14174
 -1
 -1
--1
-14186
--1
--1
+14188
+14202
 -1
 -1
 -1
-14200
 14214
 -1
 -1
 -1
 -1
-14226
 -1
-14226
-14239
-14251
--1
-14257
-14270
-14282
--1
-14288
-14301
-14313
--1
-14319
-14332
-14344
--1
-14350
-14363
-14375
--1
-14381
-14394
-14406
--1
-14412
-14425
-14437
--1
--1
--1
-14443
-14456
-14468
-14480
--1
-14486
-14499
-14511
-14523
--1
-14529
-14542
-14554
-14566
+14228
+14242
 -1
 -1
 -1
 -1
+14254
+-1
+14254
+14267
+14279
+-1
+14285
+14298
+14310
+-1
+14316
+14329
+14341
+-1
+14347
+14360
+14372
+-1
+14378
+14391
+14403
+-1
+14409
+14422
+14434
+-1
+14440
+14453
+14465
+-1
+14471
+14484
+14496
+-1
+14502
+14515
+14527
 -1
 -1
-14572
-14582
-14592
-14602
-14612
-14623
 -1
-14623
+14533
+14546
+14558
+14570
+-1
+14576
+14589
+14601
+14613
+-1
+14619
+14632
+14644
+14656
+-1
+-1
+-1
+-1
+-1
+-1
+14662
+14672
+14682
+14692
+14702
+14713
+-1
+14713
 -1
 28 int nType
 29 token nType
-230 node_type nType
-274 node_attribute nType
-320 Node nType
-322 NodeIter nType
-324 NodeVec nType
-326 boolean nType
-329 typ nType
-341 Label nType
-343 Code nType
-346 String nType
-348 AllocMode nType
-790 workspace nGlobal 320 1
-791 globalScope nGlobal 320 2
-792 initScope nGlobal 320 3
-793 mysystemId nGlobal 28 4
-794 FileType nGlobal 320 5
-795 IntegerType nGlobal 320 6
-796 BooleanType nGlobal 320 7
-797 BooleanFlowType nGlobal 320 8
-798 CharType nGlobal 320 9
-799 PCharType nGlobal 320 10
-800 ByteType nGlobal 320 11
-801 UniversalPointerType nGlobal 320 12
-802 StrLitType nGlobal 320 13
-803 ShortStringType nGlobal 320 14
-804 BuiltIn_Ord nGlobal 320 15
-805 BuiltIn_Chr nGlobal 320 16
-806 BuiltIn_Pred nGlobal 320 17
-807 BuiltIn_Succ nGlobal 320 18
-808 BuiltIn_Sizeof nGlobal 320 19
-809 System_ShortStringAppendShortString nGlobal 320 20
-810 System_ShortStringAppendChar nGlobal 320 21
-811 System_ShortStringCmp nGlobal 320 22
-812 flagExprAllowTypeName nGlobal 326 23
-813 Block nRule 13607
-815 varNodeType nInParam 230 2
-816 labelForBody nInParam 341 1
-818 BlockDecls nRule 13631
-820 varNodeType nInParam 230 1
-821 BlockStmt nRule 13782
-823 labelForBody nInParam 341 3
-824 varScope nInParam 320 2
-826 isMain nInParam 326 1
-2402 patchLS nLocal 28 1
-2405 initCode nLocal 343 2
-2409 localSpace nLocal 28 3
-827 VarDecl nRule 3234
-829 varNodeType nInParam 230 1
-830 newType nRule 11916
-832 nt nInParam 230 2
-833 size nInParam 28 1
-2281 node nLocal 320 1
-835 newIdent nRule 13982
-837 nt nInParam 230 2
-838 id nInParam 28 1
-2418 t nLocal 320 1
-840 EmitValue nRule 14010
-842 decl nInParam 320 1
-843 TypeRef nRule 11950
-845 resultType nOutParam 320 1
-846 EnumTypeRef nRule 12459
-848 resultType nOutParam 320 1
-2316 value nLocal 28 1
-2317 numValues nLocal 28 2
-2319 first nLocal 326 3
-2320 outerScope nLocal 320 4
-2336 size nLocal 28 8
-2337 addr nLocal 28 9
-2338 it nLocal 322 10
-849 PointerTypeTo nRule 13029
-851 theType nInParam 320 1
-2344 ptrType nLocal 320 1
-852 OrdinalLow nRule 13113
-854 theType nInParam 320 1
-855 OrdinalHigh nRule 13208
-857 theType nInParam 320 1
-858 AssignStmt nRule 8944
-860 decl nInParam 320 1
-861 BooleanExprControlFlow nRule 4927
-863 falseLabel nOutParam 341 1
-864 ExprAllowFlow nRule 5065
-866 falseLabel nOutParam 341 1
-867 BoolExprAllowFlow nRule 5598
-869 falseLabel nOutParam 341 1
-1665 trueLabel nLocal 341 1
-870 BoolTermAllowFlow nRule 5778
-872 falseLabel nOutParam 341 1
-1682 overallFalseLabel nLocal 341 1
-873 BoolFactorAllowFlow nRule 5916
-875 falseLabel nOutParam 341 1
-876 ArithExprAllowFlow nRule 5983
-878 falseLabel nOutParam 341 1
-1703 first nLocal 326 1
-1704 tempStrOffset nLocal 28 2
-879 TermAllowFlow nRule 6219
-881 falseLabel nOutParam 341 1
-882 FactorAllowFlow nRule 6270
-884 falseLabel nOutParam 341 1
-885 PrimaryAllowFlow nRule 6311
-887 falseLabel nOutParam 341 1
-888 VarExpr nRule 6776
-890 decl nInParam 320 1
-1776 theType nLocal 320 1
-1777 uplevels nLocal 28 2
-891 LValueFromDecl nRule 9188
-893 decl nInParam 320 2
-894 writeable nInParam 326 1
-896 LValueVar nRule 9405
-898 decl nInParam 320 2
-899 writeable nInParam 326 1
-901 IncVar nRule 9541
-903 decl nInParam 320 1
-904 DecVar nRule 9568
-906 decl nInParam 320 1
-907 FlowToVal nRule 4965
-909 falseLabel nInOutParam 341 1
-910 ValToFlow nRule 5034
-912 falseLabel nOutParam 341 1
-913 MoveIntoTempShortString nRule 10665
-2193 tempOffset nLocal 28 1
-915 DeclLevel nRule 13944
-917 decl nInParam 320 1
-918 DeclUpLevels nRule 13964
-920 decl nInParam 320 1
-921 MainRule nRule 2
-923 UsesClause nRule 7
-925 user nInParam 320 1
-926 UsesMySystem nRule 34
-928 user nInParam 320 1
-929 FindSelectSystemDecls nRule 71
-931 unit nInParam 320 1
-932 Uses nRule 148
-934 id nInParam 28 2
-935 user nInParam 320 1
-1163 unit nLocal 320 1
-937 ResolveUnitRef nRule 244
-939 decl nInOutParam 320 1
-940 EnterUsedUnits nRule 287
-942 user nInParam 320 1
-1172 unitIt nLocal 322 1
-943 EndUsedUnits nRule 349
-945 user nInParam 320 1
-1178 unitIt nLocal 322 1
-946 FindOrCompileUnit nRule 428
-948 id nInParam 28 1
-1186 unit nLocal 320 1
-1189 ok nLocal 326 2
-949 Unit nRule 503
-1194 unit nLocal 320 1
-1195 unitImpl nLocal 320 2
-951 UnitInterface nRule 838
-953 unit nInParam 320 1
-954 UnitImplementation nRule 930
-956 unit nInParam 320 1
-957 UnitInitialization nRule 940
-959 unit nInParam 320 2
-960 hasStmts nInParam 326 1
-1221 label nLocal 341 1
-1222 patchLS nLocal 28 2
-1224 scope nLocal 320 3
-1225 initCode nLocal 343 4
-1231 localSpace nLocal 28 5
-962 UnitFinalization nRule 1126
-964 unit nInParam 320 2
-965 hasStmts nInParam 326 1
-1233 label nLocal 341 1
-1234 patchLS nLocal 28 2
-1241 localSpace nLocal 28 3
-967 InitializeUnits nRule 1220
-1243 it nLocal 322 1
-969 FinalizeUnits nRule 1305
-1249 it nLocal 322 1
-971 MethodModifiers nRule 1390
-973 decl nInParam 320 1
-974 ExternalDecl nRule 1418
-976 decl nInParam 320 1
-977 ProcHeaderDecl nRule 1487
-1266 redeclaring nLocal 326 1
-1267 decl nLocal 320 2
-1277 level nLocal 28 3
-1278 nested nLocal 326 4
-1279 paramScope nLocal 320 5
-979 ProcDecl nRule 1743
-1286 decl nLocal 320 1
-981 FuncHeaderDecl nRule 1861
-1295 redeclaring nLocal 326 1
-1296 decl nLocal 320 2
-1304 level nLocal 28 3
-1305 nested nLocal 326 4
-1306 paramScope nLocal 320 5
-1310 theType nLocal 320 7
-1311 ptrType nLocal 320 8
-983 FuncDecl nRule 2178
-1315 decl nLocal 320 1
-985 FormalArgDecl nRule 2296
-987 ConstDecl nRule 2520
-989 TrueConstDecl nRule 2545
-1353 id nLocal 28 1
-1354 decl nLocal 320 2
-991 TypedConstDecl nRule 2654
-1360 decl nLocal 320 1
-1361 theType nLocal 320 2
-993 TypedConstInit nRule 2823
-995 theType nInParam 320 2
-996 addr nInParam 28 1
-998 TypeDecl nRule 3178
-1000 LabelDecl nRule 3468
-1002 ConstExpr nRule 3533
-1004 ConstExprAllowTypeName nRule 3737
-1458 oldAllowTypeName nLocal 326 1
-1006 ConstBoolExpr nRule 3760
-1008 ConstBoolTerm nRule 3783
-1010 ConstBoolFactor nRule 3806
-1012 ConstArithExpr nRule 3823
-1014 ConstTerm nRule 3872
-1016 ConstFactor nRule 3922
-1018 ConstPrimary nRule 3943
-1020 ConstRequireBoolPop nRule 4221
-1022 ConstRequireBool nRule 4235
-1024 ConstMatchTypes nRule 4248
-1518 nt nLocal 230 1
-1026 ConstCoerceType nRule 4345
-1535 nt nLocal 230 1
-1028 ConstCastType nRule 4466
-1559 nt nLocal 230 1
-1030 ConstBuiltInFunc nRule 4615
-1032 method nInParam 320 1
-1033 Expr nRule 4881
-1611 falseLabel nLocal 341 1
-1035 ExprAllowTypeName nRule 4904
-1613 oldAllowTypeName nLocal 326 1
-1037 FetchVar nRule 7533
-1039 LValueIndexes nRule 7587
-1041 ArraySubscripts nRule 7639
-1043 PointerArraySubscript nRule 7782
-1867 baseType nLocal 320 1
-1868 size nLocal 28 2
-1045 ShortStringArraySubscript nRule 7861
-1047 RecordFieldRef nRule 7891
-1878 field nLocal 320 1
-1881 offset nLocal 28 2
-1049 PointerAddition nRule 7989
-1886 elementType nLocal 320 1
-1887 elementSize nLocal 28 2
-1051 PointerSubInt nRule 8045
-1892 elementType nLocal 320 1
-1893 elementSize nLocal 28 2
-1053 PointerSubPointer nRule 8101
-1898 elementType nLocal 320 1
-1899 elementSize nLocal 28 2
-1055 PointerDeref nRule 8164
-1907 theType nLocal 320 1
-1057 CoerceType nRule 8204
-1909 nt nLocal 230 1
-1910 given nLocal 320 2
-1059 CastType nRule 8361
-1936 nt nLocal 230 1
-1061 MatchTypes nRule 8541
-1963 nt nLocal 230 1
-1063 RequireIntPop nRule 8599
-1065 RequireInt nRule 8613
-1067 PromoteToIntPop nRule 8626
-1069 PromoteToInt nRule 8646
-1071 PromoteToIntOptional nRule 8672
-1073 RequireBoolPop nRule 8692
-1075 RequireBool nRule 8706
-1077 Statement nRule 8719
-1079 LabelOrAssignOrCallStmt nRule 8816
-2014 decl nLocal 320 1
-1081 LabelDefinition nRule 8894
-1083 decl nInParam 320 1
-1084 Assign nRule 8965
-1086 AssignResultStmt nRule 9034
-1088 funcDecl nInParam 320 1
-1089 LValueExpr nRule 9161
-1091 writeable nInParam 326 1
-2041 decl nLocal 320 1
-1092 LValueCastType nRule 9273
-2051 nt nLocal 230 1
-1094 IfStmt nRule 9595
-2089 falseLabel nLocal 341 1
-1096 ForStmt nRule 9661
-2094 decl nLocal 320 1
-2095 breakLabel nLocal 341 2
-2097 checkLabel nLocal 341 3
-2098 continueLabel nLocal 341 4
-1098 RepeatStmt nRule 9838
-2102 continueLabel nLocal 341 1
-2103 breakLabel nLocal 341 2
-1100 WhileStmt nRule 9918
-2110 continueLabel nLocal 341 1
-2111 breakLabel nLocal 341 2
-1102 ContinueStmt nRule 9971
-1104 BreakStmt nRule 10003
-1106 CaseStmt nRule 10035
-2120 tableCode nLocal 343 1
-2121 tableLabel nLocal 341 2
-2123 doneLabel nLocal 341 3
-2124 otherwiseLabel nLocal 341 4
-2125 isString nLocal 326 5
-1108 GotoStmt nRule 10369
-2156 decl nLocal 320 1
-1110 BeginStmt nRule 10421
-1112 WritelnStmt nRule 10444
-1114 WriteStmt nRule 10451
-1116 ReadlnStmt nRule 10575
-1118 ReadStmt nRule 10582
-1120 ShortStringAppendShortString nRule 10774
-1122 ShortStringAppendChar nRule 10828
-1124 ShortStringCmp nRule 10882
-2200 tempOffset nLocal 28 1
-1126 Call nRule 10977
-1128 method nInParam 320 1
-2202 cdecl nLocal 326 1
-2203 resultType nLocal 320 2
-2205 tempOffset nLocal 28 3
-2206 isFunc nLocal 326 4
-2209 paramScope nLocal 320 5
-2210 actualsSize nLocal 28 6
-2215 paramIter nLocal 322 7
-2216 param nLocal 320 8
-1129 DefineExternLabel nRule 11558
-1131 method nInParam 320 1
-2247 strAddr nLocal 28 1
-2248 externalName nLocal 346 2
-1132 CallBuiltInFunc nRule 11641
-1134 method nInParam 320 1
-1135 Program nRule 13303
-2368 t nLocal 320 1
-2369 rootScope nLocal 320 2
-2371 mainLabel nLocal 341 3
-2372 program nLocal 320 4
-2377 isMain nLocal 326 5
-1137 CheckForUndefinedMethods nRule 13684
-1139 CheckForUndefinedLabels nRule 13687
-2390 it nLocal 322 1
-1141 GetOrCreateInitCode nRule 13880
-1143 scope nInParam 320 1
-2411 initCode nLocal 343 1
-1144 ScopeLevel nRule 13932
-1146 DeclareBuiltInFunc nRule 14026
-1148 id nInParam 28 1
-2421 decl nLocal 320 1
-1149 installBuiltIns nRule 14052
-2423 t nLocal 320 1
+231 node_type nType
+277 node_attribute nType
+323 Node nType
+325 NodeIter nType
+327 NodeVec nType
+329 boolean nType
+332 Label nType
+334 Code nType
+337 String nType
+339 AllocMode nType
+785 workspace nGlobal 323 1
+786 globalScope nGlobal 323 2
+787 initScope nGlobal 323 3
+788 mysystemId nGlobal 28 4
+789 FileType nGlobal 323 5
+790 IntegerType nGlobal 323 6
+791 BooleanType nGlobal 323 7
+792 BooleanFlowType nGlobal 323 8
+793 CharType nGlobal 323 9
+794 PCharType nGlobal 323 10
+795 ByteType nGlobal 323 11
+796 SingleType nGlobal 323 12
+797 DoubleType nGlobal 323 13
+798 UniversalPointerType nGlobal 323 14
+799 StrLitType nGlobal 323 15
+800 ShortStringType nGlobal 323 16
+801 BuiltIn_Ord nGlobal 323 17
+802 BuiltIn_Chr nGlobal 323 18
+803 BuiltIn_Pred nGlobal 323 19
+804 BuiltIn_Succ nGlobal 323 20
+805 BuiltIn_Sizeof nGlobal 323 21
+806 System_ShortStringAppendShortString nGlobal 323 22
+807 System_ShortStringAppendChar nGlobal 323 23
+808 System_ShortStringCmp nGlobal 323 24
+809 flagExprAllowTypeName nGlobal 329 25
+810 Block nRule 13607
+812 varNodeType nInParam 231 2
+813 labelForBody nInParam 332 1
+815 BlockDecls nRule 13631
+817 varNodeType nInParam 231 1
+818 BlockStmt nRule 13782
+820 labelForBody nInParam 332 3
+821 varScope nInParam 323 2
+823 isMain nInParam 329 1
+2399 patchLS nLocal 28 1
+2402 initCode nLocal 334 2
+2406 localSpace nLocal 28 3
+824 VarDecl nRule 3234
+826 varNodeType nInParam 231 1
+827 newType nRule 11916
+829 nt nInParam 231 2
+830 size nInParam 28 1
+2278 node nLocal 323 1
+832 newIdent nRule 13982
+834 nt nInParam 231 2
+835 id nInParam 28 1
+2415 t nLocal 323 1
+837 EmitValue nRule 14010
+839 decl nInParam 323 1
+840 TypeRef nRule 11950
+842 resultType nOutParam 323 1
+843 EnumTypeRef nRule 12459
+845 resultType nOutParam 323 1
+2313 value nLocal 28 1
+2314 numValues nLocal 28 2
+2316 first nLocal 329 3
+2317 outerScope nLocal 323 4
+2333 size nLocal 28 8
+2334 addr nLocal 28 9
+2335 it nLocal 325 10
+846 PointerTypeTo nRule 13029
+848 theType nInParam 323 1
+2341 ptrType nLocal 323 1
+849 OrdinalLow nRule 13113
+851 theType nInParam 323 1
+852 OrdinalHigh nRule 13208
+854 theType nInParam 323 1
+855 AssignStmt nRule 8944
+857 decl nInParam 323 1
+858 BooleanExprControlFlow nRule 4927
+860 falseLabel nOutParam 332 1
+861 ExprAllowFlow nRule 5065
+863 falseLabel nOutParam 332 1
+864 BoolExprAllowFlow nRule 5598
+866 falseLabel nOutParam 332 1
+1662 trueLabel nLocal 332 1
+867 BoolTermAllowFlow nRule 5778
+869 falseLabel nOutParam 332 1
+1679 overallFalseLabel nLocal 332 1
+870 BoolFactorAllowFlow nRule 5916
+872 falseLabel nOutParam 332 1
+873 ArithExprAllowFlow nRule 5983
+875 falseLabel nOutParam 332 1
+1700 first nLocal 329 1
+1701 tempStrOffset nLocal 28 2
+876 TermAllowFlow nRule 6219
+878 falseLabel nOutParam 332 1
+879 FactorAllowFlow nRule 6270
+881 falseLabel nOutParam 332 1
+882 PrimaryAllowFlow nRule 6311
+884 falseLabel nOutParam 332 1
+885 VarExpr nRule 6776
+887 decl nInParam 323 1
+1773 theType nLocal 323 1
+1774 uplevels nLocal 28 2
+888 LValueFromDecl nRule 9188
+890 decl nInParam 323 2
+891 writeable nInParam 329 1
+893 LValueVar nRule 9405
+895 decl nInParam 323 2
+896 writeable nInParam 329 1
+898 IncVar nRule 9541
+900 decl nInParam 323 1
+901 DecVar nRule 9568
+903 decl nInParam 323 1
+904 FlowToVal nRule 4965
+906 falseLabel nInOutParam 332 1
+907 ValToFlow nRule 5034
+909 falseLabel nOutParam 332 1
+910 MoveIntoTempShortString nRule 10665
+2190 tempOffset nLocal 28 1
+912 DeclLevel nRule 13944
+914 decl nInParam 323 1
+915 DeclUpLevels nRule 13964
+917 decl nInParam 323 1
+918 MainRule nRule 2
+920 UsesClause nRule 7
+922 user nInParam 323 1
+923 UsesMySystem nRule 34
+925 user nInParam 323 1
+926 FindSelectSystemDecls nRule 71
+928 unit nInParam 323 1
+929 Uses nRule 148
+931 id nInParam 28 2
+932 user nInParam 323 1
+1160 unit nLocal 323 1
+934 ResolveUnitRef nRule 244
+936 decl nInOutParam 323 1
+937 EnterUsedUnits nRule 287
+939 user nInParam 323 1
+1169 unitIt nLocal 325 1
+940 EndUsedUnits nRule 349
+942 user nInParam 323 1
+1175 unitIt nLocal 325 1
+943 FindOrCompileUnit nRule 428
+945 id nInParam 28 1
+1183 unit nLocal 323 1
+1186 ok nLocal 329 2
+946 Unit nRule 503
+1191 unit nLocal 323 1
+1192 unitImpl nLocal 323 2
+948 UnitInterface nRule 838
+950 unit nInParam 323 1
+951 UnitImplementation nRule 930
+953 unit nInParam 323 1
+954 UnitInitialization nRule 940
+956 unit nInParam 323 2
+957 hasStmts nInParam 329 1
+1218 label nLocal 332 1
+1219 patchLS nLocal 28 2
+1221 scope nLocal 323 3
+1222 initCode nLocal 334 4
+1228 localSpace nLocal 28 5
+959 UnitFinalization nRule 1126
+961 unit nInParam 323 2
+962 hasStmts nInParam 329 1
+1230 label nLocal 332 1
+1231 patchLS nLocal 28 2
+1238 localSpace nLocal 28 3
+964 InitializeUnits nRule 1220
+1240 it nLocal 325 1
+966 FinalizeUnits nRule 1305
+1246 it nLocal 325 1
+968 MethodModifiers nRule 1390
+970 decl nInParam 323 1
+971 ExternalDecl nRule 1418
+973 decl nInParam 323 1
+974 ProcHeaderDecl nRule 1487
+1263 redeclaring nLocal 329 1
+1264 decl nLocal 323 2
+1274 level nLocal 28 3
+1275 nested nLocal 329 4
+1276 paramScope nLocal 323 5
+976 ProcDecl nRule 1743
+1283 decl nLocal 323 1
+978 FuncHeaderDecl nRule 1861
+1292 redeclaring nLocal 329 1
+1293 decl nLocal 323 2
+1301 level nLocal 28 3
+1302 nested nLocal 329 4
+1303 paramScope nLocal 323 5
+1307 theType nLocal 323 7
+1308 ptrType nLocal 323 8
+980 FuncDecl nRule 2178
+1312 decl nLocal 323 1
+982 FormalArgDecl nRule 2296
+984 ConstDecl nRule 2520
+986 TrueConstDecl nRule 2545
+1350 id nLocal 28 1
+1351 decl nLocal 323 2
+988 TypedConstDecl nRule 2654
+1357 decl nLocal 323 1
+1358 theType nLocal 323 2
+990 TypedConstInit nRule 2823
+992 theType nInParam 323 2
+993 addr nInParam 28 1
+995 TypeDecl nRule 3178
+997 LabelDecl nRule 3468
+999 ConstExpr nRule 3533
+1001 ConstExprAllowTypeName nRule 3737
+1455 oldAllowTypeName nLocal 329 1
+1003 ConstBoolExpr nRule 3760
+1005 ConstBoolTerm nRule 3783
+1007 ConstBoolFactor nRule 3806
+1009 ConstArithExpr nRule 3823
+1011 ConstTerm nRule 3872
+1013 ConstFactor nRule 3922
+1015 ConstPrimary nRule 3943
+1017 ConstRequireBoolPop nRule 4221
+1019 ConstRequireBool nRule 4235
+1021 ConstMatchTypes nRule 4248
+1515 nt nLocal 231 1
+1023 ConstCoerceType nRule 4345
+1532 nt nLocal 231 1
+1025 ConstCastType nRule 4466
+1556 nt nLocal 231 1
+1027 ConstBuiltInFunc nRule 4615
+1029 method nInParam 323 1
+1030 Expr nRule 4881
+1608 falseLabel nLocal 332 1
+1032 ExprAllowTypeName nRule 4904
+1610 oldAllowTypeName nLocal 329 1
+1034 FetchVar nRule 7533
+1036 LValueIndexes nRule 7587
+1038 ArraySubscripts nRule 7639
+1040 PointerArraySubscript nRule 7782
+1864 baseType nLocal 323 1
+1865 size nLocal 28 2
+1042 ShortStringArraySubscript nRule 7861
+1044 RecordFieldRef nRule 7891
+1875 field nLocal 323 1
+1878 offset nLocal 28 2
+1046 PointerAddition nRule 7989
+1883 elementType nLocal 323 1
+1884 elementSize nLocal 28 2
+1048 PointerSubInt nRule 8045
+1889 elementType nLocal 323 1
+1890 elementSize nLocal 28 2
+1050 PointerSubPointer nRule 8101
+1895 elementType nLocal 323 1
+1896 elementSize nLocal 28 2
+1052 PointerDeref nRule 8164
+1904 theType nLocal 323 1
+1054 CoerceType nRule 8204
+1906 nt nLocal 231 1
+1907 given nLocal 323 2
+1056 CastType nRule 8361
+1933 nt nLocal 231 1
+1058 MatchTypes nRule 8541
+1960 nt nLocal 231 1
+1060 RequireIntPop nRule 8599
+1062 RequireInt nRule 8613
+1064 PromoteToIntPop nRule 8626
+1066 PromoteToInt nRule 8646
+1068 PromoteToIntOptional nRule 8672
+1070 RequireBoolPop nRule 8692
+1072 RequireBool nRule 8706
+1074 Statement nRule 8719
+1076 LabelOrAssignOrCallStmt nRule 8816
+2011 decl nLocal 323 1
+1078 LabelDefinition nRule 8894
+1080 decl nInParam 323 1
+1081 Assign nRule 8965
+1083 AssignResultStmt nRule 9034
+1085 funcDecl nInParam 323 1
+1086 LValueExpr nRule 9161
+1088 writeable nInParam 329 1
+2038 decl nLocal 323 1
+1089 LValueCastType nRule 9273
+2048 nt nLocal 231 1
+1091 IfStmt nRule 9595
+2086 falseLabel nLocal 332 1
+1093 ForStmt nRule 9661
+2091 decl nLocal 323 1
+2092 breakLabel nLocal 332 2
+2094 checkLabel nLocal 332 3
+2095 continueLabel nLocal 332 4
+1095 RepeatStmt nRule 9838
+2099 continueLabel nLocal 332 1
+2100 breakLabel nLocal 332 2
+1097 WhileStmt nRule 9918
+2107 continueLabel nLocal 332 1
+2108 breakLabel nLocal 332 2
+1099 ContinueStmt nRule 9971
+1101 BreakStmt nRule 10003
+1103 CaseStmt nRule 10035
+2117 tableCode nLocal 334 1
+2118 tableLabel nLocal 332 2
+2120 doneLabel nLocal 332 3
+2121 otherwiseLabel nLocal 332 4
+2122 isString nLocal 329 5
+1105 GotoStmt nRule 10369
+2153 decl nLocal 323 1
+1107 BeginStmt nRule 10421
+1109 WritelnStmt nRule 10444
+1111 WriteStmt nRule 10451
+1113 ReadlnStmt nRule 10575
+1115 ReadStmt nRule 10582
+1117 ShortStringAppendShortString nRule 10774
+1119 ShortStringAppendChar nRule 10828
+1121 ShortStringCmp nRule 10882
+2197 tempOffset nLocal 28 1
+1123 Call nRule 10977
+1125 method nInParam 323 1
+2199 cdecl nLocal 329 1
+2200 resultType nLocal 323 2
+2202 tempOffset nLocal 28 3
+2203 isFunc nLocal 329 4
+2206 paramScope nLocal 323 5
+2207 actualsSize nLocal 28 6
+2212 paramIter nLocal 325 7
+2213 param nLocal 323 8
+1126 DefineExternLabel nRule 11558
+1128 method nInParam 323 1
+2244 strAddr nLocal 28 1
+2245 externalName nLocal 337 2
+1129 CallBuiltInFunc nRule 11641
+1131 method nInParam 323 1
+1132 Program nRule 13303
+2365 t nLocal 323 1
+2366 rootScope nLocal 323 2
+2368 mainLabel nLocal 332 3
+2369 program nLocal 323 4
+2374 isMain nLocal 329 5
+1134 CheckForUndefinedMethods nRule 13684
+1136 CheckForUndefinedLabels nRule 13687
+2387 it nLocal 325 1
+1138 GetOrCreateInitCode nRule 13880
+1140 scope nInParam 323 1
+2408 initCode nLocal 334 1
+1141 ScopeLevel nRule 13932
+1143 DeclareBuiltInFunc nRule 14026
+1145 id nInParam 28 1
+2418 decl nLocal 323 1
+1146 installBuiltIns nRule 14052
+2420 t nLocal 323 1

@@ -34,8 +34,10 @@ typedef enum {
     nLabel,
     nType,
     nFileType,
-    nIntegerType,
     nByteType,
+    nIntegerType,
+    nSingleType,
+    nDoubleType,
     nBooleanType,
     nBooleanFlowType,
     nCharType,
@@ -220,8 +222,10 @@ typedef enum {
 #define NewnLabel()		NewNode(nLabel)
 #define NewnType()		NewNode(nType)
 #define NewnFileType()		NewNode(nFileType)
-#define NewnIntegerType()		NewNode(nIntegerType)
 #define NewnByteType()		NewNode(nByteType)
+#define NewnIntegerType()		NewNode(nIntegerType)
+#define NewnSingleType()		NewNode(nSingleType)
+#define NewnDoubleType()		NewNode(nDoubleType)
 #define NewnBooleanType()		NewNode(nBooleanType)
 #define NewnBooleanFlowType()		NewNode(nBooleanFlowType)
 #define NewnCharType()		NewNode(nCharType)

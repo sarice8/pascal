@@ -19,6 +19,7 @@ var color3 : integer = rgb( 255, 128, 128 );
 // I don't really have a color map mode, so this needs work
 var colorReverse : integer = rgb( 255, 0, 0 );
 
+var colorBlack : integer = rgb( 0, 0, 0 );
 
 
 CONST other: ARRAY [0..2] OF integer  = (1,2,1);
@@ -107,11 +108,57 @@ END;
 
 
 
+PROCEDURE draw_stone (player,x,y: integer);
+VAR  cx,cy: integer;
+BEGIN
+     cx := x_start + x_size * x;
+     cy := y_start + y_size * y;
+     DrawCircle(cx,cy,5,color1);
+     IF player = 1 THEN
+        FloodFill(cx,cy,color1,color1)
+     ELSE
+        BEGIN
+           Draw(cx-5,cy,cx+5,cy, color0);
+           Draw(cx,cy-5,cx,cy+5, color0)
+        END
+END;
+
+
+PROCEDURE erase_stone (x,y: integer);
+VAR  cx,cy: integer;
+BEGIN
+     cx := x_start + x_size * x;
+     cy := y_start + y_size * y;
+     DrawCircle(cx,cy,5,0);
+     FloodFill(cx,cy,0,0);
+     IF x > 1 THEN Draw(cx-5,cy,cx,cy,color2);
+     IF x < width THEN Draw(cx,cy,cx+5,cy,color2);
+     IF y > 1 THEN Draw(cx,cy-5,cx,cy,color2);
+     IF y < width THEN Draw(cx,cy,cx,cy+5,color2)
+END;
+
+
 PROCEDURE cursor (cx,cy: integer);
 BEGIN
      Draw(cx-x_size,cy,cx+x_size,cy, colorReverse);    { Use colour table 3,1,2,0 }
      Draw(cx,cy-y_size,cx,cy+y_size, colorReverse);
 END;
+
+procedure erase_cursor( x, y: integer );
+var  cx, cy: integer;
+     p: integer;
+begin
+     cx := x_start + x_size * x;
+     cy := y_start + y_size * y;
+
+     Draw(cx-x_size,cy,cx+x_size,cy, colorBlack);
+     Draw(cx,cy-y_size,cx,cy+y_size, colorBlack);
+
+     // redraw any stone there
+     p := owner( x, y );
+     if p <> 0 then
+       draw_stone( p, x, y );
+end;
 
 
 PROCEDURE get_move (player: integer;  VAR x,y: integer);
@@ -119,6 +166,7 @@ VAR  cx,cy: integer;
      done: boolean;
      c: char;
      key: integer;
+     oldx, oldy: integer;
 BEGIN
      // ColorTable(2,1,0,3);      { For transparent cursor movement }
 
@@ -128,6 +176,8 @@ BEGIN
 
         cx := x_start + x_size * x;
         cy := y_start + y_size * y;
+        oldx := x;
+        oldy := y;
 
         cursor (cx,cy);        { Darken cursor }
 
@@ -190,38 +240,8 @@ BEGIN
                 IF x < width THEN  x := x + 1;
             end;
 
-        cursor (cx,cy);
+        erase_cursor( oldx, oldy );
      UNTIL done;
-END;
-
-
-PROCEDURE draw_stone (player,x,y: integer);
-VAR  cx,cy: integer;
-BEGIN
-     cx := x_start + x_size * x;
-     cy := y_start + y_size * y;
-     DrawCircle(cx,cy,5,color1);
-     IF player = 1 THEN
-        FloodFill(cx,cy,color1,color1)
-     ELSE
-        BEGIN
-           Draw(cx-5,cy,cx+5,cy, color0);
-           Draw(cx,cy-5,cx,cy+5, color0)
-        END
-END;
-
-
-PROCEDURE erase_stone (x,y: integer);
-VAR  cx,cy: integer;
-BEGIN
-     cx := x_start + x_size * x;
-     cy := y_start + y_size * y;
-     DrawCircle(cx,cy,5,0);
-     FloodFill(cx,cy,0,0);
-     IF x > 1 THEN Draw(cx-5,cy,cx,cy,color2);
-     IF x < width THEN Draw(cx,cy,cx+5,cy,color2);
-     IF y > 1 THEN Draw(cx,cy-5,cx,cy,color2);
-     IF y < width THEN Draw(cx,cy,cx,cy+5,color2)
 END;
 
 

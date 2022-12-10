@@ -50,6 +50,7 @@ title: 'Pascal Compiler 1.1.5 -- Jan 01 ''90';
 input:
    pIdent
    pIntLit
+   pDoubleLit
    pStrLit
    pCharLit
    pAssign       ':='
@@ -290,20 +291,6 @@ type boolean:
    false    = 0
    true     = 1;
 
-% intrinsic types & type constructs
-
-type typ:
-   tyNone     = 0    % in ptrTyp field of TT, means no ptr to type defined
-   tyInteger
-   tyBoolean
-   tyChar
-   tyString
-   tyFile            % tyInteger..tyFile are scalars (types on their own)
-   tyPointer         % following are type constructor classes...
-   tyArray           %   (they are not type#'s)
-   tyRecord
-   tyParams          % like record; a collection of proc/func params
-   tySet;
 
 type Label:
    labelNull = 0;
@@ -449,6 +436,8 @@ mechanism id_mech:
     oId_Boolean >> int
     oId_Char >> int
     oId_Byte >> int
+    oId_Single >> int
+    oId_Double >> int
     oId_Pointer >> int
     oId_ShortString >> int
     oId_True >> int
@@ -558,6 +547,8 @@ Node    BooleanFlowType
 Node    CharType
 Node    PCharType
 Node    ByteType
+Node    SingleType
+Node    DoubleType
 Node    UniversalPointerType
 Node    StrLitType
 Node    ShortStringType
@@ -913,6 +904,8 @@ installBuiltIns:
    CharType = @newType( nCharType, 1 )
    PCharType = @PointerTypeTo( CharType )
    ByteType = @newType( nByteType, 1 )
+   SingleType = @newType( nSingleType, 4 )
+   DoubleType = @newType( nDoubleType, 8 )
    % Universal pointer says base type Byte, but this is only for the sake of
    % pointer arithmetic.  It doesn't matter otherwise, because this type cannot be dereferened.
    UniversalPointerType = @newType( nUniversalPointerType, 8 )
@@ -952,6 +945,14 @@ installBuiltIns:
 
    t = @newIdent( nTypeDecl, oId_Byte )
    oNodeSet( t, qType, ByteType )
+   oScopeDeclare( t )
+
+   t = @newIdent( nTypeDecl, oId_Single )
+   oNodeSet( t, qType, SingleType )
+   oScopeDeclare( t )
+
+   t = @newIdent( nTypeDecl, oId_Double )
+   oNodeSet( t, qType, DoubleType )
    oScopeDeclare( t )
 
    t = @newIdent( nTypeDecl, oId_Pointer )
