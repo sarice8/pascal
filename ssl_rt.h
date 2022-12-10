@@ -196,6 +196,12 @@ void ssl_enable_pascal_char_codes( int enable );
 
 
 /*
+ *  Ask scanner to accept floating point numbers.  Off by default.
+ */
+void ssl_set_code_double_lit( int code_double_lit );
+
+
+/*
  *  Set the bracketing text for a comment.
  *  This may be called multiple times to allow for multiple comment styles.
  *  If end_str is "", the comment goes to the end of the line.
@@ -404,6 +410,7 @@ struct ssl_token_struct
     int   code;      /* input token code (pIdent, pIntLit, etc) */
     int   lineNumber;
     int   colNumber;
+    double double_val;  /* for double literals */
 };
 extern struct ssl_token_struct    ssl_token;
 

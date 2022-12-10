@@ -71,7 +71,7 @@ static struct ssl_token_table_struct   *s_operator_table;
 static struct ssl_special_codes_struct *s_special_codes;
 static int    s_code_charlit;
 static int    s_enable_pascal_char_codes = 0;
-
+static int    s_code_double_lit;
 
 /*  Character classes  */
 
@@ -139,6 +139,7 @@ struct ssl_special_codes_struct      *special_codes;
     s_operator_table = operator_table;
     s_special_codes = special_codes;
     s_code_charlit = s_special_codes->invalid;
+    s_code_double_lit = s_special_codes->invalid;
 
     /* Set up scanner tables */
 
@@ -215,6 +216,15 @@ void
 ssl_enable_pascal_char_codes( int enable )
 {
   s_enable_pascal_char_codes = enable;
+}
+
+
+// If set, allow floating point literals (double precision).
+//
+void
+ssl_set_code_double_lit( int code_double_lit )
+{
+  s_code_double_lit = code_double_lit;
 }
 
 
@@ -489,7 +499,7 @@ ssl_get_next_token ()
         s_lookup_id();
     }
 
-    else if (s_digit[*s_src_ptr])          /* integer literal */
+    else if (s_digit[*s_src_ptr])          /* integer or floatint point literal */
     {
         lit = 0;
         if (*s_src_ptr == '0' && s_src_ptr[1]=='x')
@@ -509,6 +519,8 @@ ssl_get_next_token ()
                 *p++ = *s_src_ptr++;
             }
             *p = '\0';
+            ssl_token.val = lit;
+            ssl_token.code = s_special_codes->intlit;
         }
         else
         {
@@ -517,10 +529,35 @@ ssl_get_next_token ()
                 lit = lit*10 - '0' + *s_src_ptr;
                 *p++ = *s_src_ptr++;
             }
-            *p = '\0';
+
+            if ( *s_src_ptr == '.' && s_digit[s_src_ptr[1]] &&
+                 ( s_code_double_lit != s_special_codes->invalid ) ) {
+              // floating point literal
+              *p++ = *s_src_ptr++;
+              while ( s_digit[*s_src_ptr] ) {
+                  *p++ = *s_src_ptr++;
+              }
+              if ( *s_src_ptr == 'E' || *s_src_ptr == 'e' ) {
+                  *p++ = *s_src_ptr++;
+                  if ( *s_src_ptr == '+' || *s_src_ptr == '-' ) {
+                      *p++ = *s_src_ptr;
+                  }
+                  while ( s_digit[*s_src_ptr] ) {
+                      *p++ = *s_src_ptr++;
+                  }
+              }
+              *p = '\0';
+              // TO DO: I think I'm supposed to auto-detect whether the literal could be single
+              // rather than double.  For now I always produce double.
+              // TO DO: ideally I wouldn't rely on the c library for this, but whatever
+              ssl_token.double_val = atof( ssl_token.name );
+              ssl_token.code = s_code_double_lit;
+            } else {
+              *p = '\0';
+              ssl_token.val = lit;
+              ssl_token.code = s_special_codes->intlit;
+            }
         }
-        ssl_token.val = lit;
-        ssl_token.code = s_special_codes->intlit;
     }
 
     else if ( *s_src_ptr == '\'' ||
