@@ -540,7 +540,7 @@ ssl_get_next_token ()
               if ( *s_src_ptr == 'E' || *s_src_ptr == 'e' ) {
                   *p++ = *s_src_ptr++;
                   if ( *s_src_ptr == '+' || *s_src_ptr == '-' ) {
-                      *p++ = *s_src_ptr;
+                      *p++ = *s_src_ptr++;
                   }
                   while ( s_digit[*s_src_ptr] ) {
                       *p++ = *s_src_ptr++;
