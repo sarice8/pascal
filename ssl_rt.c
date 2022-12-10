@@ -144,6 +144,7 @@ void   (*ssl_init_operations_callback)(); /* func provided to init operations */
 
 int      ssl_recovery_token;              /* synch token for error recovery */
 int      ssl_eof_token;                   /* EOF token for error recovery   */
+int      ssl_option_verbose_errors;       /* print ssl traceback at each error */
 
 
 /*  Information for the debugger  */
@@ -199,6 +200,14 @@ void
 ssl_set_debug ( int debug_flag )
 {
     ssl_debug = debug_flag;
+}
+
+
+/* Print internal traceback at each error.  Helps to debug compiler. */
+void
+ssl_set_verbose_errors( int flag )
+{
+    ssl_option_verbose_errors = flag;
 }
 
 
@@ -558,6 +567,10 @@ ssl_error ( const char* msg )
 
     printf("%s on line %d\n",msg,ssl_token.lineNumber);
     /* ssl_print_token(); */
+
+    if ( ssl_option_verbose_errors ) {
+        ssl_traceback();
+    }
 }
 
 

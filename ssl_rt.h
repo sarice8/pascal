@@ -122,6 +122,12 @@ int ssl_load_program ( const char* program_filename );
 void ssl_set_debug ( int debug_flag );
 
 /*
+ * Print internal info at each error
+ */
+void ssl_set_verbose_errors( int flag );
+
+
+/*
  *  Debugging info must be provided before the run, if
  *  debug mode is turned on.
  *
