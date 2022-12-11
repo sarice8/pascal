@@ -504,6 +504,45 @@ walkTable()
        case tNegI :
               stack[sp] *= -1;
               continue;
+       case tMultD : {
+                // TO DO: consider a union for stack value, or other simpler access method
+                double x = *(double*) &stack[sp-1];
+                double y = *(double*) &stack[sp];
+                double result = x * y;
+                stack[sp-1] = *(long*) &result;
+                sp--;
+              }
+              continue;
+       case tDivD : {
+                double x = *(double*) &stack[sp-1];
+                double y = *(double*) &stack[sp];
+                double result = x / y;
+                stack[sp-1] = *(long*) &result;
+                sp--;
+              }
+              continue;
+       case tAddD : {
+                double x = *(double*) &stack[sp-1];
+                double y = *(double*) &stack[sp];
+                double result = x + y;
+                stack[sp-1] = *(long*) &result;
+                sp--;
+              }
+              continue;
+       case tSubD : {
+                double x = *(double*) &stack[sp-1];
+                double y = *(double*) &stack[sp];
+                double result = x - y;
+                stack[sp-1] = *(long*) &result;
+                sp--;
+              }
+              continue;
+       case tNegD : {
+                double x = *(double*) &stack[sp];
+                double result = -x;
+                stack[sp] = *(long*) &result;
+              }
+              continue;
        case tNot :
               stack[sp] = !stack[sp];
               continue;
@@ -581,6 +620,35 @@ walkTable()
        case tLessEqualP :
               stack[sp-1] = uint64_t(stack[sp-1]) <= uint64_t(stack[sp]);
               sp--;
+              continue;
+
+       case tGreaterD : {
+                double x = *(double*) &stack[sp-1];
+                double y = *(double*) &stack[sp];
+                stack[sp-1] = x > y;
+                sp--;
+              }
+              continue;
+       case tLessD : {
+                double x = *(double*) &stack[sp-1];
+                double y = *(double*) &stack[sp];
+                stack[sp-1] = x < y;
+                sp--;
+              }
+              continue;
+       case tGreaterEqualD : {
+                double x = *(double*) &stack[sp-1];
+                double y = *(double*) &stack[sp];
+                stack[sp-1] = x >= y;
+                sp--;
+              }
+              continue;
+       case tLessEqualD : {
+                double x = *(double*) &stack[sp-1];
+                double y = *(double*) &stack[sp];
+                stack[sp-1] = x <= y;
+                sp--;
+              }
               continue;
 
        case tAllocActuals :

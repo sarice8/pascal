@@ -27,18 +27,25 @@ begin
   writeln( sizeof( 7.6E8 ), ' ', sizeof( 7.6E9 ) );   // 4 4
 }
 
+  // Some literal tests
   writeln( 1.235e-2 );
+  writeln( 1.234e+10 );
+  writeln( 1.234e10 );
+  writeln( 1.2345 );
 
   f3 := 1.234e-10;
   writeln( f3 );
 
-{
-  f3 := 1.234e+10;
+  f3 := f3 + 1.1e-10;
   writeln( f3 );
 
-  f3 := 1.234e10;
-  writeln( f3 );
-}
+  // TO DO:
+  writeln( f3 - 1.1e-10 );
+  writeln( f3 * 1.1e-10 );
+  writeln( f3 / 1.1e-10 );
+  writeln( -1.1e-10 );
+  writeln( -f3 );
 
+  // TO DO: mixing integer/byte and double, on either side of operator
 
 end.

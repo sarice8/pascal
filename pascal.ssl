@@ -182,6 +182,11 @@ output:
    tSubPI
    tSubI
    tNegI             % top entry *= -1
+   tMultD            % operations on double-precision floating point values
+   tDivD
+   tAddD
+   tSubD
+   tNegD
    tNot              % negate top boolean
    tEqualB
    tNotEqualB
@@ -201,6 +206,10 @@ output:
    tLessP
    tGreaterEqualP
    tLessEqualP
+   tGreaterD         % double comparisions.  (equality uses EqualP, at least for now)
+   tLessD
+   tGreaterEqualD
+   tLessEqualD
    tAllocActuals     % <#bytes> - make space on call stack for actual params (adjusting call stack sp)
    tAllocActualsCdecl  % <#bytes> - starting a call to a cdecl method.  tcode still describes my own calling convention.
    tFreeActuals      % <#bytes> - discard space on call stack allocated by tAllocActuals
@@ -251,6 +260,7 @@ error:
    eNotValue
    eNotInteger
    eNotBoolean
+   eNotDouble
    eNotPointer
    eNotArray
    eNotRecord

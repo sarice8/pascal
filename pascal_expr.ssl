@@ -416,6 +416,11 @@ ArithExprAllowFlow( out Label falseLabel ):
                      .tAddI
                ]
 
+            | nDoubleType :
+               @TermAllowFlow( falseLabel )
+               @PromoteToDoublePop
+               .tAddD
+
             | nShortStringType, nStrLitType, nCharType :
                % String concatenation
                [ first
@@ -460,6 +465,11 @@ ArithExprAllowFlow( out Label falseLabel ):
                @PromoteToInt
                .tSubI
 
+            | nDoubleType :
+               @TermAllowFlow( falseLabel )
+               @PromoteToDoublePop
+               .tSubD
+
             | nPointerType, nUniversalPointerType :
                @TermAllowFlow( falseLabel )
                [ oTypeSNodeType
@@ -484,16 +494,40 @@ ArithExprAllowFlow( out Label falseLabel ):
 TermAllowFlow( out Label falseLabel ):
    @FactorAllowFlow( falseLabel )
    {[
-      | pTimes :
-         @PromoteToIntPop
-         @FactorAllowFlow( falseLabel )  % actually not allowing CF, will be caught by type check
-         @PromoteToInt
-         .tMultI
-      | pDivide :
-         @PromoteToIntPop
-         @FactorAllowFlow( falseLabel )
-         @PromoteToInt
-         .tDivI
+      | '*' :
+         [ oTypeSNodeType
+            | nIntegerType, nByteType :
+               @PromoteToIntPop
+               @FactorAllowFlow( falseLabel )  % actually not allowing CF, will be caught by type check
+               @PromoteToInt
+               .tMultI
+
+            | nDoubleType :
+               @FactorAllowFlow( falseLabel )
+               @PromoteToDoublePop
+               .tMultD
+
+            | * :
+               #eNotAllowed
+         ]
+
+      | '/' :
+         [ oTypeSNodeType
+            | nIntegerType, nByteType :
+               @PromoteToIntPop
+               @FactorAllowFlow( falseLabel )
+               @PromoteToInt
+               .tDivI
+
+            | nDoubleType :
+               @FactorAllowFlow( falseLabel )
+               @PromoteToDoublePop
+               .tDivD
+
+            | * :
+               #eNotAllowed
+         ]
+
       | * :
          >
    ]};
@@ -501,15 +535,26 @@ TermAllowFlow( out Label falseLabel ):
 
 FactorAllowFlow( out Label falseLabel ):
    [
-      | pPlus :
+      | '+' :
          @PrimaryAllowFlow( falseLabel )  % actually not allowing CF, will be caught by type check
-         % TO DO: unary +/- is supposed to leave expression type as-is.
-         @PromoteToInt
-      | pMinus :
+         [ oTypeSNodeType
+            | nIntegerType, nByteType :
+            | nDoubleType :
+            | * :
+               #eNotAllowed
+         ]
+      | '-' :
          @PrimaryAllowFlow( falseLabel )
-         % TO DO: unary +/- is supposed to leave expression type as-is.
-         @PromoteToInt
-         .tNegI
+         [ oTypeSNodeType
+            | nIntegerType, nByteType :
+               % It's probably fair to promote byte to int, since byte is unsigned
+               @PromoteToInt
+               .tNegI
+            | nDoubleType :
+               .tNegD
+            | * :
+               #eNotAllowed
+         ]
       | * :
          @PrimaryAllowFlow( falseLabel )
    ];
@@ -1243,6 +1288,18 @@ PromoteToIntOptional:
                            oTypeSPush( IntegerType )
       | * :
    ];
+
+% Convert the top value to double (if it isn't already).
+% It must be implicitly convertable to double.
+% Pop the type stack.
+%
+PromoteToDoublePop:
+   [ oTypeSNodeType
+      | nDoubleType :
+      | nIntegerType, nByteType :   #eNotImplemented
+      | * :                         #eNotDouble
+   ]
+   oTypeSPop;
 
 
 RequireBoolPop:
