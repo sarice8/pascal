@@ -168,6 +168,7 @@ output:
    tAssignI          % assign int value on top of stack to addr under it (pop both)
    tAssignB          %   "    byte   "    "   "  "   "    "    "   "   "
    tAssignP          %   "    ptr    "    "   "  "   "    "    "   "   "
+   tAssignD          %   "    double "    "   "  "   "    "    "   "   "
    tCopy             % <#bytes> - copy bytes.  tos=src, 2nd=dest (pop 2)
    tCastBtoI         % zero-extend uint8_t to int32_t
    tCastItoB         % truncate int32_t to uint8_t

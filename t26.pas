@@ -29,10 +29,10 @@ begin
 
   writeln( 1.235e-2 );
 
-{
   f3 := 1.234e-10;
   writeln( f3 );
 
+{
   f3 := 1.234e+10;
   writeln( f3 );
 

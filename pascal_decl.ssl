@@ -510,6 +510,9 @@ TypedConstInit( Node theType, int addr ):
          oTypeSPop
          .tAssignI
 
+      | nDoubleType:
+         #eNotImplemented
+
       | nPointerType, nUniversalPointerType :
          .tPushAddrGlobal  oEmitInt( addr )
          oTypeSPush( theType )

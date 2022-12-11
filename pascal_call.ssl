@@ -112,6 +112,7 @@ Call( Node method ):
                           [ oTypeSNodeType
                              | nIntegerType, nEnumType : .tAssignI
                              | nBooleanType, nByteType, nCharType :  .tAssignB
+                             | nDoubleType :  .tAssignD
                              | nFileType :   #eNotImplemented
                              | nPointerType, nUniversalPointerType :  .tAssignP
                              | nArrayType, nRecordType, nShortStringType :

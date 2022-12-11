@@ -445,6 +445,10 @@ walkTable()
               *((void**) stack[sp-1]) = (void*) stack[sp];
               sp -= 2;
               continue;
+       case tAssignD :
+              *((double*) stack[sp-1]) = *(double*) &stack[sp];
+              sp -= 2;
+              continue;
        case tCopy : {
               char* ptr1 = (char*) stack[sp-1];
               char* ptr2 = (char*) stack[sp];

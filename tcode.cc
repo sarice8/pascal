@@ -56,6 +56,7 @@ struct instrInfo_s tCodeInstrs[] = {
   { "tAssignI", 0 },
   { "tAssignB", 0 },
   { "tAssignP", 0 },
+  { "tAssignD", 0 },
   { "tCopy", 1 },
   { "tCastBtoI", 0 },
   { "tCastItoB", 0 },
