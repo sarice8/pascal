@@ -379,6 +379,15 @@ walkTable()
               if (++sp>=stackMax) fatal("stack overflow");
               stack[sp] = code[pc++];
               continue;
+       case tPushConstD : {
+              if (++sp>=stackMax) fatal("stack overflow");
+              // The value is actually a double, but we can push it as long since also 8 bytes
+              long val = *(uint32_t*) &code[pc];
+              val |= ( (long) *(uint32_t*) &code[pc+1] ) << 32;
+              stack[sp] = val;
+              pc += 2;
+              continue;
+              }
        case tPushAddrGlobal :
               if (++sp>=stackMax) fatal("stack overflow");
               stack[sp] = (long) (data + code[pc++]);
@@ -776,6 +785,11 @@ walkTable()
               } else {
                 printf( "<?badEnum>" );
               }
+              }
+              continue;
+       case tWriteD : {
+              double val = *(double*) &stack[sp--];
+              runlibWriteD( val );
               }
               continue;
        case tWriteCR :

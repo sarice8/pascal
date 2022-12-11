@@ -16,6 +16,7 @@ void runlibWriteShortStr( const char* ptr );
 void runlibWritePChar( const char* ptr );
 void runlibWriteP( const void* ptr );
 void runlibWriteEnum( int val, const EnumNameTable* table );
+void runlibWriteD( double val );
 void runlibWriteCR();
 
 void runlibReadI( int* ptr );

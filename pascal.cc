@@ -781,6 +781,10 @@ Node dNode;  // temporary for several mechanisms
     case oEmitInt :
             currentCodeStream->push_back( ssl_param );
             continue;
+    case oEmitDouble :
+            currentCodeStream->push_back( ssl_param & 0xffffffff );
+            currentCodeStream->push_back( ssl_param >> 32 );
+            continue;
     case oEmitLabel :
             currentCodeStream->push_back( ssl_param );
             continue;
@@ -866,6 +870,12 @@ Node dNode;  // temporary for several mechanisms
 
     case TOKEN_VALUE :
             ssl_result = ssl_token.val;
+            continue;
+    case TOKEN_VALUE_DOUBLE : {
+            double val = ssl_token.double_val;
+            // return double value encoded as long
+            ssl_result = *(long*) &val;
+            }
             continue;
     case LAST_ID :
             ssl_result = ssl_last_id;

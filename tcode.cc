@@ -42,6 +42,7 @@ struct instrInfo_s tCodeInstrs[] = {
   { "tPushUpParamB", 2 }, 
   { "tPushUpParamP", 2 },
   { "tPushConstI", 1 },
+  { "tPushConstD", 2 },  // value: low 32 bits, high 32 bits
   { "tPushAddrGlobal", 1 },
   { "tPushAddrLocal", 1 },
   { "tPushAddrParam", 1 },
@@ -113,6 +114,7 @@ struct instrInfo_s tCodeInstrs[] = {
   { "tWritePChar", 0 },
   { "tWriteP", 0 },
   { "tWriteEnum", 0 },
+  { "tWriteD", 0 },
   { "tWriteCR", 0 },
   { "tReadI", 0 },
   { "tReadChar", 0 },

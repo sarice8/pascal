@@ -105,6 +105,12 @@ runlibWriteEnum( int val, const EnumNameTable* table )
 }
 
 void
+runlibWriteD( double val )
+{
+  printf( "%g", val );
+}
+
+void
 runlibWriteCR()
 {
   printf( "\n" );

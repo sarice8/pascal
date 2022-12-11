@@ -154,7 +154,8 @@ output:
    tPushUpParamB     % <uplevels> <offset> - push byte value read from param in a parent static scope
    tPushUpParamP     % <uplevels> <offset> - push ptr value read from param in a parent static scope
    tPushConstI       % <int> - push int value on stack (NOTE, used for BOOLEAN too)
-   tPushAddrGlobal   % <offset> - push ptr to global var (same as tPushConstP)
+   tPushConstD       % <double> - push double value on stack
+   tPushAddrGlobal   % <offset> - push ptr to global var
    tPushAddrLocal    % <offset> - push ptr to local var
    tPushAddrParam    % <offset> - push ptr to formal param (used by method to see its param)
    tPushAddrActual   % <offset> - push ptr to actual param, in actuals space (used by caller)
@@ -225,6 +226,7 @@ output:
    tWritePChar       %  "     "    : write a null-terminated string whose addr is on tos, pop
    tWriteP           %  "     "    : write ptr var whose addr is on tos, pop
    tWriteEnum        %  "     "    : write enum name.  Name table on tos, value under it, pop both
+   tWriteD           %  "     "    : write double-precision floating point value on tos, pop
    tWriteCR          %  "     "    : write cr
    tReadI            % for readln : pointer to integer on tos.  Assign read value to it, and pop
    tReadChar         %  "     "   : pointer to char on tos.  Asign read value to it, and pop
@@ -291,6 +293,9 @@ type boolean:
    false    = 0
    true     = 1;
 
+type double:
+   doubleZero = 0
+   ;
 
 type Label:
    labelNull = 0;
@@ -358,6 +363,7 @@ mechanism node_vec_mech:
 
 mechanism emit_mech:
     oEmitInt( int )              % emit int into the generated code
+    oEmitDouble( double )        % emit double into the generated code
     oEmitLabel( Label )
     oEmitCode( Code )            % append a code stream to the current code stream
     Here >> int                  % current address in the generated code
@@ -387,6 +393,7 @@ mechanism math:
 
 mechanism more_builtins:      % These should be built-in SSL operations
     TOKEN_VALUE >> int        % value of just accepted token, e.g. IntLit token
+    TOKEN_VALUE_DOUBLE >> double
     LAST_ID >> int            % id number of last accepted identifier
     ID_STRING( int id ) >> String       % text name of identifier with given id
     CURRENT_STRLIT >> String            % text value of just-accepted string literal

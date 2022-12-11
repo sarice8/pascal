@@ -27,6 +27,9 @@ begin
   writeln( sizeof( 7.6E8 ), ' ', sizeof( 7.6E9 ) );   // 4 4
 }
 
+  writeln( 1.235e-2 );
+
+{
   f3 := 1.234e-10;
   writeln( f3 );
 
@@ -35,6 +38,7 @@ begin
 
   f3 := 1.234e10;
   writeln( f3 );
+}
 
 
 end.

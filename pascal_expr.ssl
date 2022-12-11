@@ -525,6 +525,10 @@ PrimaryAllowFlow( out Label falseLabel ):
          .tPushConstI  oEmitInt( TOKEN_VALUE )
          oTypeSPush( CharType )
 
+      | pDoubleLit :
+         .tPushConstD  oEmitDouble( TOKEN_VALUE_DOUBLE )
+         oTypeSPush( DoubleType )
+
       | '(' :
          @ExprAllowFlow( falseLabel )
          ')'

@@ -564,6 +564,7 @@ WriteStmt:
                | nBooleanType :             .tWriteBool
                | nByteType :                .tCastBtoI  .tWriteI
                | nCharType :                .tWriteChar
+               | nDoubleType :              .tWriteD
                | nShortStringType, nStrLitType :   .tWriteShortStr
                | nFileType :                #eNotImplemented
                | nEnumType :
