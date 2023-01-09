@@ -60,6 +60,7 @@ struct instrInfo_s tCodeInstrs[] = {
   { "tCopy", 1 },
   { "tCastBtoI", 0 },
   { "tCastItoB", 0 },
+  { "tCastItoD", 0 },
   { "tIncI", 0 },
   { "tDecI", 0 },
   { "tMultI", 0 },

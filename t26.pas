@@ -48,14 +48,28 @@ begin
   f3 := f3 + 1.1e-10;
   writeln( f3 );
 
-  // TO DO:
   writeln( f3 - 1.1e-10 );
   writeln( f3 * 1.1e-10 );
   writeln( f3 / 1.1e-10 );
   writeln( -1.1e-10 );
   writeln( -f3 );
 
-  // TO DO: mixing integer/byte and double, on either side of operator
+  // mixing integer/byte and double, on either side of operator.
+  // Double on left, integer on right:
+  writeln( f3 + 1 );
+  writeln( f3 - 1 );
+  writeln( f3 * 2 );
+  writeln( f3 / 2 );
+
+  // integer on left, double on right:
+  writeln( 1 + f3 );
+  writeln( 1 - f3 );
+  writeln( 2 * f3 );
+  writeln( 2 / f3 );
+
+  // relational operators, with and without a mix of integer/double on either side
+  // TO DO
+
 
   // Constant
   writeln( 'constant: ', fc1 );

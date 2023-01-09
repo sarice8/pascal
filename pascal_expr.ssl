@@ -411,6 +411,12 @@ ArithExprAllowFlow( out Label falseLabel ):
                      .tSwap
                      % leave only the ptr type on the type stack (int was already popped above)
                      @PointerAddition
+                  | nDoubleType :
+                     % int + double
+                     % int type was already popped above; leave double on type stack
+                     .tSwap
+                     .tCastItoD
+                     .tAddD
                   | * :
                      @PromoteToInt
                      .tAddI
@@ -462,8 +468,19 @@ ArithExprAllowFlow( out Label falseLabel ):
             | nIntegerType, nByteType :
                @PromoteToIntPop
                @TermAllowFlow( falseLabel )
-               @PromoteToInt
-               .tSubI
+
+               [ oTypeSNodeType
+                  | nDoubleType :
+                     % int - double
+                     % int type was already popped above; leave double on type stack
+                     .tSwap
+                     .tCastItoD
+                     .tSwap
+                     .tSubD
+                  | * :
+                     @PromoteToInt
+                     .tSubI
+               ]
 
             | nDoubleType :
                @TermAllowFlow( falseLabel )
@@ -499,8 +516,18 @@ TermAllowFlow( out Label falseLabel ):
             | nIntegerType, nByteType :
                @PromoteToIntPop
                @FactorAllowFlow( falseLabel )  % actually not allowing CF, will be caught by type check
-               @PromoteToInt
-               .tMultI
+
+               [ oTypeSNodeType
+                  | nDoubleType :
+                     % int * double
+                     % int type was already popped above; leave double on type stack
+                     .tSwap
+                     .tCastItoD
+                     .tMultD
+                  | * :
+                     @PromoteToInt
+                     .tMultI
+               ]
 
             | nDoubleType :
                @FactorAllowFlow( falseLabel )
@@ -516,8 +543,18 @@ TermAllowFlow( out Label falseLabel ):
             | nIntegerType, nByteType :
                @PromoteToIntPop
                @FactorAllowFlow( falseLabel )
-               @PromoteToInt
-               .tDivI
+               [ oTypeSNodeType
+                  | nDoubleType :
+                     % int / double
+                     % int type was already popped above; leave double on type stack
+                     .tSwap
+                     .tCastItoD
+                     .tSwap
+                     .tDivD
+                  | * :
+                     @PromoteToInt
+                     .tDivI
+               ]
 
             | nDoubleType :
                @FactorAllowFlow( falseLabel )
@@ -1306,8 +1343,14 @@ PromoteToIntOptional:
 PromoteToDoublePop:
    [ oTypeSNodeType
       | nDoubleType :
-      | nIntegerType, nByteType :   #eNotImplemented
-      | * :                         #eNotDouble
+      | nIntegerType :     .tCastItoD
+                           oTypeSPop
+                           oTypeSPush( DoubleType )
+      | nByteType :        .tCastBtoI
+                           .tCastItoD
+                           oTypeSPop
+                           oTypeSPush( DoubleType )
+      | * :                #eNotDouble
    ]
    oTypeSPop;
 

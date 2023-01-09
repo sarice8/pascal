@@ -172,6 +172,7 @@ output:
    tCopy             % <#bytes> - copy bytes.  tos=src, 2nd=dest (pop 2)
    tCastBtoI         % zero-extend uint8_t to int32_t
    tCastItoB         % truncate int32_t to uint8_t
+   tCastItoD         % convert int32_t to double
    tIncI             % increment int value on top of expr stack
    tDecI             % decrement int value on top of expr stack
    tMultI            % multiply top two integers (replacing with result)
@@ -510,7 +511,7 @@ mechanism value :              % value stack, to calc. const expr's
    oValuePop
    oValueCharToString          % convert top value from char to string
    oValueIntToDouble
-   
+
    oValueNegate                % negate top numeric value
    oValueEqual
    oValueNotEqual

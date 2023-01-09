@@ -467,6 +467,14 @@ walkTable()
               // truncates from int32_t to uint8_t
               stack[sp] = (uint8_t) stack[sp];
               continue;
+       case tCastItoD : {
+              // converts from int32_t to double
+              // (There is not yet a reverse conversion; we need separate trunc and round)
+              double value = (int32_t) stack[sp];
+              // double values are encoded on the stack as long
+              stack[sp] = *(long*) &value;
+              continue;
+              }
        case tIncI :
               stack[sp]++;
               continue;
