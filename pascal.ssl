@@ -509,6 +509,8 @@ mechanism value :              % value stack, to calc. const expr's
    oValueSwap                  % swap top two
    oValuePop
    oValueCharToString          % convert top value from char to string
+   oValueIntToDouble
+   
    oValueNegate                % negate top numeric value
    oValueEqual
    oValueNotEqual
@@ -516,13 +518,29 @@ mechanism value :              % value stack, to calc. const expr's
    oValueGreater
    oValueLessEqual
    oValueGreaterEqual
+
+   oValueNegateD               % operations on double values
+   oValueEqualD
+   oValueNotEqualD
+   oValueLessD
+   oValueGreaterD
+   oValueLessEqualD
+   oValueGreaterEqualD
+
    oValueOr                    % boolean or
    oValueAnd
    oValueNot                   % boolean not
+
    oValueAdd
    oValueSub
    oValueMult
    oValueDiv
+
+   oValueAddD
+   oValueSubD
+   oValueMultD
+   oValueDivD
+
    oValueStringCmp             % compare top two strings. replace with negative, 0, or positive
    oValueStringConcat
    ;

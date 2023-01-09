@@ -20,6 +20,7 @@ ConstExpr:
          @ConstMatchTypes
          [ oTypeSNodeType
             | nStrLitType :   oValueStringCmp  oValuePush( 0 )  oValueEqual
+            | nDoubleType :   oValueEqualD
             | * :             oValueEqual
          ]
          oTypeSPop  oTypeSPush( BooleanType )
@@ -28,6 +29,7 @@ ConstExpr:
          @ConstMatchTypes
          [ oTypeSNodeType
             | nStrLitType :   oValueStringCmp  oValuePush( 0 )  oValueNotEqual
+            | nDoubleType :   oValueNotEqualD
             | * :             oValueNotEqual
          ]
          oTypeSPop  oTypeSPush( BooleanType )
@@ -36,6 +38,7 @@ ConstExpr:
          @ConstMatchTypes
          [ oTypeSNodeType
             | nStrLitType :   oValueStringCmp  oValuePush( 0 )  oValueLess
+            | nDoubleType :   oValueLessD
             | * :             oValueLess
          ]
          oTypeSPop  oTypeSPush( BooleanType )
@@ -44,6 +47,7 @@ ConstExpr:
          @ConstMatchTypes
          [ oTypeSNodeType
             | nStrLitType :   oValueStringCmp  oValuePush( 0 )  oValueGreater
+            | nDoubleType :   oValueGreaterD
             | * :             oValueGreater
          ]
          oTypeSPop  oTypeSPush( BooleanType )
@@ -52,6 +56,7 @@ ConstExpr:
          @ConstMatchTypes
          [ oTypeSNodeType
             | nStrLitType :   oValueStringCmp  oValuePush( 0 )  oValueLessEqual
+            | nDoubleType :   oValueLessEqualD
             | * :             oValueLessEqual
          ]
          oTypeSPop  oTypeSPush( BooleanType )
@@ -60,6 +65,7 @@ ConstExpr:
          @ConstMatchTypes
          [ oTypeSNodeType
             | nStrLitType :   oValueStringCmp  oValuePush( 0 )  oValueGreaterEqual
+            | nDoubleType :   oValueGreaterEqualD
             | * :             oValueGreaterEqual
          ]
          oTypeSPop  oTypeSPush( BooleanType )
@@ -122,6 +128,7 @@ ConstArithExpr:
          @ConstMatchTypes
          [ oTypeSNodeType
             | nStrLitType :   oValueStringConcat
+            | nDoubleType :   oValueAddD
             | * :             oValueAdd
          ]
       | '-' :
@@ -129,6 +136,7 @@ ConstArithExpr:
          @ConstMatchTypes
          [ oTypeSNodeType
             | nStrLitType :   #eNotAllowed
+            | nDoubleType :   oValueSubD
             | * :             oValueSub
          ]
       | * :  >
@@ -143,6 +151,7 @@ ConstTerm:
          @ConstMatchTypes
          [ oTypeSNodeType
             | nStrLitType :   #eNotAllowed
+            | nDoubleType :   oValueMultD
             | * :             oValueMult
          ]
       | pDivide :
@@ -150,6 +159,7 @@ ConstTerm:
          @ConstMatchTypes
          [ oTypeSNodeType
             | nStrLitType :   #eNotAllowed
+            | nDoubleType :   oValueDivD
             | * :             oValueDiv
          ]
       | * :  >
@@ -162,7 +172,11 @@ ConstFactor:
          @ConstPrimary
       | pMinus :
          @ConstPrimary
-         oValueNegate
+         [ oTypeSNodeType
+            | nStrLitType :   #eNotAllowed
+            | nDoubleType :   oValueNegateD
+            | * :             oValueNegate
+         ]
       | * :
          @ConstPrimary
    ];
@@ -375,12 +389,22 @@ ConstCastType:
                [ nt
                   | nByteType, nCharType, nBooleanType :  >>
                   | nIntegerType, nEnumType :  >>
+                  % fpc does not allow explicit cast of double to integer.
+                  % User must call trunc() / round().
                   | * :
                ]
             | nByteType, nCharType, nBooleanType :
                [ nt
                   | nByteType, nCharType, nBooleanType :  >>
                   | nIntegerType, nEnumType :  >>
+                  | * :
+               ]
+            | nDoubleType :
+               [ nt
+                  | nByteType, nCharType, nBooleanType, nIntegerType, nEnumType :
+                     oValueIntToDouble
+                     >>
+                  | nDoubleType :  >>
                   | * :
                ]
             | nPointerType :

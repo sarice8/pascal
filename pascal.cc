@@ -1278,6 +1278,12 @@ Node dNode;  // temporary for several mechanisms
             valueStack.emplace_back( temp );
             }
             continue;
+     case oValueIntToDouble: {
+            ValueEntry x = valueStack.top();  valueStack.pop();
+            valueStack.emplace_back( (double) x._int );
+            }
+            continue;
+
      case oValueNegate :
             valueStack.top()._int *= -1;
             continue;
@@ -1317,6 +1323,47 @@ Node dNode;  // temporary for several mechanisms
             valueStack.emplace_back( x._int >= y._int );
             }
             continue;
+
+     case oValueNegateD :
+            valueStack.top()._double *= -1;
+            continue;
+     case oValueEqualD : {
+            ValueEntry y = valueStack.top();  valueStack.pop();
+            ValueEntry x = valueStack.top();  valueStack.pop();
+            valueStack.emplace_back( x._double == y._double );
+            }
+            continue;
+     case oValueNotEqualD : {
+            ValueEntry y = valueStack.top();  valueStack.pop();
+            ValueEntry x = valueStack.top();  valueStack.pop();
+            valueStack.emplace_back( x._double != y._double );
+            }
+            continue;
+     case oValueLessD : {
+            ValueEntry y = valueStack.top();  valueStack.pop();
+            ValueEntry x = valueStack.top();  valueStack.pop();
+            valueStack.emplace_back( x._double < y._double );
+            }
+            continue;
+     case oValueGreaterD : {
+            ValueEntry y = valueStack.top();  valueStack.pop();
+            ValueEntry x = valueStack.top();  valueStack.pop();
+            valueStack.emplace_back( x._double > y._double );
+            }
+            continue;
+     case oValueLessEqualD : {
+            ValueEntry y = valueStack.top();  valueStack.pop();
+            ValueEntry x = valueStack.top();  valueStack.pop();
+            valueStack.emplace_back( x._double <= y._double );
+            }
+            continue;
+     case oValueGreaterEqualD : {
+            ValueEntry y = valueStack.top();  valueStack.pop();
+            ValueEntry x = valueStack.top();  valueStack.pop();
+            valueStack.emplace_back( x._double >= y._double );
+            }
+            continue;
+
      case oValueOr : {
             ValueEntry y = valueStack.top();  valueStack.pop();
             ValueEntry x = valueStack.top();  valueStack.pop();
@@ -1334,6 +1381,7 @@ Node dNode;  // temporary for several mechanisms
             valueStack.emplace_back( !x._int );
             }
             continue;
+
      case oValueAdd : {
             ValueEntry y = valueStack.top();  valueStack.pop();
             ValueEntry x = valueStack.top();  valueStack.pop();
@@ -1358,6 +1406,32 @@ Node dNode;  // temporary for several mechanisms
             valueStack.emplace_back( x._int / y._int );
             }
             continue;
+
+     case oValueAddD : {
+            ValueEntry y = valueStack.top();  valueStack.pop();
+            ValueEntry x = valueStack.top();  valueStack.pop();
+            valueStack.emplace_back( x._double + y._double );
+            }
+            continue;
+     case oValueSubD : {
+            ValueEntry y = valueStack.top();  valueStack.pop();
+            ValueEntry x = valueStack.top();  valueStack.pop();
+            valueStack.emplace_back( x._double - y._double );
+            }
+            continue;
+     case oValueMultD : {
+            ValueEntry y = valueStack.top();  valueStack.pop();
+            ValueEntry x = valueStack.top();  valueStack.pop();
+            valueStack.emplace_back( x._double * y._double );
+            }
+            continue;
+     case oValueDivD : {
+            ValueEntry y = valueStack.top();  valueStack.pop();
+            ValueEntry x = valueStack.top();  valueStack.pop();
+            valueStack.emplace_back( x._double / y._double );
+            }
+            continue;
+
      case oValueStringCmp : {
             ValueEntry y = valueStack.top();  valueStack.pop();
             ValueEntry x = valueStack.top();  valueStack.pop();

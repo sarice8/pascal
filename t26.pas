@@ -6,6 +6,12 @@ program t26;
   var f3: double;
 
   const fc1 = 1.234;
+  const fc2 = 1.234 + 1.0;
+  const fc3 = double(1);
+
+  // const ic1 = shortint( 1.1 );
+  //  fpc:  Illegal type conversion: "Extended" to "ShortInt"
+  //    (docs say should use explicit call to trunc() or round())
 
 begin
 
@@ -53,5 +59,7 @@ begin
 
   // Constant
   writeln( 'constant: ', fc1 );
+  writeln( 'constant: ', fc2 );
+  writeln( 'constant: ', fc3 );
 
 end.
