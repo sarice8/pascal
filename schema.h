@@ -84,6 +84,7 @@
 #define type_Boolean1 1
 #define type_Character1 2
 #define type_Integer4 4
+#define type_Real8 5
 #define type_StringN 10
 #define type_Node 100
 #define type_List 150

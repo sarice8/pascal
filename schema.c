@@ -919,6 +919,12 @@ w_dump_h_macros ()
                      SCH_GetTypeName(GetqType(N)),
                      ssl_get_id_string(GetqIdent(N)));
             break;
+          case type_Real8:
+            fprintf (f_h_out, "#define Get%s(N)\t\t(%s)\tGetAttrReal8(N, %s)\n",
+                     ssl_get_id_string(GetqIdent(N)),
+                     SCH_GetTypeName(GetqType(N)),
+                     ssl_get_id_string(GetqIdent(N)));
+            break;
           default:
             fprintf (f_h_out, "#define Get%s(N)\t\t(%s)\tGetAttr(N, %s)\n",
                      ssl_get_id_string(GetqIdent(N)),
@@ -938,6 +944,11 @@ w_dump_h_macros ()
           case type_Character1:
           case type_Integer4:
             fprintf (f_h_out, "#define Set%s(N,V)\t\tSetAttr(N, %s, (void*)(intptr_t)(V))\n",
+                     ssl_get_id_string(GetqIdent(N)),
+                     ssl_get_id_string(GetqIdent(N)));
+            break;
+          case type_Real8:
+            fprintf (f_h_out, "#define Set%s(N,V)\t\tSetAttrReal8(N, %s, V)\n",
                      ssl_get_id_string(GetqIdent(N)),
                      ssl_get_id_string(GetqIdent(N)));
             break;

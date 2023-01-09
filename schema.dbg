@@ -1,4 +1,4 @@
-229
+230
 -1
 -1
 -1
@@ -76,6 +76,7 @@
 -1
 2
 -1
+2
 2
 2
 2
@@ -199,44 +200,44 @@
 109
 109
 109
-109
-109
-109
 115
+117
+117
 123
 131
 139
+147
 -1
-167
-167
-171
-173
-178
+175
+175
+179
+181
+186
 -1
-178
-178
-180
+186
+186
 188
 196
 204
-206
-219
-221
-223
-228
+212
+214
+227
 229
+231
+236
+237
 -1
-229
+237
 -1
 28 int nType
 29 token nType
 65 node_type nType
 73 node_attribute nType
 87 aType nType
-95 aTag nType
-100 boolean nType
-130 Schema nRule 2
-132 schema_header nRule 46
-134 class_derivation nRule 59
-136 attribute_assignment nRule 67
-138 attribute_definition nRule 72
+96 aTag nType
+101 boolean nType
+131 Schema nRule 2
+133 schema_header nRule 46
+135 class_derivation nRule 59
+137 attribute_assignment nRule 67
+139 attribute_definition nRule 72

@@ -205,6 +205,17 @@ SetAttr( Node N, int attr_code, void* value )
 }
 
 
+// Set a Real8 attribute value
+//
+void
+SetAttrReal8( Node N, int attr_code, Real8 value )
+{
+    void      **attr_ptr;
+    attr_ptr = SCH_GetAttrPtr (N, attr_code);
+    *(Real8*)attr_ptr = value;
+}
+
+
 // Set a non-pointer value
 //
 void
@@ -227,6 +238,16 @@ GetAttr( Node N, int attr_code )
     value    = *attr_ptr;
 
     return (value);
+}
+
+
+// Get a Real8 attribute value
+//
+Real8
+GetAttrReal8( Node N, int attr_code )
+{
+    void  **attr_ptr = SCH_GetAttrPtr (N, attr_code);
+    return *(Real8*)attr_ptr;
 }
 
 
@@ -652,6 +673,10 @@ Node                N;
 
                 case SCH_Type_Integer4:
                     printf ("%ld\n", *(long*)attr_ptr);
+                    break;
+
+                case SCH_Type_Real8:
+                    printf ("%g\n", *(double*)attr_ptr);
                     break;
 
                 case SCH_Type_StringN:

@@ -32,6 +32,7 @@
 typedef char                     Boolean1;
 typedef char                     Character1;
 typedef long                     Integer4;    // SARICE 9/2021 needs work
+typedef double                   Real8;
 typedef char                    *StringN;
 
 typedef struct SCH_NodeStruct   *Node;
@@ -59,6 +60,7 @@ typedef struct SCH_ItemStruct   *Item;
 #define SCH_Type_Boolean1       1
 #define SCH_Type_Character1     2
 #define SCH_Type_Integer4       4
+#define SCH_Type_Real8          5
 #define SCH_Type_StringN        10
 #define SCH_Type_Node           100
 #define SCH_Type_List           150
@@ -148,8 +150,10 @@ int      Kind     ( Node N );
 Boolean1 IsA      ( int object_type_1, int object_type_2 );
 Boolean1 IsNull   ( Node N );
 void     SetAttr  ( Node node, int attr_code, void* value );
+void     SetAttrReal8( Node node, int attr_code, Real8 value );
 void     SetValue ( Node node, int attr_code, long value );
 void*    GetAttr  ( Node node, int attr_code );
+Real8    GetAttrReal8( Node node, int attr_code );
 long     GetValue ( Node node, int attr_code );
 void     FreeNode ( Node N, Boolean1 recurse );
 

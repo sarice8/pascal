@@ -80,6 +80,7 @@ type aType:              % attribute type
 	type_Boolean1   = 1
 	type_Character1 = 2
 	type_Integer4   = 4
+	type_Real8      = 5
 	type_StringN    = 10
 	type_Node       = 100
 	type_List       = 150
@@ -197,10 +198,10 @@ attribute_definition:
             | pInteger4,
               pInteger8,
               pIntegerN,
-              pReal4,
-              pReal8,
-              pRealN,
               pObjectType :    oAttrType (type_Integer4)
+            | pReal4,
+              pReal8,
+              pRealN :         oAttrType (type_Real8)
             | pStringN :       oAttrType (type_StringN)
 	    | pList :          oAttrType (type_List)
 	    | pNode :          oAttrType (type_Node)

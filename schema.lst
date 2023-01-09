@@ -109,6 +109,7 @@
    2: 	type_Boolean1   = 1
    2: 	type_Character1 = 2
    2: 	type_Integer4   = 4
+   2: 	type_Real8      = 5
    2: 	type_StringN    = 10
    2: 	type_Node       = 100
    2: 	type_List       = 150
@@ -226,34 +227,34 @@
  107:             | pInteger4,
  109:               pInteger8,
  109:               pIntegerN,
- 109:               pReal4,
- 109:               pReal8,
- 109:               pRealN,
  109:               pObjectType :    oAttrType (type_Integer4)
- 115:             | pStringN :       oAttrType (type_StringN)
- 123: 	    | pList :          oAttrType (type_List)
- 131: 	    | pNode :          oAttrType (type_Node)
- 139: 	]
+ 115:             | pReal4,
+ 117:               pReal8,
+ 117:               pRealN :         oAttrType (type_Real8)
+ 123:             | pStringN :       oAttrType (type_StringN)
+ 131: 	    | pList :          oAttrType (type_List)
+ 139: 	    | pNode :          oAttrType (type_Node)
+ 147: 	]
       
- 167: 	[
- 167: 	    | '(' :  pIDENTIFIER    % constraint ignored for now
- 171:                      ')'
- 173: 	    | * :
- 178: 	]
+ 175: 	[
+ 175: 	    | '(' :  pIDENTIFIER    % constraint ignored for now
+ 179:                      ')'
+ 181: 	    | * :
+ 186: 	]
       
- 178: 	[
- 178: 	    | '[' :  {[
- 180: 	                 | pPri :  oAttrTag (tag_Pri)
- 188: 	                 | pAlt :  oAttrTag (tag_Alt)
- 196: 	                 | pOpt :  oAttrTag (tag_Opt)
- 204: 	                 | ',' :
- 206: 	                 | * :    >
- 219: 	             ]}
- 221: 	             ']'
- 223: 	    | * :
- 228: 	]
- 229: 	;
+ 186: 	[
+ 186: 	    | '[' :  {[
+ 188: 	                 | pPri :  oAttrTag (tag_Pri)
+ 196: 	                 | pAlt :  oAttrTag (tag_Alt)
+ 204: 	                 | pOpt :  oAttrTag (tag_Opt)
+ 212: 	                 | ',' :
+ 214: 	                 | * :    >
+ 227: 	             ]}
+ 229: 	             ']'
+ 231: 	    | * :
+ 236: 	]
+ 237: 	;
       
- 229: end
+ 237: end
       
- 229: 
+ 237: 
