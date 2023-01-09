@@ -24,6 +24,7 @@ typedef enum {
     nConst,
     nEnumValue,
     nConstStr,
+    nConstDouble,
     nTypeDecl,
     nVar,
     nGlobalVar,
@@ -87,6 +88,7 @@ typedef enum {
     qResultOffset,
     qNameOffset,
     qValueStr,
+    qValueDouble,
     qInOut,
     qDefined,
     qPointerType,
@@ -135,6 +137,7 @@ typedef enum {
 #define GetqResultOffset(N)		(Integer4)	(intptr_t) GetAttr(N, qResultOffset)
 #define GetqNameOffset(N)		(Integer4)	(intptr_t) GetAttr(N, qNameOffset)
 #define GetqValueStr(N)		(StringN)	GetAttr(N, qValueStr)
+#define GetqValueDouble(N)		(Integer4)	GetAttrReal8(N, qValueDouble)
 #define GetqInOut(N)		(Boolean1)	(intptr_t) GetAttr(N, qInOut)
 #define GetqDefined(N)		(Boolean1)	(intptr_t) GetAttr(N, qDefined)
 #define GetqPointerType(N)		(Node)	GetAttr(N, qPointerType)
@@ -181,6 +184,7 @@ typedef enum {
 #define SetqResultOffset(N,V)		SetAttr(N, qResultOffset, (void*)(intptr_t)(V))
 #define SetqNameOffset(N,V)		SetAttr(N, qNameOffset, (void*)(intptr_t)(V))
 #define SetqValueStr(N,V)		SetAttr(N, qValueStr, V)
+#define SetqValueDouble(N,V)		SetAttrReal8(N, qValueDouble, V)
 #define SetqInOut(N,V)		SetAttr(N, qInOut, (void*)(intptr_t)(V))
 #define SetqDefined(N,V)		SetAttr(N, qDefined, (void*)(intptr_t)(V))
 #define SetqPointerType(N,V)		SetAttr(N, qPointerType, V)
@@ -212,6 +216,7 @@ typedef enum {
 #define NewnConst()		NewNode(nConst)
 #define NewnEnumValue()		NewNode(nEnumValue)
 #define NewnConstStr()		NewNode(nConstStr)
+#define NewnConstDouble()		NewNode(nConstDouble)
 #define NewnTypeDecl()		NewNode(nTypeDecl)
 #define NewnVar()		NewNode(nVar)
 #define NewnGlobalVar()		NewNode(nGlobalVar)

@@ -128,6 +128,7 @@ nIdent ::= nBuiltInProc
 
 % nConst is an ordinal "true constant" (as opposed to a typed constant).
 % This includes integer types, enum types, boolean, char.  qValue is the value.
+% See also: nConstStr, nConstDouble
 %
 nIdent ::= nConst
 
@@ -141,6 +142,11 @@ nEnumValue =>
 nIdent ::= nConstStr
 nConstStr =>
         qValueStr:      StringN
+
+% nConstDouble is a double "true constant".  qValueDouble is the value.
+nIdent ::= nConstDouble
+nConstDouble =>
+        qValueDouble:   Real8
 
 
 nIdent ::= nTypeDecl

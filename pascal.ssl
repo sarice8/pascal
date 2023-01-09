@@ -335,6 +335,7 @@ type AllocMode:
 mechanism node_mech:
     oNodeNew (node_type) >> Node         % create new node
     oNodeSet (Node, node_attribute, Node)   % set Node attribute of node
+    oNodeSetDouble (Node, node_attribute, double)   % set double attribute
     oNodeSetString (Node, node_attribute, String)
     oNodeSetInt (Node, node_attribute, int) % set int attribute of node
     oNodeSetBoolean (Node, node_attribute, boolean)
@@ -342,6 +343,7 @@ mechanism node_mech:
     oNodeSetCode( Node, node_attribute, Code )    % set Code attribute of node
     oNodeAddLast( Node, node_attribute, Node value )  % append to a List attribute of node
     oNodeGet (Node, node_attribute) >> Node    % get Node attribute of node
+    oNodeGetDouble (Node, node_attribute) >> double
     oNodeGetString (Node, node_attribute) >> String
     oNodeGetInt (Node, node_attribute) >> int  % get int attribute of node
     oNodeGetBoolean (Node, node_attribute) >> boolean  % get int attribute of node
@@ -499,8 +501,10 @@ mechanism count :
 
 mechanism value :              % value stack, to calc. const expr's
    oValuePush(int)             % push an explicit int lit
+   oValuePushDouble(double)    % push a double onto value stack
    oValuePushString(String)    % push string onto value stack
    oValueTop >> int            % get top value on value stack
+   oValueTopDouble >> double
    oValueTopString >> String
    oValueSwap                  % swap top two
    oValuePop

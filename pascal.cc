@@ -143,14 +143,19 @@ int dCS[dCSsize], dCSptr;        /* count stack */
 struct ValueEntry
 {
   ValueEntry( int i )
-    : _int( i ), _isString( false )
+    : _int( i )
+  {}
+  ValueEntry( double d )
+    : _double( d ), _isDouble( true )
   {}
   ValueEntry( const char* str )
-    : _int( 0 ), _string( str ), _isString( true )
+    : _string( str ), _isString( true )
   {}
-  int   _int;
+  int   _int = 0;
+  double _double = 0;
   std::string _string;
-  bool  _isString;
+  bool  _isString = false;
+  bool  _isDouble = false;
 };
 
 class ValueStack : public std::vector<ValueEntry>
@@ -641,6 +646,11 @@ Node dNode;  // temporary for several mechanisms
     case oNodeSet:
             SetAttr ((Node)ssl_argv(0,3), ssl_argv(1,3), (Node)ssl_argv(2,3));
             continue;
+    case oNodeSetDouble: {
+            long encodedValue = ssl_argv(2,3);
+            SetAttrReal8 ((Node)ssl_argv(0,3), ssl_argv(1,3), *(double*)&encodedValue);
+            continue;
+            }
     case oNodeSetString:
             SetAttr ((Node)ssl_argv(0,3), ssl_argv(1,3), (void*)ssl_argv(2,3));
             continue;
@@ -656,6 +666,12 @@ Node dNode;  // temporary for several mechanisms
     case oNodeGet:
             ssl_result = (long) GetAttr ((Node)ssl_argv(0,2), ssl_argv(1,2));
             continue;
+    case oNodeGetDouble: {
+            double value = GetAttrReal8 ((Node)ssl_argv(0,2), ssl_argv(1,2));
+            // return double value encoded as long
+            ssl_result = *(long*) &value;
+            continue;
+            }
     case oNodeGetString:
             ssl_result = (long) GetAttr ((Node)ssl_argv(0,2), ssl_argv(1,2));
             continue;
@@ -1226,11 +1242,20 @@ Node dNode;  // temporary for several mechanisms
      case oValuePush :
             valueStack.emplace_back( (int) ssl_param );
             continue;
+     case oValuePushDouble :
+            valueStack.emplace_back( *(double*) &ssl_param );
+            continue;
      case oValuePushString :
             valueStack.emplace_back( (const char*) ssl_param );
             continue;
      case oValueTop:
             ssl_result = valueStack.top()._int;
+            continue;
+     case oValueTopDouble: {
+            double value = valueStack.top()._double;
+            // return double value encoded as long
+            ssl_result = *(long*) &value;
+            }
             continue;
      case oValueTopString:
             ssl_result = (long) valueStack.top()._string.c_str();

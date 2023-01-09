@@ -21,6 +21,7 @@ type node_type:
 	nConst
 	nEnumValue
 	nConstStr
+	nConstDouble
 	nTypeDecl
 	nVar
 	nGlobalVar
@@ -84,6 +85,7 @@ type node_attribute:
 	qResultOffset
 	qNameOffset
 	qValueStr
+	qValueDouble
 	qInOut
 	qDefined
 	qPointerType

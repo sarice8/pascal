@@ -365,6 +365,9 @@ TrueConstDecl:
         nPointerType, nUniversalPointerType :
          decl = @newIdent( nConst, id )
          oNodeSetInt( decl, qValue, oValueTop )
+      | nDoubleType :
+         decl = @newIdent( nConstDouble, id )
+         oNodeSetDouble( decl, qValueDouble, oValueTopDouble )
       | nStrLitType :
          decl = @newIdent( nConstStr, id )
          oNodeSetString( decl, qValueStr, oValueTopString )

@@ -617,6 +617,16 @@ PrimaryAllowFlow( out Label falseLabel ):
                      #eNotImplemented
                ]
 
+            | nConstDouble :
+               theType = oNodeGet( decl, qType )
+               oTypeSPush( theType )
+               [ oTypeSNodeType
+                  | nDoubleType :
+                     .tPushConstD  oEmitDouble( oNodeGetDouble( decl, qValueDouble ) )
+                  | * :
+                     #eNotImplemented
+               ]
+               
             | nConstStr :
                % This is a non-typed const defined as a strlit.
                % So far, the value is held in the compiler's symbol table.

@@ -176,6 +176,9 @@ ConstPrimary:
       | pCharLit :
          oValuePush( TOKEN_VALUE )
          oTypeSPush( CharType )
+      | pDoubleLit :
+         oValuePushDouble( TOKEN_VALUE_DOUBLE )
+         oTypeSPush( DoubleType )
       | pStrLit :
          oValuePushString( CURRENT_STRLIT )
          oTypeSPush( StrLitType )

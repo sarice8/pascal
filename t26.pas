@@ -5,12 +5,15 @@ program t26;
   var f2: single;
   var f3: double;
 
+  const fc1 = 1.234;
+
 begin
 
 {
   writeln( sizeof( f1 ), ' ', sizeof( f2 ), ' ', sizeof( f3 ) );
 
   // I'm not able to figure out how fpc decides which float type to use.
+  // I think in most cases it's going to the 10-byte extended float (80-bit)
   //
   writeln( sizeof( 1.0 ), ' ', sizeof( 1.1 ), ' ', sizeof( 0.123 ) );
   writeln( sizeof( 1.0 ), ' ', sizeof( 1.1 ), ' ', sizeof( 0.123 ) );
@@ -47,5 +50,8 @@ begin
   writeln( -f3 );
 
   // TO DO: mixing integer/byte and double, on either side of operator
+
+  // Constant
+  writeln( 'constant: ', fc1 );
 
 end.
