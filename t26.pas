@@ -67,9 +67,34 @@ begin
   writeln( 2 * f3 );
   writeln( 2 / f3 );
 
-  // relational operators, with and without a mix of integer/double on either side
-  // TO DO
+  // relational operators, with double on both sides
+  f3 := 1.5;
+  writeln( f3 = 1.5 );
+  writeln( f3 <> 1.5 );
+  writeln( f3 > 1.4 );
+  writeln( f3 > 2.0 );
+  writeln( f3 >= 1.5 );
+  writeln( f3 <= 1.5 );
+  writeln( f3 < 2.0 );
 
+
+  // relational operators, with mix of integer/byte and double, on either side.
+  // TO DO
+  //   writeln( f3 = 1 );
+  //   writeln( f3 <> 1 );
+  //   writeln( f3 > 1 );
+  //   writeln( f3 > 2 );
+  //   writeln( f3 >= 1 );
+  //   writeln( f3 <= 1 );
+  //   writeln( f3 < 2 );
+  // 
+  //   writeln( 1 = f3 );
+  //   writeln( 1 <> f3 );
+  //   writeln( 1 < f3 );
+  //   writeln( 2 < f3 );
+  //   writeln( 1 <= f3 );
+  //   writeln( 1 >= f3 );
+  //   writeln( 2 > f3 );
 
   // Constant
   writeln( 'constant: ', fc1 );

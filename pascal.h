@@ -1,4 +1,4 @@
-#define SSL_CODE_TABLE_SIZE 15300
+#define SSL_CODE_TABLE_SIZE 15400
 
 #define oJumpForward 0
 #define oJumpBack 1

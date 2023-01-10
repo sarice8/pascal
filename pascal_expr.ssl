@@ -155,10 +155,13 @@ ExprAllowFlow( out Label falseLabel ):
          @BoolExprAllowFlow( falseLabel )
          @FlowToVal( falseLabel )
          @PromoteToIntOptional
-         @MatchTypes
+         @CoerceTypePair
          [ oTypeSNodeType
             | nBooleanType, nCharType :     .tEqualB
             | nIntegerType, nEnumType :     .tEqualI
+            | nDoubleType :                 .tEqualP
+                  % Note: Assuming nDoubleType can use .tEqualP, just matching bits.
+                  %  If not, it would also put into doubt memcmp of record values.
             | nPointerType, nUniversalPointerType :    .tEqualP
             | nShortStringType, nStrLitType :
                @ShortStringCmp  .tPushConstI  oEmitInt( 0 )  .tEqualI
@@ -173,10 +176,11 @@ ExprAllowFlow( out Label falseLabel ):
          @BoolExprAllowFlow( falseLabel )
          @FlowToVal( falseLabel )
          @PromoteToIntOptional
-         @MatchTypes
+         @CoerceTypePair
          [ oTypeSNodeType
             | nBooleanType, nCharType :     .tNotEqualB
             | nIntegerType, nEnumType :     .tNotEqualI
+            | nDoubleType :                 .tNotEqualP
             | nPointerType, nUniversalPointerType :    .tNotEqualP
             | nShortStringType, nStrLitType :
                @ShortStringCmp  .tPushConstI  oEmitInt( 0 )  .tNotEqualI
@@ -191,10 +195,11 @@ ExprAllowFlow( out Label falseLabel ):
          @BoolExprAllowFlow( falseLabel )
          @FlowToVal( falseLabel )
          @PromoteToIntOptional
-         @MatchTypes
+         @CoerceTypePair
          [ oTypeSNodeType
             | nBooleanType, nCharType :     .tLessB
             | nIntegerType, nEnumType :     .tLessI
+            | nDoubleType :                 .tLessD
             | nPointerType, nUniversalPointerType :   .tLessP
             | nShortStringType, nStrLitType :
                @ShortStringCmp  .tPushConstI  oEmitInt( 0 )  .tLessI
@@ -209,10 +214,11 @@ ExprAllowFlow( out Label falseLabel ):
          @BoolExprAllowFlow( falseLabel )
          @FlowToVal( falseLabel )
          @PromoteToIntOptional
-         @MatchTypes
+         @CoerceTypePair
          [ oTypeSNodeType
             | nBooleanType, nCharType :     .tGreaterB
             | nIntegerType, nEnumType :     .tGreaterI
+            | nDoubleType :                 .tGreaterD
             | nPointerType, nUniversalPointerType :   .tGreaterP
             | nShortStringType, nStrLitType :
                @ShortStringCmp  .tPushConstI  oEmitInt( 0 )  .tGreaterI
@@ -227,10 +233,11 @@ ExprAllowFlow( out Label falseLabel ):
          @BoolExprAllowFlow( falseLabel )
          @FlowToVal( falseLabel )
          @PromoteToIntOptional
-         @MatchTypes
+         @CoerceTypePair
          [ oTypeSNodeType
             | nBooleanType, nCharType :     .tLessEqualB
             | nIntegerType, nEnumType :     .tLessEqualI
+            | nDoubleType :                 .tLessEqualD
             | nPointerType, nUniversalPointerType :   .tLessEqualP
             | nShortStringType, nStrLitType :
                @ShortStringCmp  .tPushConstI  oEmitInt( 0 )  .tLessEqualI
@@ -245,10 +252,11 @@ ExprAllowFlow( out Label falseLabel ):
          @BoolExprAllowFlow( falseLabel )
          @FlowToVal( falseLabel )
          @PromoteToIntOptional
-         @MatchTypes
+         @CoerceTypePair
          [ oTypeSNodeType
             | nBooleanType, nCharType :     .tGreaterEqualB
             | nIntegerType, nEnumType :     .tGreaterEqualI
+            | nDoubleType :                 .tGreaterEqualD
             | nPointerType, nUniversalPointerType :   .tGreaterEqualP
             | nShortStringType, nStrLitType :
                @ShortStringCmp  .tPushConstI  oEmitInt( 0 )  .tGreaterEqualI
@@ -1193,6 +1201,18 @@ CoerceType:
    ];
 
 
+% The expr stack contains two values, and their two types are on the type stack.
+% Typically these are two arguments of an operator; the key is that both types are flexible
+% (unlike CoerceType, where only the top type is flexible).
+% Coerce one type to match the other.  Generally the smaller type is coerced to the larger.  
+% Leave both values on the expr stack, and the single common type on the type stack. 
+%
+CoerceTypePair:
+   % TO DO.  For now, require that the types match.
+   @MatchTypes
+   ;
+
+
 % The expr stack contains a value whose type is on top of the type stack.
 % Generate code to cast the value to the type under it in the type stack
 % (pop the type stack, leaving only the desired type).
@@ -1254,16 +1274,20 @@ CastType:
    ];
 
 
-
 % Require that the top two types on the type stack are matching (ignoring subranges).
 % Pop one of them, leaving only one.
+%
+% This is used when passing a variable to a VAR parameter, so essentially no coercion
+% can be allowed.  The called method will interact with the actual variable using the
+% formal parameter type, so they must agree.
 %
 MatchTypes:
    node_type nt = oTypeSNodeType
    oTypeSPop
    [ equal_node_type( nt, oTypeSNodeType )
       | false :
-         % Some implicit conversion is allowed even here
+         % Some very minor implicit conversion is allowed even here,
+         % but must not affect the value size.
          [ oTypeSNodeType
             | nPointerType :
                [ nt
@@ -1335,6 +1359,7 @@ PromoteToIntOptional:
                            oTypeSPush( IntegerType )
       | * :
    ];
+
 
 % Convert the top value to double (if it isn't already).
 % It must be implicitly convertable to double.
