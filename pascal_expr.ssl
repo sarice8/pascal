@@ -1166,6 +1166,11 @@ CoerceType:
                   | nIntegerType :   .tCastItoB  >>
                   | * :
                ]
+            | nDoubleType :
+               [ nt
+                  | nIntegerType :   .tCastItoD  >>
+                  | * :
+               ]
             | nPointerType :
                [ nt
                   | nUniversalPointerType :  >>
@@ -1208,8 +1213,101 @@ CoerceType:
 % Leave both values on the expr stack, and the single common type on the type stack. 
 %
 CoerceTypePair:
-   % TO DO.  For now, require that the types match.
-   @MatchTypes
+   node_type right_nt = oTypeSNodeType
+   Node right = oTypeSTop
+   oTypeSPop
+   node_type left_nt = oTypeSNodeType
+   Node left = oTypeSTop
+
+   % Start with assumption that we'll keep left type
+   [ equal_node_type( left_nt, right_nt )
+      | true :
+         % TO DO: BUG: in some cases, need to validate base types match (e.g. enum types, ptr types)
+         >>
+      | * :
+   ]
+   [ left_nt
+      | nIntegerType :
+         [ right_nt
+            | nByteType :     .tCastBtoI  >>
+            | * :
+         ]
+      | nDoubleType :
+         [ right_nt
+            | nByteType :     .tCastBtoI  .tCastItoD  >>
+            | nIntegerType :  .tCastItoD  >>
+            | * :
+         ]
+      | nPointerType :
+         [ right_nt
+            | nUniversalPointerType :   >>
+            | * :
+         ]
+      | nShortStringType :
+         [ right_nt
+            | nStrLitType :  >>
+            | nCharType :
+               % Store char as a temp ShortString
+               oTypeSPush( CharType )
+               int tempOffset = @MoveIntoTempShortString
+               oTypeSPop
+               >>
+            | * :
+         ]
+      | * :
+   ]  
+
+   % See if we can coerce left to right type.
+   % If so remember we need to replace the type on the type stack.
+   [ right_nt
+      | nIntegerType :
+         [ left_nt
+            | nByteType :
+               .tSwap  .tCastBtoI  .tSwap
+               oTypeSPop  oTypeSPush( right )
+               >>
+            | * :
+         ]
+      | nDoubleType :
+         [ left_nt
+            | nByteType :
+               .tSwap  .tCastBtoI  .tCastItoD  .tSwap
+               oTypeSPop  oTypeSPush( right )
+               >>
+            | nIntegerType :
+               .tSwap  .tCastItoD  .tSwap
+               oTypeSPop  oTypeSPush( right )
+               >>
+            | * :
+         ]
+      | nPointerType :
+         [ left_nt
+            | nUniversalPointerType :
+               % TO DO: does fpc inherit right type here?
+               %  or stay with left.
+               oTypeSPop  oTypeSPush( right )
+               >>
+            | * :
+         ]
+      | nShortStringType :
+         [ left_nt
+            | nStrLitType :
+               oTypeSPop  oTypeSPush( right )
+               >>
+            | nCharType :
+               .tSwap
+               % Store char as a temp ShortString
+               oTypeSPush( CharType )
+               int tempOffset = @MoveIntoTempShortString
+               oTypeSPop
+               .tSwap
+               oTypeSPop  oTypeSPush( right )
+               >>
+            | * :
+         ]
+      | * :
+   ]
+   #eTypeMismatch
    ;
 
 
@@ -1280,6 +1378,11 @@ CastType:
 % This is used when passing a variable to a VAR parameter, so essentially no coercion
 % can be allowed.  The called method will interact with the actual variable using the
 % formal parameter type, so they must agree.
+%
+% TO DO: BUG: I'm not confirming that enum types are the same type!
+%     Only that they are both enums!
+%     Probably same flaw with record & array types.
+%     Not enough to compare only the node type.
 %
 MatchTypes:
    node_type nt = oTypeSNodeType

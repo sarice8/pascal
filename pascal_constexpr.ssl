@@ -17,7 +17,7 @@ ConstExpr:
    {[
       | '=' :
          @ConstBoolTerm
-         @ConstMatchTypes
+         @ConstCoerceTypePair
          [ oTypeSNodeType
             | nStrLitType :   oValueStringCmp  oValuePush( 0 )  oValueEqual
             | nDoubleType :   oValueEqualD
@@ -26,7 +26,7 @@ ConstExpr:
          oTypeSPop  oTypeSPush( BooleanType )
       | '<>' :
          @ConstBoolExpr
-         @ConstMatchTypes
+         @ConstCoerceTypePair
          [ oTypeSNodeType
             | nStrLitType :   oValueStringCmp  oValuePush( 0 )  oValueNotEqual
             | nDoubleType :   oValueNotEqualD
@@ -35,7 +35,7 @@ ConstExpr:
          oTypeSPop  oTypeSPush( BooleanType )
       | '<' :
          @ConstBoolExpr
-         @ConstMatchTypes
+         @ConstCoerceTypePair
          [ oTypeSNodeType
             | nStrLitType :   oValueStringCmp  oValuePush( 0 )  oValueLess
             | nDoubleType :   oValueLessD
@@ -44,7 +44,7 @@ ConstExpr:
          oTypeSPop  oTypeSPush( BooleanType )
       | '>' :
          @ConstBoolExpr
-         @ConstMatchTypes
+         @ConstCoerceTypePair
          [ oTypeSNodeType
             | nStrLitType :   oValueStringCmp  oValuePush( 0 )  oValueGreater
             | nDoubleType :   oValueGreaterD
@@ -53,7 +53,7 @@ ConstExpr:
          oTypeSPop  oTypeSPush( BooleanType )
       | '<=' :
          @ConstBoolExpr
-         @ConstMatchTypes
+         @ConstCoerceTypePair
          [ oTypeSNodeType
             | nStrLitType :   oValueStringCmp  oValuePush( 0 )  oValueLessEqual
             | nDoubleType :   oValueLessEqualD
@@ -62,7 +62,7 @@ ConstExpr:
          oTypeSPop  oTypeSPush( BooleanType )
       | '>=' :
          @ConstBoolExpr
-         @ConstMatchTypes
+         @ConstCoerceTypePair
          [ oTypeSNodeType
             | nStrLitType :   oValueStringCmp  oValuePush( 0 )  oValueGreaterEqual
             | nDoubleType :   oValueGreaterEqualD
@@ -125,7 +125,7 @@ ConstArithExpr:
    {[
       | '+' :
          @ConstTerm
-         @ConstMatchTypes
+         @ConstCoerceTypePair
          [ oTypeSNodeType
             | nStrLitType :   oValueStringConcat
             | nDoubleType :   oValueAddD
@@ -133,7 +133,7 @@ ConstArithExpr:
          ]
       | '-' :
          @ConstTerm
-         @ConstMatchTypes
+         @ConstCoerceTypePair
          [ oTypeSNodeType
             | nStrLitType :   #eNotAllowed
             | nDoubleType :   oValueSubD
@@ -148,7 +148,7 @@ ConstTerm:
    {[
       | pTimes :
          @ConstFactor
-         @ConstMatchTypes
+         @ConstCoerceTypePair
          [ oTypeSNodeType
             | nStrLitType :   #eNotAllowed
             | nDoubleType :   oValueMultD
@@ -156,7 +156,7 @@ ConstTerm:
          ]
       | pDivide :
          @ConstFactor
-         @ConstMatchTypes
+         @ConstCoerceTypePair
          [ oTypeSNodeType
             | nStrLitType :   #eNotAllowed
             | nDoubleType :   oValueDivD
@@ -368,6 +368,17 @@ ConstCoerceType:
          #eTypeMismatch
       | * :
    ];
+
+
+% The value stack contains two const values, and their two types are on the type stack.
+% Typically these are two arguments of an operator; the key is that botrh types are flexible.
+% Coerce one type to match the other.  Generally the smaller type is coerced to the larger.
+% Leave both values on the value stack, and the single common type on the type stack.
+%
+ConstCoerceTypePair:
+   % TO DO.  For now, require the types to match
+   @ConstMatchTypes
+   ;
 
 
 % Given a constant value on the value stack, its type on the type stack,

@@ -13,6 +13,8 @@ program t26;
   //  fpc:  Illegal type conversion: "Extended" to "ShortInt"
   //    (docs say should use explicit call to trunc() or round())
 
+  var s1: shortstring;
+
 begin
 
 {
@@ -79,26 +81,31 @@ begin
 
 
   // relational operators, with mix of integer/byte and double, on either side.
-  // TO DO
-  //   writeln( f3 = 1 );
-  //   writeln( f3 <> 1 );
-  //   writeln( f3 > 1 );
-  //   writeln( f3 > 2 );
-  //   writeln( f3 >= 1 );
-  //   writeln( f3 <= 1 );
-  //   writeln( f3 < 2 );
-  // 
-  //   writeln( 1 = f3 );
-  //   writeln( 1 <> f3 );
-  //   writeln( 1 < f3 );
-  //   writeln( 2 < f3 );
-  //   writeln( 1 <= f3 );
-  //   writeln( 1 >= f3 );
-  //   writeln( 2 > f3 );
+  writeln( f3 = 1 );
+  writeln( f3 <> 1 );
+  writeln( f3 > 1 );
+  writeln( f3 > 2 );
+  writeln( f3 >= 1 );
+  writeln( f3 <= 1 );
+  writeln( f3 < 2 );
+  
+  writeln( 1 = f3 );
+  writeln( 1 <> f3 );
+  writeln( 1 < f3 );
+  writeln( 2 < f3 );
+  writeln( 1 <= f3 );
+  writeln( 1 >= f3 );
+  writeln( 2 > f3 );
 
   // Constant
   writeln( 'constant: ', fc1 );
   writeln( 'constant: ', fc2 );
   writeln( 'constant: ', fc3 );
+
+  // While I'm at it, a couple string vs strlit comparisons
+  s1 := 'Alphabet';
+  writeln( s1 > 'Alberta' );
+  writeln( s1 > 'Alphabetize' );
+  writeln( 'Zebra' > s1 );
 
 end.
