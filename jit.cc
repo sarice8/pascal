@@ -165,7 +165,7 @@ void outI( int i );
 void outL( long l );
 void generateCode();
 void finishMethod();
-void tCodeNotImplemented( int opcode );
+void tCodeNotImplemented();
 void executeCode();
 void fatal( const char* msg, ... );
 void toDo( const char* msg, ... );
@@ -232,6 +232,7 @@ typedef enum {
   jit_Operand_Kind_ActualB,
   jit_Operand_Kind_ActualI,
   jit_Operand_Kind_ActualP,
+  jit_Operand_Kind_ActualD,
 
   // operand is the address of a variable
   jit_Operand_Kind_Addr_Global,
@@ -241,6 +242,7 @@ typedef enum {
   jit_Operand_Kind_Addr_Reg_Offset,
 
   jit_Operand_Kind_ConstI,
+  jit_Operand_Kind_ConstD,
 
   // operand is a value in a register.
   // We either have one byte valid, 4 bytes valid, or 8 bytes valid.
@@ -250,6 +252,9 @@ typedef enum {
   jit_Operand_Kind_RegB,
   jit_Operand_Kind_RegI,
   jit_Operand_Kind_RegP,
+
+  // operand is a value in a floating point register.
+  jit_Operand_Kind_RegD,
 
   // operand is a value pointed to by a register.
   // For now, these are just used by emitMov, and won't appear on expression stack.
@@ -430,6 +435,10 @@ public:
     : _kind( k ), _value( val )
   {}
 
+  Operand( jitOperandKind k, double val )
+    : _kind( k ), _double( val )
+  {}
+
   Operand( jitOperandKind k, Register* r )
     : _kind( k ), _reg( r )
   {}
@@ -452,7 +461,8 @@ public:
   bool isDeref() const { return _kind >= jit_Operand_Kind_RegP_DerefB &&
                                 _kind <= jit_Operand_Kind_RegP_DerefP; }
   bool isMem() const { return isVar() || isAddrOfVar() || isDeref(); }
-  bool isConst() const { return _kind == jit_Operand_Kind_ConstI; }
+  bool isConst() const { return _kind >= jit_Operand_Kind_ConstI &&
+                                _kind <= jit_Operand_Kind_ConstD; }
   bool isFlags() const { return _kind == jit_Operand_Kind_Flags; }
   int  size() const;  // valid size of the operand value in bytes (1, 4, or 8)
   void release();     // don't need this register anymore (if any)
@@ -472,7 +482,8 @@ public:
 
   jitOperandKind _kind = jit_Operand_Kind_Illegal;
   int _value = 0;         // for a var: the var offset
-                         // for a const: the const value
+                          // for a const: the const value
+  double _double = 0.0;   // for a const double: the const value
   Register* _reg = nullptr;    // for jit_Operand_Kind_Reg*
   ConditionFlags _flags = FlagInvalid;  // for jit_Operand_Kind_Flags
 };
@@ -544,6 +555,9 @@ Operand::describe() const
     case jit_Operand_Kind_ConstI:
       str << "ConstI(" << _value << ")";
       return str.str();
+    case jit_Operand_Kind_ConstD:
+      str << "ConstD(" << _double << ")";
+      return str.str();
     case jit_Operand_Kind_RegB:
       str << "RegB(" << _reg->_name << ")";
       return str.str();
@@ -552,6 +566,9 @@ Operand::describe() const
       return str.str();
     case jit_Operand_Kind_RegP:
       str << "RegP(" << _reg->_name << ")";
+      return str.str();
+    case jit_Operand_Kind_RegD:
+      str << "RegD(" << _reg->_name << ")";
       return str.str();
     case jit_Operand_Kind_RegP_DerefB:
       str << "RegP_DerefB(" << _reg->_name << "," << _value << ")";
@@ -597,6 +614,8 @@ void operandDeref( Operand& x, int valueSize );
 void operandExtendToP( Operand& x );
 Operand operandCompare( Operand& x, Operand& y, ConditionFlags flags );
 void operandFlagsToValue( Operand& x, int size );
+Operand operandLowWord( const Operand& x );
+Operand operandHighWord( const Operand& x );
 
 Register* allocateReg();
 void forceAllocateReg( Register* reg );
@@ -1582,6 +1601,13 @@ generateCode()
           operandStack.emplace_back( jit_Operand_Kind_ConstI, *tCodePc++ );
         }
         break;
+      case tPushConstD : {
+          long longVal = *(uint32_t*) tCodePc++;
+          longVal |= ( (long) *(uint32_t*) tCodePc++ ) << 32;
+          double val = *(double*) &longVal;
+          operandStack.emplace_back( jit_Operand_Kind_ConstD, val );
+        }
+        break;
       case tPushAddrGlobal : {
           operandStack.emplace_back( jit_Operand_Kind_Addr_Global, *tCodePc++ );
         }
@@ -1717,6 +1743,25 @@ generateCode()
           y.release();
         }
         break;
+      case tAssignD : {
+          // This is the same as tAssignP, except for how we deal with cdecl params.
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
+
+          // Watching for assignment into actuals space,
+          // to help with cdecl calls.  This assign is not affected.
+          cdeclCheckForAssignToActual( x, jit_Operand_Kind_ActualD );
+
+          // x is a pointer to a value of size 8.
+          // Make x refer to the pointed-to value (still usable as target of mov)
+          operandDeref( x, 8 );
+          // x will be a memory reference, so y must not also be in memory.
+          operandNotMem( y );
+          emitMov( x, y );
+          x.release();
+          y.release();
+        }
+        break;
       case tCopy : {
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
@@ -1793,6 +1838,10 @@ generateCode()
             x._kind = jit_Operand_Kind_RegB;
             operandStack.push_back( x );
           }
+        }
+        break;
+      case tCastItoD : {
+          tCodeNotImplemented();
         }
         break;
       case tIncI : {
@@ -1977,6 +2026,28 @@ generateCode()
           }
         }
         break;
+
+      case tMultD : {
+          tCodeNotImplemented();
+        }
+        break;
+      case tDivD : {
+          tCodeNotImplemented();
+        }
+        break;
+      case tAddD : {
+          tCodeNotImplemented();
+        }
+        break;
+      case tSubD : {
+          tCodeNotImplemented();
+        }
+        break;
+      case tNegD : {
+          tCodeNotImplemented();
+        }
+        break;
+
       case tNot : {
           Operand x = operandStack.back();   operandStack.pop_back();
           if ( doConst && x.isConst() ) {
@@ -2196,6 +2267,23 @@ generateCode()
           operandStack.push_back( operandCompare( x, y, FlagBE ) );
           x.release();
           y.release();
+        }
+        break;
+
+      case tGreaterD : {
+          tCodeNotImplemented();
+        }
+        break;
+      case tLessD : {
+          tCodeNotImplemented();
+        }
+        break;
+      case tGreaterEqualD : {
+          tCodeNotImplemented();
+        }
+        break;
+      case tLessEqualD : {
+          tCodeNotImplemented();
         }
         break;
 
@@ -2582,6 +2670,10 @@ generateCode()
           y.release();
         }
         break;
+      case tWriteD : {
+          tCodeNotImplemented();
+        }
+        break;
       case tWriteCR : {
           emitCallExtern( (char*) runlibWriteCR );
         }
@@ -2622,8 +2714,8 @@ generateCode()
         continue;
 
       default:
-        --tCodePc;
-        fatal( "bad instruction %d\n", *tCodePc );
+        tCodeNotImplemented();
+        continue;
     }
   }
 
@@ -2804,7 +2896,7 @@ preserveRegsAcrossCall()
 }
 
 
-// Check in a tAssign* is assigning to an actual.
+// Check if a tAssign* is assigning to an actual.
 // If so, and we're evaluating params of a cdecl call,
 // note if this should get assigned to a register.
 //
@@ -2820,6 +2912,10 @@ cdeclCheckForAssignToActual( Operand& x, jitOperandKind actualKind )
         ( callInfos.size() > 0 ) &&
         ( callInfos.back()._cdecl == true ) ) {
     CallInfo& ci = callInfos.back();
+    if ( actualKind == jit_Operand_Kind_ActualD ) {
+      // TO DO: actual should go in floating point register
+      toDo( "cdecl call with floating point parameter is not supported yet\n" );
+    }
     // only supporting cdecl methods that can fit all params in regs
     assert( ci._actualsToRegs.size() < paramRegs.size() );
     Operand actualOnStack( actualKind, x._value );
@@ -3122,12 +3218,15 @@ Operand::size() const
     case jit_Operand_Kind_LocalP:
     case jit_Operand_Kind_ParamP:
     case jit_Operand_Kind_ActualP:
+    case jit_Operand_Kind_ActualD:
     case jit_Operand_Kind_Addr_Global:
     case jit_Operand_Kind_Addr_Local:
     case jit_Operand_Kind_Addr_Param:
     case jit_Operand_Kind_Addr_Actual:
     case jit_Operand_Kind_Addr_Reg_Offset:
+    case jit_Operand_Kind_ConstD:
     case jit_Operand_Kind_RegP:
+    case jit_Operand_Kind_RegD:
     case jit_Operand_Kind_RegP_DerefP:
       return 8;
 
@@ -3494,6 +3593,53 @@ operandFlagsToValue( Operand& x, int size )
     x = result;
   }
 }
+
+
+// Return an operand that represents the low 32 bits of the given operand.
+//
+Operand
+operandLowWord( const Operand& x )
+{
+  switch ( x._kind ) {
+    case jit_Operand_Kind_GlobalP:
+      return Operand( jit_Operand_Kind_GlobalI, x._value );
+    case jit_Operand_Kind_LocalP:
+      return Operand( jit_Operand_Kind_LocalI, x._value );
+    case jit_Operand_Kind_ParamP:
+      return Operand( jit_Operand_Kind_ParamI, x._value );
+    case jit_Operand_Kind_ActualP:
+      return Operand( jit_Operand_Kind_ActualI, x._value );
+    case jit_Operand_Kind_RegP_DerefP:
+      return Operand( jit_Operand_Kind_RegP_DerefI, x._reg, x._value );
+    default:
+      fatal( "operandLowWord unexpected operand kind %d\n", x._kind );
+      return Operand();
+  }
+}
+
+
+// Return an operand that represents the high 32 bits of the given operand.
+//
+Operand
+operandHighWord( const Operand& x )
+{
+  switch ( x._kind ) {
+    case jit_Operand_Kind_GlobalP:
+      return Operand( jit_Operand_Kind_GlobalI, x._value + 4 );
+    case jit_Operand_Kind_LocalP:
+      return Operand( jit_Operand_Kind_LocalI, x._value + 4 );
+    case jit_Operand_Kind_ParamP:
+      return Operand( jit_Operand_Kind_ParamI, x._value + 4 );
+    case jit_Operand_Kind_ActualP:
+      return Operand( jit_Operand_Kind_ActualI, x._value + 4 );
+    case jit_Operand_Kind_RegP_DerefP:
+      return Operand( jit_Operand_Kind_RegP_DerefI, x._reg, x._value + 4 );
+    default:
+      fatal( "operandLowWord unexpected operand kind %d\n", x._kind );
+      return Operand();
+  }
+}
+
 
 
 // ----------------------------------------------------------------------------
@@ -4094,6 +4240,23 @@ emitMov( const Operand& x, const Operand& y )
       break;
 
 
+    // Moving double floating point values.
+    // Few instructions support imm64.  Instead, we often need a sequence of instructions.
+
+    case KindPair( jit_Operand_Kind_GlobalP, jit_Operand_Kind_ConstD ):
+    case KindPair( jit_Operand_Kind_LocalP, jit_Operand_Kind_ConstD ):
+    case KindPair( jit_Operand_Kind_ParamP, jit_Operand_Kind_ConstD ):
+    case KindPair( jit_Operand_Kind_ActualP, jit_Operand_Kind_ConstD ):
+      {
+        int* yWords = (int*) &y._double;
+        Operand yLow( jit_Operand_Kind_ConstI, yWords[0] );
+        Operand yHigh( jit_Operand_Kind_ConstI, yWords[1] );
+        emitMov( operandLowWord( x ), yLow );
+        emitMov( operandHighWord( x ), yHigh );
+      }
+      break;
+
+
     // mov reg, imm64
 
     case KindPair( jit_Operand_Kind_RegP, jit_Operand_Kind_ConstI ):
@@ -4413,10 +4576,20 @@ loadTCodeAndAllocNativeCode()
 }
 
 
+// Called with tCodePc pointing just after the opcode.
+// On exit, tCodePc points to the next instruction.
+//
 void
-tCodeNotImplemented( int opcode )
+tCodeNotImplemented()
 {
-  printf( "Warning: tCode operation %d not supported yet\n", opcode );
+  --tCodePc;
+  int opcode = *tCodePc;
+  const char* name = tcodeInstrName( opcode );
+  if ( name == nullptr ) {
+    fatal( "bad instruction %d\n", *tCodePc );
+  }
+  printf( "Warning: tCode operation %s not supported yet\n", name );
+  tCodePc += tcodeInstrSize( opcode );
 }
 
 

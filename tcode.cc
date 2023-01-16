@@ -142,7 +142,20 @@ int numtCodeInstrs = sizeof(tCodeInstrs) / sizeof(tCodeInstrs[0]);
 int
 tcodeInstrSize( int instr )
 {
+  if ( instr < 0 || instr >= numtCodeInstrs ) {
+    return 0;
+  }
   return tCodeInstrs[instr].args + 1;
+}
+
+
+const char*
+tcodeInstrName( int instr )
+{
+  if ( instr < 0 || instr >= numtCodeInstrs ) {
+    return nullptr;
+  }
+  return tCodeInstrs[instr].name;
 }
 
 
