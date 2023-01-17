@@ -285,15 +285,19 @@ public:
   // CalleeSave means that callers are promised that their value will remain intact.
   // So callees must preserve it if they will use it.
   //
-  Register( const std::string& name, int nativeId, bool calleeSaveLinux64, bool calleeSaveWin64 )
-    : _name( name ), _nativeId( nativeId ), _calleeSave( calleeSaveLinux64 ),
-      _calleeSaveWin64( calleeSaveWin64 )
+  Register( const std::string& name, int nativeId, int isFloat,
+            bool calleeSaveLinux64, bool calleeSaveWin64 )
+    : _name( name ), _nativeId( nativeId ), _isFloat( isFloat ),
+      _calleeSave( calleeSaveLinux64 ), _calleeSaveWin64( calleeSaveWin64 )
     {}
+
+  const bool isFloat() { return _isFloat; }
 
   void release() { _inUse = false; }
 
   std::string _name = "";
   int _nativeId = 0;
+  bool _isFloat = false;
   bool _calleeSave = false;
   bool _calleeSaveWin64 = false;   // to do. currently ignored.
   bool _inUse = false;
@@ -312,22 +316,22 @@ int regIdHighBit( int nativeId ) { return nativeId >> 3; }
 //   https://learn.microsoft.com/en-us/cpp/build/x64-software-conventions?view=msvc-170&viewFallbackFrom=vs-2017
 
 
-Register* regRax = new Register( "rax", 0, false, false );
-Register* regRcx = new Register( "rcx", 1, false, false );
-Register* regRdx = new Register( "rdx", 2, false, false ); 
-Register* regRbx = new Register( "rbx", 3, true, true );
-Register* regRsp = new Register( "rsp", 4, false, false );
-Register* regRbp = new Register( "rbp", 5, true, true );
-Register* regRsi = new Register( "rsi", 6, false, true );
-Register* regRdi = new Register( "rdi", 7, false, true );
-Register* regR8  = new Register( "r8", 8, false, false );
-Register* regR9  = new Register( "r9", 9, false, false );
-Register* regR10 = new Register( "r10", 10, false, false );
-Register* regR11 = new Register( "r11", 11, false, false );
-Register* regR12 = new Register( "r12", 12, true, true );
-Register* regR13 = new Register( "r13", 13, true, true );
-Register* regR14 = new Register( "r14", 14, true, true );
-Register* regR15 = new Register( "r15", 15, true, true );
+Register* regRax = new Register( "rax", 0, false, false, false );
+Register* regRcx = new Register( "rcx", 1, false, false, false );
+Register* regRdx = new Register( "rdx", 2, false, false, false ); 
+Register* regRbx = new Register( "rbx", 3, false, true, true );
+Register* regRsp = new Register( "rsp", 4, false, false, false );
+Register* regRbp = new Register( "rbp", 5, false, true, true );
+Register* regRsi = new Register( "rsi", 6, false, false, true );
+Register* regRdi = new Register( "rdi", 7, false, false, true );
+Register* regR8  = new Register( "r8", 8,  false, false, false );
+Register* regR9  = new Register( "r9", 9,  false, false, false );
+Register* regR10 = new Register( "r10", 10, false, false, false );
+Register* regR11 = new Register( "r11", 11, false, false, false );
+Register* regR12 = new Register( "r12", 12, false, true, true );
+Register* regR13 = new Register( "r13", 13, false, true, true );
+Register* regR14 = new Register( "r14", 14, false, true, true );
+Register* regR15 = new Register( "r15", 15, false, true, true );
 
 
 // General purpose registers, in the order we prefer to allocate them.
@@ -351,6 +355,51 @@ Register* registers[] = {
 };
 int numRegisters = sizeof(registers) / sizeof(Register*); 
 
+
+// Floating point registers (xmm) have overlapping native id's.
+// The instruction itself dictates whether a floating point register is referenced.
+// I'll be using the SSE2 instruction subset.
+
+Register* regXmm0 = new Register( "xmm0", 0, true, false, false );
+Register* regXmm1 = new Register( "xmm1", 1, true, false, false );
+Register* regXmm2 = new Register( "xmm2", 2, true, false, false );
+Register* regXmm3 = new Register( "xmm3", 3, true, false, false );
+Register* regXmm4 = new Register( "xmm4", 4, true, false, false );
+Register* regXmm5 = new Register( "xmm5", 5, true, false, false );
+Register* regXmm6 = new Register( "xmm6", 6, true, false, false );
+Register* regXmm7 = new Register( "xmm7", 7, true, false, false );
+Register* regXmm8 = new Register( "xmm8", 8, true, false, false );
+Register* regXmm9 = new Register( "xmm9", 9, true, false, false );
+Register* regXmm10 = new Register( "xmm10", 10, true, false, false );
+Register* regXmm11 = new Register( "xmm11", 11, true, false, false );
+Register* regXmm12 = new Register( "xmm12", 12, true, false, false );
+Register* regXmm13 = new Register( "xmm13", 13, true, false, false );
+Register* regXmm14 = new Register( "xmm14", 14, true, false, false );
+Register* regXmm15 = new Register( "xmm15", 15, true, false, false );
+
+// Floating point registers, in the order we prefer to allocate them.
+//
+Register* floatRegisters[] = {
+  regXmm0,
+  regXmm1,
+  regXmm2,
+  regXmm3,
+  regXmm4,
+  regXmm5,
+  regXmm6,
+  regXmm7,
+  regXmm8,
+  regXmm9,
+  regXmm10,
+  regXmm11,
+  regXmm12,
+  regXmm13,
+  regXmm14,
+  regXmm15
+};
+int numFloatRegisters = sizeof(floatRegisters) / sizeof(Register*); 
+
+
 std::vector<Register*> paramRegsLinux64 = { regRdi, regRsi, regRdx, regRcx, regR8, regR9 };
 std::vector<Register*> paramRegsWin64 = { regRcx, regRdx, regR8, regR9 };
 // TO DO: there are also differences in use of XMM/YMM/ZMM registers as params.  Floating point. (Also vector? or no?)
@@ -359,6 +408,8 @@ std::vector<Register*> paramRegsWin64 = { regRcx, regRdx, regR8, regR9 };
 // For now, hardcoded for linux64
 std::vector<Register*>& paramRegs = paramRegsLinux64;
 
+// TO DO: needs work for windows
+std::vector<Register*> paramFloatRegs = { regXmm0, regXmm1, regXmm2, regXmm3, regXmm4, regXmm5, regXmm6, regXmm7 };
 
 // Condition flags, held in the condition register, and used by
 // an operand of kind jit_Operand_Kind_Flags.
@@ -452,7 +503,8 @@ public:
   {}
 
   bool isReg() const { return _kind >= jit_Operand_Kind_RegB &&
-                              _kind <= jit_Operand_Kind_RegP; }
+                              _kind <= jit_Operand_Kind_RegD; }
+  bool isFloatReg() const { return _kind == jit_Operand_Kind_RegD; }
   bool isVar() const { return _kind >= jit_Operand_Kind_GlobalB &&
                               _kind <= jit_Operand_Kind_ActualP; }
   bool isAddrOfVar() const { return _kind >= jit_Operand_Kind_Addr_Global &&
@@ -606,6 +658,8 @@ std::vector<Operand> operandStack;
 void swap( Operand& x, Operand& y );
 void operandIntoReg( Operand& x );
 void operandIntoRegCommutative( Operand& x, Operand& y );
+void operandIntoFloatReg( Operand& x );
+void operandIntoFloatRegCommutative( Operand& x, Operand& y );
 void operandIntoSpecificReg( Operand& x, Register* reg, int size );
 void operandKindAddrIntoReg( Operand& x );
 void operandNotMem( Operand& x );
@@ -619,6 +673,7 @@ Operand operandHighWord( const Operand& x );
 
 Register* allocateReg();
 void forceAllocateReg( Register* reg );
+Register* allocateFloatReg();
 Register* getUpFrame( int uplevels );
 Operand allocateTemp( int size );
 void preserveRegsAcrossCall();
@@ -693,6 +748,7 @@ void emitJccToLabel( int label, ConditionFlags flags );
 void emitJmp( char* addr );
 void emitJcc( char* addr, ConditionFlags flags );
 void emitAdd( const Operand& x, const Operand& y );
+void emitAddFloat( const Operand& x, const Operand& y );
 void emitSub( const Operand& x, const Operand& y );
 void emitNeg( const Operand& x );
 void emitMult( const Operand& x, const Operand& y );
@@ -844,9 +900,13 @@ class Instr
 public:
   Instr( char opcode );
   Instr( char opcode1, char opcode2 );
+  Instr( char opcode1, char opcode2, char opcode3 );
 
   // provide opcode2 if not done via constructor
   Instr& opcode2( char opcode2 );
+
+  // provide opcode3 if not done via constructor
+  Instr& opcode3( char opcode3 );
 
   // requests the REX.W flag, converting a 32-bit instruction to 64-bit.
   Instr& w();
@@ -886,6 +946,7 @@ public:
 private:
   char _opcode1 = 0;
   char _opcode2 = 0;
+  char _opcode3 = 0;
 
   bool _wide = false;
   char _opcodeExtension = 0;
@@ -899,6 +960,7 @@ private:
   int _offset = 0;
 
   bool _haveOpcode2 = false;
+  bool _haveOpcode3 = false;
   bool _haveOpcodeExtension = false;
   bool _haveMemRipRelative = false;
   bool _haveImm8 = false;
@@ -915,11 +977,24 @@ Instr::Instr( char opcode1, char opcode2 )
   : _opcode1( opcode1 ), _opcode2( opcode2 ), _haveOpcode2( true )
 {}
 
+Instr::Instr( char opcode1, char opcode2, char opcode3 )
+  : _opcode1( opcode1 ), _opcode2( opcode2 ), _opcode3( opcode3 ),
+    _haveOpcode2( true ), _haveOpcode3( true )
+{}
+
 // Can provide second opcode byte separately
 Instr&
 Instr::opcode2( char opcode2 ) {
   _opcode2 = opcode2;
   _haveOpcode2 = true;
+  return *this;
+}
+
+// Can provide third opcode byte separately
+Instr&
+Instr::opcode3( char opcode3 ) {
+  _opcode3 = opcode3;
+  _haveOpcode3 = true;
   return *this;
 }
 
@@ -1042,6 +1117,9 @@ Instr::emit() const
   if ( _haveOpcode2 ) {
     outB( _opcode2 );
   }
+  if ( _haveOpcode3 ) {
+    outB( _opcode3 );
+  }
 
   // For rip-relative instructions, we'll need the number of bytes between the
   // Mod/RM byte and the next instruction.  That's just the imm* argument, if any.
@@ -1099,6 +1177,7 @@ class InstrTempl {
 public:
   InstrTempl( int size, int opcode );
   InstrTempl( int size, int opcode1, int opcode2 );
+  InstrTempl( int size, int opcode1, int opcode2, int opcode3 );
 
   InstrTempl& opc( int extension );  // opcode extension
   InstrTempl& RM();  // operands r, r/m
@@ -1125,7 +1204,9 @@ private:
   int _size;        // 8 or 32 (for 32/64)
   int _opcode;
   int _opcode2 = 0;
+  int _opcode3 = 0;
   bool _haveOpcode2 = false;
+  bool _haveOpcode3 = false;
   int _xType = 0;   // 1=I, 2=R, 3=M   0 = no x
   int _yType = 0;   // 1=I, 2=R, 3=M   0 = no y
   int _opc = -1;     // opcode extension, or -1
@@ -1138,6 +1219,12 @@ InstrTempl::InstrTempl( int size, int opcode )
 
 InstrTempl::InstrTempl( int size, int opcode1, int opcode2 )
   : _size( size ), _immSize( size ), _opcode( opcode1 ), _opcode2( opcode2 ), _haveOpcode2( true )
+{}
+
+InstrTempl::InstrTempl( int size, int opcode1, int opcode2, int opcode3 )
+  : _size( size ), _immSize( size ),
+    _opcode( opcode1 ), _opcode2( opcode2 ), _opcode3( opcode3 ),
+    _haveOpcode2( true ), _haveOpcode3( true )
 {}
 
 InstrTempl&
@@ -1307,6 +1394,7 @@ InstrTempl::operandToR( Instr& instr, const Operand& operand, int templSize ) co
       break;
     case jit_Operand_Kind_RegI:
     case jit_Operand_Kind_RegP:
+    case jit_Operand_Kind_RegD:
       assert( templSize == 32 );
       instr.reg( operand._reg );
       break;
@@ -1354,6 +1442,7 @@ InstrTempl::operandToM( Instr& instr, const Operand& operand, int templSize ) co
       break;
     case jit_Operand_Kind_RegI:
     case jit_Operand_Kind_RegP:
+    case jit_Operand_Kind_RegD:
       assert( templSize == 32 );
       instr.rmReg( operand._reg );
       break;
@@ -1402,6 +1491,9 @@ InstrTempl::emit( const Operand& x, const Operand& y ) const
   Instr instr( _opcode );
   if ( _haveOpcode2 ) {
     instr.opcode2( _opcode2 );
+  }
+  if ( _haveOpcode3 ) {
+    instr.opcode3( _opcode3 );
   }
 
   // Is this a sixty-four bit operation?  (Operand size is in bytes.)
@@ -2036,7 +2128,18 @@ generateCode()
         }
         break;
       case tAddD : {
-          tCodeNotImplemented();
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
+          if ( doConst && x.isConst() && y.isConst() ) {
+            assert( x._kind == jit_Operand_Kind_ConstD );
+            assert( y._kind == jit_Operand_Kind_ConstD );
+            operandStack.emplace_back( x._kind, x._double + y._double );
+          } else {
+            operandIntoFloatRegCommutative( x, y );
+            emitAddFloat( x, y );
+            operandStack.push_back( x );
+          }
+          y.release();
         }
         break;
       case tSubD : {
@@ -2671,7 +2774,11 @@ generateCode()
         }
         break;
       case tWriteD : {
-          tCodeNotImplemented();
+          Operand x = operandStack.back();   operandStack.pop_back();
+          Register* paramReg1 = paramFloatRegs[0];
+          operandIntoSpecificReg( x, paramReg1, 4 );
+          emitCallExtern( (char*) runlibWriteD );
+          x.release();
         }
         break;
       case tWriteCR : {
@@ -2775,7 +2882,7 @@ operandKindReg( int size )
 }
 
 
-// Provide a register.
+// Provide a general purpose register.
 // If all are in use, one will be made available by dumping its value
 // into a temporary.
 //
@@ -2789,14 +2896,33 @@ allocateReg()
     }
   }  
 
-  fatal( "TO DO: allocReg dump a reg into temporary\n" );
+  fatal( "TO DO: allocateReg dump a reg into temporary\n" );
   return nullptr;
+}
+
+
+// Provide a floating point register.
+//
+Register*
+allocateFloatReg()
+{
+  for ( Register* reg : floatRegisters ) {
+    if ( !reg->_inUse ) {
+      reg->_inUse = true;
+      return reg;
+    }
+  }  
+
+  fatal( "TO DO: allocateFloatReg dump a reg into temporary\n" );
+  return nullptr;
+
 }
 
 
 // Force reg to be available (possibly by dumping to a temporary),
 // and allocate it.
 // TO DO: I could also dump into a different register.
+// TO DO: Can this work as-is for floating point register? If so, document this.
 //
 void
 forceAllocateReg( Register* reg )
@@ -3259,6 +3385,28 @@ operandIntoRegCommutative( Operand& x, Operand& y )
 }
 
 
+// Force (at least) one of the operands into a floating point register.
+// On return, x will be in a floating point register.
+// This is for a commutative operation, so x and y may be swapped.
+//
+void
+operandIntoFloatRegCommutative( Operand& x, Operand& y )
+{
+  if ( x.isFloatReg() ) {
+    return;
+  }
+  if ( y.isFloatReg() ) {
+    swap( x, y );
+    return;
+  }
+  // we'll prefer to put a variable into a register
+  if ( !x.isVarOrAddrOfVar() && y.isVarOrAddrOfVar() ) {
+    swap( x, y );
+  }
+  operandIntoFloatReg( x );
+}
+
+
 // Force the operand into a register, if it isn't already.
 //
 void
@@ -3288,6 +3436,29 @@ operandIntoReg( Operand& x )
 }
 
 
+// Force the operand into a floating point register, if it isn't already.
+//
+void
+operandIntoFloatReg( Operand& x )
+{
+  if ( x.isFloatReg() ) {
+    return;
+  }
+
+  // The size of the register will depend on the value we're moving into it
+  jitOperandKind regKind;
+  switch ( x.size() ) {
+    case 8:
+      regKind = jit_Operand_Kind_RegD;
+      break;
+  }
+  Operand newX( regKind, allocateFloatReg() );
+  emitMov( newX, x );
+  x.release();
+  x = newX;
+}
+
+
 // Ensure the operand is in the given register, with the given data size
 //
 void
@@ -3303,7 +3474,7 @@ operandIntoSpecificReg( Operand& x, Register* reg, int size )
       desiredKind = jit_Operand_Kind_RegI;
       break;
     case 8:
-      desiredKind = jit_Operand_Kind_RegP;
+      desiredKind = reg->isFloat() ? jit_Operand_Kind_RegD : jit_Operand_Kind_RegP;
       break;
     default:
       fatal( "operandIntoSpecificReg: unexpected size\n" );
@@ -3871,6 +4042,35 @@ emitAdd( const Operand& x, const Operand& y )
 }
 
 
+// x += y
+// x is a floating point register
+//
+void
+emitAddFloat( const Operand& x, const Operand& y )
+{
+  // addsd does not allow an immediate y
+  // TO DO: as with mov, the size is implicitly 64 bit and does not need rex.w
+  static std::vector<InstrTempl> addsdTemplates = {
+    InstrTempl( 32, 0xf2, 0x0f, 0x58 ).RM()
+  };
+
+  switch ( KindPair( x._kind, y._kind ) ) {
+
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_GlobalP ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_LocalP ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_ParamP ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_RegP_DerefP ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_RegD ):
+      emit( addsdTemplates, x, y );
+      break;
+
+    default:
+      // TO DO: some other combinations can be supported with a sequence of instructions.
+      toDo( "emitAddFloat: unsupported operands\n" );
+  }
+}
+
+
 // x -= y
 // x is a register
 //
@@ -4117,6 +4317,15 @@ emitMov( const Operand& x, const Operand& y )
     InstrTempl( 32, 0x0f, 0xb6 ).RM().imm8()    // a bit misleading: y is 8-bit, but not immediate
   };
 
+  // movsd: move scalar double-precision floating point.
+  // This instruction is implicitly 64-bit and does not need rex.w to indicate that.
+  // TO DO: Enhance my template system to allow specification of size 64
+  //        and use that as an indication that rex.w is not needed to change the size.
+  static std::vector<InstrTempl> movsdTemplates = {
+    InstrTempl( 32, 0xf2, 0x0f, 0x10 ).RM(),
+    InstrTempl( 32, 0xf2, 0x0f, 0x11 ).MR()
+  };
+
   static std::vector<InstrTempl> leaTemplates = {
     InstrTempl( 32, 0x8d ).RM()
   };
@@ -4241,6 +4450,22 @@ emitMov( const Operand& x, const Operand& y )
 
 
     // Moving double floating point values.
+    // Movsd - between memory and registers
+
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_GlobalP ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_LocalP ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_ParamP ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_ActualP ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_RegD ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_RegP_DerefP ):
+    case KindPair( jit_Operand_Kind_GlobalP, jit_Operand_Kind_RegD ):
+    case KindPair( jit_Operand_Kind_LocalP, jit_Operand_Kind_RegD ):
+    case KindPair( jit_Operand_Kind_ParamP, jit_Operand_Kind_RegD ):
+    case KindPair( jit_Operand_Kind_ActualP, jit_Operand_Kind_RegD ):
+    case KindPair( jit_Operand_Kind_RegP_DerefP, jit_Operand_Kind_RegD ):
+      emit( movsdTemplates, x, y );
+      break;
+
     // Few instructions support imm64.  Instead, we often need a sequence of instructions.
 
     case KindPair( jit_Operand_Kind_GlobalP, jit_Operand_Kind_ConstD ):
