@@ -4521,11 +4521,13 @@ emitMov( const Operand& x, const Operand& y )
         // then move from there to the floating point reg.
         Operand yReg( jit_Operand_Kind_RegP, allocateReg() );
         int64_t yLong = *(int64_t*) &y._double;
+
         // I don't have template support for imm64 yet
         // mov reg, imm64
         emitRex( true, nullptr, yReg._reg );
         outB( 0xb8 | regIdLowBits( x._reg->_nativeId ) );
         outL( yLong );
+
         // movq X_xmm64, Y_reg64
         // (this is actually the movd instruction, see that page,
         // not to be confused with an older existing movq instruction.)
@@ -4537,12 +4539,10 @@ emitMov( const Operand& x, const Operand& y )
         // float regs and general purpose regs.  I can work around that by
         // using this outer switch statement to control which templates I consider,
         // but it's not ideal.
-        //
-        // TO DO: Check if this did the right thing.
         outB( 0x66 );
         emitRex( true, x._reg, yReg._reg );
         outB( 0x0f );
-        outB( 0x63 );
+        outB( 0x6e );
         emitModRM_RegReg( x._reg, yReg._reg );
         yReg.release();
       }
