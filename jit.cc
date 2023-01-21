@@ -2810,7 +2810,7 @@ generateCode()
       case tWriteD : {
           Operand x = operandStack.back();   operandStack.pop_back();
           Register* paramReg1 = paramFloatRegs[0];
-          operandIntoSpecificReg( x, paramReg1, 4 );
+          operandIntoSpecificReg( x, paramReg1, 8 );
           emitCallExtern( (char*) runlibWriteD );
           x.release();
         }
@@ -4352,6 +4352,7 @@ emitMov( const Operand& x, const Operand& y )
   };
 
   // movsd: move scalar double-precision floating point.
+  // This instructions operates only on floating point regs and memory.  No general purpose regs.
   // This instruction is implicitly 64-bit and does not need rex.w to indicate that.
   static std::vector<InstrTempl> movsdTemplates = {
     InstrTempl( 64, 0xf2, 0x0f, 0x10 ).RM(),
@@ -4482,7 +4483,8 @@ emitMov( const Operand& x, const Operand& y )
 
 
     // Moving double floating point values.
-    // Movsd - between memory and registers
+    //
+    // Movsd - between memory and floating point registers
 
     case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_GlobalP ):
     case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_LocalP ):
@@ -4513,6 +4515,38 @@ emitMov( const Operand& x, const Operand& y )
       }
       break;
 
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_ConstD ):
+      {
+        // I'll put the const in a general purpose reg using imm64,
+        // then move from there to the floating point reg.
+        Operand yReg( jit_Operand_Kind_RegP, allocateReg() );
+        int64_t yLong = *(int64_t*) &y._double;
+        // I don't have template support for imm64 yet
+        // mov reg, imm64
+        emitRex( true, nullptr, yReg._reg );
+        outB( 0xb8 | regIdLowBits( x._reg->_nativeId ) );
+        outL( yLong );
+        // movq X_xmm64, Y_reg64
+        // (this is actually the movd instruction, see that page,
+        // not to be confused with an older existing movq instruction.)
+        // My template system doesn't support this yet.  It needs a prefix 0x66
+        // before the rex.w.  In this instruction, the 66 prefix indicates that
+        // the destination is an xmm register rather than a general purpose register.
+        //
+        // Another complication is that the template system doesn't distinguish between
+        // float regs and general purpose regs.  I can work around that by
+        // using this outer switch statement to control which templates I consider,
+        // but it's not ideal.
+        //
+        // TO DO: Check if this did the right thing.
+        outB( 0x66 );
+        emitRex( true, x._reg, yReg._reg );
+        outB( 0x0f );
+        outB( 0x63 );
+        emitModRM_RegReg( x._reg, yReg._reg );
+        yReg.release();
+      }
+      break;
 
     // mov reg, imm64
 
