@@ -908,6 +908,9 @@ public:
   // provide opcode3 if not done via constructor
   Instr& opcode3( char opcode3 );
 
+  // provide a prefix.  This goes first (before any rex prefix).
+  Instr& prefix( char prefix );
+
   // requests the REX.W flag, converting a 32-bit instruction to 64-bit.
   Instr& w();
 
@@ -928,6 +931,9 @@ public:
   // specifies an immediate reg in the r/m field of ModR/M.  The register is 8 bits (the low 8 bits).
   Instr& rmReg8( Register* r );
 
+  // specifies an immediate reg that's encoded in low bits of the opcode itself, rather than ModR/M.
+  Instr& regInOpc( Register* r );
+
   // Specifies a memory reference, involving a base register and an offset.
   // The register goes in the r/m field of ModR/M.
   Instr& mem( Register* base, int offset );
@@ -941,6 +947,9 @@ public:
   // specifies an immediate 32-bit value.   For 64-bit instructions, the cpu will sign-extend it.
   Instr& imm32( int value );
 
+  // specifies an immediate 64-bit value.
+  Instr& imm64( long value );
+
   void emit() const;
 
 private:
@@ -948,23 +957,28 @@ private:
   char _opcode2 = 0;
   char _opcode3 = 0;
 
+  char _prefix = 0;
   bool _wide = false;
   char _opcodeExtension = 0;
   char* _memRipRelative = nullptr;
   char _imm8 = 0;
   int _imm32 = 0;
+  long _imm64 = 0;
   Register* _reg = nullptr;
   Register* _base = nullptr;
+  Register* _regInOpc = nullptr;
   bool _reg8 = false;
   bool _rmReg8 = false;
   int _offset = 0;
 
   bool _haveOpcode2 = false;
   bool _haveOpcode3 = false;
+  bool _havePrefix = false;
   bool _haveOpcodeExtension = false;
   bool _haveMemRipRelative = false;
   bool _haveImm8 = false;
   bool _haveImm32 = false;
+  bool _haveImm64 = false;
   bool _baseIsImmediate = false;
 };
 
@@ -997,6 +1011,17 @@ Instr::opcode3( char opcode3 ) {
   _haveOpcode3 = true;
   return *this;
 }
+
+// Specify a prefix byte.  This will go before any REX prefix.
+Instr&
+Instr::prefix( char prefix ) {
+  // only allowing for one prefix at the moment
+  assert( !_havePrefix );
+  _prefix = prefix;
+  _havePrefix = true;
+  return *this;
+}
+
 
 // requests the REX.W flag, converting a 32-bit instruction to 64-bit.
 Instr&
@@ -1064,6 +1089,14 @@ Instr::rmReg8( Register* r )
 }
 
 
+Instr&
+Instr::regInOpc( Register* r )
+{
+  _regInOpc = r;
+  return *this;
+}
+
+
 // Specifies a memory reference, involving a base register and an offset.
 // The register goes in the r/m field of ModR/M.
 Instr&
@@ -1104,16 +1137,33 @@ Instr::imm32( int value )
   return *this;
 }
 
+Instr&
+Instr::imm64( long value )
+{
+  _imm64 = value;
+  _haveImm64 = true;
+  return *this;
+}
 
 void
 Instr::emit() const
 {
+  if ( _havePrefix ) {
+    outB( _prefix );
+  }
+
   // optional REX prefix.
   // This gives access to registers r8-r15, and/or reequests 64-bit data width.
-  emitRex( _wide, _reg, _base, _reg8, _rmReg8 );
+  // If opcode encodes register itself, the upper bit goes in rex.base
+  Register* rexBase = _regInOpc ? _regInOpc : _base;
+  emitRex( _wide, _reg, rexBase, _reg8, _rmReg8 );
 
   // opcode
-  outB( _opcode1 );
+  if ( _regInOpc ) {
+    outB( _opcode1 | regIdLowBits( _regInOpc->_nativeId ) );
+  } else {
+    outB( _opcode1 );
+  }
   if ( _haveOpcode2 ) {
     outB( _opcode2 );
   }
@@ -1128,6 +1178,8 @@ Instr::emit() const
     immBytes = 1;
   } else if ( _haveImm32 ) {
     immBytes = 4;
+  } else if ( _haveImm64 ) {
+    immBytes = 8;
   }
 
   // ModR/M byte and offset
@@ -1156,6 +1208,8 @@ Instr::emit() const
     outB( _imm8 );
   } else if ( _haveImm32 ) {
     outI( _imm32 );
+  } else if ( _haveImm64 ) {
+    outL( _imm64 );
   }
 }
 
@@ -1185,6 +1239,7 @@ public:
   InstrTempl( int size, int opcode1, int opcode2, int opcode3 );
 
   InstrTempl& opc( int extension );  // opcode extension
+  InstrTempl& prefix( int prefix );  // prefix (goes first, before any rex prefix)
   InstrTempl& RM();  // operands r, r/m
   InstrTempl& MR();  // operands r/m, r
   InstrTempl& MI();  // operands r/m, imm
@@ -1210,8 +1265,10 @@ private:
   int _opcode;
   int _opcode2 = 0;
   int _opcode3 = 0;
+  int _prefix = 0;
   bool _haveOpcode2 = false;
   bool _haveOpcode3 = false;
+  bool _havePrefix = false;
   int _xType = 0;   // 1=I, 2=R, 3=M   0 = no x
   int _yType = 0;   // 1=I, 2=R, 3=M   0 = no y
   int _opc = -1;     // opcode extension, or -1
@@ -1231,6 +1288,13 @@ InstrTempl::InstrTempl( int size, int opcode1, int opcode2, int opcode3 )
     _opcode( opcode1 ), _opcode2( opcode2 ), _opcode3( opcode3 ),
     _haveOpcode2( true ), _haveOpcode3( true )
 {}
+
+InstrTempl&
+InstrTempl::prefix( int prefix ) {
+  _prefix = prefix;
+  _havePrefix = true;
+  return *this;
+}
 
 InstrTempl&
 InstrTempl::opc( int opcodeExtension ) {
@@ -1528,7 +1592,9 @@ InstrTempl::emit( const Operand& x, const Operand& y ) const
   if ( _haveOpcode3 ) {
     instr.opcode3( _opcode3 );
   }
-
+  if ( _havePrefix ) {
+    instr.prefix( _prefix );
+  }
   // Are we extending a 32-bit template to a 64 bit operation?
   // (Note operand size is in bytes.)
   if ( ( _size == 32 ) && ( x.size() == 8 ) ) {
@@ -3980,9 +4046,7 @@ emitCallExtern( char* addr )
 {
   Operand x( jit_Operand_Kind_RegP, allocateReg() );
   // mov reg, 64-bit address
-  emitRex( true, nullptr, x._reg );
-  outB( 0xb8 | regIdLowBits( x._reg->_nativeId ) );
-  outL( (long) addr );
+  emit( Instr( 0xb8 ).regInOpc( x._reg ).w().imm64( (long) addr ) );
 
   // call [reg]
   emit( Instr( 0xff ).opc( 2 ).rmReg( x._reg ) );
@@ -4359,6 +4423,19 @@ emitMov( const Operand& x, const Operand& y )
     InstrTempl( 64, 0xf2, 0x0f, 0x11 ).MR()
   };
 
+  // movd: move double-word (or quadword with rex.w) between
+  // floating point registers and general purpose registers or memory.
+  //
+  // Because my template system doesn't distinguish between float and general
+  // registers (yet), I need to have the two directions in two different templates,
+  // and the caller must decide which template list to query.
+  static std::vector<InstrTempl> movd_x_general = {
+    InstrTempl( 32, 0x0f, 0x6e ).prefix( 0x66 ).RM()
+  };
+  static std::vector<InstrTempl> movd_general_x = {
+    InstrTempl( 32, 0x0f, 0x7e ).prefix( 0x66 ).MR()
+  };
+
   static std::vector<InstrTempl> leaTemplates = {
     InstrTempl( 32, 0x8d ).RM()
   };
@@ -4521,29 +4598,10 @@ emitMov( const Operand& x, const Operand& y )
         // then move from there to the floating point reg.
         Operand yReg( jit_Operand_Kind_RegP, allocateReg() );
         int64_t yLong = *(int64_t*) &y._double;
-
-        // I don't have template support for imm64 yet
         // mov reg, imm64
-        emitRex( true, nullptr, yReg._reg );
-        outB( 0xb8 | regIdLowBits( x._reg->_nativeId ) );
-        outL( yLong );
-
+        emit( Instr( 0xb8 ).regInOpc( yReg._reg ).w().imm64( yLong ) );
         // movq X_xmm64, Y_reg64
-        // (this is actually the movd instruction, see that page,
-        // not to be confused with an older existing movq instruction.)
-        // My template system doesn't support this yet.  It needs a prefix 0x66
-        // before the rex.w.  In this instruction, the 66 prefix indicates that
-        // the destination is an xmm register rather than a general purpose register.
-        //
-        // Another complication is that the template system doesn't distinguish between
-        // float regs and general purpose regs.  I can work around that by
-        // using this outer switch statement to control which templates I consider,
-        // but it's not ideal.
-        outB( 0x66 );
-        emitRex( true, x._reg, yReg._reg );
-        outB( 0x0f );
-        outB( 0x6e );
-        emitModRM_RegReg( x._reg, yReg._reg );
+        emit( movd_x_general, x, yReg );
         yReg.release();
       }
       break;
@@ -4554,10 +4612,7 @@ emitMov( const Operand& x, const Operand& y )
       // mov reg64, immediate64 (which I sign-extend from the given 32-bit constant).
       // NOTE: this instruction really does take immediate64 rather than simply
       // sign-extending immediate32.
-      // Note: Instr() api doesn't support this yet.  Needs REX.B and outL.
-      emitRex( true, nullptr, x._reg );
-      outB( 0xb8 | regIdLowBits( x._reg->_nativeId ) );
-      outL( (long) y._value );
+      emit( Instr( 0xb8 ).regInOpc( x._reg ).w().imm64( (long) y._value ) );
       break;
 
 
