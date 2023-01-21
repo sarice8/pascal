@@ -1170,6 +1170,11 @@ emit( const Instr& instr )
 // Instruction templates are based on the Intel x86-64 instruction docs.
 // I don't make templates for all possible variants, though.
 //
+// Size is the default data size that the instruction operates on.
+// Instructions with default size 32 can also operate on 64 bits
+// by issuing the REX.W prefix.  (If some instruction doesn't permit this,
+// I'll add a way to disable it.)
+//
 // One of the emit methods can take my high-level operands,
 // and choose the matching instruction template, and emit that.
 //
@@ -1184,7 +1189,7 @@ public:
   InstrTempl& MR();  // operands r/m, r
   InstrTempl& MI();  // operands r/m, imm
   InstrTempl& M();   // single operand r/m
-  InstrTempl& imm8();  // override size of I to 8 rather than _size
+  InstrTempl& y8();  // override size of y operand to 8 bits rather than _size
 
   void emit( const Operand& x, const Operand& y ) const;
   void emit( const Operand& x ) const;
@@ -1210,19 +1215,19 @@ private:
   int _xType = 0;   // 1=I, 2=R, 3=M   0 = no x
   int _yType = 0;   // 1=I, 2=R, 3=M   0 = no y
   int _opc = -1;     // opcode extension, or -1
-  int _immSize = 0;  // usually size, unless overridden
+  int _ySize = 0;  // usually size, unless overridden
 };
 
 InstrTempl::InstrTempl( int size, int opcode )
-  : _size( size ), _immSize( size ), _opcode( opcode )
+  : _size( size ), _ySize( size ), _opcode( opcode )
 {}
 
 InstrTempl::InstrTempl( int size, int opcode1, int opcode2 )
-  : _size( size ), _immSize( size ), _opcode( opcode1 ), _opcode2( opcode2 ), _haveOpcode2( true )
+  : _size( size ), _ySize( size ), _opcode( opcode1 ), _opcode2( opcode2 ), _haveOpcode2( true )
 {}
 
 InstrTempl::InstrTempl( int size, int opcode1, int opcode2, int opcode3 )
-  : _size( size ), _immSize( size ),
+  : _size( size ), _ySize( size ),
     _opcode( opcode1 ), _opcode2( opcode2 ), _opcode3( opcode3 ),
     _haveOpcode2( true ), _haveOpcode3( true )
 {}
@@ -1262,8 +1267,8 @@ InstrTempl::M() {
 }
 
 InstrTempl&
-InstrTempl::imm8() {
-  _immSize = 8;
+InstrTempl::y8() {
+  _ySize = 8;
   return *this;
 }
 
@@ -1271,17 +1276,17 @@ InstrTempl::imm8() {
 // private helper: classify an operand for the template mechanism.
 //
 void
-classify( const Operand& operand, int& templSize, int& templType )
+classify( const Operand& operand, int& size, int& templType )
 {
-  // templ size is 8 bits or 32 bits
-  // (we assume a 64-bit instruction can be created from a 32-bit instruction using Instr.w())
   switch ( operand.size() ) {
     case 1:
-      templSize = 8;
+      size = 8;
       break;
     case 4:
+      size = 32;
+      break;
     case 8:
-      templSize = 32;
+      size = 64;
       break;
     default:
       fatal( "classify: unexpected operand size\n" );
@@ -1305,30 +1310,44 @@ const InstrTempl*
 InstrTempl::findMatch( const std::vector<InstrTempl>& templates, const Operand& x, const Operand& y )
 {
   // classify the operands
-  int xTemplSize, yTemplSize;
+  int xSize, ySize;
   int xType, yType;
-  classify( x, xTemplSize, xType );
-  classify( y, yTemplSize, yType );
+  classify( x, xSize, xType );
+  classify( y, ySize, yType );
 
   // find the matching template
   for ( auto& templ : templates ) {
-    if ( ( xTemplSize == templ._size ) &&
-         ( ( yTemplSize == templ._immSize ) ||
-           // ConstI can fit either imm8 or imm32 template
-           // (because we don't have ConstB at the moment)
-           ( yType == 1 ) ) ) {
 
-      if ( ( xType == templ._xType ) &&
-           ( yType == templ._yType ) ) {
-        return &templ;
-      }
-      // a R operand can fit in an M template too.
-      if ( ( xType == 2 && templ._xType == 3 &&
-             yType == templ._yType ) ||
-           ( yType == 2 && templ._yType == 3 &&
-             xType == templ._xType ) ) {
-        return &templ;
-      }
+    if ( xSize == templ._size ||
+         ( xSize == 64 && templ._size == 32 ) ) {
+      // x size matches
+    } else {
+      continue;
+    }
+
+    if ( ySize == templ._ySize ||
+         ( ySize == 64 && templ._ySize == 32 ) ||
+         yType == 1 ) {
+      // y size matches
+      // ConstI can fit imm8 or imm32 templates,
+      // because we don't have Const8 at the moment.
+      // ConstI can also fit 64-bit template because such instructions can
+      // sign extend imm32 to 64 bit.
+    } else {
+      continue;
+    }
+
+    if ( ( xType == templ._xType ) &&
+         ( yType == templ._yType ) ) {
+      return &templ;
+    }
+
+    // a R operand can fit in an M template too.
+    if ( ( xType == 2 && templ._xType == 3 &&
+           yType == templ._yType ) ||
+         ( yType == 2 && templ._yType == 3 &&
+           xType == templ._xType ) ) {
+      return &templ;
     }
   }
 
@@ -1342,27 +1361,35 @@ const InstrTempl*
 InstrTempl::findMatch( const std::vector<InstrTempl>& templates, const Operand& x )
 {
   // classify the operands
-  int xTemplSize;
+  int xSize;
   int xType;
-  classify( x, xTemplSize, xType );
+  classify( x, xSize, xType );
 
   // find the matching template
   for ( auto& templ : templates ) {
-    if ( ( xTemplSize == templ._size ) &&
-         ( templ._yType == 0 ) ) {
 
-      if ( xType == templ._xType ) {
+    if ( xSize == templ._size ||
+         ( xSize == 64 && templ._size == 32 ) ) {
+      // x size matches
+    } else {
+      continue;
+    }
+
+    if ( ( xType == templ._xType ) &&
+         ( templ._yType == 0 ) ) {
+      return &templ;
+    }
+
+    // a R operand can fit in an M template too.
+    if ( ( xType == 2 && templ._xType == 3 ) &&
+         ( templ._yType == 0 ) ) {
         return &templ;
-      }
-      // a R operand can fit in an M template too.
-      if ( xType == 2 && templ._xType == 3 ) {
-        return &templ;
-      }
     }
   }
 
   return nullptr;
 }
+
 
 void
 InstrTempl::operandToI( Instr& instr, const Operand& operand, int templSize ) const
@@ -1393,9 +1420,12 @@ InstrTempl::operandToR( Instr& instr, const Operand& operand, int templSize ) co
       instr.reg8( operand._reg );
       break;
     case jit_Operand_Kind_RegI:
+      assert( templSize == 32 );
+      instr.reg( operand._reg );
+      break;
     case jit_Operand_Kind_RegP:
     case jit_Operand_Kind_RegD:
-      assert( templSize == 32 );
+      assert( templSize == 32 || templSize == 64 );
       instr.reg( operand._reg );
       break;
     default:
@@ -1441,9 +1471,12 @@ InstrTempl::operandToM( Instr& instr, const Operand& operand, int templSize ) co
       instr.rmReg8( operand._reg );
       break;
     case jit_Operand_Kind_RegI:
+      assert( templSize == 32 );
+      instr.rmReg( operand._reg );
+      break;
     case jit_Operand_Kind_RegP:
     case jit_Operand_Kind_RegD:
-      assert( templSize == 32 );
+      assert( templSize == 32 || templSize == 64 );
       instr.rmReg( operand._reg );
       break;
 
@@ -1496,8 +1529,9 @@ InstrTempl::emit( const Operand& x, const Operand& y ) const
     instr.opcode3( _opcode3 );
   }
 
-  // Is this a sixty-four bit operation?  (Operand size is in bytes.)
-  if ( x.size() == 8 ) {
+  // Are we extending a 32-bit template to a 64 bit operation?
+  // (Note operand size is in bytes.)
+  if ( ( _size == 32 ) && ( x.size() == 8 ) ) {
     instr.w();
   }
   if ( _opc >= 0 ) {
@@ -1515,13 +1549,13 @@ InstrTempl::emit( const Operand& x, const Operand& y ) const
   }
   switch( _yType ) {
     case 1:
-      operandToI( instr, y, _immSize );
+      operandToI( instr, y, _ySize );
       break;
     case 2:
-      operandToR( instr, y, _immSize );
+      operandToR( instr, y, _ySize );
       break;
     case 3:
-      operandToM( instr, y, _immSize );
+      operandToM( instr, y, _ySize );
       break;
     default:
       fatal( "unexpected type in template\n" );
@@ -4031,7 +4065,7 @@ emitAdd( const Operand& x, const Operand& y )
     InstrTempl( 32, 0x81 ).opc( 0 ).MI(),   // I with size8 will implicitly mean id i.e. imm32
                                             // size32 implicitly allows rex.w to become sixtyfour,
                                             // though I remains imm32 and sign-extends to sixtyfour
-    InstrTempl( 32, 0x83 ).opc( 0 ).MI().imm8(),  // override the default of I being 32 due to size.  imm8 will be sign extended to 32 (or sixtyfour)
+    InstrTempl( 32, 0x83 ).opc( 0 ).MI().y8(),  // override the default of I being 32 due to size.  imm8 will be sign extended to 32 (or sixtyfour)
     InstrTempl( 8,  0x00 ).MR(),
     InstrTempl( 32, 0x01 ).MR(),
     InstrTempl( 8,  0x02 ).RM(),
@@ -4049,9 +4083,9 @@ void
 emitAddFloat( const Operand& x, const Operand& y )
 {
   // addsd does not allow an immediate y
-  // TO DO: as with mov, the size is implicitly 64 bit and does not need rex.w
+  // Note, the size is implicitly 64 bit and does not need rex.w
   static std::vector<InstrTempl> addsdTemplates = {
-    InstrTempl( 32, 0xf2, 0x0f, 0x58 ).RM()
+    InstrTempl( 64, 0xf2, 0x0f, 0x58 ).RM()
   };
 
   switch ( KindPair( x._kind, y._kind ) ) {
@@ -4081,7 +4115,7 @@ emitSub( const Operand& x, const Operand& y )
   static std::vector<InstrTempl> templates = {
     InstrTempl( 8,  0x80 ).opc( 5 ).MI(),
     InstrTempl( 32, 0x81 ).opc( 5 ).MI(),
-    InstrTempl( 32, 0x83 ).opc( 5 ).MI().imm8(),
+    InstrTempl( 32, 0x83 ).opc( 5 ).MI().y8(),
     InstrTempl( 8,  0x28 ).MR(),
     InstrTempl( 32, 0x29 ).MR(),
     InstrTempl( 8,  0x2a ).RM(),
@@ -4250,7 +4284,7 @@ emitCmp( const Operand& x, const Operand& y )
   static std::vector<InstrTempl> templates = {
     InstrTempl( 8,  0x80 ).opc( 7 ).MI(),
     InstrTempl( 32, 0x81 ).opc( 7 ).MI(),
-    InstrTempl( 32, 0x83 ).opc( 7 ).MI().imm8(),
+    InstrTempl( 32, 0x83 ).opc( 7 ).MI().y8(),
     InstrTempl(  8, 0x38 ).MR(),
     InstrTempl( 32, 0x39 ).MR(),
     InstrTempl(  8, 0x3a ).RM(),
@@ -4314,16 +4348,14 @@ emitMov( const Operand& x, const Operand& y )
   };
 
   static std::vector<InstrTempl> movzxTemplates = {
-    InstrTempl( 32, 0x0f, 0xb6 ).RM().imm8()    // a bit misleading: y is 8-bit, but not immediate
+    InstrTempl( 32, 0x0f, 0xb6 ).RM().y8()
   };
 
   // movsd: move scalar double-precision floating point.
   // This instruction is implicitly 64-bit and does not need rex.w to indicate that.
-  // TO DO: Enhance my template system to allow specification of size 64
-  //        and use that as an indication that rex.w is not needed to change the size.
   static std::vector<InstrTempl> movsdTemplates = {
-    InstrTempl( 32, 0xf2, 0x0f, 0x10 ).RM(),
-    InstrTempl( 32, 0xf2, 0x0f, 0x11 ).MR()
+    InstrTempl( 64, 0xf2, 0x0f, 0x10 ).RM(),
+    InstrTempl( 64, 0xf2, 0x0f, 0x11 ).MR()
   };
 
   static std::vector<InstrTempl> leaTemplates = {
