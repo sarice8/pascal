@@ -4,6 +4,7 @@ program t26b;
   var f1: double;
   var f2: double;
 
+  var i1: integer;
 begin
 
   f1 := 1.5;
@@ -25,5 +26,8 @@ begin
   writeln( f1 / f2 );
   writeln( f1 / 2.0 );
   writeln( 4.0 / 2.0 );
+
+  i1 := 3;
+  writeln( 2.2 * i1 );
 
 end.

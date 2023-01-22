@@ -756,6 +756,7 @@ void emitPxor( const Operand& x, const Operand& y );
 void emitMult( const Operand& x, const Operand& y );
 void emitMultFloat( const Operand& x, const Operand& y );
 void emitCdq();
+void emitCvtIntToDouble( const Operand& x, const Operand& y );
 void emitDiv( const Operand& x, const Operand& y );
 void emitDivFloat( const Operand& x, const Operand& y );
 void emitShl( const Operand& x, const Operand& y );
@@ -1248,7 +1249,7 @@ public:
   InstrTempl& MR();  // operands r/m, r
   InstrTempl& MI();  // operands r/m, imm
   InstrTempl& M();   // single operand r/m
-  InstrTempl& y8();  // override size of y operand to 8 bits rather than _size
+  InstrTempl& ySize( int ySize );  // override size of y operand to given #bits rather than _size
 
   void emit( const Operand& x, const Operand& y ) const;
   void emit( const Operand& x ) const;
@@ -1335,8 +1336,8 @@ InstrTempl::M() {
 }
 
 InstrTempl&
-InstrTempl::y8() {
-  _ySize = 8;
+InstrTempl::ySize( int ySize ) {
+  _ySize = ySize;
   return *this;
 }
 
@@ -2037,7 +2038,16 @@ generateCode()
         }
         break;
       case tCastItoD : {
-          tCodeNotImplemented();
+          Operand x = operandStack.back();  operandStack.pop_back();
+          if ( x.isConst() ) {
+            operandStack.emplace_back( jit_Operand_Kind_ConstD, (double) x._value );
+          } else {
+            Operand result( jit_Operand_Kind_RegD, allocateFloatReg() );
+            emitCvtIntToDouble( result, x );
+            operandStack.push_back( result );
+            x.release();
+          }
+
         }
         break;
       case tIncI : {
@@ -4190,7 +4200,7 @@ emitAdd( const Operand& x, const Operand& y )
     InstrTempl( 32, 0x81 ).opc( 0 ).MI(),   // I with size8 will implicitly mean id i.e. imm32
                                             // size32 implicitly allows rex.w to become sixtyfour,
                                             // though I remains imm32 and sign-extends to sixtyfour
-    InstrTempl( 32, 0x83 ).opc( 0 ).MI().y8(),  // override the default of I being 32 due to size.  imm8 will be sign extended to 32 (or sixtyfour)
+    InstrTempl( 32, 0x83 ).opc( 0 ).MI().ySize( 8 ),  // override the default of I being 32 due to size.  imm8 will be sign extended to 32 (or sixtyfour)
     InstrTempl( 8,  0x00 ).MR(),
     InstrTempl( 32, 0x01 ).MR(),
     InstrTempl( 8,  0x02 ).RM(),
@@ -4248,7 +4258,7 @@ emitSub( const Operand& x, const Operand& y )
   static std::vector<InstrTempl> templates = {
     InstrTempl( 8,  0x80 ).opc( 5 ).MI(),
     InstrTempl( 32, 0x81 ).opc( 5 ).MI(),
-    InstrTempl( 32, 0x83 ).opc( 5 ).MI().y8(),
+    InstrTempl( 32, 0x83 ).opc( 5 ).MI().ySize( 8 ),
     InstrTempl( 8,  0x28 ).MR(),
     InstrTempl( 32, 0x29 ).MR(),
     InstrTempl( 8,  0x2a ).RM(),
@@ -4478,6 +4488,41 @@ emitDivFloat( const Operand& x, const Operand& y )
 }
 
 
+// x = (double) y
+// x is a floating point register
+// y is an int32 in a general purpose register or memory.
+// 
+void
+emitCvtIntToDouble( const Operand& x, const Operand& y )
+{
+  static std::vector<InstrTempl> cvtsi2sdTemplates = {
+    // x is 64 bit, y is 32 bit
+    InstrTempl( 64, 0xf2, 0x0f, 0x2a ).ySize( 32 ).RM()
+  };
+
+  switch ( KindPair( x._kind, y._kind ) ) {
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_GlobalI ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_LocalI ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_ParamI ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_RegI ):
+      // cvtsi2sd x_xmm, y_int32
+      // emit( Instr( 0xf2, 0x0f, 0x2a ).reg( x._reg ).rm( y._reg ) );
+      emit( cvtsi2sdTemplates, x, y );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_ConstI ):
+      // cvtsi2sd doesn't have an immediate option.
+      // Caller would have filtered out this case already.
+      // Alternatively we can return a ConstD directly here.
+      toDo( "emitCvtIntToDouble: unexpected const operand\n" );
+      break;
+
+    default:
+      toDo( "emitCvtIntToDouble: unexpected operands\n" );
+      break;
+  }
+}
+
 
 // x << y
 // x is a register
@@ -4552,7 +4597,7 @@ emitCmp( const Operand& x, const Operand& y )
   static std::vector<InstrTempl> templates = {
     InstrTempl( 8,  0x80 ).opc( 7 ).MI(),
     InstrTempl( 32, 0x81 ).opc( 7 ).MI(),
-    InstrTempl( 32, 0x83 ).opc( 7 ).MI().y8(),
+    InstrTempl( 32, 0x83 ).opc( 7 ).MI().ySize( 8 ),
     InstrTempl(  8, 0x38 ).MR(),
     InstrTempl( 32, 0x39 ).MR(),
     InstrTempl(  8, 0x3a ).RM(),
@@ -4616,7 +4661,7 @@ emitMov( const Operand& x, const Operand& y )
   };
 
   static std::vector<InstrTempl> movzxTemplates = {
-    InstrTempl( 32, 0x0f, 0xb6 ).RM().y8()
+    InstrTempl( 32, 0x0f, 0xb6 ).RM().ySize( 8 )
   };
 
   // movsd: move scalar double-precision floating point.
