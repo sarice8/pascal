@@ -750,10 +750,14 @@ void emitJcc( char* addr, ConditionFlags flags );
 void emitAdd( const Operand& x, const Operand& y );
 void emitAddFloat( const Operand& x, const Operand& y );
 void emitSub( const Operand& x, const Operand& y );
+void emitSubFloat( const Operand& x, const Operand& y );
 void emitNeg( const Operand& x );
+void emitPxor( const Operand& x, const Operand& y );
 void emitMult( const Operand& x, const Operand& y );
+void emitMultFloat( const Operand& x, const Operand& y );
 void emitCdq();
 void emitDiv( const Operand& x, const Operand& y );
+void emitDivFloat( const Operand& x, const Operand& y );
 void emitShl( const Operand& x, const Operand& y );
 void emitInc( const Operand& x );
 void emitDec( const Operand& x );
@@ -2220,11 +2224,43 @@ generateCode()
         break;
 
       case tMultD : {
-          tCodeNotImplemented();
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
+          int bits;
+          if ( x.isConst() && !y.isConst() ) {
+            swap( x, y );
+          }
+          if ( doConst && x.isConst() && y.isConst() ) {
+            assert( x._kind == jit_Operand_Kind_ConstD );
+            assert( y._kind == jit_Operand_Kind_ConstD );
+            operandStack.emplace_back( x._kind, x._double * y._double );
+          } else if ( doConst && y.isConst() && y._double == 0.0 ) {
+            operandStack.emplace_back( x._kind, 0.0 );
+          } else if ( doConst && y.isConst() && y._double == 1.0 ) {
+            operandStack.push_back( x );
+          } else {
+            operandIntoFloatReg( x );
+            emitMultFloat( x, y );
+            operandStack.push_back( x );
+          }
+          y.release();
         }
         break;
       case tDivD : {
-          tCodeNotImplemented();
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
+          if ( doConst && x.isConst() && y.isConst() ) {
+            assert( x._kind == jit_Operand_Kind_ConstD );
+            assert( y._kind == jit_Operand_Kind_ConstD );
+            operandStack.emplace_back( x._kind, x._double / y._double );
+          } else if ( doConst && y.isConst() && y._double == 1.0 ) {
+            operandStack.push_back( x );
+          } else {
+            operandIntoFloatReg( x );
+            emitDivFloat( x, y );
+            operandStack.push_back( x );
+          }
+          y.release();
         }
         break;
       case tAddD : {
@@ -2243,11 +2279,36 @@ generateCode()
         }
         break;
       case tSubD : {
-          tCodeNotImplemented();
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
+          if ( doConst && x.isConst() && y.isConst() ) {
+            assert( x._kind == jit_Operand_Kind_ConstD );
+            assert( y._kind == jit_Operand_Kind_ConstD );
+            operandStack.emplace_back( x._kind, x._double - y._double );
+          } else {
+            operandIntoFloatReg( x );
+            emitSubFloat( x, y );
+            operandStack.push_back( x );
+          }
+          y.release();
         }
         break;
       case tNegD : {
-          tCodeNotImplemented();
+          // There doesn't seem to be a floating point neg instruction.
+          // All I really need to do is flip the sign bit.
+          // But, for now I'll subtract from 0.
+          Operand x = operandStack.back();   operandStack.pop_back();
+          if ( doConst && x.isConst() ) {
+            assert( x._kind == jit_Operand_Kind_ConstD );
+            operandStack.emplace_back( x._kind, -x._double );
+          } else {
+            Operand result( jit_Operand_Kind_RegD, allocateFloatReg() );
+            // Get zero into result
+            emitPxor( result, result );
+            emitSubFloat( result, x );
+            x.release();
+            operandStack.push_back( result );
+          }
         }
         break;
 
@@ -3859,7 +3920,7 @@ operandFlagsToValue( Operand& x, int size )
         fatal( "operandFlagsToValue: unexpected size\n" );
     }
 
-    Operand result = Operand( kind, allocateReg() );
+    Operand result( kind, allocateReg() );
     emitSet( result, x._flags );
     x = result;
   }
@@ -4162,8 +4223,16 @@ emitAddFloat( const Operand& x, const Operand& y )
       emit( addsdTemplates, x, y );
       break;
 
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_ConstD ):
+      {
+        Operand yReg( jit_Operand_Kind_RegD, allocateFloatReg() );
+        emitMov( yReg, y );
+        emitAddFloat( x, yReg );
+        yReg.release();
+      }
+      break;
+
     default:
-      // TO DO: some other combinations can be supported with a sequence of instructions.
       toDo( "emitAddFloat: unsupported operands\n" );
   }
 }
@@ -4190,6 +4259,42 @@ emitSub( const Operand& x, const Operand& y )
 }
 
 
+// x -= y
+// x is a floating point register
+//
+void
+emitSubFloat( const Operand& x, const Operand& y )
+{
+  // subsd doesn't allow immediate y
+  static std::vector<InstrTempl> subsdTemplates = {
+    InstrTempl( 64, 0xf2, 0x0f, 0x5c ).RM()
+  };
+
+  switch ( KindPair( x._kind, y._kind ) ) {
+
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_GlobalP ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_LocalP ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_ParamP ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_RegP_DerefP ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_RegD ):
+      emit( subsdTemplates, x, y );
+      break;
+
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_ConstD ):
+      {
+        Operand yReg( jit_Operand_Kind_RegD, allocateFloatReg() );
+        emitMov( yReg, y );
+        emitSubFloat( x, yReg );
+        yReg.release();
+      }
+      break;
+
+    default:
+      toDo( "emitSubFloat: unsupported operands\n" );
+  }
+}
+
+
 // x = -x
 // x is a register
 //
@@ -4202,6 +4307,33 @@ emitNeg( const Operand& x )
   };
 
   emit( templates, x );
+}
+
+
+// x = logical exclusive or of x, y
+// x is a floating point register (xmm)
+//
+// Callers use this to load 0.0 into a floating point register.
+//
+// y is a floating point register or memory.
+// But in the memory case, it reads 128 bits.
+// If I ever need this, look at the no-prefix version
+// which is 64-bit, but uses legacy mm registers rather than xmm.
+// So I'm not sure the full set of xmm registers is accessible in that case.
+//
+void
+emitPxor( const Operand& x, const Operand& y )
+{
+  switch ( KindPair( x._kind, y._kind ) ) {
+
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_RegD ):
+      // This is actually a 128-bit operation
+      emit( Instr( 0x0f, 0xef ).prefix( 0x66 ).reg( x._reg ).rmReg( y._reg ) );
+      break;
+
+    default:
+      toDo( "emitPxor: unsupported operands\n" );
+  }
 }
 
 
@@ -4240,6 +4372,42 @@ emitMult( const Operand& x, const Operand& y )
 }
 
 
+// x * y
+// x is a floating point register
+//
+void
+emitMultFloat( const Operand& x, const Operand& y )
+{
+  // mulsd - multiply scalar double precision floating point
+  static std::vector<InstrTempl> mulsdTemplates = {
+    InstrTempl( 64, 0xf2, 0x0f, 0x59 ).RM()
+  };
+
+  switch ( KindPair( x._kind, y._kind ) ) {
+
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_GlobalP ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_LocalP ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_ParamP ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_RegD ):
+      emit( mulsdTemplates, x, y );
+      break;
+ 
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_ConstD ):
+      {
+        Operand yReg( jit_Operand_Kind_RegD, allocateFloatReg() );
+        emitMov( yReg, y );
+        emitMultFloat( x, yReg );
+        yReg.release();
+      }
+      break;
+
+    default:
+      toDo( "emitMultFloat unexpected operands\n" );
+      break;
+  }
+}
+
+
 // sign-extends eax into edx:eax
 // This is useful prior to idiv.
 // Note this is in the Intel docs on the page for "CWD/CDQ/CQO".
@@ -4273,6 +4441,42 @@ emitDiv( const Operand& x, const Operand& y )
 
   emit( templates, y );
 }
+
+
+// x = x / y
+// x is a floating point register
+//
+void
+emitDivFloat( const Operand& x, const Operand& y )
+{
+  static std::vector<InstrTempl> divsdTemplates = {
+    InstrTempl( 64, 0xf2, 0x0f, 0x5e ).RM()
+  };
+
+  switch ( KindPair( x._kind, y._kind ) ) {
+
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_GlobalP ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_LocalP ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_ParamP ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_RegD ):
+      emit( divsdTemplates, x, y );
+      break;
+ 
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_ConstD ):
+      {
+        Operand yReg( jit_Operand_Kind_RegD, allocateFloatReg() );
+        emitMov( yReg, y );
+        emitDivFloat( x, yReg );
+        yReg.release();
+      }
+      break;
+
+    default:
+      toDo( "emitDivFloat unexpected operands\n" );
+      break;
+  }
+}
+
 
 
 // x << y
