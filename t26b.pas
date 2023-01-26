@@ -50,5 +50,14 @@ begin
   //
   // writeln( f1 = 1.5 );
   // writeln( f1 + 1.0 = 2.5 );
+  //
+  // TO DO:  on further investigation, it's possible that Pascal does not allow
+  //   = and <> on structured types, by default.
+  // See this page: https://www.freepascal.org/docs-html/ref/refse106.html
+  // fpc allows a program to provide an override of "operator =" for a given pair of types.
+  // ( And if the user doesn't provide <> the compiler will use not( a = b ). )
+  // If this is accurate, I can add EqualD / NotEqualD  and remove support for
+  // structured types that generates memcmp today.
+
 
 end.
