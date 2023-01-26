@@ -667,6 +667,7 @@ void operandNotRegOrDeref( Operand& x );
 void operandDeref( Operand& x, int valueSize );
 void operandExtendToP( Operand& x );
 Operand operandCompare( Operand& x, Operand& y, ConditionFlags flags );
+Operand operandCompareFloat( Operand& x, Operand& y, ConditionFlags flags );
 void operandFlagsToValue( Operand& x, int size );
 Operand operandLowWord( const Operand& x );
 Operand operandHighWord( const Operand& x );
@@ -763,6 +764,7 @@ void emitShl( const Operand& x, const Operand& y );
 void emitInc( const Operand& x );
 void emitDec( const Operand& x );
 void emitCmp( const Operand& x, const Operand& y );
+void emitComisd( const Operand& x, const Operand& y );
 void emitSet( const Operand& x, ConditionFlags flags );
 void emitMov( const Operand& x, const Operand& y );
 
@@ -2353,7 +2355,7 @@ generateCode()
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
           if ( doConst && x.isConst() && y.isConst() ) {
-            operandStack.emplace_back( x._kind, x._value == y._value ? 1 : 0 );
+            operandStack.emplace_back( jit_Operand_Kind_ConstI, x._value == y._value ? 1 : 0 );
           } else {
             operandStack.push_back( operandCompare( x, y, FlagE ) );
           }
@@ -2365,7 +2367,7 @@ generateCode()
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
           if ( doConst && x.isConst() && y.isConst() ) {
-            operandStack.emplace_back( x._kind, x._value != y._value ? 1 : 0 );
+            operandStack.emplace_back( jit_Operand_Kind_ConstI, x._value != y._value ? 1 : 0 );
           } else {
             operandStack.push_back( operandCompare( x, y, FlagNE ) );
           }
@@ -2377,7 +2379,7 @@ generateCode()
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
           if ( doConst && x.isConst() && y.isConst() ) {
-            operandStack.emplace_back( x._kind, uint8_t(x._value) > uint8_t(y._value) ? 1 : 0 );
+            operandStack.emplace_back( jit_Operand_Kind_ConstI, uint8_t(x._value) > uint8_t(y._value) ? 1 : 0 );
           } else {
             operandStack.push_back( operandCompare( x, y, FlagA ) );
           }
@@ -2389,7 +2391,7 @@ generateCode()
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
           if ( doConst && x.isConst() && y.isConst() ) {
-            operandStack.emplace_back( x._kind, uint8_t(x._value) < uint8_t(y._value) ? 1 : 0 );
+            operandStack.emplace_back( jit_Operand_Kind_ConstI, uint8_t(x._value) < uint8_t(y._value) ? 1 : 0 );
           } else {
             operandStack.push_back( operandCompare( x, y, FlagB ) );
           }
@@ -2401,7 +2403,7 @@ generateCode()
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
           if ( doConst && x.isConst() && y.isConst() ) {
-            operandStack.emplace_back( x._kind, uint8_t(x._value) >= uint8_t(y._value) ? 1 : 0 );
+            operandStack.emplace_back( jit_Operand_Kind_ConstI, uint8_t(x._value) >= uint8_t(y._value) ? 1 : 0 );
           } else {
             operandStack.push_back( operandCompare( x, y, FlagAE ) );
           }
@@ -2413,7 +2415,7 @@ generateCode()
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
           if ( doConst && x.isConst() && y.isConst() ) {
-            operandStack.emplace_back( x._kind, uint8_t(x._value) <= uint8_t(y._value) ? 1 : 0 );
+            operandStack.emplace_back( jit_Operand_Kind_ConstI, uint8_t(x._value) <= uint8_t(y._value) ? 1 : 0 );
           } else {
             operandStack.push_back( operandCompare( x, y, FlagBE ) );
           }
@@ -2426,7 +2428,7 @@ generateCode()
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
           if ( doConst && x.isConst() && y.isConst() ) {
-            operandStack.emplace_back( x._kind, x._value == y._value ? 1 : 0 );
+            operandStack.emplace_back( jit_Operand_Kind_ConstI, x._value == y._value ? 1 : 0 );
           } else {
             operandStack.push_back( operandCompare( x, y, FlagE ) );
           }
@@ -2438,7 +2440,7 @@ generateCode()
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
           if ( doConst && x.isConst() && y.isConst() ) {
-            operandStack.emplace_back( x._kind, x._value != y._value ? 1 : 0 );
+            operandStack.emplace_back( jit_Operand_Kind_ConstI, x._value != y._value ? 1 : 0 );
           } else {
             operandStack.push_back( operandCompare( x, y, FlagNE ) );
           }
@@ -2450,7 +2452,7 @@ generateCode()
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
           if ( doConst && x.isConst() && y.isConst() ) {
-            operandStack.emplace_back( x._kind, x._value > y._value ? 1 : 0 );
+            operandStack.emplace_back( jit_Operand_Kind_ConstI, x._value > y._value ? 1 : 0 );
           } else {
             operandStack.push_back( operandCompare( x, y, FlagG ) );
           }
@@ -2462,7 +2464,7 @@ generateCode()
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
           if ( doConst && x.isConst() && y.isConst() ) {
-            operandStack.emplace_back( x._kind, x._value < y._value ? 1 : 0 );
+            operandStack.emplace_back( jit_Operand_Kind_ConstI, x._value < y._value ? 1 : 0 );
           } else {
             operandStack.push_back( operandCompare( x, y, FlagL ) );
           }
@@ -2474,7 +2476,7 @@ generateCode()
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
           if ( doConst && x.isConst() && y.isConst() ) {
-            operandStack.emplace_back( x._kind, x._value >= y._value ? 1 : 0 );
+            operandStack.emplace_back( jit_Operand_Kind_ConstI, x._value >= y._value ? 1 : 0 );
           } else {
             operandStack.push_back( operandCompare( x, y, FlagGE ) );
           }
@@ -2486,7 +2488,7 @@ generateCode()
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
           if ( doConst && x.isConst() && y.isConst() ) {
-            operandStack.emplace_back( x._kind, x._value <= y._value ? 1 : 0 );
+            operandStack.emplace_back( jit_Operand_Kind_ConstI, x._value <= y._value ? 1 : 0 );
           } else {
             operandStack.push_back( operandCompare( x, y, FlagLE ) );
           }
@@ -2545,19 +2547,62 @@ generateCode()
         break;
 
       case tGreaterD : {
-          tCodeNotImplemented();
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
+          if ( doConst && x.isConst() && y.isConst() ) {
+            assert( x._kind == jit_Operand_Kind_ConstD );
+            assert( y._kind == jit_Operand_Kind_ConstD );
+            operandStack.emplace_back( jit_Operand_Kind_ConstI, x._double > y._double ? 1 : 0 );
+          } else {
+            // Note: floating point values as always signed, but its comparision operator
+            // produces flags that correspond with unsigned integer comparisions (A, B)
+            // TO DO: allow for NAN.  comisd docs suggest doing JP prior to JA etc.
+            operandStack.push_back( operandCompareFloat( x, y, FlagA ) );
+          }
+          x.release();
+          y.release();
         }
         break;
       case tLessD : {
-          tCodeNotImplemented();
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
+          if ( doConst && x.isConst() && y.isConst() ) {
+            assert( x._kind == jit_Operand_Kind_ConstD );
+            assert( y._kind == jit_Operand_Kind_ConstD );
+            operandStack.emplace_back( jit_Operand_Kind_ConstI, x._double < y._double ? 1 : 0 );
+          } else {
+            operandStack.push_back( operandCompareFloat( x, y, FlagB ) );
+          }
+          x.release();
+          y.release();
         }
         break;
       case tGreaterEqualD : {
-          tCodeNotImplemented();
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
+          if ( doConst && x.isConst() && y.isConst() ) {
+            assert( x._kind == jit_Operand_Kind_ConstD );
+            assert( y._kind == jit_Operand_Kind_ConstD );
+            operandStack.emplace_back( jit_Operand_Kind_ConstI, x._double >= y._double ? 1 : 0 );
+          } else {
+            operandStack.push_back( operandCompareFloat( x, y, FlagAE ) );
+          }
+          x.release();
+          y.release();
         }
         break;
       case tLessEqualD : {
-          tCodeNotImplemented();
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
+          if ( doConst && x.isConst() && y.isConst() ) {
+            assert( x._kind == jit_Operand_Kind_ConstD );
+            assert( y._kind == jit_Operand_Kind_ConstD );
+            operandStack.emplace_back( jit_Operand_Kind_ConstI, x._double <= y._double ? 1 : 0 );
+          } else {
+            operandStack.push_back( operandCompareFloat( x, y, FlagBE ) );
+          }
+          x.release();
+          y.release();
         }
         break;
 
@@ -3908,6 +3953,32 @@ operandCompare( Operand& x, Operand& y, ConditionFlags flags )
 }
 
 
+// Generate a comparison of two floating point operands.
+// The condition flags indicates what should be considered a true result.
+// Returns the result operand (which will usually be a Flags Operand).
+//
+Operand
+operandCompareFloat( Operand& x, Operand& y, ConditionFlags flags )
+{
+  // emitComisd only supports (reg, reg) or (reg, mem)
+  if ( x.isConst() ) {
+    operandIntoFloatReg( x );
+  }
+  if ( y.isConst() ) {
+    operandIntoFloatReg( y );
+  }
+  if ( x.isMem() && y.isReg() ) {
+    swap( x, y );
+    swapConditionFlag( flags );
+  }
+  operandIntoFloatReg( x );
+
+  emitComisd( x, y );
+
+  return Operand( jit_Operand_Kind_Flags, flags );
+}
+
+
 // If x is a Flags operand, covert it to a 0/1 value.
 // Given the byte size of the value we want.
 //
@@ -4605,6 +4676,32 @@ emitCmp( const Operand& x, const Operand& y )
   };
 
   emit( templates, x, y );
+}
+
+
+// Compare floating point values x and y
+// x is a floating point register.
+// y is a floating point register or memory reference.
+// This produces condition flags.  The caller will create the appropriate result Operand.
+//
+// The caller should interpret the flags similar to an unsigned integer comparison
+// (even though float values are always signed).
+//
+// TO DO: the caller should do an extra check for the P (unordered?) flag
+//   to allow for NAN in the comparison.  I still need to figure out how to handle this.
+//   ACTUALLY, the comisd doc says comisd will signal an invalid operation exception
+//   for either a quiet nan or signalling nan, while ucomisd will only signal for a
+//   signalling nan.  So probably it's not enough to check P after the compare,
+//   maybe I also need to use ucomisd.
+//
+void
+emitComisd( const Operand& x, const Operand& y )
+{
+  static std::vector<InstrTempl> comisdTemplates = {
+    InstrTempl( 64, 0x66, 0x0f, 0x2f ).RM()
+  };
+
+  emit( comisdTemplates, x, y );
 }
 
 
