@@ -207,7 +207,9 @@ output:
    tLessP
    tGreaterEqualP
    tLessEqualP
-   tGreaterD         % double comparisions.  (equality uses EqualP, at least for now)
+   tEqualD           % double comparisions
+   tNotEqualD
+   tGreaterD
    tLessD
    tGreaterEqualD
    tLessEqualD

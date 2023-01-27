@@ -48,8 +48,8 @@ begin
   // Take a peek at what c compilers do for something like that.)
   // This might be a first step towards support for managed types, so worth tackling.
   //
-  // writeln( f1 = 1.5 );
-  // writeln( f1 + 1.0 = 2.5 );
+  writeln( f1 = 1.5 );
+  writeln( f1 + 1.0 = 2.5 );
   //
   // TO DO:  on further investigation, it's possible that Pascal does not allow
   //   = and <> on structured types, by default.

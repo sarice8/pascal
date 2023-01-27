@@ -95,6 +95,8 @@ struct instrInfo_s tCodeInstrs[] = {
   { "tLessP", 0 },
   { "tGreaterEqualP", 0 },
   { "tLessEqualP", 0 },
+  { "tEqualD", 0 },
+  { "tNotEqualD", 0 },
   { "tGreaterD", 0 },
   { "tLessD", 0 },
   { "tGreaterEqualD", 0 },

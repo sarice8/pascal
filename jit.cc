@@ -2546,6 +2546,36 @@ generateCode()
         }
         break;
 
+      case tEqualD : {
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
+          if ( doConst && x.isConst() && y.isConst() ) {
+            assert( x._kind == jit_Operand_Kind_ConstD );
+            assert( y._kind == jit_Operand_Kind_ConstD );
+            operandStack.emplace_back( jit_Operand_Kind_ConstI, x._double == y._double ? 1 : 0 );
+          } else {
+            // TO DO: allow for NAN.  comisd docs suggest doing JP prior to JA etc.
+            operandStack.push_back( operandCompareFloat( x, y, FlagE ) );
+          }
+          x.release();
+          y.release();
+        }
+        break;
+      case tNotEqualD : {
+          Operand y = operandStack.back();   operandStack.pop_back();
+          Operand x = operandStack.back();   operandStack.pop_back();
+          if ( doConst && x.isConst() && y.isConst() ) {
+            assert( x._kind == jit_Operand_Kind_ConstD );
+            assert( y._kind == jit_Operand_Kind_ConstD );
+            operandStack.emplace_back( jit_Operand_Kind_ConstI, x._double == y._double ? 1 : 0 );
+          } else {
+            // TO DO: allow for NAN.  comisd docs suggest doing JP prior to JA etc.
+            operandStack.push_back( operandCompareFloat( x, y, FlagE ) );
+          }
+          x.release();
+          y.release();
+        }
+        break;
       case tGreaterD : {
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
@@ -2556,7 +2586,6 @@ generateCode()
           } else {
             // Note: floating point values as always signed, but its comparision operator
             // produces flags that correspond with unsigned integer comparisions (A, B)
-            // TO DO: allow for NAN.  comisd docs suggest doing JP prior to JA etc.
             operandStack.push_back( operandCompareFloat( x, y, FlagA ) );
           }
           x.release();
@@ -3967,11 +3996,15 @@ operandCompareFloat( Operand& x, Operand& y, ConditionFlags flags )
   if ( y.isConst() ) {
     operandIntoFloatReg( y );
   }
-  if ( x.isMem() && y.isReg() ) {
+  if ( x.isMem() && y.isFloatReg() ) {
     swap( x, y );
     swapConditionFlag( flags );
   }
   operandIntoFloatReg( x );
+  // Don't expect I could have y in a general purpose reg, but just in case:
+  if ( y.isReg() && !y.isFloatReg() ) {
+    operandIntoFloatReg( y );
+  }
 
   emitComisd( x, y );
 

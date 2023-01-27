@@ -159,9 +159,7 @@ ExprAllowFlow( out Label falseLabel ):
          [ oTypeSNodeType
             | nBooleanType, nCharType :     .tEqualB
             | nIntegerType, nEnumType :     .tEqualI
-            | nDoubleType :                 .tEqualP
-                  % Note: Assuming nDoubleType can use .tEqualP, just matching bits.
-                  %  If not, it would also put into doubt memcmp of record values.
+            | nDoubleType :                 .tEqualD
             | nPointerType, nUniversalPointerType :    .tEqualP
             | nShortStringType, nStrLitType :
                @ShortStringCmp  .tPushConstI  oEmitInt( 0 )  .tEqualI
@@ -180,7 +178,7 @@ ExprAllowFlow( out Label falseLabel ):
          [ oTypeSNodeType
             | nBooleanType, nCharType :     .tNotEqualB
             | nIntegerType, nEnumType :     .tNotEqualI
-            | nDoubleType :                 .tNotEqualP
+            | nDoubleType :                 .tNotEqualD
             | nPointerType, nUniversalPointerType :    .tNotEqualP
             | nShortStringType, nStrLitType :
                @ShortStringCmp  .tPushConstI  oEmitInt( 0 )  .tNotEqualI

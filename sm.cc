@@ -630,6 +630,20 @@ walkTable()
               sp--;
               continue;
 
+       case tEqualD : {
+                double x = *(double*) &stack[sp-1];
+                double y = *(double*) &stack[sp];
+                stack[sp-1] = x == y;
+                sp--;
+              }
+              continue;
+       case tNotEqualD : {
+                double x = *(double*) &stack[sp-1];
+                double y = *(double*) &stack[sp];
+                stack[sp-1] = x == y;
+                sp--;
+              }
+              continue;
        case tGreaterD : {
                 double x = *(double*) &stack[sp-1];
                 double y = *(double*) &stack[sp];
