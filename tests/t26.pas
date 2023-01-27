@@ -1,6 +1,8 @@
 // floating point types
 
 program t26; 
+uses testing;
+
   var f1: real;
   var f2: single;
   var f3: double;
@@ -106,9 +108,9 @@ begin
 
   // While I'm at it, a couple string vs strlit comparisons
   s1 := 'Alphabet';
-  writeln( s1 > 'Alberta' );
-  writeln( s1 > 'Alphabetize' );
-  writeln( 'Zebra' > s1 );
+  writeln( s1 > 'Alberta' );      // BUG: I say false, but should be true (fpc is correct))
+  writeln( s1 > 'Alphabetize' );  // BUG: I say true, but should be false (fpc is correct)
+  writeln( 'Zebra' > s1 );        // BUG: I say false, should be true (fpc is correct)
 
   // More float tests
 

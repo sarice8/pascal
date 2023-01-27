@@ -2567,10 +2567,10 @@ generateCode()
           if ( doConst && x.isConst() && y.isConst() ) {
             assert( x._kind == jit_Operand_Kind_ConstD );
             assert( y._kind == jit_Operand_Kind_ConstD );
-            operandStack.emplace_back( jit_Operand_Kind_ConstI, x._double == y._double ? 1 : 0 );
+            operandStack.emplace_back( jit_Operand_Kind_ConstI, x._double != y._double ? 1 : 0 );
           } else {
             // TO DO: allow for NAN.  comisd docs suggest doing JP prior to JA etc.
-            operandStack.push_back( operandCompareFloat( x, y, FlagE ) );
+            operandStack.push_back( operandCompareFloat( x, y, FlagNE ) );
           }
           x.release();
           y.release();
