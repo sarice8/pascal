@@ -721,6 +721,10 @@ public:
   //  assigning non-register actuals to.
   //  For the moment, I don't support non-register params in cdecl.
 
+  // How many param registers have been assigned for this call
+  int _numGeneralRegs = 0;
+  int _numFloatRegs = 0;
+
   bool _isFunc = false;
   // If isFunc, this is the location of the temporary in local space
   // that my tcode expects the return value to be stored in.
@@ -3269,12 +3273,14 @@ preserveRegsAcrossCall()
 
 // Check if a tAssign* is assigning to an actual.
 // If so, and we're evaluating params of a cdecl call,
-// note if this should get assigned to a register.
+// build up an ordered list of actuals that correspond with parameters.
 //
 // At the moment, the assignment into the stack always proceeds,
-// and we'll copy into register later via cdeclParamsIntoRegisters().
+// and we'll copy into registers, as needed by the native calling convention,
+// later via cdeclParamsIntoRegisters().
 //
 // Note this will pick up a function result's dummy VAR parameter too.
+// We will manage to avoid assigning that to a register for the call.
 //
 void
 cdeclCheckForAssignToActual( Operand& x, jitOperandKind actualKind )
@@ -3283,15 +3289,16 @@ cdeclCheckForAssignToActual( Operand& x, jitOperandKind actualKind )
         ( callInfos.size() > 0 ) &&
         ( callInfos.back()._cdecl == true ) ) {
     CallInfo& ci = callInfos.back();
-    if ( actualKind == jit_Operand_Kind_ActualD ) {
-      // TO DO: actual should go in floating point register
-      toDo( "cdecl call with floating point parameter is not supported yet\n" );
-    }
-    // only supporting cdecl methods that can fit all params in regs
-    assert( ci._actualsToRegs.size() < paramRegs.size() );
     Operand actualOnStack( actualKind, x._value );
-    Register* reg = paramRegs[ ci._actualsToRegs.size() ];
-    ci._actualsToRegs.push_back( { actualOnStack, reg } );
+    // Don't assume the assignments to actuals occur in left param to right param order.
+    // Build up a sorted list, and assign registers later.
+    // Not expecting many params, so a simple insertion sorting.
+    auto it = ci._actualsToRegs.begin();
+    while ( ( it != ci._actualsToRegs.end() ) &&
+            ( it->first._value < x._value ) ) {
+      ++it;
+    }
+    ci._actualsToRegs.insert( it, { { actualOnStack, nullptr } } );
   }
 }
 
@@ -3384,6 +3391,17 @@ cdeclParamsIntoRegisters()
 
   for ( auto actualToReg : ci._actualsToRegs ) {
     int paramSize = actualToReg.first.size();
+    if ( actualToReg.first._kind == jit_Operand_Kind_ActualD ) {
+      if ( ci._numFloatRegs >= paramFloatRegs.size() ) {
+        toDo( "cdecl call with more float parameters than will fit in float regs\n" );
+      }
+      actualToReg.second = paramFloatRegs[ ci._numFloatRegs++ ];
+    } else {
+      if ( ci._numGeneralRegs >= paramRegs.size() ) {
+        toDo( "cdecl call with more parameters than will fit in general regs\n" );
+      }
+      actualToReg.second = paramRegs[ ci._numGeneralRegs++ ];
+    }
     operandIntoSpecificReg( actualToReg.first, actualToReg.second, paramSize );
   }
 }
