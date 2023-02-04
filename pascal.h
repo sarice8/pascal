@@ -234,14 +234,15 @@
 #define eAlreadyDefined 22
 #define eOnlyOneVarCanBeInitialized 23
 #define eExternalMethodCannotBeNested 24
-#define eCantFindUnitFile 25
-#define eInternalScopeMismatch 26
-#define eEnumValueNotAscending 27
-#define eUsedButNotDefined 28
-#define eCantUsePredSuccOnEnumWithValueGaps 29
-#define eCantDereference 30
-#define eSizeMismatch 31
-#define eTypeNameNotAllowedHere 32
+#define eExternalMethodMustBeCdecl 25
+#define eCantFindUnitFile 26
+#define eInternalScopeMismatch 27
+#define eEnumValueNotAscending 28
+#define eUsedButNotDefined 29
+#define eCantUsePredSuccOnEnumWithValueGaps 30
+#define eCantDereference 31
+#define eSizeMismatch 32
+#define eTypeNameNotAllowedHere 33
 #define nINVALID 0
 #define Object 1
 #define nWorkspace 2
@@ -534,16 +535,17 @@ struct ssl_error_table_struct ssl_error_table[] = {
    "eAlreadyDefined", 22,
    "eOnlyOneVarCanBeInitialized", 23,
    "eExternalMethodCannotBeNested", 24,
-   "eCantFindUnitFile", 25,
-   "eInternalScopeMismatch", 26,
-   "eEnumValueNotAscending", 27,
-   "eUsedButNotDefined", 28,
-   "eCantUsePredSuccOnEnumWithValueGaps", 29,
-   "eCantDereference", 30,
-   "eSizeMismatch", 31,
-   "eTypeNameNotAllowedHere", 32,
+   "eExternalMethodMustBeCdecl", 25,
+   "eCantFindUnitFile", 26,
+   "eInternalScopeMismatch", 27,
+   "eEnumValueNotAscending", 28,
+   "eUsedButNotDefined", 29,
+   "eCantUsePredSuccOnEnumWithValueGaps", 30,
+   "eCantDereference", 31,
+   "eSizeMismatch", 32,
+   "eTypeNameNotAllowedHere", 33,
    "", 0
 };
-int ssl_error_table_size = 33;
+int ssl_error_table_size = 34;
 
 #endif // SSL_INCLUDE_ERR_TABLE

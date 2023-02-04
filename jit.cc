@@ -506,7 +506,7 @@ public:
                               _kind <= jit_Operand_Kind_RegD; }
   bool isFloatReg() const { return _kind == jit_Operand_Kind_RegD; }
   bool isVar() const { return _kind >= jit_Operand_Kind_GlobalB &&
-                              _kind <= jit_Operand_Kind_ActualP; }
+                              _kind <= jit_Operand_Kind_ActualD; }
   bool isAddrOfVar() const { return _kind >= jit_Operand_Kind_Addr_Global &&
                                     _kind <= jit_Operand_Kind_Addr_Reg_Offset; }
   bool isVarOrAddrOfVar() const { return isVar() || isAddrOfVar(); }
@@ -588,6 +588,9 @@ Operand::describe() const
       return str.str();
     case jit_Operand_Kind_ActualP:
       str << "ActualP(" << _value << ")";
+      return str.str();
+    case jit_Operand_Kind_ActualD:
+      str << "ActualD(" << _value << ")";
       return str.str();
     case jit_Operand_Kind_Addr_Global:
       str << "Addr_Global(" << _value << ")";
@@ -1537,6 +1540,7 @@ InstrTempl::operandToM( Instr& instr, const Operand& operand, int templSize ) co
     case jit_Operand_Kind_ActualB:
     case jit_Operand_Kind_ActualI:
     case jit_Operand_Kind_ActualP:
+    case jit_Operand_Kind_ActualD:
     case jit_Operand_Kind_Addr_Actual:
       instr.mem( regRsp, operand._value );
       break;
@@ -4672,7 +4676,7 @@ emitShl( const Operand& x, const Operand& y )
       break;
 
     default:
-      fatal( "emitMov: unexpected operands\n" );
+      fatal( "emitShl: unexpected operands\n" );
   }
 }
 
@@ -4964,12 +4968,14 @@ emitMov( const Operand& x, const Operand& y )
     case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_LocalP ):
     case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_ParamP ):
     case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_ActualP ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_ActualD ):
     case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_RegD ):
     case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_RegP_DerefP ):
     case KindPair( jit_Operand_Kind_GlobalP, jit_Operand_Kind_RegD ):
     case KindPair( jit_Operand_Kind_LocalP, jit_Operand_Kind_RegD ):
     case KindPair( jit_Operand_Kind_ParamP, jit_Operand_Kind_RegD ):
     case KindPair( jit_Operand_Kind_ActualP, jit_Operand_Kind_RegD ):
+    case KindPair( jit_Operand_Kind_ActualD, jit_Operand_Kind_RegD ):
     case KindPair( jit_Operand_Kind_RegP_DerefP, jit_Operand_Kind_RegD ):
       emit( movsdTemplates, x, y );
       break;

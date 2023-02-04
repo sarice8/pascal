@@ -77,6 +77,15 @@ char data[dataSize];         /* Data memory */
 char* call_sp;
 char* call_fp;
 
+// Helper: read a method parameter from the tcode call stack.
+template<typename T>
+T
+getParam( int offset )
+{
+  return *(T*)( call_sp + offset );       
+}
+
+
 
 short temp;
 char trace, underflow, dump;
@@ -273,30 +282,33 @@ callCdecl( const std::string& name )
   // For now, need to hardcode calls to the available cdecl methods.
 
   if ( name == "runlibShortStrCmp" ) {
-    int* resultPtr = *(int**)( call_sp + 16 );
+    int* resultPtr = getParam<int*>( 16 );
     *resultPtr = runlibShortStrCmp( *(const char**)call_sp, *(const char**)(call_sp+8) );
   } else if ( name == "runlibMalloc" ) {
-    void** resultPtr = *(void***)( call_sp + 4 );
-    *resultPtr = runlibMalloc( *(int*)call_sp );
+    void** resultPtr = getParam<void**>( 4 );
+    *resultPtr = runlibMalloc( getParam<int>( 0 ) );
   } else if ( name == "runlibRealloc" ) {
-    void** resultPtr = *(void***)( call_sp + 12 );  // Note params are not aligned today
-    *resultPtr = runlibRealloc( *(void**)call_sp, *(int*)(call_sp+8) );
+    void** resultPtr = getParam<void**>( 12 );  // Note params are not aligned today
+    *resultPtr = runlibRealloc( getParam<void*>( 0 ), getParam<int>( 8 ) );
   } else if ( name == "runlibFree" ) {
-    runlibFree( *(void**)call_sp );
+    runlibFree( getParam<void*>( 0 ) );
   } else if ( name == "runlibClearScreen" ) {
     runlibClearScreen();
   } else if ( name == "runlibUpdateScreen" ) {
     runlibUpdateScreen();
   } else if ( name == "runlibSetPixel" ) {
-    runlibSetPixel( *(int*)call_sp, *(int*)(call_sp+4), *(int*)(call_sp+8) );
+    runlibSetPixel( getParam<int>( 0 ), getParam<int>( 4 ), getParam<int>( 8 ) );
   } else if ( name == "runlibGetPixel" ) {
-    int* resultPtr = *(int**)( call_sp + 8 );
-    *resultPtr = runlibGetPixel( *(int*)call_sp, *(int*)(call_sp+4) );
+    int* resultPtr = getParam<int*>( 8 );
+    *resultPtr = runlibGetPixel( getParam<int>( 0 ), getParam<int>( 4 ) );
   } else if ( name == "runlibDelay" ) {
-    runlibDelay( *(int*)call_sp );
+    runlibDelay( getParam<int>( 0 ) );
   } else if ( name == "runlibWaitKey" ) {
-    int* resultPtr = *(int**)( call_sp );
+    int* resultPtr = getParam<int*>( 0 );
     *resultPtr = runlibWaitKey();
+  } else if ( name == "runlibTrunc" ) {
+    int* resultPtr = getParam<int*>( 8 );
+    *resultPtr = runlibTrunc( getParam<double>( 0 ) );
   } else if ( runlibLookupMethod( name.c_str() ) != nullptr ) {
     printf( "SM callCdecl() needs to be taught how to call %s\n", name.c_str() );
   } else {

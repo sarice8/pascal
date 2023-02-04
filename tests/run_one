@@ -8,6 +8,12 @@
 #   The .pas suffix is optional
 #
 # If filename contains "*_unit*" it is assumed to be a unit file, and ignored.
+#
+# NOTE: for fpc:
+#  tests that -use- units expect that the unit file was already compiled,
+#  so there are both *.ppu and *.o files existing for those units.
+#  For now I generate those manually (fpc unit_name) and leave the files around.
+#  Should automate that.
 
 # -------------------------------------------------------------------------
 #

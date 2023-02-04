@@ -31,6 +31,11 @@ ExternalDecl( Node decl ):
       | false :  #eExternalMethodCannotBeNested
       | * :
    ]
+   % For now, only cdecl methods may be declared external
+   [ oNodeGetBoolean( decl, qCdecl )
+      | false :  #eExternalMethodMustBeCdecl
+      | * :
+   ]
    oNodeSetBoolean( decl, qExternal, true )
    [
       | pStrLit :

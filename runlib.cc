@@ -28,6 +28,7 @@
 // For now, I have a hardcoded list of available external methods.
 //
 std::unordered_map<std::string, void*> runlibMethods = {
+  { "runlibTrunc", (void*) runlibTrunc },
   { "runlibShortStrCmp", (void*) runlibShortStrCmp },
   { "runlibMalloc", (void*) runlibMalloc },
   { "runlibRealloc", (void*) runlibRealloc },
@@ -419,3 +420,14 @@ runlibWaitKey()
 }
 
 
+// round towards zero
+//
+int
+runlibTrunc( double x )
+{
+  return (int) std::trunc( x );
+}
+
+// TO DO: see an implementation of banker's rounding here
+//   (Pascal's round() - halfway points round towards even number)
+//   https://cplusplus.com/forum/articles/3638/

@@ -29,6 +29,8 @@ void* runlibMalloc( int size );
 void* runlibRealloc( void* ptr, int size );
 void runlibFree( void* ptr );
 
+int runlibTrunc( double x );
+
 void grInit();
 void grTerm();
 void runlibClearScreen();

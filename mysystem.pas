@@ -45,6 +45,46 @@ procedure memcpy( dest: Pointer; src: Pointer; size: integer );
 // TO DO: a built-in SizeOf( type )  would be nice, to use with memcpy
 
 
+const PI = 3.141592653589793238462643383;
+
+// Standard Pascal math functions.
+// (fpc has additional functions in unit math)
+
+// TO DO: support overloading, for both pascal methods and cdecl methods.
+// function abs( x: integer ): integer;
+
+function abs( x: double ): double;
+
+function arctan( radians: double ): double; cdecl;
+  external 'runlib' name 'runlibArctan';
+
+function cos( radians: double ): double; cdecl;
+  external 'runlib' name 'runlibCos';
+
+function exp( x: double ): double; cdecl;
+  external 'runlib' name 'runlibExp';
+
+function ln( x: double ): double; cdecl;
+  external 'runlib' name 'runlibLn';
+
+// round to nearest integer; .5 rounds to closest even integer
+function round( x: double ): integer; cdecl;
+  external 'runlib' name 'runlibRound';
+
+function sin( radians: double ): double; cdecl;
+  external 'runlib' name 'runlibSin';
+
+// square (power 2)
+function sqr( x: double ): double;
+
+function sqrt( x: double ): double; cdecl;
+  external 'runlib' name 'runlibSqrt';
+
+// round towards zero
+function trunc( x: double ): integer; cdecl;
+  external 'runlib' name 'runlibTrunc';
+
+
 // For use by compiler
 // -------------------
 
@@ -75,6 +115,20 @@ procedure AssignAnsiStringFromPChar( var str: AnsiString; from: PChar );
 
 
 implementation
+
+function abs( x: double ): double;
+  begin
+    if x >= 0.0 then
+      abs := x
+    else
+      abs := -x;
+  end;
+
+function sqr( x: double ): double;
+  begin
+    sqr := x * x;
+  end;
+
 
 procedure ShortStringAppendShortString( strA: ^ShortString; strB: ^ShortString );
     var lengthA, lengthB : integer;
