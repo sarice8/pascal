@@ -222,12 +222,15 @@ typedef enum {
   jit_Operand_Kind_GlobalB,
   jit_Operand_Kind_GlobalI,
   jit_Operand_Kind_GlobalP,
+  jit_Operand_Kind_GlobalD,
   jit_Operand_Kind_LocalB,
   jit_Operand_Kind_LocalI,
   jit_Operand_Kind_LocalP,
+  jit_Operand_Kind_LocalD,
   jit_Operand_Kind_ParamB,
   jit_Operand_Kind_ParamI,
   jit_Operand_Kind_ParamP,
+  jit_Operand_Kind_ParamD,
   // Actual* won't occur on expression stack, but is used internally to help assign to actuals
   jit_Operand_Kind_ActualB,
   jit_Operand_Kind_ActualI,
@@ -252,7 +255,6 @@ typedef enum {
   jit_Operand_Kind_RegB,
   jit_Operand_Kind_RegI,
   jit_Operand_Kind_RegP,
-
   // operand is a value in a floating point register.
   jit_Operand_Kind_RegD,
 
@@ -261,6 +263,7 @@ typedef enum {
   jit_Operand_Kind_RegP_DerefB,
   jit_Operand_Kind_RegP_DerefI,
   jit_Operand_Kind_RegP_DerefP,
+  jit_Operand_Kind_RegP_DerefD,
 
   // operand is held in the condition register.
   // Operand._flags indicates which conditions define a "true" result.
@@ -511,12 +514,13 @@ public:
                                     _kind <= jit_Operand_Kind_Addr_Reg_Offset; }
   bool isVarOrAddrOfVar() const { return isVar() || isAddrOfVar(); }
   bool isDeref() const { return _kind >= jit_Operand_Kind_RegP_DerefB &&
-                                _kind <= jit_Operand_Kind_RegP_DerefP; }
+                                _kind <= jit_Operand_Kind_RegP_DerefD; }
   bool isMem() const { return isVar() || isAddrOfVar() || isDeref(); }
   bool isConst() const { return _kind >= jit_Operand_Kind_ConstI &&
                                 _kind <= jit_Operand_Kind_ConstD; }
   bool isFlags() const { return _kind == jit_Operand_Kind_Flags; }
   int  size() const;  // valid size of the operand value in bytes (1, 4, or 8)
+  bool isFloat() const;
   void release();     // don't need this register anymore (if any)
 
   std::string describe() const;
@@ -562,6 +566,9 @@ Operand::describe() const
     case jit_Operand_Kind_GlobalP:
       str << "GlobalP(" << _value << ")";
       return str.str();
+    case jit_Operand_Kind_GlobalD:
+      str << "GlobalD(" << _value << ")";
+      return str.str();
     case jit_Operand_Kind_LocalB:
       str << "LocalB(" << _value << ")";
       return str.str();
@@ -571,6 +578,9 @@ Operand::describe() const
     case jit_Operand_Kind_LocalP:
       str << "LocalP(" << _value << ")";
       return str.str();
+    case jit_Operand_Kind_LocalD:
+      str << "LocalD(" << _value << ")";
+      return str.str();
     case jit_Operand_Kind_ParamB:
       str << "ParamB(" << _value << ")";
       return str.str();
@@ -579,6 +589,9 @@ Operand::describe() const
       return str.str();
     case jit_Operand_Kind_ParamP:
       str << "ParamP(" << _value << ")";
+      return str.str();
+    case jit_Operand_Kind_ParamD:
+      str << "ParamD(" << _value << ")";
       return str.str();
     case jit_Operand_Kind_ActualB:
       str << "ActualB(" << _value << ")";
@@ -634,6 +647,9 @@ Operand::describe() const
     case jit_Operand_Kind_RegP_DerefP:
       str << "RegP_DerefP(" << _reg->_name << "," << _value << ")";
       return str.str();
+    case jit_Operand_Kind_RegP_DerefD:
+      str << "RegP_DerefD(" << _reg->_name << "," << _value << ")";
+      return str.str();
     case jit_Operand_Kind_Flags:
       str << "Flags(" << _flags << ")";
       return str.str();
@@ -668,6 +684,7 @@ void operandKindAddrIntoReg( Operand& x );
 void operandNotMem( Operand& x );
 void operandNotRegOrDeref( Operand& x );
 void operandDeref( Operand& x, int valueSize );
+void operandDerefFloat( Operand& x, int valueSize );
 void operandExtendToP( Operand& x );
 Operand operandCompare( Operand& x, Operand& y, ConditionFlags flags );
 Operand operandCompareFloat( Operand& x, Operand& y, ConditionFlags flags );
@@ -679,9 +696,9 @@ Register* allocateReg();
 void forceAllocateReg( Register* reg );
 Register* allocateFloatReg();
 Register* getUpFrame( int uplevels );
-Operand allocateTemp( int size );
+Operand allocateTemp( int size, bool isFloat );
 void preserveRegsAcrossCall();
-jitOperandKind operandKindReg( int size );
+jitOperandKind operandKindReg( int size, bool isFloat );
 
 std::unordered_map<int, char*> labels;
 std::unordered_map<int, int> labelTCodeAddrs;
@@ -1519,6 +1536,7 @@ InstrTempl::operandToM( Instr& instr, const Operand& operand, int templSize ) co
     case jit_Operand_Kind_GlobalB:
     case jit_Operand_Kind_GlobalI:
     case jit_Operand_Kind_GlobalP:
+    case jit_Operand_Kind_GlobalD:
     case jit_Operand_Kind_Addr_Global:
       instr.memRipRelative( &data[ operand._value ] );
       break;
@@ -1526,6 +1544,7 @@ InstrTempl::operandToM( Instr& instr, const Operand& operand, int templSize ) co
     case jit_Operand_Kind_LocalB:
     case jit_Operand_Kind_LocalI:
     case jit_Operand_Kind_LocalP:
+    case jit_Operand_Kind_LocalD:
     case jit_Operand_Kind_Addr_Local:
       instr.mem( regRbp, operand._value );
       break;
@@ -1533,6 +1552,7 @@ InstrTempl::operandToM( Instr& instr, const Operand& operand, int templSize ) co
     case jit_Operand_Kind_ParamB:
     case jit_Operand_Kind_ParamI:
     case jit_Operand_Kind_ParamP:
+    case jit_Operand_Kind_ParamD:
     case jit_Operand_Kind_Addr_Param:
       instr.mem( regRbp, operand._value + FRAME_PARAMS_OFFSET );
       break;
@@ -1554,6 +1574,9 @@ InstrTempl::operandToM( Instr& instr, const Operand& operand, int templSize ) co
       instr.rmReg( operand._reg );
       break;
     case jit_Operand_Kind_RegP:
+      assert( templSize == 32 || templSize == 64 );
+      instr.rmReg( operand._reg );
+      break;
     case jit_Operand_Kind_RegD:
       assert( templSize == 32 || templSize == 64 );
       instr.rmReg( operand._reg );
@@ -1562,6 +1585,7 @@ InstrTempl::operandToM( Instr& instr, const Operand& operand, int templSize ) co
     case jit_Operand_Kind_RegP_DerefB:
     case jit_Operand_Kind_RegP_DerefI:
     case jit_Operand_Kind_RegP_DerefP:
+    case jit_Operand_Kind_RegP_DerefD:
     case jit_Operand_Kind_Addr_Reg_Offset:
       instr.mem( operand._reg, operand._value );
       break;
@@ -1720,6 +1744,10 @@ generateCode()
           operandStack.emplace_back( jit_Operand_Kind_GlobalP, *tCodePc++ );
         }
         break;
+      case tPushGlobalD : {
+          operandStack.emplace_back( jit_Operand_Kind_GlobalD, *tCodePc++ );
+        }
+        break;
       case tPushLocalI : {
           operandStack.emplace_back( jit_Operand_Kind_LocalI, *tCodePc++ );
         }
@@ -1732,6 +1760,10 @@ generateCode()
           operandStack.emplace_back( jit_Operand_Kind_LocalP, *tCodePc++ );
         }
         break;
+      case tPushLocalD : {
+          operandStack.emplace_back( jit_Operand_Kind_LocalD, *tCodePc++ );
+        }
+        break;
       case tPushParamI : {
           operandStack.emplace_back( jit_Operand_Kind_ParamI, *tCodePc++ );
         }
@@ -1742,6 +1774,10 @@ generateCode()
         break;
       case tPushParamP : {
           operandStack.emplace_back( jit_Operand_Kind_ParamP, *tCodePc++ );
+        }
+        break;
+      case tPushParamD : {
+          operandStack.emplace_back( jit_Operand_Kind_ParamD, *tCodePc++ );
         }
         break;
       case tPushUpLocalI : {
@@ -1774,6 +1810,16 @@ generateCode()
           operandStack.push_back( x );
         }
         break;
+      case tPushUpLocalD : {
+          int uplevels = *tCodePc++;
+          int offset = *tCodePc++;
+          Register* frameReg = getUpFrame( uplevels );
+          Operand x( jit_Operand_Kind_RegP_DerefD, frameReg, offset );
+          // For now, deref is only understood by emitMov, so need to get var into a register
+          operandIntoFloatReg( x );
+          operandStack.push_back( x );
+        }
+        break;
       case tPushUpParamI : {
           int uplevels = *tCodePc++;
           int offset = *tCodePc++;
@@ -1801,6 +1847,16 @@ generateCode()
           Operand x( jit_Operand_Kind_RegP_DerefP, frameReg, offset + FPO );
           // For now, deref is only understood by emitMov, so need to get var into a register
           operandIntoReg( x );
+          operandStack.push_back( x );
+        }
+        break;
+      case tPushUpParamD : {
+          int uplevels = *tCodePc++;
+          int offset = *tCodePc++;
+          Register* frameReg = getUpFrame( uplevels );
+          Operand x( jit_Operand_Kind_RegP_DerefD, frameReg, offset + FPO );
+          // For now, deref is only understood by emitMov, so need to get var into a register
+          operandIntoFloatReg( x );
           operandStack.push_back( x );
         }
         break;
@@ -1894,6 +1950,20 @@ generateCode()
           operandStack.push_back( x );
         }
         break;
+      case tFetchD : {
+          Operand x = operandStack.back();   operandStack.pop_back();
+          // x is a pointer to a value of size 8.
+          // Make x refer to the pointed-to value
+          operandDerefFloat( x, 8 );
+          // If I allow jit_Operand_Kind_RegP_Deref* on the operand stack,
+          // then we could just push x and be done.
+          // The actual retrieval of the value can be included in the next operation.
+          // But, for now, we only handle that operand kind in emitMov.
+          // So we have to retrieve it into a register now.
+          operandIntoFloatReg( x );
+          operandStack.push_back( x );
+        }
+        break;
       case tAssignI : {
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
@@ -1951,7 +2021,7 @@ generateCode()
         }
         break;
       case tAssignD : {
-          // This is the same as tAssignP, except for how we deal with cdecl params.
+          // This is similar to tAssignP, except for how we deal with cdecl params.
           Operand y = operandStack.back();   operandStack.pop_back();
           Operand x = operandStack.back();   operandStack.pop_back();
 
@@ -1959,9 +2029,9 @@ generateCode()
           // to help with cdecl calls.  This assign is not affected.
           cdeclCheckForAssignToActual( x, jit_Operand_Kind_ActualD );
 
-          // x is a pointer to a value of size 8.
+          // x is a pointer to a float value of size 8.
           // Make x refer to the pointed-to value (still usable as target of mov)
-          operandDeref( x, 8 );
+          operandDerefFloat( x, 8 );
           // x will be a memory reference, so y must not also be in memory.
           operandNotMem( y );
           emitMov( x, y );
@@ -3122,15 +3192,24 @@ finishMethod()
 // Return the operand kind for a register with the given size.
 //
 jitOperandKind
-operandKindReg( int size )
+operandKindReg( int size, bool isFloat )
 {
-  switch ( size ) {
-    case 1: return jit_Operand_Kind_RegB;
-    case 4: return jit_Operand_Kind_RegI;
-    case 8: return jit_Operand_Kind_RegP;
-    default:
-      fatal( "operandKindReg: unexpected size %d\n", size );
-      return jit_Operand_Kind_Illegal;
+  if ( isFloat ) {
+    switch ( size ) {
+      case 8: return jit_Operand_Kind_RegD;
+      default:
+        fatal( "operandKindReg: unexpected size %d for float\n", size );
+        return jit_Operand_Kind_Illegal;
+    }
+  } else {
+    switch ( size ) {
+      case 1: return jit_Operand_Kind_RegB;
+      case 4: return jit_Operand_Kind_RegI;
+      case 8: return jit_Operand_Kind_RegP;
+      default:
+        fatal( "operandKindReg: unexpected size %d\n", size );
+        return jit_Operand_Kind_Illegal;
+    }
   }
 }
 
@@ -3190,7 +3269,7 @@ forceAllocateReg( Register* reg )
 
     for ( Operand& x : operandStack ) {
       if ( x.isReg() && x._reg == reg ) {
-        Operand newX = allocateTemp( x.size() );
+        Operand newX = allocateTemp( x.size(), reg->isFloat() );
         emitMov( newX, x );
         x.release();
         // replace entry in operand stack
@@ -3262,7 +3341,7 @@ preserveRegsAcrossCall()
     if ( x.isReg() && !x._reg->_calleeSave ) {
       // TO DO: if same reg is referenced by multiple opconds in the stack,
       //        share the same temporary too.  But only if they have the same size.
-      Operand newX = allocateTemp( x.size() );
+      Operand newX = allocateTemp( x.size(), x._reg->isFloat() );
       emitMov( newX, x );
       x.release();
       // replace entry in operand stack
@@ -3345,7 +3424,11 @@ cdeclCheckForFunction( int* tCodePc )
       ci._isFunc = true;
       ci._returnValue = Operand( jit_Operand_Kind_LocalP, tCodePc[1] );
       break;
-    case tPushAddrLocal:
+    case tPushLocalD:
+      ci._isFunc = true;
+      ci._returnValue = Operand( jit_Operand_Kind_LocalD, tCodePc[1] );
+      break;
+      case tPushAddrLocal:
       // complex return value
       // not supporting in cdec yet.
       toDo( "cdeclCheckForFunction: complex function return type not supported yet\n" );
@@ -3424,9 +3507,11 @@ cdeclSaveReturnValue()
   assert( ci._cdecl == true );
 
   if ( ci._isFunc ) {
-    // For all my currently supported cases,
-    // the cdecl return value is in rax
-    Operand cdeclResult( operandKindReg( ci._returnValue.size() ), regRax );
+    // cdecl return value is in regRax for integral types,
+    // and xmm0 for floating types.  I don't support struct return types yet.
+    bool isFloat = ci._returnValue.isFloat();
+    Register* cdeclReg = isFloat ? regXmm0 : regRax;
+    Operand cdeclResult( operandKindReg( ci._returnValue.size(), isFloat ), cdeclReg );
     emitMov( ci._returnValue, cdeclResult );
   }  
 }
@@ -3436,22 +3521,32 @@ cdeclSaveReturnValue()
 // Allocate a temporary variable of the given byte size (1, 4, 8).
 //
 Operand
-allocateTemp( int size )
+allocateTemp( int size, bool isFloat )
 {
   currLocalSpace += size;
   jitOperandKind newKind = jit_Operand_Kind_Illegal;
-  switch ( size ) {
-    case 1:
-      newKind = jit_Operand_Kind_LocalB;
-      break;
-    case 4:
-      newKind = jit_Operand_Kind_LocalI;
-      break;
-    case 8:
-      newKind = jit_Operand_Kind_LocalP;
-      break;
-    default:
-      fatal( "allocateTemp: unexpected size %d\n", size );
+  if ( isFloat ) {
+    switch ( size ) {
+      case 8:
+        newKind = jit_Operand_Kind_LocalD;
+        break;
+      default:
+        fatal( "allocateTemp: unexpected size %d for float\n", size );
+    }
+  } else {
+    switch ( size ) {
+      case 1:
+        newKind = jit_Operand_Kind_LocalB;
+        break;
+      case 4:
+        newKind = jit_Operand_Kind_LocalI;
+        break;
+      case 8:
+        newKind = jit_Operand_Kind_LocalP;
+        break;
+      default:
+        fatal( "allocateTemp: unexpected size %d\n", size );
+    }
   }
   return Operand( newKind, -currLocalSpace );
 }
@@ -3608,8 +3703,11 @@ Operand::size() const
       return 4;
 
     case jit_Operand_Kind_GlobalP:
+    case jit_Operand_Kind_GlobalD:
     case jit_Operand_Kind_LocalP:
+    case jit_Operand_Kind_LocalD:
     case jit_Operand_Kind_ParamP:
+    case jit_Operand_Kind_ParamD:
     case jit_Operand_Kind_ActualP:
     case jit_Operand_Kind_ActualD:
     case jit_Operand_Kind_Addr_Global:
@@ -3621,12 +3719,34 @@ Operand::size() const
     case jit_Operand_Kind_RegP:
     case jit_Operand_Kind_RegD:
     case jit_Operand_Kind_RegP_DerefP:
+    case jit_Operand_Kind_RegP_DerefD:
       return 8;
 
     default:
       fatal( "Operand::size() - unexpected operand kind %d\n", (int) _kind );
   }
   return 1;  // won't reach here
+}
+
+
+// Does the operand represent a floating point value?
+//
+bool
+Operand::isFloat() const
+{
+  switch ( _kind ) {
+    case jit_Operand_Kind_GlobalD:
+    case jit_Operand_Kind_LocalD:
+    case jit_Operand_Kind_ParamD:
+    case jit_Operand_Kind_ActualD:
+    case jit_Operand_Kind_ConstD:
+    case jit_Operand_Kind_RegD:
+    case jit_Operand_Kind_RegP_DerefD:
+      return true;
+
+    default:
+      return false;
+  }
 }
 
 
@@ -3685,18 +3805,33 @@ operandIntoReg( Operand& x )
 
   // The size of the register will depend on the value we're moving into it
   jitOperandKind regKind;
-  switch ( x.size() ) {
-    case 1:
-      regKind = jit_Operand_Kind_RegB;
-      break;
-    case 4:
-      regKind = jit_Operand_Kind_RegI;
-      break;
-    case 8:
-      regKind = jit_Operand_Kind_RegP;
-      break;
+  Register* reg = nullptr;
+  if ( x.isFloat() ) {
+    reg = allocateFloatReg();
+    switch ( x.size() ) {
+      case 8:
+        regKind = jit_Operand_Kind_RegD;
+        break;
+      default:
+        fatal( "operandIntoReg: unexpected size %d for float operand\n", x.size() );
+    }
+  } else {
+    reg = allocateReg();
+    switch ( x.size() ) {
+      case 1:
+        regKind = jit_Operand_Kind_RegB;
+        break;
+      case 4:
+        regKind = jit_Operand_Kind_RegI;
+        break;
+      case 8:
+        regKind = jit_Operand_Kind_RegP;
+        break;
+      default:
+        fatal( "operandIntoReg: unexpected size %d\n", x.size() );
+    }
   }
-  Operand newX( regKind, allocateReg() );
+  Operand newX( regKind, reg );
   emitMov( newX, x );
   x.release();
   x = newX;
@@ -3800,7 +3935,7 @@ void
 operandNotRegOrDeref( Operand& x )
 {
   if ( x.isReg() || x.isDeref() ) {
-    Operand newX = allocateTemp( x.size() );
+    Operand newX = allocateTemp( x.size(), x.isFloat() );
     emitMov( newX, x );
     x.release();
     x = newX;
@@ -3928,6 +4063,80 @@ operandDeref( Operand& x, int size )
       break;
     default:
       fatal( "operandDeref: unexpected operands\n" );
+      break;
+  }
+}
+
+
+// x is a pointer to a floating point value of the given byte size.
+// Make x refer to the pointed-to value.
+// The resulting operand can be used as the left or right argument of emitMov().
+//
+void
+operandDerefFloat( Operand& x, int size )
+{
+  if ( x.isVar() ) {
+    // the pointer is stored in a variable, so we need to fetch the pointer first.
+    operandIntoReg( x );
+  }
+
+  // Create an opcond that represents the pointed-to value.
+  switch ( x._kind ) {
+    case jit_Operand_Kind_Addr_Global:
+      switch ( size ) {
+        case 8:
+          x = Operand( jit_Operand_Kind_GlobalD, x._value );
+          break;
+        default:
+          break;
+      }
+      break;
+    case jit_Operand_Kind_Addr_Local:
+      switch ( size ) {
+        case 8:
+          x = Operand( jit_Operand_Kind_LocalD, x._value );
+          break;
+        default:
+          break;
+      }
+      break;
+    case jit_Operand_Kind_Addr_Param:
+      switch ( size ) {
+        case 8:
+          x = Operand( jit_Operand_Kind_ParamD, x._value );
+          break;
+        default:
+          break;
+      }
+      break;
+    case jit_Operand_Kind_Addr_Actual:
+      switch ( size ) {
+        case 8:
+          x = Operand( jit_Operand_Kind_ActualD, x._value );
+          break;
+        default:
+          break;
+      }
+      break;
+    case jit_Operand_Kind_Addr_Reg_Offset:
+      switch ( size ) {
+        case 8:
+          x = Operand( jit_Operand_Kind_RegP_DerefD, x._reg, x._value );
+          break;
+        default:
+          break;
+      }
+    case jit_Operand_Kind_RegP:
+      switch ( size ) {
+        case 8:
+          x = Operand( jit_Operand_Kind_RegP_DerefD, x._reg, 0 );
+          break;
+        default:
+          break;
+      }
+      break;
+    default:
+      fatal( "operandDerefFloat: unexpected operands\n" );
       break;
   }
 }
@@ -4070,14 +4279,19 @@ operandLowWord( const Operand& x )
 {
   switch ( x._kind ) {
     case jit_Operand_Kind_GlobalP:
+    case jit_Operand_Kind_GlobalD:
       return Operand( jit_Operand_Kind_GlobalI, x._value );
     case jit_Operand_Kind_LocalP:
+    case jit_Operand_Kind_LocalD:
       return Operand( jit_Operand_Kind_LocalI, x._value );
     case jit_Operand_Kind_ParamP:
+    case jit_Operand_Kind_ParamD:
       return Operand( jit_Operand_Kind_ParamI, x._value );
     case jit_Operand_Kind_ActualP:
+    case jit_Operand_Kind_ActualD:
       return Operand( jit_Operand_Kind_ActualI, x._value );
     case jit_Operand_Kind_RegP_DerefP:
+    case jit_Operand_Kind_RegP_DerefD:
       return Operand( jit_Operand_Kind_RegP_DerefI, x._reg, x._value );
     default:
       fatal( "operandLowWord unexpected operand kind %d\n", x._kind );
@@ -4093,14 +4307,19 @@ operandHighWord( const Operand& x )
 {
   switch ( x._kind ) {
     case jit_Operand_Kind_GlobalP:
+    case jit_Operand_Kind_GlobalD:
       return Operand( jit_Operand_Kind_GlobalI, x._value + 4 );
     case jit_Operand_Kind_LocalP:
+    case jit_Operand_Kind_LocalD:
       return Operand( jit_Operand_Kind_LocalI, x._value + 4 );
     case jit_Operand_Kind_ParamP:
+    case jit_Operand_Kind_ParamD:
       return Operand( jit_Operand_Kind_ParamI, x._value + 4 );
     case jit_Operand_Kind_ActualP:
+    case jit_Operand_Kind_ActualD:
       return Operand( jit_Operand_Kind_ActualI, x._value + 4 );
     case jit_Operand_Kind_RegP_DerefP:
+    case jit_Operand_Kind_RegP_DerefD:
       return Operand( jit_Operand_Kind_RegP_DerefI, x._reg, x._value + 4 );
     default:
       fatal( "operandLowWord unexpected operand kind %d\n", x._kind );
@@ -4355,6 +4574,11 @@ emitAddFloat( const Operand& x, const Operand& y )
     case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_LocalP ):
     case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_ParamP ):
     case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_RegP_DerefP ):
+      // TO DO: Do I still need the above?
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_GlobalD ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_LocalD ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_ParamD ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_RegP_DerefD ):
     case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_RegD ):
       emit( addsdTemplates, x, y );
       break;
@@ -4412,6 +4636,12 @@ emitSubFloat( const Operand& x, const Operand& y )
     case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_LocalP ):
     case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_ParamP ):
     case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_RegP_DerefP ):
+      // TO DO: may not need above anymore?
+
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_GlobalD ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_LocalD ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_ParamD ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_RegP_DerefD ):
     case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_RegD ):
       emit( subsdTemplates, x, y );
       break;
@@ -4524,6 +4754,11 @@ emitMultFloat( const Operand& x, const Operand& y )
     case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_GlobalP ):
     case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_LocalP ):
     case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_ParamP ):
+      // TO DO: may not need above anymore?
+
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_GlobalD ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_LocalD ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_ParamD ):
     case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_RegD ):
       emit( mulsdTemplates, x, y );
       break;
@@ -4594,6 +4829,10 @@ emitDivFloat( const Operand& x, const Operand& y )
     case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_GlobalP ):
     case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_LocalP ):
     case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_ParamP ):
+      // Do I still need the above?
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_GlobalD ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_LocalD ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_ParamD ):
     case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_RegD ):
       emit( divsdTemplates, x, y );
       break;
@@ -4968,24 +5207,40 @@ emitMov( const Operand& x, const Operand& y )
     case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_LocalP ):
     case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_ParamP ):
     case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_ActualP ):
-    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_ActualD ):
-    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_RegD ):
     case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_RegP_DerefP ):
     case KindPair( jit_Operand_Kind_GlobalP, jit_Operand_Kind_RegD ):
     case KindPair( jit_Operand_Kind_LocalP, jit_Operand_Kind_RegD ):
     case KindPair( jit_Operand_Kind_ParamP, jit_Operand_Kind_RegD ):
     case KindPair( jit_Operand_Kind_ActualP, jit_Operand_Kind_RegD ):
-    case KindPair( jit_Operand_Kind_ActualD, jit_Operand_Kind_RegD ):
     case KindPair( jit_Operand_Kind_RegP_DerefP, jit_Operand_Kind_RegD ):
+      // I used the above prior to introducing "D" variables.  Probably can remove now.
+
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_GlobalD ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_LocalD ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_ParamD ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_ActualD ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_RegD ):
+    case KindPair( jit_Operand_Kind_RegD, jit_Operand_Kind_RegP_DerefD ):
+    case KindPair( jit_Operand_Kind_GlobalD, jit_Operand_Kind_RegD ):
+    case KindPair( jit_Operand_Kind_LocalD, jit_Operand_Kind_RegD ):
+    case KindPair( jit_Operand_Kind_ParamD, jit_Operand_Kind_RegD ):
+    case KindPair( jit_Operand_Kind_ActualD, jit_Operand_Kind_RegD ):
+    case KindPair( jit_Operand_Kind_RegP_DerefD, jit_Operand_Kind_RegD ):
       emit( movsdTemplates, x, y );
       break;
 
-    // Few instructions support imm64.  Instead, we often need a sequence of instructions.
+    // ConstD is an imm64 value.  But not many instructions support imm64.
+    // Instead, we often need a sequence of instructions.
 
     case KindPair( jit_Operand_Kind_GlobalP, jit_Operand_Kind_ConstD ):
     case KindPair( jit_Operand_Kind_LocalP, jit_Operand_Kind_ConstD ):
     case KindPair( jit_Operand_Kind_ParamP, jit_Operand_Kind_ConstD ):
     case KindPair( jit_Operand_Kind_ActualP, jit_Operand_Kind_ConstD ):
+      // Do we still need the above?
+    case KindPair( jit_Operand_Kind_GlobalD, jit_Operand_Kind_ConstD ):
+    case KindPair( jit_Operand_Kind_LocalD, jit_Operand_Kind_ConstD ):
+    case KindPair( jit_Operand_Kind_ParamD, jit_Operand_Kind_ConstD ):
+    case KindPair( jit_Operand_Kind_ActualD, jit_Operand_Kind_ConstD ):
       {
         int* yWords = (int*) &y._double;
         Operand yLow( jit_Operand_Kind_ConstI, yWords[0] );

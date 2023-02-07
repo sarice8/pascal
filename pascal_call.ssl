@@ -167,6 +167,7 @@ Call( Node method ):
          [ oTypeSNodeType
             | nIntegerType, nEnumType :   .tPushLocalI  oEmitInt( tempOffset )
             | nBooleanType, nByteType, nCharType :   .tPushLocalB  oEmitInt( tempOffset )
+            | nDoubleType :               .tPushLocalD  oEmitInt( tempOffset )
             | nFileType :  #eNotImplemented
             | nPointerType, nUniversalPointerType :   .tPushLocalP  oEmitInt( tempOffset )
             | nArrayType, nRecordType, nShortStringType :   % compound type: push address

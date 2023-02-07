@@ -136,23 +136,28 @@ input:
 
 output:
 
-%  Instructions for a stack machine (all vars are 32-bit integers)
+%  Instructions for a stack machine
 
    tPushGlobalI      % <ptr> - push int value read from ptr
    tPushGlobalB      % <ptr> - push byte value read from ptr
    tPushGlobalP      % <ptr> - push ptr value read from ptr
+   tPushGlobalD      % <ptr> - push double precision float value read from ptr
    tPushLocalI       % <offset> - push int value read from local var in current scope
    tPushLocalB       % <offset> - push byte value read from local var in current scope
    tPushLocalP       % <offset> - push ptr value read from local var in current scope
+   tPushLocalD       % <offset> - push double value read from local var in current scope
    tPushParamI       % <offset> - push int value read from param in current scope
    tPushParamB       % <offset> - push byte value read from param in current scope
    tPushParamP       % <offset> - push ptr value read from param in current scope
+   tPushParamD       % <offset> - push double value read from param in current scope
    tPushUpLocalI     % <uplevels> <offset> - push int value read from local var in a parent static scope
    tPushUpLocalB     % <uplevels> <offset> - push byte value read from local var in a parent static scope
    tPushUpLocalP     % <uplevels> <offset> - push ptr value read from local var in a parent static scope
+   tPushUpLocalD     % <uplevels> <offset> - push double value read from local var in a parent static scope
    tPushUpParamI     % <uplevels> <offset> - push int value read from param in a parent static scope
    tPushUpParamB     % <uplevels> <offset> - push byte value read from param in a parent static scope
    tPushUpParamP     % <uplevels> <offset> - push ptr value read from param in a parent static scope
+   tPushUpParamD     % <uplevels> <offset> - push double value read from param in a parent static scope
    tPushConstI       % <int> - push int value on stack (NOTE, used for BOOLEAN too)
    tPushConstD       % <double> - push double value on stack
    tPushAddrGlobal   % <offset> - push ptr to global var
@@ -165,6 +170,7 @@ output:
    tFetchI           % pop ptr from stack, and push int value it points to
    tFetchB           %    "      "      "     "     byte  "   "    "
    tFetchP           %    "      "      "     "     ptr   "   "    "   
+   tFetchD           %    "      "      "     "     double "  "    "   
    tAssignI          % assign int value on top of stack to addr under it (pop both)
    tAssignB          %   "    byte   "    "   "  "   "    "    "   "   "
    tAssignP          %   "    ptr    "    "   "  "   "    "    "   "   "

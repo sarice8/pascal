@@ -306,6 +306,27 @@ callCdecl( const std::string& name )
   } else if ( name == "runlibWaitKey" ) {
     int* resultPtr = getParam<int*>( 0 );
     *resultPtr = runlibWaitKey();
+  } else if ( name == "runlibArctan" ) {
+    double* resultPtr = getParam<double*>( 8 );
+    *resultPtr = runlibArctan( getParam<double>( 0 ) );
+  } else if ( name == "runlibCos" ) {
+    double* resultPtr = getParam<double*>( 8 );
+    *resultPtr = runlibCos( getParam<double>( 0 ) );
+  } else if ( name == "runlibExp" ) {
+    double* resultPtr = getParam<double*>( 8 );
+    *resultPtr = runlibExp( getParam<double>( 0 ) );
+  } else if ( name == "runlibLn" ) {
+    double* resultPtr = getParam<double*>( 8 );
+    *resultPtr = runlibLn( getParam<double>( 0 ) );
+  } else if ( name == "runlibRound" ) {
+    int* resultPtr = getParam<int*>( 8 );
+    *resultPtr = runlibRound( getParam<double>( 0 ) );
+  } else if ( name == "runlibSin" ) {
+    double* resultPtr = getParam<double*>( 8 );
+    *resultPtr = runlibSin( getParam<double>( 0 ) );
+  } else if ( name == "runlibSqrt" ) {
+    double* resultPtr = getParam<double*>( 8 );
+    *resultPtr = runlibSqrt( getParam<double>( 0 ) );
   } else if ( name == "runlibTrunc" ) {
     int* resultPtr = getParam<int*>( 8 );
     *resultPtr = runlibTrunc( getParam<double>( 0 ) );
@@ -341,6 +362,10 @@ walkTable()
               if (++sp>=stackMax) fatal("stack overflow");
               stack[sp] = (long) *(void**) (data + code[pc++]);
               continue;
+       case tPushGlobalD :
+              if (++sp>=stackMax) fatal("stack overflow");
+              stack[sp] = (long) *(void**) (data + code[pc++]);
+              continue;
        case tPushLocalI :
               // code provides negative offset from call_fp
               if (++sp>=stackMax) fatal("stack overflow");
@@ -354,6 +379,10 @@ walkTable()
               if (++sp>=stackMax) fatal("stack overflow");
               stack[sp] = (long) *(void**) (call_fp + code[pc++]);
               continue;
+       case tPushLocalD :
+              if (++sp>=stackMax) fatal("stack overflow");
+              stack[sp] = (long) *(void**) (call_fp + code[pc++]);
+              continue;
        case tPushParamI :
               if (++sp>=stackMax) fatal("stack overflow");
               stack[sp] = *(int*) (call_fp + code[pc++] + FRAME_PARAMS_OFFSET);
@@ -363,6 +392,10 @@ walkTable()
               stack[sp] = *(char*) (call_fp + code[pc++] + FRAME_PARAMS_OFFSET);
               continue;
        case tPushParamP :
+              if (++sp>=stackMax) fatal("stack overflow");
+              stack[sp] = (long) *(void**) (call_fp + code[pc++] + FRAME_PARAMS_OFFSET);
+              continue;
+       case tPushParamD :
               if (++sp>=stackMax) fatal("stack overflow");
               stack[sp] = (long) *(void**) (call_fp + code[pc++] + FRAME_PARAMS_OFFSET);
               continue;
@@ -381,6 +414,13 @@ walkTable()
               continue;
               }
        case tPushUpLocalP : {
+              if (++sp>=stackMax) fatal("stack overflow");
+              int uplevels = code[pc++];
+              int offset = code[pc++];
+              stack[sp] = (long) *(void**) (upStaticFrame( uplevels ) + offset);
+              continue;
+              }
+       case tPushUpLocalD : {
               if (++sp>=stackMax) fatal("stack overflow");
               int uplevels = code[pc++];
               int offset = code[pc++];
@@ -443,6 +483,9 @@ walkTable()
               stack[sp] = *(char*) stack[sp];
               continue;
        case tFetchP :
+              stack[sp] = (long) *(void**) stack[sp];
+              continue;
+       case tFetchD :
               stack[sp] = (long) *(void**) stack[sp];
               continue;
        case tAssignI :

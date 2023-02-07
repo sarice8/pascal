@@ -13,6 +13,7 @@
 #include <string.h>
 #include <assert.h>
 #include <sys/mman.h>
+#include <cmath>
 
 #include <string>
 #include <stack>
@@ -28,6 +29,13 @@
 // For now, I have a hardcoded list of available external methods.
 //
 std::unordered_map<std::string, void*> runlibMethods = {
+  { "runlibArctan", (void*) runlibArctan },
+  { "runlibCos", (void*) runlibCos },
+  { "runlibExp", (void*) runlibExp },
+  { "runlibLn", (void*) runlibLn },
+  { "runlibRound", (void*) runlibRound },
+  { "runlibSin", (void*) runlibSin },
+  { "runlibSqrt", (void*) runlibSqrt },
   { "runlibTrunc", (void*) runlibTrunc },
   { "runlibShortStrCmp", (void*) runlibShortStrCmp },
   { "runlibMalloc", (void*) runlibMalloc },
@@ -420,6 +428,70 @@ runlibWaitKey()
 }
 
 
+double
+runlibArctan( double x )
+{
+  return atan( x );
+}
+
+double
+runlibCos( double radians )
+{
+  return cos( radians );
+}
+
+double
+runlibExp( double x )
+{
+  return exp( x );  // e to the x
+}
+
+double
+runlibLn( double x )
+{
+  return log( x );  // natural log
+}
+
+// Round to nearest int.
+// values at x.5 round to the nearest even int ("banker's rounding").
+//
+static double runlib_ROUNDING_EPSILON = 0.0000001;
+
+int
+runlibRound( double x )
+{
+  // Algorithm of banker's rounding from
+  //   https://cplusplus.com/forum/articles/3638/
+
+  if ( x < 0.0 ) {
+    return -runlibRound( -x );
+  }
+  double intPart;
+  std::modf( x, &intPart );
+  int i = (int) intPart;  // implicit conversion truncates
+
+  // Is x halfway between two integers
+  if ( fabs( x - ( intPart + 0.5 ) ) < runlib_ROUNDING_EPSILON ) {
+    // Yes.  Move to even integer.
+    return ( i % 2 == 0 ) ? i : i + 1;
+  }
+
+  // Move to closest integer.
+  return (int) round( x );
+}
+
+double
+runlibSin( double radians )
+{
+  return sin( radians );
+}
+
+double
+runlibSqrt( double x )
+{
+  return sqrt( x );
+}
+
 // round towards zero
 //
 int
@@ -428,6 +500,3 @@ runlibTrunc( double x )
   return (int) std::trunc( x );
 }
 
-// TO DO: see an implementation of banker's rounding here
-//   (Pascal's round() - halfway points round towards even number)
-//   https://cplusplus.com/forum/articles/3638/

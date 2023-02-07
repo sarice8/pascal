@@ -841,9 +841,31 @@ VarExpr( Node decl ):
       | nFileType :
          #eNotImplemented
 
-      | nPointerType, nUniversalPointerType, nDoubleType :
-         % Note we're using this code for reading double vars too.
-         % P is the correct size, and no differences are needed at the moment.
+      | nDoubleType :
+         [ oNodeType( decl )
+            | nGlobalVar, nTypedConst :   .tPushGlobalD  @EmitValue( decl )
+            | nLocalVar :
+               [ equal_zero( uplevels )
+                  | true :  .tPushLocalD  @EmitValue( decl )
+                  | * :     .tPushUpLocalD  oEmitInt( uplevels )  @EmitValue( decl )
+               ]
+            | nParam :
+               [ oNodeGetBoolean( decl, qInOut )
+                  | true :    % VAR param points to the var.  Auto dereference.
+                     [ equal_zero( uplevels )
+                        | true :  .tPushParamP  @EmitValue( decl )
+                        | * :     .tPushUpParamP  oEmitInt( uplevels )  @EmitValue( decl )
+                     ]
+                     .tFetchD
+                  | * :
+                     [ equal_zero( uplevels )
+                        | true :  .tPushParamD  @EmitValue( decl )
+                        | * :     .tPushUpParamD  oEmitInt( uplevels )  @EmitValue( decl )
+                     ]
+               ]
+         ]
+
+      | nPointerType, nUniversalPointerType :
          [ oNodeType( decl )
             | nGlobalVar, nTypedConst :   .tPushGlobalP @EmitValue( decl )
             | nLocalVar :
@@ -919,6 +941,7 @@ FetchVar:
    [ oTypeSNodeType
       | nIntegerType, nEnumType :  .tFetchI
       | nBooleanType, nByteType, nCharType :  .tFetchB
+      | nDoubleType :              .tFetchD
       | nFileType :   #eNotImplemented
       | nPointerType :             .tFetchP
       | nUniversalPointerType :    #eCantDereference

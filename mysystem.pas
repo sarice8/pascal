@@ -55,7 +55,7 @@ const PI = 3.141592653589793238462643383;
 
 function abs( x: double ): double;
 
-function arctan( radians: double ): double; cdecl;
+function arctan( x: double ): double; cdecl;
   external 'runlib' name 'runlibArctan';
 
 function cos( radians: double ): double; cdecl;

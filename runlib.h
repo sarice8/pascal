@@ -29,6 +29,13 @@ void* runlibMalloc( int size );
 void* runlibRealloc( void* ptr, int size );
 void runlibFree( void* ptr );
 
+double runlibArctan( double x );
+double runlibCos( double radians );
+double runlibExp( double x );
+double runlibLn( double x );
+int runlibRound( double x );
+double runlibSin( double radians );
+double runlibSqrt( double x );
 int runlibTrunc( double x );
 
 void grInit();
