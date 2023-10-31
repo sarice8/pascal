@@ -1,0 +1,29 @@
+
+% Generated automatically by schema
+
+type node_type:
+	nINVALID
+	Object
+	nSchema
+	nClass
+	nAttr
+	nConstraint
+	nAttrSym
+	;
+
+type node_attribute:
+	qINVALID
+	qClassTree
+	qAttrSyms
+	qAllClasses
+	qIdent
+	qText
+	qCode
+	qAttrs
+	qDerived
+	qAttrSym
+	qConstraint
+	qTags
+	qType
+	;
+

@@ -1,0 +1,7 @@
+
+Schema 1.4 (4/21/1994)
+
+This is the Schema compiler, built using SSL 1.3.2 and the
+generic SSL runtime module (ssl_rt 2.0)
+
+It also includes a schema, so it should compile itself.

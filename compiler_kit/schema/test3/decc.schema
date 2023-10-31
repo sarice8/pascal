@@ -1,0 +1,119 @@
+
+schema Decc root FuncDef is
+
+Object ::= AddressedObject
+AddressedObject =>
+	qAddr:		Integer4
+
+AddressedObject ::= FuncDef
+FuncDef =>
+	qLocalSpace:	Integer4			% Number of bytes for local variables
+	qParamSpace:	Integer4			% Highest param accessed, starting with 0x0E
+	qReturnAddr:	Integer4			% Address of function's exit code
+	qBody:		List		(Statement)
+
+%
+% -----------------------------------------------------------------------------------------------
+%
+
+AddressedObject ::= Expression
+
+Expression ::= Var
+Var =>
+	qDeclAddr:	Integer4
+
+Expression ::= Const
+Const =>
+	qValue:		Integer4
+
+Const ::= Address	% Variable address constant
+
+Expression ::= BinaryOperator
+BinaryOperator =>
+	qLeft:		Node	(Expression)
+	qRight:		Node	(Expression)
+
+BinaryOperator ::= Compare
+Compare =>
+	qCompareType:	Integer4
+
+BinaryOperator ::= Add
+
+BinaryOperator ::= And
+
+BinaryOperator ::= Or
+
+BinaryOperator ::= BitAnd
+
+Expression ::= UnaryOperator
+UnaryOperator =>
+	qExpr:		Node	(Expression)
+
+UnaryOperator ::= Invert
+
+%
+% -----------------------------------------------------------------------------------------------
+%
+
+% A Statement is an Expression because some statements can
+% appear in expression trees (e.g. Assign, Call, Inc).
+% However, Statement lists must contain only Statements.
+
+% A statement is usually committed to a statement list,
+% but sometimes it can be pulled out and made part of an
+% expression.
+
+Expression ::= Statement
+Statement =>
+	qCommitted:	Boolean1			% Committed to statement list?
+
+Statement ::= Call
+Call =>
+	qTargetAddr:	Integer4
+	qParams:	List	(Expression)
+
+Statement ::= Assign
+Assign =>
+	qTarget:	Node	(Expression)
+	qExpr:		Node	(Expression)
+
+Statement ::= Inc
+Inc =>
+	qTarget:	Node	(Expression)
+	qPostfix:	Boolean1
+
+Statement ::= Goto
+Goto =>
+	qTargetAddr:	Integer4
+
+Statement ::= NotSupported
+NotSupported =>
+	qText:		StringN
+
+
+% StructureStatements encapsulate blocks of code.
+% Also, these statements don't have a terminating ';'
+
+Statement ::= StructureStatement
+
+StructureStatement ::= If
+If =>
+	qExpr:		Node	(Expression)
+	qThen:		List	(Statement)
+	qElse:		List	(Statement)
+
+StructureStatement ::= While
+While =>
+	qExpr:		Node	(Expression)
+	qBody:		List	(Statement)
+
+StructureStatement ::= For
+For =>
+	qInit:		List	(Statement)
+	qExpr:		Node	(Expression)
+	qIncr:		List	(Statement)
+	qBody:		List	(Statement)
+	
+
+End
+
