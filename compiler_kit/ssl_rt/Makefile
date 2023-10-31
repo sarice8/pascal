@@ -2,12 +2,12 @@
 #  SSL runtime modules
 
 # Needs snapshot of supporting tools
-RELEASE      = /home/steve/fun/compilers/release_images
+RELEASE      = ../release
 
-DBG_DIR      = $(RELEASE)/debug/1.3.0
+DBG_DIR      = $(RELEASE)/debug
 
 # This is the directory we would export our own build to
-OUR_RELEASE_DIR = $(RELEASE)/ssl_rt/2.0
+OUR_RELEASE_DIR = $(RELEASE)/ssl_rt
 
 # ---------------------------------------------------------
 
