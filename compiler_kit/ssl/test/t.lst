@@ -1,0 +1,4160 @@
+      %  sccsid = "%W% %G% %U% %P%";
+      
+   2: title: 'SSL Translator 1.3.2 -- September 14 ''93';
+      
+      %
+      % *****************************************************************************
+      %
+      %   Syntax/Semantic Language Compiler
+      %
+      %   by Steve Rice
+      %
+      %   Aug 31, 1989
+      %
+      % *****************************************************************************
+      %
+      %   ssl.ssl             SSL compiler
+      %
+      %   HISTORY
+      % -----------------------------------------------------------------------------
+      %   08/31/89 | Steve  | Translated from my SSL processor hardcoded in C
+      %   09/08/89 |        | SSL processor now functional, except for error recovery
+      %   10/18/89 |        | Added 'title' section
+      %   02/03/90 |        | Change to ssl.c: Added debugger output
+      %   03/20/91 |        | Change to ssl.c: Increased string table size
+      %   03/26/91 |        | Fixed bug in handling of statement ">>value"
+      %            |        | Fixed bug in handling of choice using a choice rule
+      %            |        | defined later
+      %   04/24/91 |        | Change to ssl.c: Increased identifier size to 50 chars
+      %   05/05/91 |        | Change to ssl.c: Increased identifier table size to
+      %            |        | 600, and moved names out of table. New limit 256 chars.
+      %            |        | Added "include" feature.
+      %   05/21/91 |        | Multiple "error" sections will use distinct error #'s
+      %            |        | Added postprocess optimization: reduce chains of jumps
+      %   06/04/91 |        | Change to ssl.c: Write rule addresses to code file
+      %   08/23/93 |        | Fix some loops so error recovery can terminate
+      %   08/25/93 |        | Reimplement using schema database for symbol table
+      %   08/27/93 |        | Add new language features: local variables,
+      %            |        | multiple parameters, inout parameters,
+      %            |        | expressions with nested function calls.
+      %            |        | (User program requires the 2.0 runtime model for new
+      %            |        | instructions in generated code).
+      %   08/29/93 |        | Reimplement compiler using above new language features
+      %            |        | (typically using local variables rather than stacks)
+      %   09/14/93 |        | Split into two passes: collect definitions, generate
+      %            |        | code for rules.  So user is not required to provide
+      %            |        | forward definitions for rules with out parameters.
+      %            |        |
+      % 
+      % *****************************************************************************
+      %
+      
+   2: input:
+   2:     pIdent
+   2:     pIntLit
+   2:     pStrLit
+   2:     pMinus      '-'
+   2:     pEquals     '='
+   2:     pColon      ':'
+   2:     pSemiColon  ';'
+   2:     pComma      ','
+   2:     pLParen     '('
+   2:     pRParen     ')'
+   2:     pReturn     '>>'
+   2:     pBreak      '>'
+   2:     pLCurly     '{'
+   2:     pRCurly     '}'
+   2:     pLSquare    '['
+   2:     pRSquare    ']'
+   2:     pBar        '|'
+   2:     pCall       '@'
+   2:     pEmit       '.'
+   2:     pStar       '*'
+   2:     pErr        '#'
+   2:     pQuestion   '?'
+   2:     pEof
+   2:     pInvalid
+      
+      %  keywords
+      
+   2:     pTitle
+   2:     pInput
+   2:     pOutput
+   2:     pType
+   2:     pError
+   2:     pMechanism
+   2:     pInclude
+   2:     pRules
+   2:     pEnd
+   2:     pIn
+   2:     pOut
+   2:     pInOut
+   2:     ;
+      
+      
+   2: output:
+      
+      %  codes for SSL machine instructions
+      
+   2:     iJumpForward
+   2:     iJumpBack
+   2:     iInput
+   2:     iInputAny
+   2:     iEmit
+   2:     iError
+   2:     iInputChoice
+   2:     iCall
+   2:     iReturn
+   2:     iSetResult
+   2:     iChoice
+   2:     iEndChoice
+   2:     iPushResult      % push ssl_result on variable stack
+   2:     iPop             % (n)  discard n entries from variable stack
+   2:     iBreak           % instruction used by debugger
+   2:     iGlobalSpace     % (n)  make space for n globals on variable stack (sets initial fp)
+   2:     iLocalSpace      % (n)  make space for n locals on variable stack
+   2:     iGetParam        % (n)  ssl_result = value of param n
+   2:     iGetFromParam    % (n)  ssl_result = value of variable whose address is in param n
+   2:     iGetLocal        % (n)  ssl_result = value of local var n
+   2:     iGetGlobal       % (n)  ssl_result = value of global var n
+   2:     iGetAddrParam    % (n)  ssl_result = addr of param n
+   2:     iGetAddrLocal    % (n)  ssl_result = addr of local var n
+   2:     iGetAddrGlobal   % (n)  ssl_result = addr of global var n
+   2:     iAssign          % variable whose address is pushed on stack = ssl_result; pop stack
+      
+      %   NOTE: Any instructions added here should also be added to
+      %         the system_operations table in ssl.c
+      %         as well as optimize_table, list_generated_code.
+      
+      %  other output
+      
+   2:     iSpace;          % emit a dummy value; a value will be patched here later
+      
+   2: error:
+   2:    eWrongType
+   2:    eNotAType
+   2:    eNotAValue
+   2:    eNotInput
+   2:    eNotOutput
+   2:    eNotARule
+   2:    eNotAnErrSig
+   2:    eNotInLoop
+   2:    eChoiceOpRuleOutOfPlace
+   2:    eUndeclRuleParamsNotSupported
+   2:    eNotTyped
+   2:    eIdentNotAllowedInExpr
+   2:    eIllegalLvalue
+   2:    eNotRuleOrGlobalDefn
+   2:    eRuleBodyAlreadyDeclared
+   2:    eReturnTypeMismatch
+   2:    eParameterMismatch
+   2:    eUndeclaredIdentifier
+   2:     eAliasNotAllowed
+   2:    ;
+      
+      
+      
+      
+      % Generated automatically by schema
+      
+   2: type node_type:
+   2: 	nINVALID
+   2: 	Object
+   2: 	nScope
+   2: 	nDeclaration
+   2: 	nIdent
+   2: 	nInput
+   2: 	nOutput
+   2: 	nError
+   2: 	nType
+   2: 	nValue
+   2: 	nMechanism
+   2: 	nOperation
+   2: 	nRule
+   2: 	nVariable
+   2: 	nParam
+   2: 	nInParam
+   2: 	nOutParam
+   2: 	nInOutParam
+   2: 	nLocal
+   2: 	nGlobal
+   2: 	;
+      
+   2: type node_attribute:
+   2: 	qINVALID
+   2: 	qParentScope
+   2: 	qDecls
+   2: 	qIdent
+   2: 	qValue
+   2: 	qType
+   2: 	qParamScope
+   2: 	qScope
+   2: 	qAddrDefined
+   2: 	qTypeDefined
+   2: 	qAddr
+   2: 	;
+      
+      
+   2: type boolean:
+   2:     false    = 0
+   2:     true     = 1
+   2:     no       = 0
+   2:     yes      = 1;
+      
+   2: type warning:
+   2:     wRuleMissingAtSign
+   2:     wReturnValueIgnored
+   2:     ;
+      
+   2: type Node:     % A pointer to a node in the schema database (symbol database)
+   2:     Null = 0
+   2:     ;
+      
+   2: type kind:
+   2:     kIllegal        % not an identifier
+   2:     kUnknown        % new identifier
+   2:     kInput
+   2:     kOutput
+   2:     kError
+   2:     kType
+   2:     kVal            % an element of a type
+   2:     kMech
+   2:     kOp
+   2:     kRule
+   2:     kVar
+   2:     ;
+      
+   2: type pass:
+   2:     CollectDefinitionsPass
+   2:     CodeGenerationPass
+   2:     ;
+      
+   2: mechanism scanner_mech:
+   2:     oResetInput               % reset input to start (if required)
+   2:     oStartListing             % start listing if requested; collect debug line numbers
+   2:     ;
+      
+   2: mechanism warning_mech:
+   2:     oWarning (warning);       % issue warning message,
+                                    % continue normally (not in error recovery mode)
+      
+   2: mechanism more_errors_mech:
+   2:     oUndeclaredRule (int id)     % Report that rule id was referenced, but never
+                                       % declared (i.e. no body).  No error recovery mode.
+   2:     ;
+      
+   2: mechanism emit_mech:
+   2:     oEmitInt (int)            % emit an integer into the generated code
+   2:     Here >> int               % return the current address in the generated code
+   2:     oPatch (int addr, int val) % patch an integer into any address in the generated code
+   2:     ;
+      
+   2: mechanism math:
+   2:     inc (inout int)
+   2:     dec (inout int)
+   2:     negate (int) >> int
+   2:     equal_zero (int) >> boolean
+   2:     equal_node_type (node_type, node_type) >> boolean     % Want equal_<type> for every type
+   2:     ;
+      
+   2: mechanism more_builtins:      % These should be built-in SSL operations
+   2:     TOKEN_VALUE >> int        % value of just accepted token, e.g. IntLit token
+   2:     LAST_ID >> int            % id number of last accepted identifier
+   2:     ;
+      
+   2: mechanism shortForm:          % keep a table of string shortforms for input/output
+   2:     oShortFormAdd (Node)      % associate current StrLit token with nDeclaration
+   2:     oShortFormLookup (out Node);   % look up strLit, return associated nDeclaration
+      
+      
+      % keep different patch stacks, each with a stack of position markers:
+      
+   2: type patchStack:
+   2:     patchChoiceTableAddr    % addr where pointer to table is stored
+   2:     patchChoiceTable        % build up choice table here (value,addr)
+   2:     patchChoiceExit         % addrs where jumps at end of each option are
+   2:     patchCall               % (addr,ident) where calls to undefined rules are
+   2:     patchLoop               % addr of start of a loop
+   2:     patchBreak;             % addrs where jumps out of a loop are
+      
+   2: mechanism patch_mech:
+   2:     oPatchMark(patchStack)             % mark current position on a stack
+   2:     oPatchAtMark(patchStack) >> boolean     % true if all items since
+                                                 %   last mark are popped
+                                                 %   (mark is dropped if true)
+   2:     oPatchPushHere(patchStack)         % put current address on a patch stack
+   2:     oPatchPushInt (patchStack, int)    % put int on a patch stack
+   2:     oPatchPushIdent(patchStack)        % put last ident on a patch stack
+   2:     oPatchAnyEntries(patchStack) >> boolean    % are there any entries?
+   2:     oPatchPopFwd(patchStack)           % fix table, storing here-x at x,
+                                             %   where x is on top of the stack
+   2:     oPatchPopBack(patchStack)          % emit here-x here (advance 'here')
+   2:     oPatchPopValue(patchStack)         % emit x here (advance 'here')
+   2:     oPatchPopCall(patchStack);         % fix table, storing value of ident i
+                                             %   at x, where i is on top of stack
+                                             %   and x is under it  (pop both)
+      
+   2: mechanism titleMech:
+   2:     oTitleSet;          % define title to be strlit just read
+      
+   2: mechanism doc:         % display documentary info
+   2:     oDocNewRule;        % print "Rule <token>"
+      
+   2: mechanism include_mech:
+   2:     oInclude;           % include the SSL file whose name is in the
+                             % string token just accepted
+      
+   2: mechanism node_mech:
+   2:     oNodeNew (node_type) >> Node         % create new node
+   2:     oNodeSet (Node, node_attribute, Node)   % set Node attribute of node
+   2:     oNodeSetInt (Node, node_attribute, int) % set int attribute of node
+   2:     oNodeSetBoolean (Node, node_attribute, boolean)
+   2:     oNodeGet (Node, node_attribute) >> Node    % get Node attribute of node
+   2:     oNodeGetInt (Node, node_attribute) >> int  % get int attribute of node
+   2:     oNodeGetBoolean (Node, node_attribute) >> boolean  % get int attribute of node
+   2:     oNodeNull (Node) >> boolean          % is node null?
+   2:     oNodeNext (inout Node)               % advance Node to next in list    
+   2:     oNodeType (Node) >> node_type        % return node type of node
+   2:     oNodeEqual (Node, Node) >> boolean   % compare two nodes for equality
+                                               % (i.e. same node, not just same contents)
+   2:     ;
+      
+   2: mechanism scope_mech:
+   2:     oScopeBegin (out Node)             % create a new scope.  Subsequent declarations will go here.
+                                             % Sets nScope's qParent to parent scope.
+   2:     oScopeOpen (Node)                  % open an existing scope.  Its definitions become visible again.
+   2:     oScopeEnd                          % end current scope.  Subsequent declarations will go to parent scope.
+   2:     oScopeDeclare (Node)               % declare node in current scope
+   2:     oScopeFind (out Node) >> boolean   % find declaration of last accepted identifier
+   2:     oScopeFindRequire (out Node)       % find declaration of last accepted identifier.
+                                             % Go into error recovery if not found.
+   2:     ;
+      
+      
+   2: mechanism install_mech:
+   2:     oInstallSystemOperations (inout int next_operation)   % Predefine some operations
+   2:     oInstallSystemTypes (out Node int_type)   % Predefine some types.
+                                                    % Return nType declaration of int type.
+   2:     ;
+      
+   2: mechanism write_mech:
+   2:     oWriteTables (Node global_scope);   % Write files, given global scope of symbol table.
+      
+   2: rules
+      
+      % ---------------------- Global Variables --------------------
+      
+   2: pass    CurrentPass         % which of two passes are we in?
+   2: Node    IntType             % nType node for built-in "int" type
+   2: Node    CurrentRule         % nRule node for current rule being declared
+   2: int     NumGlobals          % number of global variables in program
+   2: int     NumLocals           % number of local variables in current rule
+   2: int     RuleLocalSpaceAddr  % address of LocalSpace argument for rule
+   2: int     NextOperation       % code for next semantic operation decl
+   2: int     NextError           % next error code
+   2: Node    GlobalScope         % global nScope
+      
+      % -------------------- Forward Declarations ------------------
+      
+      % ------------------------- Main Parser ----------------------
+      
+   2: ProcessSSL:
+   4:     @CollectDefinitions     % first pass through input
+   6:     oResetInput
+   7:     @CodeGeneration         % second pass through input
+  10:     ;
+      
+      
+  10: CollectDefinitions:
+      
+  12:     CurrentPass = CollectDefinitionsPass
+      
+  18:     oScopeBegin (GlobalScope)
+      
+  24:     NextError = 0
+  30:     NextOperation = 0
+      
+  36:     oInstallSystemOperations (NextOperation)
+  42:     oInstallSystemTypes (IntType)
+      
+  48:     NumGlobals = 0                 % Count global variables
+      
+  54:     {[ @Section
+  57:         | true:
+  58:         | *:  >
+  65:     ]}
+      
+  67:     oScopeEnd
+  69:     ;
+      
+      
+  69: CodeGeneration:
+      
+  71:     CurrentPass = CodeGenerationPass
+      
+  77:     oScopeOpen (GlobalScope)   % Re-open scope
+      
+  83:     oStartListing   % Listing done in second pass, so it contains
+                          % addresses of generated code.
+                          % Also, collects line numbers for debugging.
+      
+          % Make space for global variables (inc because addressed from 1, not 0)
+  84:     inc (NumGlobals)   .iGlobalSpace  oEmitInt(NumGlobals)
+      
+  98:     {[ @Section
+ 101:         | true:
+ 102:         | *:  >
+ 109:     ]}
+      
+ 111:     @FixForwardCalls
+ 113:     @VerifyAllRulesDeclared
+      
+ 115:     oScopeEnd
+      
+ 116:     oWriteTables (GlobalScope)
+ 123:     ;
+      
+      
+      % Returns true if a section found
+      
+ 123: Section >> boolean:
+      
+ 125:     [ CurrentPass
+ 128:         | CollectDefinitionsPass :
+ 129:             [
+ 129:                 | pTitle:      @Title
+ 133:                 | pInput:      @Input
+ 137:                 | pOutput:     @Output
+ 141:                 | pError:      @Error
+ 145:                 | pType:       @Type
+ 149:                 | pInclude:    @Include
+ 153:                 | pMechanism:  @Mechanism
+ 157:                 | pRules:      @Rules
+ 161:                 | pEof:        >> false      % end of file
+ 166:             ]
+      
+ 188:         | CodeGenerationPass :
+ 190:             [
+ 190:                 | pTitle, pInput, pOutput, pError, pType, pMechanism :
+ 192:                                @SkipSection
+      
+ 194:                 | pInclude:    @Include
+ 198:                 | pRules:      @Rules
+ 202:                 | pEof:        >> false      % end of file
+ 207:             ]
+ 229:     ]
+ 237:     >> true
+ 241:     ;
+      
+ 241: SkipSection:
+ 243:     {[
+ 243:         | ';' : >
+ 247:         | * :   ?
+ 253:     ]};
+      
+      % ------------------------- Sections -------------------------
+      
+ 256: Title:
+ 258:     ':' pStrLit oTitleSet ';' ;
+      
+ 266: Input:
+ 268:     int  next_value
+ 268:     ':'
+ 270:     next_value = 0
+ 276:     @ValueList (nInput, next_value, true, Null)
+ 292:     ';';
+      
+ 295: Output:
+ 297:     int  next_value
+ 297:     ':'
+ 299:     next_value = 0
+ 305:     @ValueList (nOutput, next_value, true, Null)
+ 321:     ';';
+      
+ 324: Error:
+ 326:     ':'
+ 328:     @ValueList (nError, NextError, false, Null)
+ 344:     ';';
+      
+      
+ 347: Type:
+ 349:     Node  t
+ 349:     int   next_value
+      
+ 349:     pIdent
+ 351:     [ oScopeFind (t)
+ 358:         | false:
+ 359:             t = oNodeNew (nType)  oNodeSetInt (t, qIdent, LAST_ID)
+ 380:             oScopeDeclare (t)
+      
+ 386:         | true:
+      
+                  % Extend existing definition (to add more values)
+                  % Note, new values will start from 0 again unless told otherwise!
+      
+ 388:             @RequireType (t)
+ 395:     ]
+      
+ 403:     ':'
+ 405:     next_value = 0
+ 411:     @ValueList (nValue, next_value, false, t)
+ 427:     ';';
+      
+      
+ 430: Include:
+ 432:     pStrLit oInclude;
+      
+ 436: Mechanism:
+ 438:     Node  m
+      
+ 438:     pIdent
+ 440:     m = oNodeNew (nMechanism)  oNodeSetInt(m, qIdent, LAST_ID)
+ 461:     oScopeDeclare (m)
+      
+ 467:     ':'
+ 469:     {[ @OperationDefinition
+ 472:         | true:
+ 473:         | *:  >
+ 480:     ]}
+ 482:     ';' ;
+      
+ 485: Rules:
+ 487:     {[ @RuleSectionDefinition
+ 490:         | true:
+ 491:         | *:  >
+ 498:     ]}
+ 500:     pEnd ;
+      
+      
+      % ------------------------- Value List ----------------------
+      
+ 503: ValueList (node_type class, inout int value, boolean str_alias_allowed, Node t):
+ 505:     Node  p, t2
+ 505:     {[
+ 505:         | pIdent:
+ 507:             p = oNodeNew (class)  oNodeSetInt (p, qIdent, LAST_ID)
+      
+ 528:             [ class
+ 531:                 | nValue :    oNodeSet (p, qType, t)
+ 544:                 | * :
+ 549:             ]
+      
+ 549:             [ | pStrLit:
+ 551:                 [ str_alias_allowed
+ 554:                     | true:  oShortFormAdd (p)   % Associate short form with declaration
+ 561:                     | *:     #eAliasNotAllowed
+ 568:                 ]
+ 568:               | *:
+ 573:             ]
+      
+ 573:             [ | '=':       value = @Const(t2)
+ 586:                            [ @MatchType (t, t2)
+ 597:                                | true :
+ 598:                                | false :  @RequireMatchIntType(t2)
+ 607:                            ]
+ 615:               |*:
+ 620:             ]
+ 620:             oNodeSetInt (p, qValue, value)
+ 632:             inc (value)
+      
+ 638:             oScopeDeclare (p)
+      
+ 644:         | *:  >
+ 651:     ]};
+      
+      % ------------------------- Variables ------------------------
+      
+      %  Declare a list of variables, given class (local/global),
+      %  nType, and a counter used to assign addresses for that class.
+      
+ 654: DeclareVariables (node_type class, Node t, inout int addr_counter):
+ 656:     Node  i
+ 656:     {
+ 656:         pIdent
+ 658:         i = oNodeNew(class)  oNodeSetInt(i, qIdent, LAST_ID)
+ 679:         oNodeSet (i, qType, t)
+      
+              % Assign address to variable
+ 691:         inc (addr_counter)   oNodeSetInt (i, qAddr, addr_counter)
+      
+ 709:         oScopeDeclare (i)
+      
+ 715:         [ | ',' :
+ 717:           | * :   >
+ 724:         ]
+ 724:     };
+      
+      %  Declare a list of global variables, given nType.
+      
+ 727: DeclareGlobals (Node t):
+ 729:     @DeclareVariables (nGlobal, t, NumGlobals);
+      
+      %  Declare a list of local variables, given nType.
+      
+ 743: DeclareLocals (Node t):
+ 745:     @DeclareVariables (nLocal, t, NumLocals);
+      
+      
+      %  Skip list of global variables, during second pass.
+      
+ 759: SkipGlobals:
+ 761:     {
+ 761:         pIdent
+ 763:         [ | ',' : | * : > ]
+ 772:     };
+      
+      
+      %  Defines formal parameters (if any) in current scope.
+      %  The caller should have called oScopeBegin to begin a
+      %  scope just for parameters.  (This gives a simple way
+      %  to check if an operation/rule has parameters).
+      %  Does not end the scope.
+      %
+      %  nParam's may be named or unnamed (qIdent == 0)
+      %
+      %  Parameters are assigned addresses in reverse order
+      %  from n to 1.  This is for efficient stack access.
+      %  E.g. func(a,b,c):  address of a:3, b:2, c:1
+      %  (Later I would like to instead push actuals in reverse order)
+      
+ 775: FormalParamDefinition (Node scope):
+ 777:     int        num_params
+ 777:     node_type  dir
+ 777:     Node       p, t
+      
+ 777:     [ | '(' :
+ 779:       | *   : >>
+ 785:     ]
+      
+ 785:     num_params = 0      % Count the parameters, to assign addresses
+      
+ 791:     {
+ 791:         inc (num_params)
+      
+              % parameter direction
+ 797:         [
+ 797:             | pIn :     dir = nInParam
+ 805:             | pOut :    dir = nOutParam
+ 813:             | pInOut :  dir = nInOutParam
+ 821:             | * :       dir = nInParam
+ 836:         ]
+      
+              % parameter type
+ 836:         pIdent  @LookupType (t)
+      
+ 845:         p = oNodeNew(dir)
+ 855:         oNodeSet (p, qType, t)
+      
+              % parameter name
+ 867:         [
+ 867:             | pIdent :  oNodeSetInt (p, qIdent, LAST_ID)   % named parameter
+ 880:             | * :       % unnamed parameter
+ 885:         ]
+      
+ 885:         oScopeDeclare (p)       % declare nParam
+      
+ 891:         [
+ 891:             | ',' :
+ 893:             | * :   >
+ 900:         ]
+ 900:     }
+      
+ 902:     ')'
+      
+          %  Now go back and assign addresses to the parameters
+      
+ 904:     p = oNodeGet (scope, qDecls)
+      
+ 917:     {
+ 917:         [ equal_zero (num_params)
+ 924:             | true:  >
+ 927:             | false:
+ 929:         ]
+      
+ 937:         oNodeSetInt (p, qAddr, num_params)
+      
+ 949:         dec (num_params)
+ 955:         oNodeNext (p)
+ 961:     }
+ 964:     ;
+      
+      %  Redefine formal parameters, perhaps during declaration of actual rule (with body).
+      %  Previously, parameters were declared by a forward declaration or by usage.
+      %  Ensure that types match.  Update parameter names to new names given.
+      %
+      %  Previous parameter nScope is given, and scope has been opened.
+      %  (Addresses were assigned previously, no need to do it again).
+      %  NOTE: I probably don't really want to open the previous scope since the
+      %  old param names are not valid.
+      
+ 964: FormalParamRedefinition (Node scope):
+ 966:     Node      p
+ 966:     node_type dir, dir2
+ 966:     Node      t, t2
+      
+ 966:     p = oNodeGet (scope, qDecls)       % previous param declarations
+      
+ 979:     [ | '(' :
+ 981:       | *   : [ oNodeNull(p)
+ 993:                   | true :
+ 994:                   | * :    #eParameterMismatch
+1001:               ]
+1001:               >>
+1002:     ]
+      
+1002:     {
+1002:         [ oNodeNull(p)
+1009:             | true :    #eParameterMismatch  % too many params given this time
+1012:             | false :
+1014:         ]
+      
+1022:         dir = oNodeType(p)         % previous direction
+              % parameter direction
+1032:         [
+1032:             | pIn :     dir2 = nInParam
+1040:             | pOut :    dir2 = nOutParam
+1048:             | pInOut :  dir2 = nInOutParam
+1056:             | * :       dir2 = nInParam
+1071:         ]
+1071:         [ equal_node_type (dir, dir2)
+1081:             | true :
+1082:             | * :     #eParameterMismatch
+1089:         ]
+      
+1089:         t = oNodeGet (p, qType)    % previous type
+1102:         pIdent  @LookupType(t2)    % parameter type
+1111:         @RequireMatchType (t, t2)
+      
+              % parameter name
+1121:         [
+1121:             | pIdent :  oNodeSetInt (p, qIdent, LAST_ID)
+1134:             | * :       oNodeSetInt (p, qIdent, 0)   % currently unnamed
+1151:         ]
+      
+1151:         oNodeNext (p)
+      
+1157:         [
+1157:             | ',' :
+1159:             | * :   >
+1166:         ]
+1166:     }
+      
+1168:     ')'
+      
+1170:     [ oNodeNull(p)
+1177:         | true :
+1178:         | * :    #eParameterMismatch   % Not enough params given this time
+1185:     ]
+1186:     ;
+      
+      
+      % ------------------------- Operations -----------------------
+      
+      %  Returns true if definition found
+      
+1186: OperationDefinition >> boolean:
+1188:     Node  op, s, t
+1188:     [
+1188:         | pIdent:
+1190:         | *:        >> false
+1198:     ]
+      
+1198:     op = oNodeNew (nOperation)  oNodeSetInt (op, qIdent, LAST_ID)
+1219:     oNodeSetInt (op, qValue, NextOperation)
+1231:     inc (NextOperation)
+      
+1237:     oScopeBegin (s)   % parameter scope
+      
+1243:     @FormalParamDefinition(s)
+      
+1250:     oNodeSet (op, qParamScope, s)
+      
+1262:     [ | '>>': pIdent  @LookupType (t)   oNodeSet (op, qType, t)
+1285:       |*:     %  qType is Null by default
+1290:     ]
+      
+1290:     oScopeEnd      % parameter scope
+      
+1291:     oScopeDeclare (op)
+      
+1297:     >> true
+1301:     ;
+      
+      % ------------------------- Rules ----------------------------
+      
+      %  Parse a definition in the rules secition.
+      %  This could be:
+      %      a rule definition, a rule prototype, or a global variable definition.
+      %  Returns true if one of the above found
+      
+1301: RuleSectionDefinition >> boolean:
+1303:     Node  i
+1303:     [
+1303:         | pIdent:
+1305:         | * :        >> false
+1313:     ]
+      
+1313:     [ oScopeFind (i)
+1320:         | false:     @RuleDefinition
+1323:         | true:
+1325:             [ oNodeType(i)
+1332:                 | nType :  [ CurrentPass
+1336:                                | CollectDefinitionsPass :  @DeclareGlobals(i)
+1344:                                | CodeGenerationPass :      @SkipGlobals
+1348:                            ]
+1356:                 | nRule :  @RuleRedefinition(i)    % Probably body of fwd declared rule
+1365:                 | * :      #eNotRuleOrGlobalDefn  >> true  % True to skip to next
+1377:             ]
+1377:     ]
+      
+1385:     >> true
+1389:     ;
+      
+      
+      % Skip a rule body during first pass (may begin with ':', or may not be a body)
+1389: SkipRule:
+1391:     {[
+1391:         | ';' : >
+1395:         | * :   ?
+1401:     ]};
+      
+      %   Define the parameters, and possibly the body, of a rule
+      %   that has not been defined previously.
+      %   Just parsed ident of rule.
+      
+1404: RuleDefinition:
+1406:     Node  r
+1406:     Node  s
+1406:     Node  t
+      
+1406:     oDocNewRule
+      
+1407:     r = oNodeNew(nRule)  oNodeSetInt(r, qIdent, LAST_ID)
+1428:     CurrentRule = r
+      
+      
+1434:     oScopeBegin (s)                 % param scope
+1440:     @FormalParamDefinition(s)
+1447:     oNodeSet (r, qParamScope, s)    % leave scope open, to access params during rule
+      
+1459:     [ | '>>':   pIdent  @LookupType(t)  oNodeSet (r, qType, t)
+1482:       | * :
+1487:     ]
+      
+1487:     [ CurrentPass
+1490:         | CollectDefinitionsPass :
+1491:             @SkipRule
+1493:         | CodeGenerationPass :
+1495:             [
+1495:                 | ':' :  @RuleBodyDefinition (r)
+1504:                 | * :    % No body; a forward declaration of the rule.
+1509:             ]
+1509:             ';'
+1511:     ]
+      
+      
+1519:     oScopeEnd            % parameters scope (already linked to nRule above)
+      
+1520:     oScopeDeclare (r)    % declare nRule
+                               % (Note, can't call rule recursively since not defined until end)
+1527:     ;
+      
+      
+      % Given the nRule node
+      
+1527: RuleBodyDefinition (Node r):
+1529:     Node  s
+      
+1529:     oNodeSetInt (r, qValue, Here)      % Address of rule is now defined
+1540:     oNodeSetBoolean (r, qAddrDefined, yes)
+      
+1552:     oScopeBegin (s)       % rule variables scope
+      
+1558:     NumLocals = 0
+      
+1564:     .iLocalSpace 
+1566:     RuleLocalSpaceAddr = Here   .iSpace
+      
+1573:     {[ @Statement
+1576:         | true:
+1577:         | *:  >
+1584:     ]}
+      
+1586:     .iReturn
+      
+1588:     oPatch (RuleLocalSpaceAddr, NumLocals)
+      
+1597:     oScopeEnd            % rule variables scope
+1598:     oNodeSet (r, qScope, s)
+      
+1611:     ;
+      
+      
+      %   Redefine a rule (to provide body of a forward-declared rule).
+      %   Given the existing nRule declaration.
+      
+1611: RuleRedefinition (Node r):
+1613:     Node  s, p
+1613:     Node  t, t2
+      
+1613:     [ oNodeGetBoolean (r, qAddrDefined)
+1623:         | yes :   #eRuleBodyAlreadyDeclared  >>
+1627:         | * :
+1632:     ]
+      
+1632:     oDocNewRule
+      
+1633:     CurrentRule = r
+      
+1639:     s = oNodeGet(r, qParamScope)
+1652:     oScopeOpen (s)   % Make the existing parameters visible.
+                           % (Actually, probably don't want to do this).
+      
+1658:     @FormalParamRedefinition (s)   % verify types, update param names
+      
+          % Verify return type matches previous declaration/usage
+1665:     t = oNodeGet (r, qType)
+1678:     [ | '>>':   pIdent  @LookupType(t2)  @RequireMatchType(t, t2)
+1699:       | * :     @RequireMatchType(t, Null)
+1714:     ]
+      
+1714:     [ CurrentPass
+1717:         | CollectDefinitionsPass :
+1718:             @SkipRule
+1720:         | CodeGenerationPass :
+1722:             [
+1722:                 | ':' :  @RuleBodyDefinition (r)
+1731:                 | * :    % No body; a forward declaration of the rule.
+1736:             ]
+1736:             ';'
+1738:     ]
+      
+1746:     oScopeEnd            % parameters scope (already linked to nRule)
+1748:     ;
+      
+      % ------------------------- Statements -----------------------
+      
+      %  Returns true if statement found
+      
+1748: Statement >> boolean:
+1750:     Node  i
+1750:     Node  t, t2
+      
+1750:     [
+1750:         | pStrLit:           % input alias
+1752:             oShortFormLookup(i)  @RequireInput(i)
+1765:             .iInput @EmitValue(i)
+      
+1774:         | pIdent:            % input or operation
+1776:             oScopeFindRequire(i)
+1782:             [ oNodeType(i)
+      
+1789:                 | nInput:      .iInput @EmitValue(i)
+      
+1799:                 | nOperation:  @RequireNoType(i) @CallOperation(i)
+      
+1815:                 | nType:       @DeclareLocals(i)
+      
+1824:                 | *:           @Assignment(i)
+1840:             ]
+      
+1840: 	| '#':
+1842:             pIdent  @LookupError(i)
+1851:             .iError @EmitValue(i)
+      
+1860: 	| '.':
+1862: 	    [ | pIdent:    @LookupOutput(i)
+1871:               | pStrLit:   oShortFormLookup(i) @RequireOutput(i)
+1886:             ]
+1894:             .iEmit @EmitValue(i)
+      
+1903: 	| '@':
+1905: 	    pIdent
+1907:             [ oScopeFind(i)
+1914:                 | true :
+1915:                     @RequireRule(i)  @RequireNoType(i)
+1929:                     @CallRule(i)
+      
+1936:                 | false :
+1938:                     @CallUndefinedRule
+1940:             ]
+      
+1948: 	| '>>':
+1950:             t = oNodeGet (CurrentRule, qType)
+1963: 	    [ oNodeNull(t)
+1970:                 | true :
+1971:                 | * :       @Expr(t2)  @RequireMatchType(t, t2)
+1993:             ]
+1993:             .iReturn
+      
+1995: 	| '{':
+1997:             oPatchPushHere (patchLoop)
+2003:             oPatchMark (patchBreak)
+2009: 	    {[ @Statement
+2012: 		| true:
+2013: 		| *:  >
+2020: 	    ]}
+2022: 	    '}'
+2024:             .iJumpBack
+2026:             oPatchPopBack (patchLoop)
+      
+                  % Fix up break statements
+2032:             {[ oPatchAtMark (patchBreak)
+2039:                 | false :    oPatchPopFwd (patchBreak)
+2046:                 | * :        >
+2053:             ]}
+      
+2055: 	| '>':
+2057:             [ oPatchAnyEntries (patchLoop)
+2064:                 | false:  #eNotInLoop
+2067:                 | *:
+2072:             ]
+2072:             .iJumpForward  oPatchPushHere (patchBreak)  .iSpace
+      
+2082: 	| '?':  .iInputAny
+      
+2086: 	| '[':  @Choice
+      
+2090:         | *:    >> false    % Not a statement
+2116:     ]
+2116:     >> true ;
+      
+      
+      %  Given nOperation
+      
+2120: CallOperation (Node o):
+2122:     int  num_params
+      
+2122:     num_params = @ActualParams (o)
+      
+2133:     @EmitValue(o)        % call operation
+      
+2140:     [ equal_zero (num_params)
+2147:         | true :
+2148:         | false :     .iPop oEmitInt(num_params)
+2158:     ]
+2167:     ;
+      
+      
+      %  Given nOperation or nRule.  Returns number of parameters.
+      
+2167: ActualParams (Node r) >> int:
+      
+2169:     int   num_params
+2169:     Node  param_scope, p
+2169:     Node  t, t2
+      
+2169:     param_scope = oNodeGet (r, qParamScope)  % Always present, but might contain no nParams
+2182:     p = oNodeGet (param_scope, qDecls)
+      
+2195:     [ oNodeNull(p)
+      
+2202:         | true :    >> 0
+2206:         | false :
+2208:     ]
+      
+2216:     num_params = 0
+      
+2222:     '('
+      
+2224:     {
+2224:         inc (num_params)
+      
+              %  ----------------------------
+      
+              %  One actual parameter.
+      
+2230:         t = oNodeGet (p, qType)    % formal param type
+      
+2243:         [ oNodeType(p)
+2250:             | nInParam :                @Expr (t2)
+2258:             | nOutParam, nInOutParam :  @Lvalue (t2)
+2267:         ]
+              
+2277:         @RequireMatchType (t, t2)
+2287:         .iPushResult
+      
+              %  ----------------------------
+      
+2289:         oNodeNext (p)
+      
+2295:         [ oNodeNull (p)
+2302:             | true :   >
+2305:             | false :
+2307:         ]
+      
+2315:         ','
+2317:     }
+      
+2319:     ')'
+      
+2321:     >> num_params
+2325:     ;
+      
+      
+      
+      %  Called for a nRule whose parameter types are defined.
+      %  The rule address might not yet be known.
+      
+2325: CallRule (Node r):
+2327:     int  num_params
+      
+2327:     num_params = @ActualParams(r)
+      
+2338:     [ oNodeGetBoolean (r, qAddrDefined)     % A call to a forward-declared rule?
+2348:         | yes :   .iCall @EmitValue(r)
+2358:         | no :    .iCall oPatchPushHere(patchCall) 
+2368:                          oPatchPushInt (patchCall, oNodeGetInt(r, qIdent))
+2384:                          .iSpace
+2386:     ]
+      
+          % Pop actual params
+2394:     [ equal_zero (num_params)
+2401:         | true :
+2402:         | false :     .iPop oEmitInt(num_params)
+2412:     ]
+2421:     ;
+      
+      
+      %  Implicitly declare a rule that has not previously been declared.
+      %  Rule name is last accepted identifier.
+      %  Implicitly declares InParam parameters, and no return type.
+      %
+      %  Rule is declared in GlobalScope.
+      
+2421: CallUndefinedRule:
+2423:     Node  r, s, t, p
+2423:     int   id, num_params, addr
+      
+          % Global scope opened so that rule will be declared in it,
+          % and so the parameters we declare for the rule will have the
+          % correct ParentScope
+      
+2423:     oScopeOpen (GlobalScope)
+      
+      
+2429:     r = oNodeNew (nRule)  id = LAST_ID  oNodeSetInt (r, qIdent, id)
+2456:     oNodeSetBoolean(r, qAddrDefined, false)
+      
+          % Implicit parameters
+      
+2468:     oScopeBegin (s)
+2474:     oNodeSet (r, qParamScope, s)
+      
+2486:     num_params = 0
+      
+2492:     [ | '(' :
+      
+2494:         {
+2494:             @Expr(t)
+2501:             p = oNodeNew (nInParam)  oNodeSet(p, qType, t)
+2523:             oScopeDeclare(p)
+2529:             inc(num_params)
+      
+2535:             [ | ',' :
+2537:               | * :   >
+2544:             ]
+2544:         }
+2546:         ')'
+      
+              % Assign parameter addresses
+      
+2548:         addr = num_params
+2554:         p = oNodeGet (s, qDecls)
+2567:         {
+2567:             [ oNodeNull(p)
+2574:                 | true :  >
+2577:                 | false :
+2579:             ]
+2587:             oNodeSetInt (p, qAddr, addr)
+2599:             dec (addr)
+2605:             oNodeNext (p)
+2611:         }
+      
+2613:       | * :
+2618:     ]
+      
+2618:     oScopeEnd    % param scope
+2619:     oScopeDeclare (r)
+      
+2625:     oScopeEnd    % GlobalScope
+      
+      
+          % Now call rule
+      
+2626:     .iCall
+2628:     oPatchPushHere (patchCall)
+2634:     oPatchPushInt (patchCall, id)
+2643:     .iSpace
+      
+2645:     [ equal_zero (num_params)
+2652:         | true :
+2653:         | * :     .iPop oEmitInt(num_params)
+2666:     ];
+      
+      
+      %  Already parsed pIdent and determined it is not a rule/type/operation.
+      
+2667: Assignment (Node i):
+2669:     Node t, t2
+2669:     @Lvalue_HaveIdent(i,t)
+2679:     .iPushResult
+2681:     '='
+2683:     @Expr(t2)  @RequireMatchType(t,t2)
+2700:     .iAssign
+2703:     ;
+      
+2703: Choice:
+2705:     int    num_options    % count the number of options in the choice
+2705:     kind   choice_kind    % input choice, expr choice, expr undefined type choice
+2705:     Node   choice_type    % type of expr choice
+2705:     Node   t
+2705:     Node   i
+2705:     int    val
+      
+          %  Determine if this is an input choice or a value choice.
+          %  For value choice, determine type of value (if known).
+      
+2705:     [
+2705:         | '|' :
+2707:             .iInputChoice   choice_kind = kInput
+      
+2715:         | * :
+2720:             @Expr(choice_type)  .iChoice
+      
+                  % Expr indicates forward use of undefined rule by returning type Null.
+                  % We will indicate this for ourselves by setting kind to kUnknown.
+      
+2729:             [ oNodeNull(choice_type)
+2736:                 | true :    choice_kind = kUnknown   % flag that this is expr choice, unknown type
+2743:                 | false:    choice_kind = kType      % flag that this is expr choice, known type
+2751:             ]
+      
+2759:             '|'
+2761:     ]
+      
+2761:     oPatchPushHere (patchChoiceTableAddr)
+2767:     .iSpace
+      
+2769:     oPatchMark (patchChoiceTable)    % build up choice table in this stack
+2775:     oPatchMark (patchChoiceExit)     % remember end of each option
+2781:     num_options = 0                  % count options
+      
+2787:     {
+2787:         [
+2787:             | '*':     % default code (must be last option)
+2789:                 ':'
+2791:                 @CopyChoiceTable (num_options)
+      
+2798:                 {[ @Statement
+2801:                     | true :
+2802:                     | *: >
+2809: 	        ]}
+2811:                 ']'
+      
+                      % Finish up
+2813:                 @FixChoiceExits
+2815:                 >>
+      
+2816:             | * :
+2821:                 {
+2821:                     [ choice_kind
+      
+2824:                         | kType :         % expr choice
+2825:                             val = @Const(t)
+2836:                             @RequireMatchType (choice_type, t)
+      
+2846:                         | kUnknown :      % expr choice, type not known yet
+2848:                             val = @Const(choice_type)
+      
+                                  % NOTE: now that we know type of forward rule in expr, we could update nRule
+      
+                                  % Now know type
+2859:                             choice_kind = kType
+      
+2865:                         | kInput :        % input choice
+2867:                             [ | pIdent :  @LookupInput(i)
+2876:                               | pStrLit : oShortFormLookup(i) @RequireInput(i)
+2891:                             ]
+2899:                             val = oNodeGetInt (i, qValue)
+2912:                     ]
+      
+2922:                     oPatchPushHere (patchChoiceTable)
+2928:                     oPatchPushInt  (patchChoiceTable, val)
+2937:                     inc (num_options)
+      
+2943:                     [
+2943:                         | ':' :   >
+2947:                         | ',' :
+2949:                     ]
+2957:                 }
+2959:         ]
+      
+              % Code for this option:
+      
+2959:         {[ @Statement
+2962:             | true:
+2963:             | *:  >
+2970:         ]}
+      
+2972:         [
+2972:             | ']' :     % end of choice, no default
+2974:                 .iJumpForward
+2976:                 oPatchPushHere (patchChoiceExit) .iSpace
+2984:                 @CopyChoiceTable (num_options)
+      
+2991:                 .iEndChoice
+      
+2993:                 @FixChoiceExits
+2995:                 >>
+      
+2996:             | '|' :     % more options follow
+2998:                 .iJumpForward
+3000:                 oPatchPushHere (patchChoiceExit) .iSpace
+3008:         ]
+3016:     };
+      
+      
+      %  Install choice table here, given number of options.
+      %  Order of options is opposite that in the source (note for error recovery)
+      
+3019: CopyChoiceTable (int num_options):
+3021:     oPatchPopFwd (patchChoiceTableAddr)    % fix pointer to table
+3027:     oEmitInt (num_options)                 % # table entries
+3033:     {[ oPatchAtMark (patchChoiceTable)
+3040:         | false :
+3041:             oPatchPopValue (patchChoiceTable)
+3047:             oPatchPopBack (patchChoiceTable)
+3053:         | * :   >
+3060:     ]};
+          
+      % Fix jumps from end of each option to end of choice
+      
+3063: FixChoiceExits:
+3065:     {[ oPatchAtMark (patchChoiceExit)
+3072:         | false:    oPatchPopFwd (patchChoiceExit)
+3079:         | *:        >
+3086:     ]};
+      
+3089: FixForwardCalls:
+3091:     {[ oPatchAnyEntries (patchCall)
+3098:         | true :    oPatchPopCall (patchCall)
+3105:         | * :       >
+3112:     ]};
+      
+      % Ensure that there are no rules referenced but never declared
+3115: VerifyAllRulesDeclared:
+3117:     Node  n
+3117:     n = oNodeGet (GlobalScope, qDecls)
+3130:     {
+3130:         [ oNodeNull(n)
+3137:             | true : >
+3140:             | false :
+3142:         ]
+      
+3150:         [ oNodeType(n)
+3157:             | nRule :
+3158:                 [ oNodeGetBoolean (n, qAddrDefined)
+3168:                     | false :   oUndeclaredRule(oNodeGetInt(n, qIdent))
+3182:                     | * :
+3187:                 ]
+3187:             | * :
+3192:         ]
+      
+3192:         oNodeNext(n)
+3198:     };
+      
+      %  ------------------------------------------------------- 
+      
+      %  Emits code for expression (with result in ssl_result).
+      %  Returns nType of expression.
+      
+3201: Expr (out Node t):
+3203:     Node  i
+3203:     [
+3203:         | pIdent :
+      
+3205:             [ oScopeFind (i)
+3212:                 | true :
+3213:                     [ oNodeType (i)
+3220:                         | nRule :        oWarning(wRuleMissingAtSign) @CallRule(i)
+3234:                         | nOperation :   @CallOperation(i)
+3243:                         | nValue :       .iSetResult    @EmitValue(i)
+3254:                         | nInParam :     .iGetParam     @EmitAddr(i)
+3265:                         | nOutParam :    .iGetFromParam @EmitAddr(i)
+3276:                         | nInOutParam :  .iGetFromParam @EmitAddr(i)
+3287:                         | nLocal :       .iGetLocal     @EmitAddr(i)
+3298:                         | nGlobal :      .iGetGlobal    @EmitAddr(i)
+3309:                         | * : #eIdentNotAllowedInExpr
+3330:                     ]
+      
+3330:                     t = oNodeGet (i, qType)         % Get type of identifier
+3343:                     [ oNodeNull(t)
+3350:                         | true:  #eNotTyped   % e.g. call with no return value
+3353:                         | * :
+3358:                     ]
+      
+3358:                 | false :
+3360:                     t = Null  #eUndeclaredIdentifier
+3368:             ]
+      
+3376:         | '@' :
+3378: 	    pIdent
+3380:             [ oScopeFind (i)
+3387:                 | true :
+3388:                     @RequireRule(i) @CallRule(i)
+3402:                     t = oNodeGet (i, qType)
+3415:                     [ oNodeNull (t)
+3422:                         | true:  #eNotTyped   % e.g. call with no return value
+3425:                         | * :
+3430:                     ]
+      
+3430:                 | false :
+                          % Call before defined.  Limited use in this case.
+                          % The nType pushed will be NULL.  We don't know the real type.
+                          % This is really just allowed so we can have simple rules in a Choice expression.
+      
+3432:                     @CallUndefinedRule
+3434:                     t = Null
+3440:             ]
+      
+3448:         | '-' :
+3450:             pIntLit   .iSetResult  oEmitInt(negate(TOKEN_VALUE))
+3463:             t = IntType
+3469:         | pIntLit :
+3471:             .iSetResult  oEmitInt(TOKEN_VALUE)
+3478:             t = IntType
+3484:     ];
+      
+      %  Emits code for lvalue (putting address of variable in ssl_result).
+      %  Returns nType of the referenced value.
+      
+3497: Lvalue (out Node t):
+3499:     Node i
+3499:     [
+3499:         | pIdent :
+      
+3501:             [ oScopeFind(i)
+3508:                 | true :      @Lvalue_HaveIdent(i,t)
+      
+3519:                 | false :     % a forward use of rule, illegal as lvalue
+3521:                     t = Null  #eIllegalLvalue
+3529:             ]
+      
+3537:         | '-' :   pIntLit     t = Null    #eIllegalLvalue
+3549:         | pIntLit :           t = Null    #eIllegalLvalue
+3559:     ];
+      
+      %  Emit code for lvalue, given nDeclaration of identifier.
+      %  Return lvalue's nType
+      
+3570: Lvalue_HaveIdent (Node i, out Node t):
+3572:     [ oNodeType(i)
+3579:         | nInParam :     .iGetAddrParam  @EmitAddr(i)
+3589:         | nOutParam :    .iGetParam      @EmitAddr(i)
+3600:         | nInOutParam :  .iGetParam      @EmitAddr(i)
+3611:         | nLocal :       .iGetAddrLocal  @EmitAddr(i)
+3622:         | nGlobal :      .iGetAddrGlobal @EmitAddr(i)
+3633:         | * : #eIllegalLvalue
+3648:     ]
+3648:     t = oNodeGet (i, qType)         % Get type of identifier
+3662:     ;
+      
+      %  Return a constant value.  Also return the type of the value.
+      %  No code is generated.
+      
+3662: Const (out Node t) >> int:
+3664:     Node  i
+3664:     int   val
+3664:     [
+3664:         | pIdent :
+3666:             @LookupValue (i)
+3673:             val = oNodeGetInt (i, qValue)
+3686:             t = oNodeGet (i, qType)
+3699:         | '-' :
+3701:             pIntLit
+3703:             val = negate(TOKEN_VALUE)
+3712:             t = IntType
+3718:         | pIntLit :
+3720:             val = TOKEN_VALUE
+3725:             t = IntType
+3731:     ]
+3741:     >> val;
+      
+      %  Return integer constant.  Only values of type "int" are
+      %  permitted.  No code is generated.
+      
+3745: IntConst >> int:
+3747:     Node t
+3747:     int  i
+3747:     i = @Const (t)  @RequireMatchIntType (t)
+3765:     >> i;
+      
+      %  ------------------------------------------------------- 
+      
+      %  Assert that the ident we just read is a particular kind of
+      %  identifier.  Return the declaration node of the identifier.
+      
+3769: LookupType (out Node i):
+3771:     oScopeFindRequire (i)
+3777:     @RequireType (i);
+      
+3785: LookupInput (out Node i):
+3787:     oScopeFindRequire (i)
+3793:     @RequireInput (i);
+      
+3801: LookupOutput (out Node i):
+3803:     oScopeFindRequire (i)
+3809:     @RequireOutput (i);
+      
+3817: LookupValue (out Node i):
+3819:     oScopeFindRequire (i)
+3825:     @RequireValue (i);
+      
+3833: LookupError (out Node i):
+3835:     oScopeFindRequire (i)
+3841:     @RequireError (i);
+      
+      %  Assert that the given nDeclaration represents a particular
+      %  kind of declaration.
+      
+3849: RequireType (Node i):
+3851:     [ oNodeType(i)
+3858:         | nType :
+3859:         | * :    #eNotAType
+3866:     ];
+      
+3867: RequireInput (Node i):
+3869:     [ oNodeType(i)
+3876:         | nInput :
+3877:         | * :    #eNotInput
+3884:     ];
+      
+3885: RequireOutput (Node i):
+3887:     [ oNodeType(i)
+3894:         | nOutput :
+3895:         | * :    #eNotOutput
+3902:     ];
+      
+3903: RequireValue (Node i):
+3905:     [ oNodeType(i)
+3912:         | nValue :
+3913:         | * :    #eNotAValue
+3920:     ];
+      
+3921: RequireError (Node i):
+3923:     [ oNodeType(i)
+3930:         | nError :
+3931:         | * :    #eNotAnErrSig
+3938:     ];
+      
+3939: RequireRule (Node i):
+3941:     [ oNodeType(i)
+3948:         | nRule :
+3949:         | * :    #eNotARule
+3956:     ];
+      
+      %  Require that rule/operation has no return type
+      
+3957: RequireNoType (Node r):
+3959:     [ oNodeNull (oNodeGet(r, qType))
+3973:         | false: oWarning(wReturnValueIgnored)  % #eChoiceOpRuleOutOfPlace
+3980:         | * :
+3985:     ];
+      
+      %  Given a value nDeclaration, and a nType.
+      %  Ensure that the value symbol has the type nType.
+      
+3986: RequireMatchValueType (Node v, Node t):
+3988:     [ oNodeEqual (oNodeGet(v, qType), t)
+4005:         | true :
+4006:         | * :    #eWrongType
+4013:     ];
+      
+      
+      %  Do two types match?
+      
+4014: MatchType (Node t1, Node t2) >> boolean:
+4016:     >> oNodeEqual (t1, t2);
+      
+4027: RequireMatchType (Node t1, Node t2):
+4029:     [ oNodeEqual (t1, t2)
+4039:         | true :
+4040:         | * :    #eWrongType
+4047:     ];
+      
+      %  Is the nType "int"?
+      
+4048: MatchIntType (Node t) >> boolean:
+4050:     >> oNodeEqual (t, IntType);
+      
+4061: RequireMatchIntType (Node t):
+4063:     [ oNodeEqual (t, IntType)
+4073:         | true :
+4074:         | * :     #eWrongType
+4081:     ];
+      
+      
+      %  ------------------------------------------------------- 
+      
+      
+      %  Emit the value of an identifier declaration, given its nDeclaration
+      
+4082: EmitValue (Node i):
+4084:     oEmitInt (oNodeGetInt(i, qValue));
+      
+      %  Emit the addr of a variable, given its declaration
+      
+4098: EmitAddr (Node v):
+4100:     oEmitInt (oNodeGetInt(v, qAddr));
+      
+4114: end
+      
+4114: 
+
+Generated code:
+
+   0: oGlobalSpace 10
+   2: oLocalSpace 0
+   4: oCall 10
+   6: oResetInput
+   7: oCall 69
+   9: oReturn
+  10: oLocalSpace 0
+  12: oGetAddrGlobal 1
+  14: oPushResult
+  15: oSetResult 0
+  17: oAssign
+  18: oGetAddrGlobal 9
+  20: oPushResult
+  21: oScopeBegin
+  22: oPop 1
+  24: oGetAddrGlobal 8
+  26: oPushResult
+  27: oSetResult 0
+  29: oAssign
+  30: oGetAddrGlobal 7
+  32: oPushResult
+  33: oSetResult 0
+  35: oAssign
+  36: oGetAddrGlobal 7
+  38: oPushResult
+  39: oInstallSystemOperations
+  40: oPop 1
+  42: oGetAddrGlobal 2
+  44: oPushResult
+  45: oInstallSystemTypes
+  46: oPop 1
+  48: oGetAddrGlobal 4
+  50: oPushResult
+  51: oSetResult 0
+  53: oAssign
+  54: oCall 123
+  56: oChoice 60
+  58: oJumpForward 65
+  60: Choice Lookup Table
+           1     58
+  63: oJumpForward 67
+  65: oJumpBack 54
+  67: oScopeEnd
+  68: oReturn
+  69: oLocalSpace 0
+  71: oGetAddrGlobal 1
+  73: oPushResult
+  74: oSetResult 1
+  76: oAssign
+  77: oGetGlobal 9
+  79: oPushResult
+  80: oScopeOpen
+  81: oPop 1
+  83: oStartListing
+  84: oGetAddrGlobal 4
+  86: oPushResult
+  87: inc
+  88: oPop 1
+  90: oEmit 15
+  92: oGetGlobal 4
+  94: oPushResult
+  95: oEmitInt
+  96: oPop 1
+  98: oCall 123
+ 100: oChoice 104
+ 102: oJumpForward 109
+ 104: Choice Lookup Table
+           1    102
+ 107: oJumpForward 111
+ 109: oJumpBack 98
+ 111: oCall 3089
+ 113: oCall 3115
+ 115: oScopeEnd
+ 116: oGetGlobal 9
+ 118: oPushResult
+ 119: oWriteTables
+ 120: oPop 1
+ 122: oReturn
+ 123: oLocalSpace 0
+ 125: oGetGlobal 1
+ 127: oChoice 231
+ 129: oInputChoice 168
+ 131: oCall 256
+ 133: oJumpForward 188
+ 135: oCall 266
+ 137: oJumpForward 188
+ 139: oCall 295
+ 141: oJumpForward 188
+ 143: oCall 324
+ 145: oJumpForward 188
+ 147: oCall 347
+ 149: oJumpForward 188
+ 151: oCall 430
+ 153: oJumpForward 188
+ 155: oCall 436
+ 157: oJumpForward 188
+ 159: oCall 485
+ 161: oJumpForward 188
+ 163: oSetResult 0
+ 165: oReturn
+ 166: oJumpForward 188
+ 168: Choice Lookup Table
+          22    163
+          31    159
+          29    155
+          30    151
+          27    147
+          28    143
+          26    139
+          25    135
+          24    131
+ 187: oEndChoice
+ 188: oJumpForward 237
+ 190: oInputChoice 209
+ 192: oCall 241
+ 194: oJumpForward 229
+ 196: oCall 430
+ 198: oJumpForward 229
+ 200: oCall 485
+ 202: oJumpForward 229
+ 204: oSetResult 0
+ 206: oReturn
+ 207: oJumpForward 229
+ 209: Choice Lookup Table
+          22    204
+          31    200
+          30    196
+          29    192
+          27    192
+          28    192
+          26    192
+          25    192
+          24    192
+ 228: oEndChoice
+ 229: oJumpForward 237
+ 231: Choice Lookup Table
+           1    190
+           0    129
+ 236: oEndChoice
+ 237: oSetResult 1
+ 239: oReturn
+ 240: oReturn
+ 241: oLocalSpace 0
+ 243: oInputChoice 249
+ 245: oJumpForward 255
+ 247: oJumpForward 253
+ 249: Choice Lookup Table
+           6    245
+ 252: oInputAny
+ 253: oJumpBack 243
+ 255: oReturn
+ 256: oLocalSpace 0
+ 258: oInput 5
+ 260: oInput 2
+ 262: oTitleSet
+ 263: oInput 6
+ 265: oReturn
+ 266: oLocalSpace 1
+ 268: oInput 5
+ 270: oGetAddrLocal 1
+ 272: oPushResult
+ 273: oSetResult 0
+ 275: oAssign
+ 276: oSetResult 5
+ 278: oPushResult
+ 279: oGetAddrLocal 1
+ 281: oPushResult
+ 282: oSetResult 1
+ 284: oPushResult
+ 285: oSetResult 0
+ 287: oPushResult
+ 288: oCall 503
+ 290: oPop 4
+ 292: oInput 6
+ 294: oReturn
+ 295: oLocalSpace 1
+ 297: oInput 5
+ 299: oGetAddrLocal 1
+ 301: oPushResult
+ 302: oSetResult 0
+ 304: oAssign
+ 305: oSetResult 6
+ 307: oPushResult
+ 308: oGetAddrLocal 1
+ 310: oPushResult
+ 311: oSetResult 1
+ 313: oPushResult
+ 314: oSetResult 0
+ 316: oPushResult
+ 317: oCall 503
+ 319: oPop 4
+ 321: oInput 6
+ 323: oReturn
+ 324: oLocalSpace 0
+ 326: oInput 5
+ 328: oSetResult 7
+ 330: oPushResult
+ 331: oGetAddrGlobal 8
+ 333: oPushResult
+ 334: oSetResult 0
+ 336: oPushResult
+ 337: oSetResult 0
+ 339: oPushResult
+ 340: oCall 503
+ 342: oPop 4
+ 344: oInput 6
+ 346: oReturn
+ 347: oLocalSpace 2
+ 349: oInput 0
+ 351: oGetAddrLocal 1
+ 353: oPushResult
+ 354: oScopeFind
+ 355: oPop 1
+ 357: oChoice 397
+ 359: oGetAddrLocal 1
+ 361: oPushResult
+ 362: oSetResult 8
+ 364: oPushResult
+ 365: oNodeNew
+ 366: oPop 1
+ 368: oAssign
+ 369: oGetLocal 1
+ 371: oPushResult
+ 372: oSetResult 3
+ 374: oPushResult
+ 375: LAST_ID
+ 376: oPushResult
+ 377: oNodeSetInt
+ 378: oPop 3
+ 380: oGetLocal 1
+ 382: oPushResult
+ 383: oScopeDeclare
+ 384: oPop 1
+ 386: oJumpForward 403
+ 388: oGetLocal 1
+ 390: oPushResult
+ 391: oCall 3849
+ 393: oPop 1
+ 395: oJumpForward 403
+ 397: Choice Lookup Table
+           1    388
+           0    359
+ 402: oEndChoice
+ 403: oInput 5
+ 405: oGetAddrLocal 2
+ 407: oPushResult
+ 408: oSetResult 0
+ 410: oAssign
+ 411: oSetResult 9
+ 413: oPushResult
+ 414: oGetAddrLocal 2
+ 416: oPushResult
+ 417: oSetResult 0
+ 419: oPushResult
+ 420: oGetLocal 1
+ 422: oPushResult
+ 423: oCall 503
+ 425: oPop 4
+ 427: oInput 6
+ 429: oReturn
+ 430: oLocalSpace 0
+ 432: oInput 2
+ 434: oInclude
+ 435: oReturn
+ 436: oLocalSpace 1
+ 438: oInput 0
+ 440: oGetAddrLocal 1
+ 442: oPushResult
+ 443: oSetResult 10
+ 445: oPushResult
+ 446: oNodeNew
+ 447: oPop 1
+ 449: oAssign
+ 450: oGetLocal 1
+ 452: oPushResult
+ 453: oSetResult 3
+ 455: oPushResult
+ 456: LAST_ID
+ 457: oPushResult
+ 458: oNodeSetInt
+ 459: oPop 3
+ 461: oGetLocal 1
+ 463: oPushResult
+ 464: oScopeDeclare
+ 465: oPop 1
+ 467: oInput 5
+ 469: oCall 1186
+ 471: oChoice 475
+ 473: oJumpForward 480
+ 475: Choice Lookup Table
+           1    473
+ 478: oJumpForward 482
+ 480: oJumpBack 469
+ 482: oInput 6
+ 484: oReturn
+ 485: oLocalSpace 0
+ 487: oCall 1301
+ 489: oChoice 493
+ 491: oJumpForward 498
+ 493: Choice Lookup Table
+           1    491
+ 496: oJumpForward 500
+ 498: oJumpBack 487
+ 500: oInput 32
+ 502: oReturn
+ 503: oLocalSpace 2
+ 505: oInputChoice 646
+ 507: oGetAddrLocal 1
+ 509: oPushResult
+ 510: oGetParam 4
+ 512: oPushResult
+ 513: oNodeNew
+ 514: oPop 1
+ 516: oAssign
+ 517: oGetLocal 1
+ 519: oPushResult
+ 520: oSetResult 3
+ 522: oPushResult
+ 523: LAST_ID
+ 524: oPushResult
+ 525: oNodeSetInt
+ 526: oPop 3
+ 528: oGetParam 4
+ 530: oChoice 546
+ 532: oGetLocal 1
+ 534: oPushResult
+ 535: oSetResult 5
+ 537: oPushResult
+ 538: oGetParam 1
+ 540: oPushResult
+ 541: oNodeSet
+ 542: oPop 3
+ 544: oJumpForward 549
+ 546: Choice Lookup Table
+           9    532
+ 549: oInputChoice 570
+ 551: oGetParam 2
+ 553: oChoice 563
+ 555: oGetLocal 1
+ 557: oPushResult
+ 558: oShortFormAdd
+ 559: oPop 1
+ 561: oJumpForward 568
+ 563: Choice Lookup Table
+           1    555
+ 566: oError 18
+ 568: oJumpForward 573
+ 570: Choice Lookup Table
+           2    551
+ 573: oInputChoice 617
+ 575: oGetParam 3
+ 577: oPushResult
+ 578: oGetAddrLocal 2
+ 580: oPushResult
+ 581: oCall 3662
+ 583: oPop 1
+ 585: oAssign
+ 586: oGetParam 1
+ 588: oPushResult
+ 589: oGetLocal 2
+ 591: oPushResult
+ 592: oCall 4014
+ 594: oPop 2
+ 596: oChoice 609
+ 598: oJumpForward 615
+ 600: oGetLocal 2
+ 602: oPushResult
+ 603: oCall 4061
+ 605: oPop 1
+ 607: oJumpForward 615
+ 609: Choice Lookup Table
+           0    600
+           1    598
+ 614: oEndChoice
+ 615: oJumpForward 620
+ 617: Choice Lookup Table
+           4    575
+ 620: oGetLocal 1
+ 622: oPushResult
+ 623: oSetResult 4
+ 625: oPushResult
+ 626: oGetFromParam 3
+ 628: oPushResult
+ 629: oNodeSetInt
+ 630: oPop 3
+ 632: oGetParam 3
+ 634: oPushResult
+ 635: inc
+ 636: oPop 1
+ 638: oGetLocal 1
+ 640: oPushResult
+ 641: oScopeDeclare
+ 642: oPop 1
+ 644: oJumpForward 651
+ 646: Choice Lookup Table
+           0    507
+ 649: oJumpForward 653
+ 651: oJumpBack 505
+ 653: oReturn
+ 654: oLocalSpace 1
+ 656: oInput 0
+ 658: oGetAddrLocal 1
+ 660: oPushResult
+ 661: oGetParam 3
+ 663: oPushResult
+ 664: oNodeNew
+ 665: oPop 1
+ 667: oAssign
+ 668: oGetLocal 1
+ 670: oPushResult
+ 671: oSetResult 3
+ 673: oPushResult
+ 674: LAST_ID
+ 675: oPushResult
+ 676: oNodeSetInt
+ 677: oPop 3
+ 679: oGetLocal 1
+ 681: oPushResult
+ 682: oSetResult 5
+ 684: oPushResult
+ 685: oGetParam 2
+ 687: oPushResult
+ 688: oNodeSet
+ 689: oPop 3
+ 691: oGetParam 1
+ 693: oPushResult
+ 694: inc
+ 695: oPop 1
+ 697: oGetLocal 1
+ 699: oPushResult
+ 700: oSetResult 10
+ 702: oPushResult
+ 703: oGetFromParam 1
+ 705: oPushResult
+ 706: oNodeSetInt
+ 707: oPop 3
+ 709: oGetLocal 1
+ 711: oPushResult
+ 712: oScopeDeclare
+ 713: oPop 1
+ 715: oInputChoice 719
+ 717: oJumpForward 724
+ 719: Choice Lookup Table
+           7    717
+ 722: oJumpForward 726
+ 724: oJumpBack 656
+ 726: oReturn
+ 727: oLocalSpace 0
+ 729: oSetResult 19
+ 731: oPushResult
+ 732: oGetParam 1
+ 734: oPushResult
+ 735: oGetAddrGlobal 4
+ 737: oPushResult
+ 738: oCall 654
+ 740: oPop 3
+ 742: oReturn
+ 743: oLocalSpace 0
+ 745: oSetResult 18
+ 747: oPushResult
+ 748: oGetParam 1
+ 750: oPushResult
+ 751: oGetAddrGlobal 5
+ 753: oPushResult
+ 754: oCall 654
+ 756: oPop 3
+ 758: oReturn
+ 759: oLocalSpace 0
+ 761: oInput 0
+ 763: oInputChoice 767
+ 765: oJumpForward 772
+ 767: Choice Lookup Table
+           7    765
+ 770: oJumpForward 774
+ 772: oJumpBack 761
+ 774: oReturn
+ 775: oLocalSpace 4
+ 777: oInputChoice 781
+ 779: oJumpForward 785
+ 781: Choice Lookup Table
+           8    779
+ 784: oReturn
+ 785: oGetAddrLocal 1
+ 787: oPushResult
+ 788: oSetResult 0
+ 790: oAssign
+ 791: oGetAddrLocal 1
+ 793: oPushResult
+ 794: inc
+ 795: oPop 1
+ 797: oInputChoice 823
+ 799: oGetAddrLocal 2
+ 801: oPushResult
+ 802: oSetResult 15
+ 804: oAssign
+ 805: oJumpForward 836
+ 807: oGetAddrLocal 2
+ 809: oPushResult
+ 810: oSetResult 16
+ 812: oAssign
+ 813: oJumpForward 836
+ 815: oGetAddrLocal 2
+ 817: oPushResult
+ 818: oSetResult 17
+ 820: oAssign
+ 821: oJumpForward 836
+ 823: Choice Lookup Table
+          35    815
+          34    807
+          33    799
+ 830: oGetAddrLocal 2
+ 832: oPushResult
+ 833: oSetResult 15
+ 835: oAssign
+ 836: oInput 0
+ 838: oGetAddrLocal 4
+ 840: oPushResult
+ 841: oCall 3769
+ 843: oPop 1
+ 845: oGetAddrLocal 3
+ 847: oPushResult
+ 848: oGetLocal 2
+ 850: oPushResult
+ 851: oNodeNew
+ 852: oPop 1
+ 854: oAssign
+ 855: oGetLocal 3
+ 857: oPushResult
+ 858: oSetResult 5
+ 860: oPushResult
+ 861: oGetLocal 4
+ 863: oPushResult
+ 864: oNodeSet
+ 865: oPop 3
+ 867: oInputChoice 882
+ 869: oGetLocal 3
+ 871: oPushResult
+ 872: oSetResult 3
+ 874: oPushResult
+ 875: LAST_ID
+ 876: oPushResult
+ 877: oNodeSetInt
+ 878: oPop 3
+ 880: oJumpForward 885
+ 882: Choice Lookup Table
+           0    869
+ 885: oGetLocal 3
+ 887: oPushResult
+ 888: oScopeDeclare
+ 889: oPop 1
+ 891: oInputChoice 895
+ 893: oJumpForward 900
+ 895: Choice Lookup Table
+           7    893
+ 898: oJumpForward 902
+ 900: oJumpBack 791
+ 902: oInput 9
+ 904: oGetAddrLocal 3
+ 906: oPushResult
+ 907: oGetParam 1
+ 909: oPushResult
+ 910: oSetResult 2
+ 912: oPushResult
+ 913: oNodeGet
+ 914: oPop 2
+ 916: oAssign
+ 917: oGetLocal 1
+ 919: oPushResult
+ 920: equal_zero
+ 921: oPop 1
+ 923: oChoice 931
+ 925: oJumpForward 963
+ 927: oJumpForward 937
+ 929: oJumpForward 937
+ 931: Choice Lookup Table
+           0    929
+           1    925
+ 936: oEndChoice
+ 937: oGetLocal 3
+ 939: oPushResult
+ 940: oSetResult 10
+ 942: oPushResult
+ 943: oGetLocal 1
+ 945: oPushResult
+ 946: oNodeSetInt
+ 947: oPop 3
+ 949: oGetAddrLocal 1
+ 951: oPushResult
+ 952: dec
+ 953: oPop 1
+ 955: oGetAddrLocal 3
+ 957: oPushResult
+ 958: oNodeNext
+ 959: oPop 1
+ 961: oJumpBack 917
+ 963: oReturn
+ 964: oLocalSpace 5
+ 966: oGetAddrLocal 1
+ 968: oPushResult
+ 969: oGetParam 1
+ 971: oPushResult
+ 972: oSetResult 2
+ 974: oPushResult
+ 975: oNodeGet
+ 976: oPop 2
+ 978: oAssign
+ 979: oInputChoice 983
+ 981: oJumpForward 1002
+ 983: Choice Lookup Table
+           8    981
+ 986: oGetLocal 1
+ 988: oPushResult
+ 989: oNodeNull
+ 990: oPop 1
+ 992: oChoice 996
+ 994: oJumpForward 1001
+ 996: Choice Lookup Table
+           1    994
+ 999: oError 16
+1001: oReturn
+1002: oGetLocal 1
+1004: oPushResult
+1005: oNodeNull
+1006: oPop 1
+1008: oChoice 1016
+1010: oError 16
+1012: oJumpForward 1022
+1014: oJumpForward 1022
+1016: Choice Lookup Table
+           0   1014
+           1   1010
+1021: oEndChoice
+1022: oGetAddrLocal 2
+1024: oPushResult
+1025: oGetLocal 1
+1027: oPushResult
+1028: oNodeType
+1029: oPop 1
+1031: oAssign
+1032: oInputChoice 1058
+1034: oGetAddrLocal 3
+1036: oPushResult
+1037: oSetResult 15
+1039: oAssign
+1040: oJumpForward 1071
+1042: oGetAddrLocal 3
+1044: oPushResult
+1045: oSetResult 16
+1047: oAssign
+1048: oJumpForward 1071
+1050: oGetAddrLocal 3
+1052: oPushResult
+1053: oSetResult 17
+1055: oAssign
+1056: oJumpForward 1071
+1058: Choice Lookup Table
+          35   1050
+          34   1042
+          33   1034
+1065: oGetAddrLocal 3
+1067: oPushResult
+1068: oSetResult 15
+1070: oAssign
+1071: oGetLocal 2
+1073: oPushResult
+1074: oGetLocal 3
+1076: oPushResult
+1077: equal_node_type
+1078: oPop 2
+1080: oChoice 1084
+1082: oJumpForward 1089
+1084: Choice Lookup Table
+           1   1082
+1087: oError 16
+1089: oGetAddrLocal 4
+1091: oPushResult
+1092: oGetLocal 1
+1094: oPushResult
+1095: oSetResult 5
+1097: oPushResult
+1098: oNodeGet
+1099: oPop 2
+1101: oAssign
+1102: oInput 0
+1104: oGetAddrLocal 5
+1106: oPushResult
+1107: oCall 3769
+1109: oPop 1
+1111: oGetLocal 4
+1113: oPushResult
+1114: oGetLocal 5
+1116: oPushResult
+1117: oCall 4027
+1119: oPop 2
+1121: oInputChoice 1136
+1123: oGetLocal 1
+1125: oPushResult
+1126: oSetResult 3
+1128: oPushResult
+1129: LAST_ID
+1130: oPushResult
+1131: oNodeSetInt
+1132: oPop 3
+1134: oJumpForward 1151
+1136: Choice Lookup Table
+           0   1123
+1139: oGetLocal 1
+1141: oPushResult
+1142: oSetResult 3
+1144: oPushResult
+1145: oSetResult 0
+1147: oPushResult
+1148: oNodeSetInt
+1149: oPop 3
+1151: oGetAddrLocal 1
+1153: oPushResult
+1154: oNodeNext
+1155: oPop 1
+1157: oInputChoice 1161
+1159: oJumpForward 1166
+1161: Choice Lookup Table
+           7   1159
+1164: oJumpForward 1168
+1166: oJumpBack 1002
+1168: oInput 9
+1170: oGetLocal 1
+1172: oPushResult
+1173: oNodeNull
+1174: oPop 1
+1176: oChoice 1180
+1178: oJumpForward 1185
+1180: Choice Lookup Table
+           1   1178
+1183: oError 16
+1185: oReturn
+1186: oLocalSpace 3
+1188: oInputChoice 1192
+1190: oJumpForward 1198
+1192: Choice Lookup Table
+           0   1190
+1195: oSetResult 0
+1197: oReturn
+1198: oGetAddrLocal 1
+1200: oPushResult
+1201: oSetResult 11
+1203: oPushResult
+1204: oNodeNew
+1205: oPop 1
+1207: oAssign
+1208: oGetLocal 1
+1210: oPushResult
+1211: oSetResult 3
+1213: oPushResult
+1214: LAST_ID
+1215: oPushResult
+1216: oNodeSetInt
+1217: oPop 3
+1219: oGetLocal 1
+1221: oPushResult
+1222: oSetResult 4
+1224: oPushResult
+1225: oGetGlobal 7
+1227: oPushResult
+1228: oNodeSetInt
+1229: oPop 3
+1231: oGetAddrGlobal 7
+1233: oPushResult
+1234: inc
+1235: oPop 1
+1237: oGetAddrLocal 2
+1239: oPushResult
+1240: oScopeBegin
+1241: oPop 1
+1243: oGetLocal 2
+1245: oPushResult
+1246: oCall 775
+1248: oPop 1
+1250: oGetLocal 1
+1252: oPushResult
+1253: oSetResult 6
+1255: oPushResult
+1256: oGetLocal 2
+1258: oPushResult
+1259: oNodeSet
+1260: oPop 3
+1262: oInputChoice 1287
+1264: oInput 0
+1266: oGetAddrLocal 3
+1268: oPushResult
+1269: oCall 3769
+1271: oPop 1
+1273: oGetLocal 1
+1275: oPushResult
+1276: oSetResult 5
+1278: oPushResult
+1279: oGetLocal 3
+1281: oPushResult
+1282: oNodeSet
+1283: oPop 3
+1285: oJumpForward 1290
+1287: Choice Lookup Table
+          10   1264
+1290: oScopeEnd
+1291: oGetLocal 1
+1293: oPushResult
+1294: oScopeDeclare
+1295: oPop 1
+1297: oSetResult 1
+1299: oReturn
+1300: oReturn
+1301: oLocalSpace 1
+1303: oInputChoice 1307
+1305: oJumpForward 1313
+1307: Choice Lookup Table
+           0   1305
+1310: oSetResult 0
+1312: oReturn
+1313: oGetAddrLocal 1
+1315: oPushResult
+1316: oScopeFind
+1317: oPop 1
+1319: oChoice 1379
+1321: oCall 1404
+1323: oJumpForward 1385
+1325: oGetLocal 1
+1327: oPushResult
+1328: oNodeType
+1329: oPop 1
+1331: oChoice 1367
+1333: oGetGlobal 1
+1335: oChoice 1350
+1337: oGetLocal 1
+1339: oPushResult
+1340: oCall 727
+1342: oPop 1
+1344: oJumpForward 1356
+1346: oCall 759
+1348: oJumpForward 1356
+1350: Choice Lookup Table
+           1   1346
+           0   1337
+1355: oEndChoice
+1356: oJumpForward 1377
+1358: oGetLocal 1
+1360: oPushResult
+1361: oCall 1611
+1363: oPop 1
+1365: oJumpForward 1377
+1367: Choice Lookup Table
+          12   1358
+           8   1333
+1372: oError 13
+1374: oSetResult 1
+1376: oReturn
+1377: oJumpForward 1385
+1379: Choice Lookup Table
+           1   1325
+           0   1321
+1384: oEndChoice
+1385: oSetResult 1
+1387: oReturn
+1388: oReturn
+1389: oLocalSpace 0
+1391: oInputChoice 1397
+1393: oJumpForward 1403
+1395: oJumpForward 1401
+1397: Choice Lookup Table
+           6   1393
+1400: oInputAny
+1401: oJumpBack 1391
+1403: oReturn
+1404: oLocalSpace 3
+1406: oDocNewRule
+1407: oGetAddrLocal 1
+1409: oPushResult
+1410: oSetResult 12
+1412: oPushResult
+1413: oNodeNew
+1414: oPop 1
+1416: oAssign
+1417: oGetLocal 1
+1419: oPushResult
+1420: oSetResult 3
+1422: oPushResult
+1423: LAST_ID
+1424: oPushResult
+1425: oNodeSetInt
+1426: oPop 3
+1428: oGetAddrGlobal 3
+1430: oPushResult
+1431: oGetLocal 1
+1433: oAssign
+1434: oGetAddrLocal 2
+1436: oPushResult
+1437: oScopeBegin
+1438: oPop 1
+1440: oGetLocal 2
+1442: oPushResult
+1443: oCall 775
+1445: oPop 1
+1447: oGetLocal 1
+1449: oPushResult
+1450: oSetResult 6
+1452: oPushResult
+1453: oGetLocal 2
+1455: oPushResult
+1456: oNodeSet
+1457: oPop 3
+1459: oInputChoice 1484
+1461: oInput 0
+1463: oGetAddrLocal 3
+1465: oPushResult
+1466: oCall 3769
+1468: oPop 1
+1470: oGetLocal 1
+1472: oPushResult
+1473: oSetResult 5
+1475: oPushResult
+1476: oGetLocal 3
+1478: oPushResult
+1479: oNodeSet
+1480: oPop 3
+1482: oJumpForward 1487
+1484: Choice Lookup Table
+          10   1461
+1487: oGetGlobal 1
+1489: oChoice 1513
+1491: oCall 1389
+1493: oJumpForward 1519
+1495: oInputChoice 1506
+1497: oGetLocal 1
+1499: oPushResult
+1500: oCall 1527
+1502: oPop 1
+1504: oJumpForward 1509
+1506: Choice Lookup Table
+           5   1497
+1509: oInput 6
+1511: oJumpForward 1519
+1513: Choice Lookup Table
+           1   1495
+           0   1491
+1518: oEndChoice
+1519: oScopeEnd
+1520: oGetLocal 1
+1522: oPushResult
+1523: oScopeDeclare
+1524: oPop 1
+1526: oReturn
+1527: oLocalSpace 1
+1529: oGetParam 1
+1531: oPushResult
+1532: oSetResult 4
+1534: oPushResult
+1535: Here
+1536: oPushResult
+1537: oNodeSetInt
+1538: oPop 3
+1540: oGetParam 1
+1542: oPushResult
+1543: oSetResult 8
+1545: oPushResult
+1546: oSetResult 1
+1548: oPushResult
+1549: oNodeSetBoolean
+1550: oPop 3
+1552: oGetAddrLocal 1
+1554: oPushResult
+1555: oScopeBegin
+1556: oPop 1
+1558: oGetAddrGlobal 5
+1560: oPushResult
+1561: oSetResult 0
+1563: oAssign
+1564: oEmit 16
+1566: oGetAddrGlobal 6
+1568: oPushResult
+1569: Here
+1570: oAssign
+1571: oEmit 25
+1573: oCall 1748
+1575: oChoice 1579
+1577: oJumpForward 1584
+1579: Choice Lookup Table
+           1   1577
+1582: oJumpForward 1586
+1584: oJumpBack 1573
+1586: oEmit 8
+1588: oGetGlobal 6
+1590: oPushResult
+1591: oGetGlobal 5
+1593: oPushResult
+1594: oPatch
+1595: oPop 2
+1597: oScopeEnd
+1598: oGetParam 1
+1600: oPushResult
+1601: oSetResult 7
+1603: oPushResult
+1604: oGetLocal 1
+1606: oPushResult
+1607: oNodeSet
+1608: oPop 3
+1610: oReturn
+1611: oLocalSpace 4
+1613: oGetParam 1
+1615: oPushResult
+1616: oSetResult 8
+1618: oPushResult
+1619: oNodeGetBoolean
+1620: oPop 2
+1622: oChoice 1629
+1624: oError 14
+1626: oReturn
+1627: oJumpForward 1632
+1629: Choice Lookup Table
+           1   1624
+1632: oDocNewRule
+1633: oGetAddrGlobal 3
+1635: oPushResult
+1636: oGetParam 1
+1638: oAssign
+1639: oGetAddrLocal 1
+1641: oPushResult
+1642: oGetParam 1
+1644: oPushResult
+1645: oSetResult 6
+1647: oPushResult
+1648: oNodeGet
+1649: oPop 2
+1651: oAssign
+1652: oGetLocal 1
+1654: oPushResult
+1655: oScopeOpen
+1656: oPop 1
+1658: oGetLocal 1
+1660: oPushResult
+1661: oCall 964
+1663: oPop 1
+1665: oGetAddrLocal 3
+1667: oPushResult
+1668: oGetParam 1
+1670: oPushResult
+1671: oSetResult 5
+1673: oPushResult
+1674: oNodeGet
+1675: oPop 2
+1677: oAssign
+1678: oInputChoice 1701
+1680: oInput 0
+1682: oGetAddrLocal 4
+1684: oPushResult
+1685: oCall 3769
+1687: oPop 1
+1689: oGetLocal 3
+1691: oPushResult
+1692: oGetLocal 4
+1694: oPushResult
+1695: oCall 4027
+1697: oPop 2
+1699: oJumpForward 1714
+1701: Choice Lookup Table
+          10   1680
+1704: oGetLocal 3
+1706: oPushResult
+1707: oSetResult 0
+1709: oPushResult
+1710: oCall 4027
+1712: oPop 2
+1714: oGetGlobal 1
+1716: oChoice 1740
+1718: oCall 1389
+1720: oJumpForward 1746
+1722: oInputChoice 1733
+1724: oGetParam 1
+1726: oPushResult
+1727: oCall 1527
+1729: oPop 1
+1731: oJumpForward 1736
+1733: Choice Lookup Table
+           5   1724
+1736: oInput 6
+1738: oJumpForward 1746
+1740: Choice Lookup Table
+           1   1722
+           0   1718
+1745: oEndChoice
+1746: oScopeEnd
+1747: oReturn
+1748: oLocalSpace 3
+1750: oInputChoice 2092
+1752: oGetAddrLocal 1
+1754: oPushResult
+1755: oShortFormLookup
+1756: oPop 1
+1758: oGetLocal 1
+1760: oPushResult
+1761: oCall 3867
+1763: oPop 1
+1765: oEmit 2
+1767: oGetLocal 1
+1769: oPushResult
+1770: oCall 4082
+1772: oPop 1
+1774: oJumpForward 2116
+1776: oGetAddrLocal 1
+1778: oPushResult
+1779: oScopeFindRequire
+1780: oPop 1
+1782: oGetLocal 1
+1784: oPushResult
+1785: oNodeType
+1786: oPop 1
+1788: oChoice 1826
+1790: oEmit 2
+1792: oGetLocal 1
+1794: oPushResult
+1795: oCall 4082
+1797: oPop 1
+1799: oJumpForward 1840
+1801: oGetLocal 1
+1803: oPushResult
+1804: oCall 3957
+1806: oPop 1
+1808: oGetLocal 1
+1810: oPushResult
+1811: oCall 2120
+1813: oPop 1
+1815: oJumpForward 1840
+1817: oGetLocal 1
+1819: oPushResult
+1820: oCall 743
+1822: oPop 1
+1824: oJumpForward 1840
+1826: Choice Lookup Table
+           8   1817
+          11   1801
+           5   1790
+1833: oGetLocal 1
+1835: oPushResult
+1836: oCall 2667
+1838: oPop 1
+1840: oJumpForward 2116
+1842: oInput 0
+1844: oGetAddrLocal 1
+1846: oPushResult
+1847: oCall 3833
+1849: oPop 1
+1851: oEmit 5
+1853: oGetLocal 1
+1855: oPushResult
+1856: oCall 4082
+1858: oPop 1
+1860: oJumpForward 2116
+1862: oInputChoice 1888
+1864: oGetAddrLocal 1
+1866: oPushResult
+1867: oCall 3801
+1869: oPop 1
+1871: oJumpForward 1894
+1873: oGetAddrLocal 1
+1875: oPushResult
+1876: oShortFormLookup
+1877: oPop 1
+1879: oGetLocal 1
+1881: oPushResult
+1882: oCall 3885
+1884: oPop 1
+1886: oJumpForward 1894
+1888: Choice Lookup Table
+           2   1873
+           0   1864
+1893: oEndChoice
+1894: oEmit 4
+1896: oGetLocal 1
+1898: oPushResult
+1899: oCall 4082
+1901: oPop 1
+1903: oJumpForward 2116
+1905: oInput 0
+1907: oGetAddrLocal 1
+1909: oPushResult
+1910: oScopeFind
+1911: oPop 1
+1913: oChoice 1942
+1915: oGetLocal 1
+1917: oPushResult
+1918: oCall 3939
+1920: oPop 1
+1922: oGetLocal 1
+1924: oPushResult
+1925: oCall 3957
+1927: oPop 1
+1929: oGetLocal 1
+1931: oPushResult
+1932: oCall 2325
+1934: oPop 1
+1936: oJumpForward 1948
+1938: oCall 2421
+1940: oJumpForward 1948
+1942: Choice Lookup Table
+           0   1938
+           1   1915
+1947: oEndChoice
+1948: oJumpForward 2116
+1950: oGetAddrLocal 2
+1952: oPushResult
+1953: oGetGlobal 3
+1955: oPushResult
+1956: oSetResult 5
+1958: oPushResult
+1959: oNodeGet
+1960: oPop 2
+1962: oAssign
+1963: oGetLocal 2
+1965: oPushResult
+1966: oNodeNull
+1967: oPop 1
+1969: oChoice 1973
+1971: oJumpForward 1993
+1973: Choice Lookup Table
+           1   1971
+1976: oGetAddrLocal 3
+1978: oPushResult
+1979: oCall 3201
+1981: oPop 1
+1983: oGetLocal 2
+1985: oPushResult
+1986: oGetLocal 3
+1988: oPushResult
+1989: oCall 4027
+1991: oPop 2
+1993: oEmit 8
+1995: oJumpForward 2116
+1997: oSetResult 4
+1999: oPushResult
+2000: oPatchPushHere
+2001: oPop 1
+2003: oSetResult 5
+2005: oPushResult
+2006: oPatchMark
+2007: oPop 1
+2009: oCall 1748
+2011: oChoice 2015
+2013: oJumpForward 2020
+2015: Choice Lookup Table
+           1   2013
+2018: oJumpForward 2022
+2020: oJumpBack 2009
+2022: oInput 13
+2024: oEmit 1
+2026: oSetResult 4
+2028: oPushResult
+2029: oPatchPopBack
+2030: oPop 1
+2032: oSetResult 5
+2034: oPushResult
+2035: oPatchAtMark
+2036: oPop 1
+2038: oChoice 2048
+2040: oSetResult 5
+2042: oPushResult
+2043: oPatchPopFwd
+2044: oPop 1
+2046: oJumpForward 2053
+2048: Choice Lookup Table
+           0   2040
+2051: oJumpForward 2055
+2053: oJumpBack 2032
+2055: oJumpForward 2116
+2057: oSetResult 4
+2059: oPushResult
+2060: oPatchAnyEntries
+2061: oPop 1
+2063: oChoice 2069
+2065: oError 7
+2067: oJumpForward 2072
+2069: Choice Lookup Table
+           0   2065
+2072: oEmit 0
+2074: oSetResult 5
+2076: oPushResult
+2077: oPatchPushHere
+2078: oPop 1
+2080: oEmit 25
+2082: oJumpForward 2116
+2084: oEmit 3
+2086: oJumpForward 2116
+2088: oCall 2703
+2090: oJumpForward 2116
+2092: Choice Lookup Table
+          14   2088
+          21   2084
+          11   2057
+          12   1997
+          10   1950
+          17   1905
+          18   1862
+          20   1842
+           0   1776
+           2   1752
+2113: oSetResult 0
+2115: oReturn
+2116: oSetResult 1
+2118: oReturn
+2119: oReturn
+2120: oLocalSpace 1
+2122: oGetAddrLocal 1
+2124: oPushResult
+2125: oGetParam 1
+2127: oPushResult
+2128: oCall 2167
+2130: oPop 1
+2132: oAssign
+2133: oGetParam 1
+2135: oPushResult
+2136: oCall 4082
+2138: oPop 1
+2140: oGetLocal 1
+2142: oPushResult
+2143: equal_zero
+2144: oPop 1
+2146: oChoice 2160
+2148: oJumpForward 2166
+2150: oEmit 13
+2152: oGetLocal 1
+2154: oPushResult
+2155: oEmitInt
+2156: oPop 1
+2158: oJumpForward 2166
+2160: Choice Lookup Table
+           0   2150
+           1   2148
+2165: oEndChoice
+2166: oReturn
+2167: oLocalSpace 5
+2169: oGetAddrLocal 2
+2171: oPushResult
+2172: oGetParam 1
+2174: oPushResult
+2175: oSetResult 6
+2177: oPushResult
+2178: oNodeGet
+2179: oPop 2
+2181: oAssign
+2182: oGetAddrLocal 3
+2184: oPushResult
+2185: oGetLocal 2
+2187: oPushResult
+2188: oSetResult 2
+2190: oPushResult
+2191: oNodeGet
+2192: oPop 2
+2194: oAssign
+2195: oGetLocal 3
+2197: oPushResult
+2198: oNodeNull
+2199: oPop 1
+2201: oChoice 2210
+2203: oSetResult 0
+2205: oReturn
+2206: oJumpForward 2216
+2208: oJumpForward 2216
+2210: Choice Lookup Table
+           0   2208
+           1   2203
+2215: oEndChoice
+2216: oGetAddrLocal 1
+2218: oPushResult
+2219: oSetResult 0
+2221: oAssign
+2222: oInput 8
+2224: oGetAddrLocal 1
+2226: oPushResult
+2227: inc
+2228: oPop 1
+2230: oGetAddrLocal 4
+2232: oPushResult
+2233: oGetLocal 3
+2235: oPushResult
+2236: oSetResult 5
+2238: oPushResult
+2239: oNodeGet
+2240: oPop 2
+2242: oAssign
+2243: oGetLocal 3
+2245: oPushResult
+2246: oNodeType
+2247: oPop 1
+2249: oChoice 2269
+2251: oGetAddrLocal 5
+2253: oPushResult
+2254: oCall 3201
+2256: oPop 1
+2258: oJumpForward 2277
+2260: oGetAddrLocal 5
+2262: oPushResult
+2263: oCall 3497
+2265: oPop 1
+2267: oJumpForward 2277
+2269: Choice Lookup Table
+          17   2260
+          16   2260
+          15   2251
+2276: oEndChoice
+2277: oGetLocal 4
+2279: oPushResult
+2280: oGetLocal 5
+2282: oPushResult
+2283: oCall 4027
+2285: oPop 2
+2287: oEmit 12
+2289: oGetAddrLocal 3
+2291: oPushResult
+2292: oNodeNext
+2293: oPop 1
+2295: oGetLocal 3
+2297: oPushResult
+2298: oNodeNull
+2299: oPop 1
+2301: oChoice 2309
+2303: oJumpForward 2319
+2305: oJumpForward 2315
+2307: oJumpForward 2315
+2309: Choice Lookup Table
+           0   2307
+           1   2303
+2314: oEndChoice
+2315: oInput 7
+2317: oJumpBack 2224
+2319: oInput 9
+2321: oGetLocal 1
+2323: oReturn
+2324: oReturn
+2325: oLocalSpace 1
+2327: oGetAddrLocal 1
+2329: oPushResult
+2330: oGetParam 1
+2332: oPushResult
+2333: oCall 2167
+2335: oPop 1
+2337: oAssign
+2338: oGetParam 1
+2340: oPushResult
+2341: oSetResult 8
+2343: oPushResult
+2344: oNodeGetBoolean
+2345: oPop 2
+2347: oChoice 2388
+2349: oEmit 7
+2351: oGetParam 1
+2353: oPushResult
+2354: oCall 4082
+2356: oPop 1
+2358: oJumpForward 2394
+2360: oEmit 7
+2362: oSetResult 3
+2364: oPushResult
+2365: oPatchPushHere
+2366: oPop 1
+2368: oSetResult 3
+2370: oPushResult
+2371: oGetParam 1
+2373: oPushResult
+2374: oSetResult 3
+2376: oPushResult
+2377: oNodeGetInt
+2378: oPop 2
+2380: oPushResult
+2381: oPatchPushInt
+2382: oPop 2
+2384: oEmit 25
+2386: oJumpForward 2394
+2388: Choice Lookup Table
+           0   2360
+           1   2349
+2393: oEndChoice
+2394: oGetLocal 1
+2396: oPushResult
+2397: equal_zero
+2398: oPop 1
+2400: oChoice 2414
+2402: oJumpForward 2420
+2404: oEmit 13
+2406: oGetLocal 1
+2408: oPushResult
+2409: oEmitInt
+2410: oPop 1
+2412: oJumpForward 2420
+2414: Choice Lookup Table
+           0   2404
+           1   2402
+2419: oEndChoice
+2420: oReturn
+2421: oLocalSpace 7
+2423: oGetGlobal 9
+2425: oPushResult
+2426: oScopeOpen
+2427: oPop 1
+2429: oGetAddrLocal 1
+2431: oPushResult
+2432: oSetResult 12
+2434: oPushResult
+2435: oNodeNew
+2436: oPop 1
+2438: oAssign
+2439: oGetAddrLocal 5
+2441: oPushResult
+2442: LAST_ID
+2443: oAssign
+2444: oGetLocal 1
+2446: oPushResult
+2447: oSetResult 3
+2449: oPushResult
+2450: oGetLocal 5
+2452: oPushResult
+2453: oNodeSetInt
+2454: oPop 3
+2456: oGetLocal 1
+2458: oPushResult
+2459: oSetResult 8
+2461: oPushResult
+2462: oSetResult 0
+2464: oPushResult
+2465: oNodeSetBoolean
+2466: oPop 3
+2468: oGetAddrLocal 2
+2470: oPushResult
+2471: oScopeBegin
+2472: oPop 1
+2474: oGetLocal 1
+2476: oPushResult
+2477: oSetResult 6
+2479: oPushResult
+2480: oGetLocal 2
+2482: oPushResult
+2483: oNodeSet
+2484: oPop 3
+2486: oGetAddrLocal 6
+2488: oPushResult
+2489: oSetResult 0
+2491: oAssign
+2492: oInputChoice 2615
+2494: oGetAddrLocal 3
+2496: oPushResult
+2497: oCall 3201
+2499: oPop 1
+2501: oGetAddrLocal 4
+2503: oPushResult
+2504: oSetResult 15
+2506: oPushResult
+2507: oNodeNew
+2508: oPop 1
+2510: oAssign
+2511: oGetLocal 4
+2513: oPushResult
+2514: oSetResult 5
+2516: oPushResult
+2517: oGetLocal 3
+2519: oPushResult
+2520: oNodeSet
+2521: oPop 3
+2523: oGetLocal 4
+2525: oPushResult
+2526: oScopeDeclare
+2527: oPop 1
+2529: oGetAddrLocal 6
+2531: oPushResult
+2532: inc
+2533: oPop 1
+2535: oInputChoice 2539
+2537: oJumpForward 2544
+2539: Choice Lookup Table
+           7   2537
+2542: oJumpForward 2546
+2544: oJumpBack 2494
+2546: oInput 9
+2548: oGetAddrLocal 7
+2550: oPushResult
+2551: oGetLocal 6
+2553: oAssign
+2554: oGetAddrLocal 4
+2556: oPushResult
+2557: oGetLocal 2
+2559: oPushResult
+2560: oSetResult 2
+2562: oPushResult
+2563: oNodeGet
+2564: oPop 2
+2566: oAssign
+2567: oGetLocal 4
+2569: oPushResult
+2570: oNodeNull
+2571: oPop 1
+2573: oChoice 2581
+2575: oJumpForward 2613
+2577: oJumpForward 2587
+2579: oJumpForward 2587
+2581: Choice Lookup Table
+           0   2579
+           1   2575
+2586: oEndChoice
+2587: oGetLocal 4
+2589: oPushResult
+2590: oSetResult 10
+2592: oPushResult
+2593: oGetLocal 7
+2595: oPushResult
+2596: oNodeSetInt
+2597: oPop 3
+2599: oGetAddrLocal 7
+2601: oPushResult
+2602: dec
+2603: oPop 1
+2605: oGetAddrLocal 4
+2607: oPushResult
+2608: oNodeNext
+2609: oPop 1
+2611: oJumpBack 2567
+2613: oJumpForward 2618
+2615: Choice Lookup Table
+           8   2494
+2618: oScopeEnd
+2619: oGetLocal 1
+2621: oPushResult
+2622: oScopeDeclare
+2623: oPop 1
+2625: oScopeEnd
+2626: oEmit 7
+2628: oSetResult 3
+2630: oPushResult
+2631: oPatchPushHere
+2632: oPop 1
+2634: oSetResult 3
+2636: oPushResult
+2637: oGetLocal 5
+2639: oPushResult
+2640: oPatchPushInt
+2641: oPop 2
+2643: oEmit 25
+2645: oGetLocal 6
+2647: oPushResult
+2648: equal_zero
+2649: oPop 1
+2651: oChoice 2655
+2653: oJumpForward 2666
+2655: Choice Lookup Table
+           1   2653
+2658: oEmit 13
+2660: oGetLocal 6
+2662: oPushResult
+2663: oEmitInt
+2664: oPop 1
+2666: oReturn
+2667: oLocalSpace 2
+2669: oGetParam 1
+2671: oPushResult
+2672: oGetAddrLocal 1
+2674: oPushResult
+2675: oCall 3570
+2677: oPop 2
+2679: oEmit 12
+2681: oInput 4
+2683: oGetAddrLocal 2
+2685: oPushResult
+2686: oCall 3201
+2688: oPop 1
+2690: oGetLocal 1
+2692: oPushResult
+2693: oGetLocal 2
+2695: oPushResult
+2696: oCall 4027
+2698: oPop 2
+2700: oEmit 24
+2702: oReturn
+2703: oLocalSpace 6
+2705: oInputChoice 2717
+2707: oEmit 6
+2709: oGetAddrLocal 2
+2711: oPushResult
+2712: oSetResult 2
+2714: oAssign
+2715: oJumpForward 2761
+2717: Choice Lookup Table
+          16   2707
+2720: oGetAddrLocal 3
+2722: oPushResult
+2723: oCall 3201
+2725: oPop 1
+2727: oEmit 10
+2729: oGetLocal 3
+2731: oPushResult
+2732: oNodeNull
+2733: oPop 1
+2735: oChoice 2753
+2737: oGetAddrLocal 2
+2739: oPushResult
+2740: oSetResult 1
+2742: oAssign
+2743: oJumpForward 2759
+2745: oGetAddrLocal 2
+2747: oPushResult
+2748: oSetResult 5
+2750: oAssign
+2751: oJumpForward 2759
+2753: Choice Lookup Table
+           0   2745
+           1   2737
+2758: oEndChoice
+2759: oInput 16
+2761: oSetResult 0
+2763: oPushResult
+2764: oPatchPushHere
+2765: oPop 1
+2767: oEmit 25
+2769: oSetResult 1
+2771: oPushResult
+2772: oPatchMark
+2773: oPop 1
+2775: oSetResult 2
+2777: oPushResult
+2778: oPatchMark
+2779: oPop 1
+2781: oGetAddrLocal 1
+2783: oPushResult
+2784: oSetResult 0
+2786: oAssign
+2787: oInputChoice 2818
+2789: oInput 5
+2791: oGetLocal 1
+2793: oPushResult
+2794: oCall 3019
+2796: oPop 1
+2798: oCall 1748
+2800: oChoice 2804
+2802: oJumpForward 2809
+2804: Choice Lookup Table
+           1   2802
+2807: oJumpForward 2811
+2809: oJumpBack 2798
+2811: oInput 15
+2813: oCall 3063
+2815: oReturn
+2816: oJumpForward 2959
+2818: Choice Lookup Table
+          19   2789
+2821: oGetLocal 2
+2823: oChoice 2914
+2825: oGetAddrLocal 6
+2827: oPushResult
+2828: oGetAddrLocal 4
+2830: oPushResult
+2831: oCall 3662
+2833: oPop 1
+2835: oAssign
+2836: oGetLocal 3
+2838: oPushResult
+2839: oGetLocal 4
+2841: oPushResult
+2842: oCall 4027
+2844: oPop 2
+2846: oJumpForward 2922
+2848: oGetAddrLocal 6
+2850: oPushResult
+2851: oGetAddrLocal 3
+2853: oPushResult
+2854: oCall 3662
+2856: oPop 1
+2858: oAssign
+2859: oGetAddrLocal 2
+2861: oPushResult
+2862: oSetResult 5
+2864: oAssign
+2865: oJumpForward 2922
+2867: oInputChoice 2893
+2869: oGetAddrLocal 5
+2871: oPushResult
+2872: oCall 3785
+2874: oPop 1
+2876: oJumpForward 2899
+2878: oGetAddrLocal 5
+2880: oPushResult
+2881: oShortFormLookup
+2882: oPop 1
+2884: oGetLocal 5
+2886: oPushResult
+2887: oCall 3867
+2889: oPop 1
+2891: oJumpForward 2899
+2893: Choice Lookup Table
+           2   2878
+           0   2869
+2898: oEndChoice
+2899: oGetAddrLocal 6
+2901: oPushResult
+2902: oGetLocal 5
+2904: oPushResult
+2905: oSetResult 4
+2907: oPushResult
+2908: oNodeGetInt
+2909: oPop 2
+2911: oAssign
+2912: oJumpForward 2922
+2914: Choice Lookup Table
+           2   2867
+           1   2848
+           5   2825
+2921: oEndChoice
+2922: oSetResult 1
+2924: oPushResult
+2925: oPatchPushHere
+2926: oPop 1
+2928: oSetResult 1
+2930: oPushResult
+2931: oGetLocal 6
+2933: oPushResult
+2934: oPatchPushInt
+2935: oPop 2
+2937: oGetAddrLocal 1
+2939: oPushResult
+2940: inc
+2941: oPop 1
+2943: oInputChoice 2951
+2945: oJumpForward 2959
+2947: oJumpForward 2957
+2949: oJumpForward 2957
+2951: Choice Lookup Table
+           7   2949
+           5   2945
+2956: oEndChoice
+2957: oJumpBack 2821
+2959: oCall 1748
+2961: oChoice 2965
+2963: oJumpForward 2970
+2965: Choice Lookup Table
+           1   2963
+2968: oJumpForward 2972
+2970: oJumpBack 2959
+2972: oInputChoice 3010
+2974: oEmit 0
+2976: oSetResult 2
+2978: oPushResult
+2979: oPatchPushHere
+2980: oPop 1
+2982: oEmit 25
+2984: oGetLocal 1
+2986: oPushResult
+2987: oCall 3019
+2989: oPop 1
+2991: oEmit 11
+2993: oCall 3063
+2995: oReturn
+2996: oJumpForward 3016
+2998: oEmit 0
+3000: oSetResult 2
+3002: oPushResult
+3003: oPatchPushHere
+3004: oPop 1
+3006: oEmit 25
+3008: oJumpForward 3016
+3010: Choice Lookup Table
+          16   2998
+          15   2974
+3015: oEndChoice
+3016: oJumpBack 2787
+3018: oReturn
+3019: oLocalSpace 0
+3021: oSetResult 0
+3023: oPushResult
+3024: oPatchPopFwd
+3025: oPop 1
+3027: oGetParam 1
+3029: oPushResult
+3030: oEmitInt
+3031: oPop 1
+3033: oSetResult 1
+3035: oPushResult
+3036: oPatchAtMark
+3037: oPop 1
+3039: oChoice 3055
+3041: oSetResult 1
+3043: oPushResult
+3044: oPatchPopValue
+3045: oPop 1
+3047: oSetResult 1
+3049: oPushResult
+3050: oPatchPopBack
+3051: oPop 1
+3053: oJumpForward 3060
+3055: Choice Lookup Table
+           0   3041
+3058: oJumpForward 3062
+3060: oJumpBack 3033
+3062: oReturn
+3063: oLocalSpace 0
+3065: oSetResult 2
+3067: oPushResult
+3068: oPatchAtMark
+3069: oPop 1
+3071: oChoice 3081
+3073: oSetResult 2
+3075: oPushResult
+3076: oPatchPopFwd
+3077: oPop 1
+3079: oJumpForward 3086
+3081: Choice Lookup Table
+           0   3073
+3084: oJumpForward 3088
+3086: oJumpBack 3065
+3088: oReturn
+3089: oLocalSpace 0
+3091: oSetResult 3
+3093: oPushResult
+3094: oPatchAnyEntries
+3095: oPop 1
+3097: oChoice 3107
+3099: oSetResult 3
+3101: oPushResult
+3102: oPatchPopCall
+3103: oPop 1
+3105: oJumpForward 3112
+3107: Choice Lookup Table
+           1   3099
+3110: oJumpForward 3114
+3112: oJumpBack 3091
+3114: oReturn
+3115: oLocalSpace 1
+3117: oGetAddrLocal 1
+3119: oPushResult
+3120: oGetGlobal 9
+3122: oPushResult
+3123: oSetResult 2
+3125: oPushResult
+3126: oNodeGet
+3127: oPop 2
+3129: oAssign
+3130: oGetLocal 1
+3132: oPushResult
+3133: oNodeNull
+3134: oPop 1
+3136: oChoice 3144
+3138: oJumpForward 3200
+3140: oJumpForward 3150
+3142: oJumpForward 3150
+3144: Choice Lookup Table
+           0   3142
+           1   3138
+3149: oEndChoice
+3150: oGetLocal 1
+3152: oPushResult
+3153: oNodeType
+3154: oPop 1
+3156: oChoice 3189
+3158: oGetLocal 1
+3160: oPushResult
+3161: oSetResult 8
+3163: oPushResult
+3164: oNodeGetBoolean
+3165: oPop 2
+3167: oChoice 3184
+3169: oGetLocal 1
+3171: oPushResult
+3172: oSetResult 3
+3174: oPushResult
+3175: oNodeGetInt
+3176: oPop 2
+3178: oPushResult
+3179: oUndeclaredRule
+3180: oPop 1
+3182: oJumpForward 3187
+3184: Choice Lookup Table
+           0   3169
+3187: oJumpForward 3192
+3189: Choice Lookup Table
+          12   3158
+3192: oGetAddrLocal 1
+3194: oPushResult
+3195: oNodeNext
+3196: oPop 1
+3198: oJumpBack 3130
+3200: oReturn
+3201: oLocalSpace 1
+3203: oInputChoice 3486
+3205: oGetAddrLocal 1
+3207: oPushResult
+3208: oScopeFind
+3209: oPop 1
+3211: oChoice 3370
+3213: oGetLocal 1
+3215: oPushResult
+3216: oNodeType
+3217: oPop 1
+3219: oChoice 3311
+3221: oSetResult 0
+3223: oPushResult
+3224: oWarning
+3225: oPop 1
+3227: oGetLocal 1
+3229: oPushResult
+3230: oCall 2325
+3232: oPop 1
+3234: oJumpForward 3330
+3236: oGetLocal 1
+3238: oPushResult
+3239: oCall 2120
+3241: oPop 1
+3243: oJumpForward 3330
+3245: oEmit 9
+3247: oGetLocal 1
+3249: oPushResult
+3250: oCall 4082
+3252: oPop 1
+3254: oJumpForward 3330
+3256: oEmit 17
+3258: oGetLocal 1
+3260: oPushResult
+3261: oCall 4098
+3263: oPop 1
+3265: oJumpForward 3330
+3267: oEmit 18
+3269: oGetLocal 1
+3271: oPushResult
+3272: oCall 4098
+3274: oPop 1
+3276: oJumpForward 3330
+3278: oEmit 18
+3280: oGetLocal 1
+3282: oPushResult
+3283: oCall 4098
+3285: oPop 1
+3287: oJumpForward 3330
+3289: oEmit 19
+3291: oGetLocal 1
+3293: oPushResult
+3294: oCall 4098
+3296: oPop 1
+3298: oJumpForward 3330
+3300: oEmit 20
+3302: oGetLocal 1
+3304: oPushResult
+3305: oCall 4098
+3307: oPop 1
+3309: oJumpForward 3330
+3311: Choice Lookup Table
+          19   3300
+          18   3289
+          17   3278
+          16   3267
+          15   3256
+           9   3245
+          11   3236
+          12   3221
+3328: oError 11
+3330: oGetParam 1
+3332: oPushResult
+3333: oGetLocal 1
+3335: oPushResult
+3336: oSetResult 5
+3338: oPushResult
+3339: oNodeGet
+3340: oPop 2
+3342: oAssign
+3343: oGetFromParam 1
+3345: oPushResult
+3346: oNodeNull
+3347: oPop 1
+3349: oChoice 3355
+3351: oError 10
+3353: oJumpForward 3358
+3355: Choice Lookup Table
+           1   3351
+3358: oJumpForward 3376
+3360: oGetParam 1
+3362: oPushResult
+3363: oSetResult 0
+3365: oAssign
+3366: oError 17
+3368: oJumpForward 3376
+3370: Choice Lookup Table
+           0   3360
+           1   3213
+3375: oEndChoice
+3376: oJumpForward 3496
+3378: oInput 0
+3380: oGetAddrLocal 1
+3382: oPushResult
+3383: oScopeFind
+3384: oPop 1
+3386: oChoice 3442
+3388: oGetLocal 1
+3390: oPushResult
+3391: oCall 3939
+3393: oPop 1
+3395: oGetLocal 1
+3397: oPushResult
+3398: oCall 2325
+3400: oPop 1
+3402: oGetParam 1
+3404: oPushResult
+3405: oGetLocal 1
+3407: oPushResult
+3408: oSetResult 5
+3410: oPushResult
+3411: oNodeGet
+3412: oPop 2
+3414: oAssign
+3415: oGetFromParam 1
+3417: oPushResult
+3418: oNodeNull
+3419: oPop 1
+3421: oChoice 3427
+3423: oError 10
+3425: oJumpForward 3430
+3427: Choice Lookup Table
+           1   3423
+3430: oJumpForward 3448
+3432: oCall 2421
+3434: oGetParam 1
+3436: oPushResult
+3437: oSetResult 0
+3439: oAssign
+3440: oJumpForward 3448
+3442: Choice Lookup Table
+           0   3432
+           1   3388
+3447: oEndChoice
+3448: oJumpForward 3496
+3450: oInput 1
+3452: oEmit 9
+3454: TOKEN_VALUE
+3455: oPushResult
+3456: negate
+3457: oPop 1
+3459: oPushResult
+3460: oEmitInt
+3461: oPop 1
+3463: oGetParam 1
+3465: oPushResult
+3466: oGetGlobal 2
+3468: oAssign
+3469: oJumpForward 3496
+3471: oEmit 9
+3473: TOKEN_VALUE
+3474: oPushResult
+3475: oEmitInt
+3476: oPop 1
+3478: oGetParam 1
+3480: oPushResult
+3481: oGetGlobal 2
+3483: oAssign
+3484: oJumpForward 3496
+3486: Choice Lookup Table
+           1   3471
+           3   3450
+          17   3378
+           0   3205
+3495: oEndChoice
+3496: oReturn
+3497: oLocalSpace 1
+3499: oInputChoice 3561
+3501: oGetAddrLocal 1
+3503: oPushResult
+3504: oScopeFind
+3505: oPop 1
+3507: oChoice 3531
+3509: oGetLocal 1
+3511: oPushResult
+3512: oGetParam 1
+3514: oPushResult
+3515: oCall 3570
+3517: oPop 2
+3519: oJumpForward 3537
+3521: oGetParam 1
+3523: oPushResult
+3524: oSetResult 0
+3526: oAssign
+3527: oError 12
+3529: oJumpForward 3537
+3531: Choice Lookup Table
+           0   3521
+           1   3509
+3536: oEndChoice
+3537: oJumpForward 3569
+3539: oInput 1
+3541: oGetParam 1
+3543: oPushResult
+3544: oSetResult 0
+3546: oAssign
+3547: oError 12
+3549: oJumpForward 3569
+3551: oGetParam 1
+3553: oPushResult
+3554: oSetResult 0
+3556: oAssign
+3557: oError 12
+3559: oJumpForward 3569
+3561: Choice Lookup Table
+           1   3551
+           3   3539
+           0   3501
+3568: oEndChoice
+3569: oReturn
+3570: oLocalSpace 0
+3572: oGetParam 2
+3574: oPushResult
+3575: oNodeType
+3576: oPop 1
+3578: oChoice 3635
+3580: oEmit 21
+3582: oGetParam 2
+3584: oPushResult
+3585: oCall 4098
+3587: oPop 1
+3589: oJumpForward 3648
+3591: oEmit 17
+3593: oGetParam 2
+3595: oPushResult
+3596: oCall 4098
+3598: oPop 1
+3600: oJumpForward 3648
+3602: oEmit 17
+3604: oGetParam 2
+3606: oPushResult
+3607: oCall 4098
+3609: oPop 1
+3611: oJumpForward 3648
+3613: oEmit 22
+3615: oGetParam 2
+3617: oPushResult
+3618: oCall 4098
+3620: oPop 1
+3622: oJumpForward 3648
+3624: oEmit 23
+3626: oGetParam 2
+3628: oPushResult
+3629: oCall 4098
+3631: oPop 1
+3633: oJumpForward 3648
+3635: Choice Lookup Table
+          19   3624
+          18   3613
+          17   3602
+          16   3591
+          15   3580
+3646: oError 12
+3648: oGetParam 1
+3650: oPushResult
+3651: oGetParam 2
+3653: oPushResult
+3654: oSetResult 5
+3656: oPushResult
+3657: oNodeGet
+3658: oPop 2
+3660: oAssign
+3661: oReturn
+3662: oLocalSpace 2
+3664: oInputChoice 3733
+3666: oGetAddrLocal 1
+3668: oPushResult
+3669: oCall 3817
+3671: oPop 1
+3673: oGetAddrLocal 2
+3675: oPushResult
+3676: oGetLocal 1
+3678: oPushResult
+3679: oSetResult 4
+3681: oPushResult
+3682: oNodeGetInt
+3683: oPop 2
+3685: oAssign
+3686: oGetParam 1
+3688: oPushResult
+3689: oGetLocal 1
+3691: oPushResult
+3692: oSetResult 5
+3694: oPushResult
+3695: oNodeGet
+3696: oPop 2
+3698: oAssign
+3699: oJumpForward 3741
+3701: oInput 1
+3703: oGetAddrLocal 2
+3705: oPushResult
+3706: TOKEN_VALUE
+3707: oPushResult
+3708: negate
+3709: oPop 1
+3711: oAssign
+3712: oGetParam 1
+3714: oPushResult
+3715: oGetGlobal 2
+3717: oAssign
+3718: oJumpForward 3741
+3720: oGetAddrLocal 2
+3722: oPushResult
+3723: TOKEN_VALUE
+3724: oAssign
+3725: oGetParam 1
+3727: oPushResult
+3728: oGetGlobal 2
+3730: oAssign
+3731: oJumpForward 3741
+3733: Choice Lookup Table
+           1   3720
+           3   3701
+           0   3666
+3740: oEndChoice
+3741: oGetLocal 2
+3743: oReturn
+3744: oReturn
+3745: oLocalSpace 2
+3747: oGetAddrLocal 2
+3749: oPushResult
+3750: oGetAddrLocal 1
+3752: oPushResult
+3753: oCall 3662
+3755: oPop 1
+3757: oAssign
+3758: oGetLocal 1
+3760: oPushResult
+3761: oCall 4061
+3763: oPop 1
+3765: oGetLocal 2
+3767: oReturn
+3768: oReturn
+3769: oLocalSpace 0
+3771: oGetParam 1
+3773: oPushResult
+3774: oScopeFindRequire
+3775: oPop 1
+3777: oGetFromParam 1
+3779: oPushResult
+3780: oCall 3849
+3782: oPop 1
+3784: oReturn
+3785: oLocalSpace 0
+3787: oGetParam 1
+3789: oPushResult
+3790: oScopeFindRequire
+3791: oPop 1
+3793: oGetFromParam 1
+3795: oPushResult
+3796: oCall 3867
+3798: oPop 1
+3800: oReturn
+3801: oLocalSpace 0
+3803: oGetParam 1
+3805: oPushResult
+3806: oScopeFindRequire
+3807: oPop 1
+3809: oGetFromParam 1
+3811: oPushResult
+3812: oCall 3885
+3814: oPop 1
+3816: oReturn
+3817: oLocalSpace 0
+3819: oGetParam 1
+3821: oPushResult
+3822: oScopeFindRequire
+3823: oPop 1
+3825: oGetFromParam 1
+3827: oPushResult
+3828: oCall 3903
+3830: oPop 1
+3832: oReturn
+3833: oLocalSpace 0
+3835: oGetParam 1
+3837: oPushResult
+3838: oScopeFindRequire
+3839: oPop 1
+3841: oGetFromParam 1
+3843: oPushResult
+3844: oCall 3921
+3846: oPop 1
+3848: oReturn
+3849: oLocalSpace 0
+3851: oGetParam 1
+3853: oPushResult
+3854: oNodeType
+3855: oPop 1
+3857: oChoice 3861
+3859: oJumpForward 3866
+3861: Choice Lookup Table
+           8   3859
+3864: oError 1
+3866: oReturn
+3867: oLocalSpace 0
+3869: oGetParam 1
+3871: oPushResult
+3872: oNodeType
+3873: oPop 1
+3875: oChoice 3879
+3877: oJumpForward 3884
+3879: Choice Lookup Table
+           5   3877
+3882: oError 3
+3884: oReturn
+3885: oLocalSpace 0
+3887: oGetParam 1
+3889: oPushResult
+3890: oNodeType
+3891: oPop 1
+3893: oChoice 3897
+3895: oJumpForward 3902
+3897: Choice Lookup Table
+           6   3895
+3900: oError 4
+3902: oReturn
+3903: oLocalSpace 0
+3905: oGetParam 1
+3907: oPushResult
+3908: oNodeType
+3909: oPop 1
+3911: oChoice 3915
+3913: oJumpForward 3920
+3915: Choice Lookup Table
+           9   3913
+3918: oError 2
+3920: oReturn
+3921: oLocalSpace 0
+3923: oGetParam 1
+3925: oPushResult
+3926: oNodeType
+3927: oPop 1
+3929: oChoice 3933
+3931: oJumpForward 3938
+3933: Choice Lookup Table
+           7   3931
+3936: oError 6
+3938: oReturn
+3939: oLocalSpace 0
+3941: oGetParam 1
+3943: oPushResult
+3944: oNodeType
+3945: oPop 1
+3947: oChoice 3951
+3949: oJumpForward 3956
+3951: Choice Lookup Table
+          12   3949
+3954: oError 5
+3956: oReturn
+3957: oLocalSpace 0
+3959: oGetParam 1
+3961: oPushResult
+3962: oSetResult 5
+3964: oPushResult
+3965: oNodeGet
+3966: oPop 2
+3968: oPushResult
+3969: oNodeNull
+3970: oPop 1
+3972: oChoice 3982
+3974: oSetResult 1
+3976: oPushResult
+3977: oWarning
+3978: oPop 1
+3980: oJumpForward 3985
+3982: Choice Lookup Table
+           0   3974
+3985: oReturn
+3986: oLocalSpace 0
+3988: oGetParam 2
+3990: oPushResult
+3991: oSetResult 5
+3993: oPushResult
+3994: oNodeGet
+3995: oPop 2
+3997: oPushResult
+3998: oGetParam 1
+4000: oPushResult
+4001: oNodeEqual
+4002: oPop 2
+4004: oChoice 4008
+4006: oJumpForward 4013
+4008: Choice Lookup Table
+           1   4006
+4011: oError 0
+4013: oReturn
+4014: oLocalSpace 0
+4016: oGetParam 2
+4018: oPushResult
+4019: oGetParam 1
+4021: oPushResult
+4022: oNodeEqual
+4023: oPop 2
+4025: oReturn
+4026: oReturn
+4027: oLocalSpace 0
+4029: oGetParam 2
+4031: oPushResult
+4032: oGetParam 1
+4034: oPushResult
+4035: oNodeEqual
+4036: oPop 2
+4038: oChoice 4042
+4040: oJumpForward 4047
+4042: Choice Lookup Table
+           1   4040
+4045: oError 0
+4047: oReturn
+4048: oLocalSpace 0
+4050: oGetParam 1
+4052: oPushResult
+4053: oGetGlobal 2
+4055: oPushResult
+4056: oNodeEqual
+4057: oPop 2
+4059: oReturn
+4060: oReturn
+4061: oLocalSpace 0
+4063: oGetParam 1
+4065: oPushResult
+4066: oGetGlobal 2
+4068: oPushResult
+4069: oNodeEqual
+4070: oPop 2
+4072: oChoice 4076
+4074: oJumpForward 4081
+4076: Choice Lookup Table
+           1   4074
+4079: oError 0
+4081: oReturn
+4082: oLocalSpace 0
+4084: oGetParam 1
+4086: oPushResult
+4087: oSetResult 4
+4089: oPushResult
+4090: oNodeGetInt
+4091: oPop 2
+4093: oPushResult
+4094: oEmitInt
+4095: oPop 1
+4097: oReturn
+4098: oLocalSpace 0
+4100: oGetParam 1
+4102: oPushResult
+4103: oSetResult 10
+4105: oPushResult
+4106: oNodeGetInt
+4107: oPop 2
+4109: oPushResult
+4110: oEmitInt
+4111: oPop 1
+4113: oReturn

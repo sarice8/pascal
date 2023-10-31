@@ -1,0 +1,77 @@
+
+Additions to SSL definition:
+----------------------------
+
+
+output:
+    n_name (ident_type)         % parameterized output token
+
+    .n_name (qIdent(qModuleSym(stmt)))    % emitting this token, with param expression
+
+rules
+
+code_generation (Node sourceFile)   % parameterized rules, variables, optional ':' after ()
+
+    oAssertNodeIsA (sourceFile, nSourceFile)    % refer to variables,
+                                                % multiple params
+
+    iterate unit qDecls(sourceFile)     % implicit var, iterate_start, iterate_while, iterate_next
+    {                                   % given type of expr [Node]
+        @vcgDesignUnit (unit)
+    }
+
+    ;
+
+vcvDesignUnit (Node unit)
+
+    [ ! oNodeIsA (unit, nModule)     % boolean ! operator, short-form boolean "if"
+        #vcgNotSupported  >>         % (no error if not matched)
+    ]                                % maybe need boolean type built-in, also to define iterator funcs
+
+    @vcgBlock (qRegion(unit))        % param expression;
+                                          define qRegion as Node mechansim, or better a macro:
+
+                                          type Node;
+                                          type attribute:
+                                              aRegion, ...;
+                                          mechanism NodeMech:
+                                               oNodeGet(Node, attribute) >> any_type   % could return Node or ...
+                                               qRegion(Node n) >> Node = oNodeGet(n, aRegion)
+    
+    Node   stmt             % declaring local (global) variable
+
+    stmt = qElse(stmt)      % assignment to variable
+
+    iterate decl qDecls(region)
+    {
+        qHandle(decl) = oCodeAllocHandle      % using function as a LHS of assignment!
+        qRep(decl)    = BV32                  %      "qRep(Node n) = representation r" = oNodeSet(n, aRep, r)
+    }                                         % pretty complicated definition.
+
+                                   how about: qRep(Node n) << representation r = oNodeSet(n, aRep, r)
+                     if not an alias:
+                               qRep(Node) << representation
+                     and mechanism would be called as:           qRep_LVALUE(Node, representation)
+
+Node, some attributes have different types; what to do in that case?
+
+Actually, all Node types are the same (for now).  Just distinguish between ssl types.
+(number_type, representation, etc).
+
+Maybe just have different forms:
+
+        qLeft(Node) >> Node
+        qLeft(Node) << Node
+
+        qLeft(Node) >> number_type
+        qLeft(Node) << number_type
+
+Unless aliases are defined, they will all call the same mechanisms (qLeft or qLeft_LVALUE)
+
+        qLeft(Node) >> Node
+        qLeft(Node) >> number_type = qLeft_number_type     % no alias params means takes same params as qLeft
+
+        qLeft(Node) << Node
+        qLeft(Node) << number_type = qLeft_number_type_LVALUE
+
+

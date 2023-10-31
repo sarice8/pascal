@@ -1,0 +1,95 @@
+
+%
+% This schema is designed to hold a symbol table while processing an
+% SSL program description.
+%
+% Steve Rice -- Aug 24 '93
+%
+
+Schema SSL Root nScope Is
+
+% -----------------------------------------------------------------------
+% Scope
+% -----------------------------------------------------------------------
+ 
+Object ::= nScope
+nScope =>
+	qParentScope:	Node		(nScope)		[Alt,Opt]
+	qDecls:		List		(nDeclaration)		[Pri,Opt]
+
+% -----------------------------------------------------------------------
+% Declarations
+% -----------------------------------------------------------------------
+
+Object ::= nDeclaration
+nDeclaration =>
+	qIdent:		Integer4
+
+nDeclaration ::= nIdent
+
+% Input tokens are now recorded as nValue with qType == "token"
+%nIdent ::= nInput
+%nInput =>
+%	qValue:		Integer4
+
+nIdent ::= nOutput
+nOutput =>
+	qValue:		Integer4
+
+nIdent ::= nError
+nError =>
+	qValue:		Integer4
+
+nIdent ::= nType
+
+nIdent ::= nValue	% element of a type
+nValue =>
+	qValue:		Integer4
+	qType:		Node		(nType)			[Alt]
+
+nIdent ::= nMechanism
+
+nIdent ::= nOperation
+nOperation =>
+	qValue:		Integer4
+	qType:		Node		(nType)			[Alt,Opt]
+        qParamScope:    Node            (nScope)                [Pri,Opt]
+
+nIdent ::= nRule
+nRule =>
+	qValue:		Integer4
+	qType:		Node		(nType)			[Alt,Opt]
+        qParamScope:    Node            (nScope)                [Pri,Opt]
+	qScope:		Node		(nScope)		[Pri,Opt]
+        qAddrDefined:   Boolean1      % true when rule body (and address) known
+        qTypeDefined:   Boolean1      % true when return type known
+             % e.g. From a forward-declaration prototype,
+             %      we know params and type, but not address.
+             %      From usage we may know params but not address or
+             %      return type (if return type was ignored by the call).
+             %      From the declaration of the code, we know everything.
+             %      [ Note, hence we always know param type, or at least
+             %        know what we have assumed it to be. ]
+             %      The things we do not yet know must be added later,
+             %      and the things we do know must be consistent.
+
+% -----------------------------------------------------------------------
+% Variables
+% -----------------------------------------------------------------------
+
+nIdent ::= nVariable
+nVariable =>
+	qAddr:		Integer4
+	qType:		Node		(nType)			[Alt]
+
+nVariable ::= nParam
+
+nParam    ::= nInParam
+nParam    ::= nOutParam
+nParam    ::= nInOutParam
+
+nVariable ::= nLocal
+
+nVariable ::= nGlobal
+
+

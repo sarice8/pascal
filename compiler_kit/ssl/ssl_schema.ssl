@@ -1,0 +1,39 @@
+
+% Generated automatically by schema
+
+type node_type:
+	nINVALID
+	Object
+	nScope
+	nDeclaration
+	nIdent
+	nOutput
+	nError
+	nType
+	nValue
+	nMechanism
+	nOperation
+	nRule
+	nVariable
+	nParam
+	nInParam
+	nOutParam
+	nInOutParam
+	nLocal
+	nGlobal
+	;
+
+type node_attribute:
+	qINVALID
+	qParentScope
+	qDecls
+	qIdent
+	qValue
+	qType
+	qParamScope
+	qScope
+	qAddrDefined
+	qTypeDefined
+	qAddr
+	;
+
