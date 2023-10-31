@@ -1,31 +1,31 @@
 
-# Needs snapshot of schema compiler version 1.4/boot2 (or current version 1.4) to build this one
-RELEASE          = /home/steve/fun/compilers/release_images
+# Needs snapshot of previous schema compiler (or stable current version) to build this one
+RELEASE          = ../release
 
-#SCHEMA_DIR       = ${RELEASE}/schema/1.4
+#SCHEMA_DIR       = ${RELEASE}/schema
 # To build with self:
 SCHEMA_DIR       = .
 
 # Generic SSL runtime module
-SSL_RT_DIR       = ${RELEASE}/ssl_rt/2.0
+SSL_RT_DIR       = ${RELEASE}/ssl_rt
 SSL_RT_HEADERS   = ${SSL_RT_DIR}/ssl_rt.h \
 		   ${SSL_RT_DIR}/ssl_begin.h \
 		   ${SSL_RT_DIR}/ssl_end.h
 
-SSL_DIR          = ${RELEASE}/ssl/1.3.2
+SSL_DIR          = ${RELEASE}/ssl
 
 # This is the directory we would export our own build to
-OUR_RELEASE_DIR = $(RELEASE)/schema/1.4
+OUR_RELEASE_DIR = $(RELEASE)/schema
 
 # ---------------------------------------------------------
 
-DBG_DIR          = ${RELEASE}/debug/1.3.0
+DBG_DIR          = ${RELEASE}/debug
 DBG_OBJS         = ${DBG_DIR}/obj-$(OSTYPE)/debug.o
 DBG_STUBS        = ${DBG_DIR}/obj-$(OSTYPE)/dbgstub.o
 
 # Uses SslTool
 # Not available yet, needs porting to a new GUI.
-#SSLTOOL_DIR      = ${RELEASE}/ssltool/1.2.7
+#SSLTOOL_DIR      = ${RELEASE}/ssltool
 #SSLTOOL_OBJS     = ${SSLTOOL_DIR}/ssltool_stubs_new.o \
 #                   ${SSLTOOL_DIR}/ssltool_ui_new.o
 #SSLTOOL_LIB_PATH = -L${GUIDEHOME}/lib -L${OPENWINHOME}/lib
