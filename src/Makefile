@@ -1,22 +1,21 @@
 
 # Needs snapshot of supporting tools
-RELEASE          = ../release_images
+KIT              = ../compiler_kit/release
 
-SSL_RT_DIR       = $(RELEASE)/ssl_rt/2.0
+SSL_RT_DIR       = $(KIT)/ssl_rt
 SSL_RT_HEADERS   = $(SSL_RT_DIR)/ssl_rt.h \
                    $(SSL_RT_DIR)/ssl_begin.h \
                    $(SSL_RT_DIR)/ssl_end.h
 
-SSL_DIR          = $(RELEASE)/ssl/1.3.2
+SSL_DIR          = $(KIT)/ssl
 
 # ssl_rt wants debug, apparently
-DBG_DIR          = $(RELEASE)/debug/1.3.0
+DBG_DIR          = $(KIT)/debug
 
 DBG_OBJS         = $(DBG_DIR)/obj-$(OSTYPE)/debug.o
 DBG_STUBS        = $(DBG_DIR)/obj-$(OSTYPE)/dbgstub.o
 
-#SCHEMA_DIR       = $(RELEASE)/schema/1.3
-SCHEMA_DIR       = $(RELEASE)/schema/1.4
+SCHEMA_DIR       = $(KIT)/schema
 
 
 # Graphics library built into back end needs SDL2

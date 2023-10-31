@@ -17,3 +17,4 @@ tmp.*
 *.diffs
 *.ppu
 *.o
+*.dmp
