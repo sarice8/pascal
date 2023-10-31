@@ -1,14 +1,14 @@
 
 # Needs a snapshot of supporting tools
-RELEASE      = /home/steve/fun/compilers/release_images
+RELEASE      = ../release
 
-SSL_RT_DIR = $(RELEASE)/ssl_rt/2.0
+SSL_RT_DIR = $(RELEASE)/ssl_rt
 
 # Debugger integrates with schema, to allow dumping nodes
-SCHEMA_DIR = $(RELEASE)/schema/1.3
+SCHEMA_DIR = $(RELEASE)/schema
 
 # This is the directory we would export our own build to
-OUR_RELEASE_DIR = $(RELEASE)/debug/1.3.0
+OUR_RELEASE_DIR = $(RELEASE)/debug
 
 
 # ---------------------------------------------------------
