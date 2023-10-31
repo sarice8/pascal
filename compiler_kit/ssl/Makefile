@@ -2,38 +2,38 @@
 # SSL compiler, built using generic SSL runtime module & scanner
 
 # Needs snapshot of supporting tools
-RELEASE        = /home/steve/fun/compilers/release_images
+RELEASE        = ../release
 
 # Generic SSL runtime module
-SSL_RT_DIR     = ${RELEASE}/ssl_rt/2.0
+SSL_RT_DIR     = ${RELEASE}/ssl_rt
 SSL_RT_HEADERS = ${SSL_RT_DIR}/ssl_rt.h \
                  ${SSL_RT_DIR}/ssl_begin.h \
                  ${SSL_RT_DIR}/ssl_end.h
 
-SCHEMA_DIR     = $(RELEASE)/schema/1.3
+SCHEMA_DIR     = $(RELEASE)/schema
 
 # This SSL compiler used to build this one ...
-SSL_DIR        = ${RELEASE}/ssl/1.3.2
+SSL_DIR        = ${RELEASE}/ssl
 # if want to build with self, for testing:
-#SSL_DIR        = /home/steve/fun/compilers/ssl_1.3.2/ssl
+#SSL_DIR        = .
 
 
 # This is the directory we would export our own build to
-OUR_RELEASE_DIR = $(RELEASE)/ssl/1.3.2
+OUR_RELEASE_DIR = $(RELEASE)/ssl
 
 
 # ---------------------------------------------------------
 
 # Debug objects only required if compile with -DDEBUG
 
-DBG_DIR        = ${RELEASE}/debug/1.3.0
+DBG_DIR        = ${RELEASE}/debug
 
 DBG_OBJS       = ${DBG_DIR}/obj-$(OSTYPE)/debug.o
 DBG_STUBS      = ${DBG_DIR}/obj-$(OSTYPE)/dbgstub.o
 
-# Uses SslTool version 1.2.7
+# Uses SslTool
 # Not available yet, needs porting to a new GUI.
-#SSLTOOL_DIR    = ${ROOT}/ssltool/1.2.7
+#SSLTOOL_DIR    = ${ROOT}/ssltool
 #SSLTOOL_OBJS   = ${SSLTOOL_DIR}/ssltool_stubs_new.o \
 #                 ${SSLTOOL_DIR}/ssltool_ui_new.o 
 #SSLTOOL_LIB_PATH = -L${GUIDEHOME}/lib -L${OPENWINHOME}/lib 
