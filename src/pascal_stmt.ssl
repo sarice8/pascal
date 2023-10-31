@@ -1,0 +1,619 @@
+%
+% Pascal Compiler
+%
+
+
+% ------------------------------ Statements -----------------------------
+
+Statement:
+   [
+      | pWriteln :     @WritelnStmt
+      | pWrite :       @WriteStmt
+      | pReadln :      @ReadlnStmt
+      | pRead :        @ReadStmt
+      | pIf :          @IfStmt
+      | pWhile :       @WhileStmt
+      | pFor :         @ForStmt
+      | pRepeat :      @RepeatStmt
+      | pBreak :       @BreakStmt
+      | pContinue :    @ContinueStmt
+      | pBegin :       @BeginStmt
+      | pIdent :       @LabelOrAssignOrCallStmt
+      | pCase :        @CaseStmt
+      | pGoto :        @GotoStmt
+      | pIntLit :      % should be an integer label
+                       oChangeIntLitToLabelIdent
+                       @LabelOrAssignOrCallStmt
+      | * :            % null statement : don't accept any tokens
+   ];
+
+
+LabelOrAssignOrCallStmt:
+   Node decl = oScopeFindRequire
+   @ResolveUnitRef( decl )
+   [ oNodeType( decl )
+      | nLabel :                          @LabelDefinition( decl )
+                                          @Statement
+      | nProc :                           @Call( decl )
+      | nGlobalVar, nLocalVar, nParam, nTypeDecl :
+                                          @AssignStmt( decl )
+      | nFunc :                           @AssignResultStmt( decl )
+      | * :                               #eBadStatement
+   ];
+
+
+% Parse a "label:" prefix in front of a statement.
+%
+LabelDefinition( Node decl ):
+   [ oNodeGetBoolean( decl, qDefined )
+      | true :  #eAlreadyDefined
+      | * :
+   ]
+   .tLabel  oEmitLabel( oNodeGetLabel( decl, qValue ) )
+   oNodeSetBoolean( decl, qDefined, true )
+   ':'
+   ;
+
+
+% Given decl, the just-accepted first identifier on the left hand side.
+%
+AssignStmt( Node decl ):
+   @LValueFromDecl( decl, true )
+   ':=' 
+   @Expr
+   @CoerceType
+   @Assign
+   ;
+
+
+% Performs a raw assignment.
+% Given lvalue 2nd on stack, and expr value top of stack (already coerced to the lvalue type),
+% and type of both of these on the type stack,
+% perform the assignment and pop the type off the type stack.
+%
+Assign:
+   [ oTypeSNodeType
+      | nIntegerType, nEnumType :  .tAssignI
+      | nBooleanType, nByteType, nCharType :  .tAssignB
+      | nDoubleType :  .tAssignD
+      | nFileType :   #eNotImplemented
+      | nPointerType, nUniversalPointerType :  .tAssignP
+      % compound var assigns; addrs of src, dest on stack
+      | nArrayType, nRecordType, nShortStringType :
+          % TO DO: for ShortString, allow destination to be smaller capacity,
+          % and truncate the copied value/length.
+          int size = oNodeGetInt( oTypeSTop, qSize )
+          .tCopy  oEmitInt( size )    % multi-word copy
+   ]
+   oTypeSPop
+   ;
+
+% Given nFunc for the just-accepted identifier on the left hand side.
+% Parse an assignment that represents assignment of the function result.
+%
+AssignResultStmt( Node funcDecl ):
+   % Only allowed to assign the result of the immediately enclosing function, I think.
+   [ oNodeEqual( oNodeGet( funcDecl, qChildScope ), oScopeCurrent )
+      | false :   #eNotCurrentFunction
+      | * :
+   ]
+
+   % Result value is stored in the caller's space, via a hidden VAR parameter.
+   .tPushParamP  oEmitInt( oNodeGetInt( funcDecl, qResultOffset ) )
+   oTypeSPush( oNodeGet( funcDecl, qType ) )
+
+   ':='
+   @Expr
+   @CoerceType
+   [ oTypeSNodeType
+      | nIntegerType, nEnumType : .tAssignI
+      | nBooleanType, nByteType, nCharType :  .tAssignB
+      | nDoubleType :  .tAssignD
+      | nFileType :   #eNotImplemented
+      | nPointerType, nUniversalPointerType :  .tAssignP
+      % compound var assigns; addrs of src, dest on stack
+      | nArrayType, nRecordType, nShortStringType :
+          int size = oNodeGetInt( oTypeSTop, qSize )
+          .tCopy  oEmitInt( size )    % multi-word copy
+   ]
+   oTypeSPop
+   ;
+
+
+
+% Parse an lvalue expression, from scratch.
+% This is an expression that may appear on the left side of an assignment.
+% Leaves the address of the value on the expr stack,
+% and the type of the value at that address on the type stack.
+% If writeable is false, the expression won't be written to, so may access a
+% typed const.
+%
+LValueExpr( boolean writeable ):
+   % Al lvalue expressions start with a variable name,
+   % or a type name (for an lvalue typecast).
+   pIdent
+   Node decl = oScopeFindRequire
+   @ResolveUnitRef( decl )
+   @LValueFromDecl( decl, writeable )
+   ;
+
+
+% Parse an lvalue expression, starting with the decl of the just accepted identifier.
+% Leaves the address of the value on the expr stack,
+% and the type of the value at that address on the type stack.
+% If writeable is false, the expression won't be written to, so may access a
+% typed const.
+%
+LValueFromDecl( Node decl, boolean writeable ):
+   [ oNodeType( decl )
+      | nGlobalVar, nLocalVar, nParam, nTypedConst :
+         @LValueVar( decl, writeable )
+
+      | nTypeDecl :
+         % lvalue typecast
+         % This is only allowed if the provided lvalue we're casting from has the same size.
+         % No conversion code occurs, it's just a different interpretation of the same bits.
+         oTypeSPush( oNodeGet( decl, qType ) )
+         '('
+         @LValueExpr( writeable )
+         ')'
+         @LValueCastType
+         % There can be further modifications of the lvalue after the cast.
+         % This is taken from LValueVar.  Try to consolidate.
+         [ oTypeSNodeType
+            | nPointerType :
+               [
+                  | '[' :
+                     % dereference the pointer var first
+                     .tFetchP
+                     @PointerArraySubscript
+                  | * :
+               ]
+            | * :
+         ]
+         % additional subscripts, if any
+         @LValueIndexes
+ 
+      | * :  #eNotVar
+   ]
+   ;
+
+
+% An lvalue is on the expression stack.
+% The type of the lvalue is on the type stack.
+% The desired type is under it on the type stack.
+% Perform an lvalue cast to the desired type, leaving just that type.
+%
+% An lvalue cast is allowed only if the data size is the same.
+% No conversion code occurs, it's just a different interpretation of the same bits.
+%
+LValueCastType:
+   node_type nt = oTypeSNodeType
+   oTypeSPop
+   [ equal_node_type( nt, oTypeSNodeType )
+      | false :
+         % Can we cast the value to the desired type?
+         [ oTypeSNodeType
+            | nIntegerType, nEnumType :
+               [ nt
+                  | nByteType, nCharType, nBooleanType :  #eSizeMismatch  >>
+                  | nIntegerType, nEnumType :   >>
+                  | * :
+               ]
+            | nByteType, nCharType, nBooleanType :
+               [ nt
+                  | nByteType, nCharType, nBooleanType :   >>
+                  | nIntegerType, nEnumType :  #eSizeMismatch  >>
+                  | * :
+               ]
+            | nPointerType :
+               [ nt
+                  | nUniversalPointerType :  >>
+                  | * :
+               ]
+            | nUniversalPointerType :
+               [ nt
+                  | nPointerType :  >>
+                  | * :
+               ]
+            | nShortStringType :
+               [ nt
+                  | nStrLitType :  >>
+                  | * :
+               ]
+            | * :
+         ]
+         #eTypeMismatch
+      | * :
+   ];
+
+
+
+% Parse an lvalue expression (e.g. left side of an assign statement)
+% that starts with the just-accepted identifier indicated by the given decl.
+% Leaves the lvalue address on the expression stack,
+% and the type of the value at that address on the type stack.
+%
+LValueVar( Node decl, boolean writeable ):
+   [ oNodeType( decl )
+      | nGlobalVar :   .tPushAddrGlobal @EmitValue( decl )
+      | nLocalVar :    .tPushAddrLocal @EmitValue( decl )
+      | nParam :
+         [ oNodeGetBoolean( decl, qInOut )
+            | true :   % VAR param points to variable.  No dereference.
+                       .tPushParamP @EmitValue( decl )
+            | * :      .tPushAddrParam @EmitValue( decl )
+         ]
+      | nTypedConst :
+         [ writeable
+            | false :  .tPushAddrGlobal @EmitValue( decl )                       
+            | * :      #eNotVar
+         ]
+      | * :            #eNotVar
+   ]
+
+   oTypeSPush( oNodeGet( decl, qType ) )
+
+   % handle subscripts, if any.
+   % There is one case that I'm not fitting into the pattern nicely, so need to
+   % check for specially here:  if lvalue var is a pointer variable, and is
+   % followed by [index], we need to dereference the pointer variable before applying
+   % the index.  This is different from handling of [index] on an rvalue expression.
+   % Right now I have LValueIndexes working for both lvalue and rvalue (composite types)
+   % so can't easily add this behavior in there.
+   % TO DO: probably I need separate rules LValueIndexes and RValueIndexes.
+   %    This might also explain my confusion about handling of deref operator in LValueIndexes vs rvalue expr,
+   %    and having separate rules might clear that up better.
+
+   [ oTypeSNodeType
+      | nPointerType :
+         [
+            | '[' :
+               % dereference the pointer var first
+               .tFetchP
+               @PointerArraySubscript
+            | * :
+         ]
+      | * :
+   ]
+   % additional subscripts, if any
+   @LValueIndexes
+   ;
+
+
+IncVar( Node decl ):
+   @LValueVar( decl, true )
+   @RequireIntPop
+   @VarExpr( decl )
+   oTypeSPop
+   .tIncI
+   .tAssignI;
+
+DecVar( Node decl ):
+   @LValueVar( decl, true )
+   @RequireIntPop
+   @VarExpr( decl )
+   oTypeSPop
+   .tDecI
+   .tAssignI;
+
+
+IfStmt:
+   Label falseLabel = labelNull
+
+   @BooleanExprControlFlow( falseLabel )
+   pThen
+   @Statement
+   [
+      | pElse :
+         Label doneLabel = oLabelNew
+
+         .tJump  oEmitLabel( doneLabel )
+         .tLabel oEmitLabel( falseLabel )
+         @Statement
+         .tLabel oEmitLabel( doneLabel )
+
+      | * :
+         .tLabel oEmitLabel( falseLabel )
+   ];
+
+
+ForStmt:
+   pIdent
+
+   Node decl = oScopeFindRequire
+   % TO DO: disallow use of a compound variable field.
+   %        Could do that by disallowing use of LValueIndexes,
+   %        or by double-checking the decl's qType here.
+   % TO DO: I think I read somewhere that the variable must be in current scope.
+   @LValueVar( decl, true )
+   @RequireIntPop
+
+   ':='
+
+   @Expr
+   @RequireIntPop
+   .tAssignI
+
+   Label breakLabel = oLabelNew
+
+   Label checkLabel = oLabelNew
+   .tJump  oEmitLabel( checkLabel )
+
+   Label continueLabel = oLabelNew
+   .tLabel  oEmitLabel( continueLabel )
+   [
+      | pTo :
+         @IncVar( decl )
+         .tLabel  oEmitLabel( checkLabel )
+         @VarExpr( decl )  oTypeSPop
+         @Expr
+         @RequireIntPop
+         .tGreaterI
+         .tJumpTrue  oEmitLabel( breakLabel )
+      | pDownto :
+         @DecVar( decl )
+         .tLabel  oEmitLabel( checkLabel )
+         @VarExpr( decl )  oTypeSPop
+         @Expr
+         @RequireIntPop
+         .tLessI
+         .tJumpTrue  oEmitLabel( breakLabel )
+   ]
+   oLoopPush( continueLabel, breakLabel )
+   pDo
+   @Statement
+   .tJump  oEmitLabel( continueLabel )
+   .tLabel  oEmitLabel( breakLabel )
+   oLoopPop;
+
+
+RepeatStmt:
+   Label continueLabel = oLabelNew
+   .tLabel  oEmitLabel( continueLabel )
+
+   Label breakLabel = oLabelNew
+
+   oLoopPush( continueLabel, breakLabel )
+   @Statement
+   {[
+      | ';' :
+         @Statement
+      | pUntil :
+         Label falseLabel
+         @BooleanExprControlFlow( falseLabel )
+         .tLabelAlias  oEmitLabel( falseLabel )  oEmitLabel( continueLabel )
+         >
+   ]}
+   .tLabel  oEmitLabel( breakLabel )
+   oLoopPop;
+
+
+WhileStmt:
+   Label continueLabel = oLabelNew
+   .tLabel  oEmitLabel( continueLabel )
+
+   Label breakLabel
+   @BooleanExprControlFlow( breakLabel )
+
+   oLoopPush( continueLabel, breakLabel )
+   pDo
+   @Statement
+   .tJump  oEmitLabel( continueLabel )
+   .tLabel  oEmitLabel( breakLabel )
+   oLoopPop;
+
+
+ContinueStmt:                     % NOTE, for repeat..until, skips test (??)
+   [ equal_label( oLoopContinueLabel, labelNull )
+      | true :
+         #eNotInALoop
+      | false :
+         .tJump  oEmitLabel( oLoopContinueLabel )
+   ];
+
+
+BreakStmt:
+   [ equal_label( oLoopBreakLabel, labelNull )
+      | true :
+         #eNotInALoop
+      | false :
+         .tJump  oEmitLabel( oLoopBreakLabel )
+   ];
+
+
+CaseStmt:
+   Code tableCode = oCodeNew
+   Label tableLabel = oLabelNew
+   Label doneLabel = oLabelNew
+   Label otherwiseLabel = doneLabel
+   boolean isString = false
+
+   @Expr
+   % Leave the expr type on the type stack throughout case statement
+   [ oTypeSNodeType
+      | nBooleanType, nByteType, nCharType :   .tJumpCaseB  oEmitLabel( tableLabel )
+      | nIntegerType, nEnumType :              .tJumpCaseI  oEmitLabel( tableLabel )
+      | nShortStringType, nStrLitType :        isString = true
+                                               .tJumpCaseS  oEmitLabel( tableLabel )
+      | * :     #eNotAllowed
+   ]
+   pOf
+
+   {
+      [
+         | pOtherwise, pElse :
+            otherwiseLabel = oLabelNew
+            .tLabel  oEmitLabel( otherwiseLabel )
+
+            % A bit tricky:
+            % The otherwise clause allows multiple statements (unlike other cases).
+            % ';' might be separating statements in the otherwise clause,
+            % or might be an optional trailing ; after the last statement.
+            % I have to watch for End to know when the statements stop.
+            % (Note, the otherwise clause is the last part of the case statement.)
+            {[
+               | pEnd :  >
+               | * :
+                  @Statement
+                  [
+                     | ';' :
+                     | * :   pEnd  >
+                  ]
+            ]}
+            >
+
+         | pEnd :
+            % Reached end with no otherwise clause
+            >
+
+         | * :
+            Label caseLabel = oLabelNew
+            oCodePush( tableCode )
+            {
+               @ConstExpr
+               @ConstCoerceType
+               int val
+               [ isString
+                  | true :    val = oStringAllocShortStringLit( oValueTopString )
+                  | false :   val = oValueTop
+               ]
+               oValuePop
+               [
+                  | '..' :  @ConstExpr
+                            @ConstCoerceType
+                            int highval
+                            [ isString
+                               | true :   highval = oStringAllocShortStringLit( oValueTopString )
+                               | false :  highval = oValueTop
+                            ]
+                            oValuePop
+                            .tCaseRange  oEmitInt( val )  oEmitInt( highval )  oEmitLabel( caseLabel )
+                  | * :     .tCase  oEmitInt( val )  oEmitLabel( caseLabel )
+               ]
+               [
+                  | ',' :
+                  | * :  >
+               ]
+            }
+            oCodePop
+            ':'
+            .tLabel  oEmitLabel( caseLabel )
+            @Statement
+            .tJump  oEmitLabel( doneLabel )
+            % Swallow optional trailing ';'
+            [
+               | ';' :
+               | * :
+            ]
+            
+      ]
+   
+   }
+
+   .tLabel  oEmitLabel( tableLabel )
+   oEmitCode( tableCode )
+   .tCaseEnd  oEmitLabel( otherwiseLabel )
+   .tLabel  oEmitLabel( doneLabel )
+   oTypeSPop
+   ;
+
+
+GotoStmt:
+   [
+      | pIdent :
+      | pIntLit :
+         % Replace token with identifier "_label_<intlit>"
+         oChangeIntLitToLabelIdent
+   ]
+
+   % Some pascals have rules about where you can jump (to a sibling statement or
+   % higher level statement in the block, but not into a lower lower level statement.)
+   % fpc just says "jumping into a nested statement can have strange effects."
+   % I'm going to follow that and not prohibit any goto, as long as it's in the same block.
+
+   % Label must be declared in the same block (same scope) it is used.
+   % Some pascals allow non-local goto, but we do not.
+   % That would require more tracking of dynamic scope, to unwind stack.
+   % Note: in main program statement, this relies on the temporaries scope extending
+   %  the main scope (where a label declaration would occur).
+   Node decl = oScopeFindRequireInScope( oScopeCurrent )
+   oNodeSetBoolean( decl, qUsed, true )
+   .tJump  oEmitLabel( oNodeGetLabel( decl, qValue ) )
+   ;
+
+
+BeginStmt:
+   @Statement
+   {[
+      | ';' :   @Statement
+      | pEnd :  >
+   ]};
+
+
+WritelnStmt:
+   @WriteStmt
+   .tWriteCR;
+
+
+WriteStmt:
+   [
+      | '(' :
+         {
+            @Expr
+            [ oTypeSNodeType
+               | nIntegerType :             .tWriteI
+               | nBooleanType :             .tWriteBool
+               | nByteType :                .tCastBtoI  .tWriteI
+               | nCharType :                .tWriteChar
+               | nDoubleType :              .tWriteD
+               | nShortStringType, nStrLitType :   .tWriteShortStr
+               | nFileType :                #eNotImplemented
+               | nEnumType :
+                  % write name via table lookup
+                  .tPushAddrGlobal  oEmitInt( oNodeGetInt( oTypeSTop, qNameTable ) )
+                  .tWriteEnum
+               | nPointerType :
+                  [ equal_node( oTypeSTop, PCharType )
+                     | true :               .tWritePChar
+                     | * :                  .tWriteP
+                  ]
+               | nUniversalPointerType :    .tWriteP
+               | * :                        #eNotAllowed
+            ]
+            oTypeSPop
+            [
+               | ')' : >
+               | ',' :
+            ]
+         }
+      | * :
+   ];
+
+
+ReadlnStmt:
+   @ReadStmt
+   .tReadCR;
+
+
+ReadStmt:
+   [
+      | '(' :
+         {
+            @LValueExpr( true )
+            [ oTypeSNodeType
+               | nIntegerType :      .tReadI
+               | nCharType :         .tReadChar
+               | nShortStringType :  
+                   int capacity = subtract( oNodeGetInt( oTypeSTop, qSize ), 1 )
+                   .tReadShortStr  oEmitInt( capacity )
+               | * :                 #eNotAllowed
+            ]
+            oTypeSPop
+            [
+               | ')' : >
+               | ',' :
+            ]
+         }
+      | * :
+   ];

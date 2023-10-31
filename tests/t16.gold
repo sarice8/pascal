@@ -1,0 +1,26 @@
+Pascal Compiler 1.1.5 -- Jan 01 '90
+Including ../mysystem.pas
+Including ./testing.pas
+
+Writing Files...
+Jit - program loaded (886 words)
+Executing code ...
+TEST: Starting test
+Hello ABCD
+ABCThere
+a 97 z
+b1=130 i1=130
+c1=2
+i1=50
+int/byte comparison worked
+i1=3
+ord=1
+c1=1
+i1=49
+West
+South
+E2
+E2
+4
+TEST: Finished test
+Done

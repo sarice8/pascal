@@ -1,0 +1,266 @@
+
+%
+% This schema holds a symbol table for a Pascal program.
+% Inspired by what I did in the SSL 1.3.2 processor.
+%
+% Steve Rice -- Sept 10, 2022
+%
+
+Schema Pascal Root nWorkspace Is
+
+
+Object ::= nWorkspace
+nWorkspace =>
+        % all loaded units; not necessarily visible to program or each other
+        qUnits:         List            (nUnit)                 [Pri,Opt]
+        qProgram:       Node            (nProgram)              [Pri,Opt]
+        qGlobalSize:    Integer4
+
+
+Object ::= nModule
+nModule =>
+        qIdent:         Integer4
+        qUsedUnits:     List            (nUnit)                 [Alt,Opt]
+
+
+nModule ::= nProgram
+nProgram =>
+        qChildScope:    Node            (nScope)                [Pri]
+        % scope for use by the main routine, for temporaries
+        qMainRoutineScope:  Node        (nScope)                [Pri]
+
+
+nModule ::= nUnit
+nUnit =>
+        qImpl:          Node            (nUnitImpl)             [Pri]
+        qPublicScope:   Node            (nScope)                [Pri]
+        qPrivateScope:  Node            (nScope)                [Pri]
+        qInitLabel:     Integer4            % initialization method label, or 0 for none
+        qFinalLabel:    Integer4            % finalization method label, or 0 for none
+        % scope for use by the initialization routine, for temporaries
+        qInitRoutineScope:  Node        (nScope)                [Pri]
+
+
+% unit impl is split out because it has its own UsedUnits.
+% could move qPrivateScope etc here.
+% 
+nModule ::= nUnitImpl
+
+
+% -----------------------------------------------------------------------
+% Scope
+% -----------------------------------------------------------------------
+
+Object ::= nScope
+nScope =>
+        qLevel:         Integer4        % static scope level (0 = globals)
+        qDecls:         List            (nDeclaration)          [Pri,Opt]
+        % This scope extends another, in terms of visibility (e.g. unit impl extends interface).
+        % A decl with the same name would be redeclaring (or providing impl), not shadowing.
+        qExtends:       Node            (nScope)                [Alt,Opt]
+        qSize:          Integer4        % space required by declared variables
+        qAllocMode:     Boolean1        % how to allocate variables
+        qInitCode:      Integer4        % id of code stream to initialize scope's vars
+
+Object ::= nDeclaration
+nDeclaration =>
+        qParentScope:   Node            (nScope)                [Alt]
+
+
+% TO DO: not sure why I had both nDeclaration and nIdent
+nDeclaration ::= nIdent
+nIdent =>
+        qIdent:         Integer4
+        qType:          Node            (nType)                 [Alt,Opt]  % for var, func, typeDecl (how about const?)
+        qValue:         Integer4   % for const: value
+                                   % for nGlobalVar: global address
+                                   % for nLocalVar: local address (relative to frame ptr)
+                                   % for nParam: local address (relative to frame ptr)
+
+
+% nUnitRef appears in a scope that uses a unit.  It's used to support syntax <unit>.<ident>
+% 
+nIdent ::= nUnitRef
+nUnitRef =>
+        qPublicScope:   Node            (nScope)                [Alt]
+
+
+
+% nMethod is a proc or func declaration.
+% qValue is the label.  It is allocated when the declaration is first seen
+% (including forward declaration).  That lets calls invoke the method
+% before the body is seen.  (For an external method, the calling code will
+% define the label with .tLabelExtern)
+% 
+% When the body is seen, qBodyDefined is set to true.
+% A forward declaration followed by an actual body declaration will revise
+% the existing declaration in the symbol table, rather than create a second one.
+%
+nIdent ::= nMethod
+nMethod =>
+        qParams:        Node            (nScope)                [Pri,Opt]
+        qChildScope:    Node            (nScope)                [Pri,Opt]
+        qBodyDefined:   Boolean1
+        qExternal:      Boolean1
+        qExternalName:  StringN
+        qCdecl:         Boolean1
+        qUsed:          Boolean1     % has anybody called this method
+
+        % The next two fields are used when a forward declaration is redefined.
+        % I don't really need to keep them, but don't have a way to cleanly delete nodes yet.
+        qOldParams:     Node            (nScope)                [Pri,Opt]
+        qOldType:       Node            (nType)                 [Pri,Opt]
+
+
+nMethod ::= nProc
+
+% func return type is qType in nIdent.
+nMethod ::= nFunc
+nFunc =>
+        qResultOffset:  Integer4    % offset of VAR param for result
+
+
+% A built-in method is handled specially by the compiler.
+% It may have special rules for parameters, so params aren't declared in the symbol table.
+nIdent ::= nBuiltInFunc
+nIdent ::= nBuiltInProc
+
+
+% nConst is an ordinal "true constant" (as opposed to a typed constant).
+% This includes integer types, enum types, boolean, char.  qValue is the value.
+% See also: nConstStr, nConstDouble
+%
+nIdent ::= nConst
+
+nConst ::= nEnumValue
+nEnumValue =>
+        qNameOffset:    Integer4    % offset of name in global data, for building name table
+
+
+% nConstStr is a string "true constant".  qValueStr is the null-terminated string value.
+%
+nIdent ::= nConstStr
+nConstStr =>
+        qValueStr:      StringN
+
+% nConstDouble is a double "true constant".  qValueDouble is the value.
+nIdent ::= nConstDouble
+nConstDouble =>
+        qValueDouble:   Real8
+
+
+nIdent ::= nTypeDecl
+
+nIdent ::= nVar
+
+nVar ::= nGlobalVar
+
+nVar ::= nLocalVar
+
+nVar ::= nRecordField
+
+nVar ::= nParam
+nParam =>
+        qInOut:         Boolean1      % has VAR keyword
+
+
+% A typed const is like a read-only global Variable.
+% It's used for type const arrays and records.
+% qValue is the global address of the value.
+nIdent ::= nTypedConst
+
+
+nIdent ::= nLabel
+nLabel =>
+        % A user label may be an identifier or an integer literal.
+        % If the user label is an integer "1234", we'll record it with identifier "_label_1234".
+        % qValue is our tcode label for this user label.  It's created at label declaration time.
+        qDefined:       Boolean1      % true when location for the label has been set
+        qUsed:          Boolean1      % true if referenced by a goto
+
+
+Object ::= nType
+
+
+% nType objects are all owned by a type table, so child types are [Alt] here.
+%
+nType =>
+        qSize:          Integer4
+        qPointerType:   Node            (nType)                 [Alt,Opt]
+             % possibly silly optimization: a type that's a pointer to this type
+
+nType ::= nFileType
+
+nType ::= nByteType       % uint8_t
+nType ::= nIntegerType    % int32_t
+nType ::= nSingleType     % float32_t
+nType ::= nDoubleType     % float64_t
+
+nType ::= nBooleanType
+
+% nBooleanFlowType is an expression type that's represented by control flow rather than a value.
+% It's not used in the symbol table.
+nType ::= nBooleanFlowType
+
+nType ::= nCharType
+
+nType ::= nPointerType
+nPointerType =>
+        qBaseType:      Node            (nType)                 [Alt]
+
+
+% nUniversalPointerType is a separate type that can be assigned to/from
+% any pointer type.  I give it a base type nByteType to meet the requirement that
+% pointer arithmetic acts as if the pointed-to size is 1 byte.
+% But, universal pointer cannot be dereferenced.
+%
+nPointerType ::= nUniversalPointerType
+
+nType ::= nArrayType
+nArrayType =>
+        % The index type is always just for one dimension.
+        % A multi-dimension array is recorded as array of array,
+        % and may be referenced as such in the user's program.
+        qIndexType:     Node            (nSubrangeType)         [Alt]
+        qBaseType:      Node            (nType)                 [Alt]
+
+nType ::= nSubrangeType
+nSubrangeType =>
+        qLow:           Integer4
+        qHigh:          Integer4
+        qBaseType:      Node            (nType)                 [Alt]
+
+nType ::= nRecordType
+nRecordType =>
+        % the record field declarations, each with a relative offset
+        qScope:         Node            (nScope)                [Pri]
+
+% We have a separate type for StrLit, because it can be assigned to both
+% ShortString and PChar, which is not the case for ShortString.
+% I will store StrLit to have both a length byte and null termination,
+% to work for both cases.
+%
+nType ::= nStrLitType
+
+nType ::= nShortStringType
+nShortStringType =>
+        qCapacity:      Integer4
+
+nType ::= nEnumType
+nEnumType =>
+        % The enum value declarations (nEnumValue), each with its int value.
+        % The values are declared both here and the parent scope, so can be used with or without
+        % the enum type name as a prefix.
+        qScope:         Node            (nScope)                [Pri]
+        % Global data offset of name table: <value><offset of char*>..
+        % ending with name == nullptr
+        qNameTable:     Integer4
+        % Is there a gap in the values of the type? Can't use pred/succ in that case.
+        qHasGap:        Boolean1
+
+% a collection of enum values, like a bit vector
+nType ::= nSetType
+nSetType =>
+        qBaseType:      Node            (nType)                 [Alt]
+
+

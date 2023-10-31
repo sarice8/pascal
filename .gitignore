@@ -12,3 +12,10 @@ obj-*/
 *.swp
 *.swo
 
+# Temp output of unit tests
+a.*
+tmp.*
+*.diffs
+*.ppu
+*.o
+*.dmp

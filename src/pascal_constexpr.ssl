@@ -1,0 +1,561 @@
+%
+% Pascal Compiler
+%
+
+% --------------------------- Const Expressions --------------------------
+
+
+% Constant expressions are evaluated at compile time.
+% They are limited to constant literals, declared constants (not including TypedConstants!)
+% and a small selection of built-in functions. 
+%
+% The value of a constant expression is left on the Value Stack.
+% The type is left on the Type Stack.
+
+ConstExpr:
+   @ConstBoolExpr
+   {[
+      | '=' :
+         @ConstBoolTerm
+         @ConstCoerceTypePair
+         [ oTypeSNodeType
+            | nStrLitType :   oValueStringCmp  oValuePush( 0 )  oValueEqual
+            | nDoubleType :   oValueEqualD
+            | * :             oValueEqual
+         ]
+         oTypeSPop  oTypeSPush( BooleanType )
+      | '<>' :
+         @ConstBoolExpr
+         @ConstCoerceTypePair
+         [ oTypeSNodeType
+            | nStrLitType :   oValueStringCmp  oValuePush( 0 )  oValueNotEqual
+            | nDoubleType :   oValueNotEqualD
+            | * :             oValueNotEqual
+         ]
+         oTypeSPop  oTypeSPush( BooleanType )
+      | '<' :
+         @ConstBoolExpr
+         @ConstCoerceTypePair
+         [ oTypeSNodeType
+            | nStrLitType :   oValueStringCmp  oValuePush( 0 )  oValueLess
+            | nDoubleType :   oValueLessD
+            | * :             oValueLess
+         ]
+         oTypeSPop  oTypeSPush( BooleanType )
+      | '>' :
+         @ConstBoolExpr
+         @ConstCoerceTypePair
+         [ oTypeSNodeType
+            | nStrLitType :   oValueStringCmp  oValuePush( 0 )  oValueGreater
+            | nDoubleType :   oValueGreaterD
+            | * :             oValueGreater
+         ]
+         oTypeSPop  oTypeSPush( BooleanType )
+      | '<=' :
+         @ConstBoolExpr
+         @ConstCoerceTypePair
+         [ oTypeSNodeType
+            | nStrLitType :   oValueStringCmp  oValuePush( 0 )  oValueLessEqual
+            | nDoubleType :   oValueLessEqualD
+            | * :             oValueLessEqual
+         ]
+         oTypeSPop  oTypeSPush( BooleanType )
+      | '>=' :
+         @ConstBoolExpr
+         @ConstCoerceTypePair
+         [ oTypeSNodeType
+            | nStrLitType :   oValueStringCmp  oValuePush( 0 )  oValueGreaterEqual
+            | nDoubleType :   oValueGreaterEqualD
+            | * :             oValueGreaterEqual
+         ]
+         oTypeSPop  oTypeSPush( BooleanType )
+      | * :  >
+   ]};
+
+
+% Same as ConstExpr, but allow a typename as a primary.
+% This is for use within sizeof().
+% The value produced by that primary is bogus, but doesn't matter.
+%
+ConstExprAllowTypeName:
+   boolean oldAllowTypeName = flagExprAllowTypeName
+   flagExprAllowTypeName = true
+   @ConstExpr
+   flagExprAllowTypeName = oldAllowTypeName
+   ;
+
+
+ConstBoolExpr:
+   @ConstBoolTerm
+   {[
+      | pOr :
+         @ConstRequireBool
+         @ConstBoolTerm
+         @ConstRequireBoolPop
+         oValueOr
+      | * :  >
+   ]};
+
+
+ConstBoolTerm:
+   @ConstBoolFactor
+   {[
+      | pAnd :
+         @ConstRequireBool
+         @ConstBoolFactor
+         @ConstRequireBoolPop
+         oValueAnd
+      | * :  >
+   ]};
+
+
+ConstBoolFactor:
+   [
+      | pNot :
+         @ConstBoolFactor
+         @ConstRequireBool
+         oValueNot
+      | * :
+         @ConstArithExpr
+   ];
+
+
+ConstArithExpr:
+   @ConstTerm
+   {[
+      | '+' :
+         @ConstTerm
+         @ConstCoerceTypePair
+         [ oTypeSNodeType
+            | nStrLitType :   oValueStringConcat
+            | nDoubleType :   oValueAddD
+            | * :             oValueAdd
+         ]
+      | '-' :
+         @ConstTerm
+         @ConstCoerceTypePair
+         [ oTypeSNodeType
+            | nStrLitType :   #eNotAllowed
+            | nDoubleType :   oValueSubD
+            | * :             oValueSub
+         ]
+      | * :  >
+   ]};
+
+
+ConstTerm:
+   @ConstFactor
+   {[
+      | pTimes :
+         @ConstFactor
+         @ConstCoerceTypePair
+         [ oTypeSNodeType
+            | nStrLitType :   #eNotAllowed
+            | nDoubleType :   oValueMultD
+            | * :             oValueMult
+         ]
+      | pDivide :
+         @ConstFactor
+         @ConstCoerceTypePair
+         [ oTypeSNodeType
+            | nStrLitType :   #eNotAllowed
+            | nDoubleType :   oValueDivD
+            | * :             oValueDiv
+         ]
+      | * :  >
+   ]};
+
+
+ConstFactor:
+   [
+      | pPlus :
+         @ConstPrimary
+      | pMinus :
+         @ConstPrimary
+         [ oTypeSNodeType
+            | nStrLitType :   #eNotAllowed
+            | nDoubleType :   oValueNegateD
+            | * :             oValueNegate
+         ]
+      | * :
+         @ConstPrimary
+   ];
+
+
+ConstPrimary:
+   [
+      | pIntLit :
+         oValuePush( TOKEN_VALUE )
+         oTypeSPush( IntegerType )
+      | pCharLit :
+         oValuePush( TOKEN_VALUE )
+         oTypeSPush( CharType )
+      | pDoubleLit :
+         oValuePushDouble( TOKEN_VALUE_DOUBLE )
+         oTypeSPush( DoubleType )
+      | pStrLit :
+         oValuePushString( CURRENT_STRLIT )
+         oTypeSPush( StrLitType )
+      | '(' :
+         @ConstExpr
+         ')'
+      | pIdent :
+         Node decl = oScopeFindRequire
+         @ResolveUnitRef( decl )
+         [ oNodeType( decl )
+            | nBuiltInFunc :
+               @ConstBuiltInFunc( decl )
+            | nConst :
+               oValuePush( oNodeGetInt( decl, qValue ) )
+               oTypeSPush( oNodeGet( decl, qType ) )
+            | nConstStr :
+               oValuePushString( oNodeGetString( decl, qValueStr ) )
+               oTypeSPush( oNodeGet( decl, qType ) )
+            | nEnumValue :
+               oValuePush( oNodeGetInt( decl, qValue ) )
+               oTypeSPush( oNodeGet( decl, qType ) )
+            | nTypeDecl :
+               % A type cast, or a typename primary when within sizeof()
+               oTypeSPush( oNodeGet( decl, qType ) )
+               [
+                  | '(' :
+                     % Type cast
+                     @ConstExpr
+                     ')'
+                     @ConstCastType
+                     % Constexprs are not compound types or dereferenceable pointers (I believe)
+                     % so no need to check for additional suffixes here as we do in PrimaryAllowCF
+                  | * :
+                     % Not a type cast
+                     % A raw typename is only allowed in expressions within sizeof
+                     [ flagExprAllowTypeName
+                        | true :
+                           % The value we produce is bogus.  Only the type stack matters.
+                           oValuePush( 0 )
+                        | * :   #eTypeNameNotAllowedHere
+                     ]
+               ]
+
+            | * :
+               #eNotConst
+               oValuePush( 0 )
+               oTypeSPush( IntegerType )
+         ]
+      | '@' :
+         #eNotImplemented
+         oValuePush( 0 )
+         oTypeSPush( UniversalPointerType )
+      | * :
+         #eNotConst
+         oValuePush( 0 )
+         oTypeSPush( IntegerType )
+   ];
+
+ConstRequireBoolPop:
+   [ oTypeSNodeType
+      | nBooleanType :
+      | * :          #eNotBoolean
+   ]
+   oTypeSPop;
+
+
+ConstRequireBool:
+   [ oTypeSNodeType
+      | nBooleanType :
+      | * :          #eNotBoolean
+   ];
+
+
+% Require that the top two types on the type stack are matching (ignoring subranges).
+% Pop one of them, leaving only one.
+% The types refer to constant values on the Value Stack,
+% so any implicit conversion would occur there, not in code.
+%
+% Some implicit conversion is allowed for either of the types.
+% See also ConstCoerceType where only the top type may change.
+%
+ConstMatchTypes:
+   node_type nt = oTypeSNodeType
+   oTypeSPop
+   [ equal_node_type( nt, oTypeSNodeType )
+      | false :
+         % Some implicit conversion is allowed even here
+         [ oTypeSNodeType
+            | nPointerType :
+               [ nt
+                  | nUniversalPointerType :  >>
+                  | * :
+               ]
+            | nUniversalPointerType :
+               [ nt
+                  | nPointerType :  >>
+                  | * :
+               ]
+            | nStrLitType :
+               [ nt
+                  | nCharType :
+                     oValueCharToString
+                     >>
+                  | * :
+               ]
+            | nCharType :
+               [ nt
+                  | nStrLitType :
+                     oValueSwap
+                     oValueCharToString
+                     oValueSwap
+                     oTypeSPop
+                     oTypeSPush( StrLitType )
+                     >>
+                  | * :
+               ]
+            | * :
+         ]
+         #eTypeMismatch
+      | * :
+   ];
+
+
+% Given a constant value on the value stack, its type on the type stack,
+% and the desired type under it on the type stack.
+% Perform any necessary implicit conversions so the value is the desired type.
+% Pop the top type, leaving only the desired type.
+%
+ConstCoerceType:
+   node_type nt = oTypeSNodeType
+   oTypeSPop
+   [ equal_node_type( nt, oTypeSNodeType )
+      | false :
+         % Can we implicitly convert the value to the desired type?
+         [ oTypeSNodeType
+            | nIntegerType :
+               [ nt
+                  | nByteType :  >>
+                  | * :
+               ]
+            | nByteType :
+               [ nt
+                  | nIntegerType :  >>
+                  | * :
+               ]
+            | nPointerType :
+               [ nt
+                  | nUniversalPointerType :  >>
+                  | * :
+               ]
+            | nUniversalPointerType :
+               [ nt
+                  | nPointerType :  >>
+                  | * :
+               ]
+            | nStrLitType :
+               [ nt
+                  | nCharType :
+                     oValueCharToString
+                     >>
+                  | * :
+               ]
+            | nShortStringType :
+               [ nt
+                  | nStrLitType :  >>
+                  | nCharType :
+                     oValueCharToString
+                     >>
+                  | * :
+               ]
+            | * :
+         ]
+         #eTypeMismatch
+      | * :
+   ];
+
+
+% The value stack contains two const values, and their two types are on the type stack.
+% Typically these are two arguments of an operator; the key is that botrh types are flexible.
+% Coerce one type to match the other.  Generally the smaller type is coerced to the larger.
+% Leave both values on the value stack, and the single common type on the type stack.
+%
+ConstCoerceTypePair:
+   % TO DO.  For now, require the types to match
+   @ConstMatchTypes
+   ;
+
+
+% Given a constant value on the value stack, its type on the type stack,
+% and the desired type under it on the type stack.
+% Perform any necessary conversions so the value is cast to the desired type.
+% Pop the top type, leaving only the desired type.
+%
+% This is stronger than ConstCoerceType, since it isn't limited to implicit conversions.
+% There are still going to be limits on what is allowed though.
+%
+ConstCastType:
+   node_type nt = oTypeSNodeType
+   oTypeSPop
+   [ equal_node_type( nt, oTypeSNodeType )
+      | false :
+         % Can we cast the value to the desired type?
+         [ oTypeSNodeType
+            | nIntegerType, nEnumType :
+               [ nt
+                  | nByteType, nCharType, nBooleanType :  >>
+                  | nIntegerType, nEnumType :  >>
+                  % fpc does not allow explicit cast of double to integer.
+                  % User must call trunc() / round().
+                  | * :
+               ]
+            | nByteType, nCharType, nBooleanType :
+               [ nt
+                  | nByteType, nCharType, nBooleanType :  >>
+                  | nIntegerType, nEnumType :  >>
+                  | * :
+               ]
+            | nDoubleType :
+               [ nt
+                  | nByteType, nCharType, nBooleanType, nIntegerType, nEnumType :
+                     oValueIntToDouble
+                     >>
+                  | nDoubleType :  >>
+                  | * :
+               ]
+            | nPointerType :
+               [ nt
+                  | nUniversalPointerType :  >>
+                  | * :
+               ]
+            | nUniversalPointerType :
+               [ nt
+                  | nPointerType :  >>
+                  | * :
+               ]
+            | nStrLitType :
+               [ nt
+                  | nCharType :
+                     oValueCharToString
+                     >>
+                  | * :
+               ]
+            | nShortStringType :
+               [ nt
+                  | nStrLitType :  >>
+                  | nCharType :
+                     oValueCharToString
+                     >>
+                  | * :
+               ]
+            | * :
+         ]
+         #eTypeMismatch
+      | * :
+   ];
+
+
+% These are the methods that Pascal allows in a constant expression:
+%   Abs( x: integer_or_real ) : integer_or_real
+%   Round( x: real ) : integer
+%   Trunc( x: real ) : integer
+%   Chr( x: integer ) : char
+%   Ord( x: ordinal ) : integer
+%   Length( s: string ) : integer
+%   Pred( x: ordinal ) : ordinal
+%   Succ( x: ordinal ) : ordinal
+%   SizeOf( var, expr, or typename ) : integer
+%   Odd( x: integer ) : boolean  - true if the argument is odd
+%
+ConstBuiltInFunc( Node method ):
+
+   % Ord(x)
+   [ oNodeEqual( method, BuiltIn_Ord )
+      | true :
+         '('
+         @ConstExpr
+         ')'
+         [ oTypeSNodeType
+            | nIntegerType, nEnumType :
+            | nBooleanType, nByteType, nCharType :
+            | * :  #eTypeMismatch
+         ]
+         oTypeSPop
+         oTypeSPush( IntegerType )
+         ')'
+         >>
+      | * :
+   ]
+
+   % Chr(x)
+   [ oNodeEqual( method, BuiltIn_Chr )
+      | true :
+         '('
+         @ConstExpr
+         ')'
+         [ oTypeSNodeType
+            | nIntegerType :
+            | nByteType :
+            | * :  #eTypeMismatch
+         ]
+         oTypeSPop
+         oTypeSPush( CharType )
+         ')'
+         >>
+      | * :
+   ]
+
+   % Pred(x)
+   [ oNodeEqual( method, BuiltIn_Pred )
+      | true :
+         '('
+         @ConstExpr
+         [ oTypeSNodeType
+            | nEnumType :
+               [ oNodeGetBoolean( oTypeSTop, qHasGap )
+                  | true :   #eCantUsePredSuccOnEnumWithValueGaps
+                  | * :
+               ]
+            | * :  #eTypeMismatch
+         ]
+         oValuePush( 1 )  oValueSub
+         ')'
+         >>
+      | * :
+   ]
+
+   % Succ(x)
+   [ oNodeEqual( method, BuiltIn_Succ )
+      | true :
+         '('
+         @ConstExpr
+         [ oTypeSNodeType
+            | nEnumType :
+               [ oNodeGetBoolean( oTypeSTop, qHasGap )
+                  | true :   #eCantUsePredSuccOnEnumWithValueGaps
+                  | * :
+               ]
+            | * :  #eTypeMismatch
+         ]
+         oValuePush( 1 )  oValueAdd
+         ')'
+         >>
+      | * :
+   ]
+
+   % Sizeof(x)
+   [ oNodeEqual( method, BuiltIn_Sizeof )
+      | true :
+         '('
+         % Parse expression but only for its type.
+         % And, allow use of typename as a primary in the expression.
+         @ConstExprAllowTypeName
+         oValuePop
+         Node theType = oTypeSTop
+         oTypeSPop
+         oValuePush( oNodeGetInt( theType, qSize ) )
+         oTypeSPush( IntegerType )
+         ')'
+         >>
+      | * :
+   ]
+
+   #eNotImplemented
+   ;
+
+

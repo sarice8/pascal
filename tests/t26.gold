@@ -1,0 +1,75 @@
+Pascal Compiler 1.1.5 -- Jan 01 '90
+Including ../mysystem.pas
+Including ./testing.pas
+
+Writing Files...
+Jit - program loaded (1192 words)
+Executing code ...
+TEST: Starting test
+0.01235
+1.234e+10
+1.234e+10
+1.2345
+1.234e-10
+2.334e-10
+1.234e-10
+2.5674e-20
+2.12182
+-1.1e-10
+-2.334e-10
+1
+-1
+4.668e-10
+1.167e-10
+1
+1
+4.668e-10
+8.56898e+09
+TRUE
+FALSE
+TRUE
+FALSE
+TRUE
+TRUE
+TRUE
+FALSE
+TRUE
+TRUE
+FALSE
+TRUE
+FALSE
+TRUE
+FALSE
+TRUE
+TRUE
+FALSE
+TRUE
+FALSE
+TRUE
+constant: 1.234
+constant: 2.234
+constant: 1
+TRUE
+FALSE
+TRUE
+3.1
+2.1
+1.6
+1.4
+-0.1
+1.7
+-2
+-1.5
+2.4
+3
+0.9375
+0.75
+2
+6.6
+static: TRUE
+FALSE
+TRUE
+TRUE
+TRUE
+TEST: Finished test
+Done

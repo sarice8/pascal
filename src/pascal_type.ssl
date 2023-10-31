@@ -1,0 +1,335 @@
+%
+% Pascal Compiler
+%
+
+% ------------------------------ Types -----------------------------
+
+
+% Create and return a new nType of the given node_type, adding it to the type table.
+%
+newType( node_type nt, int size ) >> Node:
+  Node node = oNodeNew( nt )
+  oNodeSetInt( node, qSize, size )
+  oTypeAdd( node )
+  >> node
+  ;
+
+
+% Parse a type reference, returning the nType.
+% This will add types to the type table, as needed.
+%
+% Style question - at the moment I think callers look clearer if we use
+% an out param here, rather than a return value.
+%
+TypeRef( out Node resultType ):
+   [
+      | pIdent :           % previously named type (including intrinsics)
+         Node decl = oScopeFindRequire
+         @ResolveUnitRef( decl )
+         [ oNodeType( decl )
+            | nTypeDecl :
+               resultType = oNodeGet( decl, qType )
+            | * :
+               #eNotType
+               resultType = IntegerType
+         ]
+   
+      | pArray :
+         '['
+
+         % A multi-dimensional array is represented as a chain
+         %    array [subrange1] of array [subrange2] of elementType
+
+         % First, we build a vector of nArray's, each with one subrange as its index type,
+         % but without setting the "of" type or size.
+
+         NodeVec dimensions = oNodeVecNew
+
+         {
+            % to do: probably should use general subrange parsing, incl minimal size value
+            %   In fact, supposed to parse ordinal_type here.  all ordinal types have a static low, high.
+            %   Not necessary to be a subrange.
+
+            Node subrange = oNodeNew( nSubrangeType )
+
+            @ConstExpr
+            oNodeSetInt( subrange, qLow, oValueTop )
+            oValuePop
+            '..'
+            @ConstExpr
+            oNodeSetInt( subrange, qHigh, oValueTop )
+            oValuePop
+
+            @ConstMatchTypes
+            oNodeSet( subrange, qBaseType, oTypeSTop )
+            oNodeSetInt( subrange, qSize, oNodeGetInt( oTypeSTop, qSize ) )
+            oTypeSPop
+            oTypeAdd( subrange )
+
+            Node a = oNodeNew( nArrayType )
+            oNodeSet( a, qIndexType, subrange )
+
+            oNodeVecAppend( dimensions, a )
+            % I'll hold off on adding 'a' to the type table since not fully formed yet
+
+            [
+               | ']' : >
+               | ',' :
+            ]
+         }
+
+         pOf
+         Node baseType
+         @TypeRef( baseType )
+
+         % Work backwards through the dimensions,
+         % hooking up the 'of' type and calculating the size.
+         % At each iteration, baseType is the 'of' type.
+
+         int dim = oNodeVecSize( dimensions )
+
+         {
+             dec(dim)
+
+             Node a = oNodeVecElement( dimensions, dim )
+
+             oNodeSet( a, qBaseType, baseType )
+             Node subrange = oNodeGet( a, qIndexType )
+             int width = subtract( oNodeGetInt( subrange, qHigh ), oNodeGetInt( subrange, qLow ) )
+             inc( width )
+             oNodeSetInt( a, qSize, multiply( width, oNodeGetInt( baseType, qSize ) ) )
+
+             oTypeAdd( a )
+             baseType = a
+
+             [ equal_zero(dim)
+                 | true:  >
+                 | *:
+             ]
+         }
+
+         resultType = oNodeVecElement( dimensions, 0 )
+         oNodeVecDelete( dimensions )
+
+      | '^' :
+         Node theType
+         @TypeRef( theType )
+         resultType = @PointerTypeTo( theType )
+
+      | pRecord :
+         resultType = oNodeNew( nRecordType )
+         oScopeBegin( -1, allocUp )    % level is meaningless here
+
+         @VarDecl( nRecordField )
+
+         int size = oNodeGetInt( oScopeCurrent, qSize )
+         % to do: padding
+         [ equal_zero( size )
+            | true : #eRecordEmpty
+            | * :
+         ]
+
+         pEnd
+
+         oNodeSet( resultType, qScope, oScopeCurrent )
+         oNodeSetInt( resultType, qSize, size )
+         oScopeEnd
+         oTypeAdd( resultType )
+
+
+      | '(' :
+         % An enum type declaration.
+         @EnumTypeRef( resultType )
+
+
+      % *** TO DO: following type constructors are not implemented *** 
+      | pSet :
+         pOf
+         Node theType
+         @TypeRef( theType )
+         #eNotImplemented
+      | * :       % this works for cases except where expr starts with an id
+         @ConstExpr '..' @ConstExpr
+         @ConstMatchTypes
+         #eNotImplemented
+   ];
+
+
+% Parse an enum type.
+% We've already accepted the '('
+% Returns the new type.
+%
+EnumTypeRef( out Node resultType ):
+
+   resultType = oNodeNew( nEnumType )
+   int value = 0
+   int numValues = 0
+   boolean first = true
+
+   % We'll declare the enum values in two scopes: the current scope, and a scope nested in the enum type.
+   % That will let programs use either <val> or <enumType>.<val>
+   Node outerScope = oScopeCurrent
+   oScopeBegin( -1, allocUp )   % level is meaningless, and we won't use allocate
+
+   {
+      % TO DO: assert that name not already seen in this scope, i.e. this enum.
+      %  And possibly not in the outerScope either, since that probably wouldn't count as shadowing.
+      %  It might be in some other higher/used scope.
+      pIdent
+      Node decl = @newIdent( nEnumValue, LAST_ID )
+      Node decl2 = @newIdent( nEnumValue, LAST_ID )
+      oNodeSet( decl, qType, resultType )
+      oNodeSet( decl2, qType, resultType )
+
+      % build up name table, for i/o
+      int nameOffset = oStringAllocLit( ID_STRING( LAST_ID ) )
+      oNodeSetInt( decl, qNameOffset, nameOffset )
+      oNodeSetInt( decl2, qNameOffset, nameOffset )
+      [
+         | '=', ':=' :
+            oTypeSPush( IntegerType )
+            @ConstExpr
+            @ConstCoerceType
+            oTypeSPop
+            % value must be ascending
+            % this obviously doesn't apply to the first value
+            [ equal_zero( numValues )
+               | false :
+                  [ greater( oValueTop, value )
+                     | false :   #eEnumValueNotAscending
+                     | * :
+                  ]
+               | * :
+            ]
+            [ equal( value, oValueTop )
+               | false :
+                  % The values differ from 0..N-1.  pred/succ may not be used with this type.
+                  oNodeSetBoolean( resultType, qHasGap, true )
+               | * :
+            ]
+            value = oValueTop
+            oValuePop
+         | * :
+      ]
+      oNodeSetInt( decl, qValue, value )
+      oNodeSetInt( decl2, qValue, value )
+      oScopeDeclare( decl )
+
+      oScopeEnter( outerScope )
+      oScopeDeclare( decl2 )
+      oScopeEnd
+
+      inc( value )
+      inc( numValues )
+      [
+         | ',' :
+         | * :    >
+      ]
+   }
+   ')'
+
+   oNodeSet( resultType, qScope, oScopeCurrent )
+   oNodeSetInt( resultType, qSize, 4 )   % always integer sized
+   oScopeEnd
+
+   % Finish creation of the name table
+   %    struct {
+   %      int    value;
+   %      int    padding;
+   %      char*  name;
+   %    } table[ numValues + 1 ];
+   %  final entry will have name == nullptr
+   %
+   % I'll need to generate init code, to store pointers in global data,
+   % since I don't have a relocation mechanism for static data at the moment.
+   oCodePush( @GetOrCreateInitCode( globalScope ) )
+   oScopeEnter( globalScope )
+   int size = multiply( add( numValues, 1 ), 16 )
+   int addr = oScopeAlloc( size, 8 )
+   oScopeEnd
+   oNodeSetInt( resultType, qNameTable, addr )
+   % loop over enum values
+   NodeIter it = oNodeGetIter( oNodeGet( resultType, qScope ), qDecls )
+   {
+      Node enumValue = oNodeIterValue( it )
+      [ oNodeNull( enumValue )
+         | true :  >
+         | * :
+      ]
+      .tPushAddrGlobal  oEmitInt( addr )
+      .tPushConstI  oEmitInt( oNodeGetInt( enumValue, qValue ) )
+      .tAssignI
+      addr = add( addr, 8 )
+      .tPushAddrGlobal  oEmitInt( addr )
+      .tPushAddrGlobal  oEmitInt( oNodeGetInt( enumValue, qNameOffset ) )
+      .tAssignP
+      addr = add( addr, 8 )
+      oNodeIterNext( it )
+   }
+   % final table entry
+   .tPushAddrGlobal  oEmitInt( addr )
+   .tPushConstI  oEmitInt( 0 )
+   .tAssignI
+   addr = add( addr, 8 )
+   .tPushAddrGlobal  oEmitInt( addr )
+   .tPushConstI  oEmitInt( 0 )
+   .tAssignP
+   addr = add( addr, 8 )
+   oCodePop
+
+   oTypeAdd( resultType )
+   ;
+
+
+
+% Return an nType representing a pointer to the given type.
+% (Creates a new type if necessary.)
+%
+PointerTypeTo( Node theType ) >> Node:
+   Node ptrType = oNodeGet( theType, qPointerType )
+   [ oNodeNull( ptrType )
+      | true :
+         ptrType = oNodeNew( nPointerType )
+         oNodeSet( ptrType, qBaseType, theType )
+         oNodeSetInt( ptrType, qSize, 8 )
+         oTypeAdd( ptrType )
+         oNodeSet( theType, qPointerType, ptrType )
+      | * :
+   ]
+   >> ptrType;
+
+
+
+% Return the low value of an ordinal type
+%
+OrdinalLow( Node theType ) >> int:
+   [ oNodeType( theType )
+      | nIntegerType :  >> oMININT
+      | nBooleanType :  >> 0
+      | nCharType :     >> 0
+      | nEnumType :
+         Node enumScope = oNodeGet( theType, qScope )
+         Node first = oNodeIterValue( oNodeGetIter( enumScope, qDecls ) )
+         >> oNodeGetInt( first, qValue )
+      | nSubrangeType : >> oNodeGetInt( theType, qLow )
+      | * :             #eNotOrdinalType
+                        >> 0
+   ];
+
+
+% Return the high value of an ordinal type
+%
+OrdinalHigh( Node theType ) >> int:
+   [ oNodeType( theType )
+      | nIntegerType :  >> oMAXINT
+      | nBooleanType :  >> 1
+      | nCharType :     >> 255
+      | nEnumType :
+         Node enumScope = oNodeGet( theType, qScope )
+         Node last = oNodeIterValue( oNodeGetIterLast( enumScope, qDecls ) )
+         >> oNodeGetInt( last, qValue )
+      | nSubrangeType : >> oNodeGetInt( theType, qHigh )
+      | * :             #eNotOrdinalType
+                        >> 0
+   ];
+

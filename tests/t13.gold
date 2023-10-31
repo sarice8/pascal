@@ -1,0 +1,19 @@
+Pascal Compiler 1.1.5 -- Jan 01 '90
+Including ../mysystem.pas
+Including ./testing.pas
+Including ./t13_unit3.pas
+Including ./t13_unit1.pas
+Including ./t13_unit2.pas
+
+Writing Files...
+Jit - program loaded (748 words)
+Executing code ...
+TEST: Starting test
+Hello from unit3.  x=40
+Hello from unit2.  x=30
+Hello from unit1.  x=20
+Hello from main.  x=20
+and getX=Hello from unit1.getX.  x=20
+20
+TEST: Finished test
+Done

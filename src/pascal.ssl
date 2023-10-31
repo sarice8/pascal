@@ -1,0 +1,1046 @@
+title: 'Pascal Compiler 1.1.5 -- Jan 01 ''90';
+   
+%
+%  Pascal.ssl
+%
+%  Pascal Compiler for the Amiga, by Steve Rice.
+%
+%  HISTORY
+%    11Sep89   First version, framework of parser.
+%    18Sep89   Added some semantic mechanisms.
+%    21Sep89   Added simple type references; expressions generate code.
+%    22Sep89   Allocate variable addresses as they're declared.
+%    24Sep89   Added arrays, pointers.
+%    27Sep89   Added for statement.
+%    23Oct89   Fixed for statement, so CYCLE goes to next step.
+%    01Jan90   Added string literals
+%    09Sep22   I have returned.  Migrate symbol table to schema, to ease development.
+%    01Oct22   Language: Switch from cycle/exit (Mac Pascal extension) to continue/break (Borland).
+%
+%  NOTES
+%    -  The 'value' of a var symbol is its allocated address.
+%    -  References to vars of intrinsic types, and pointer types,
+%       pushes the value of the var on the expr stack.  Referenecs to
+%       vars of compound types (arrays, records...) pushes the address
+%       on the expr stack.
+%    -  Just as there is only one type table entry for a given (named) type,
+%       there is only one type table entry for a pointer to a named type.
+%       When a pointer type is declared, a field in the TT entry of the
+%       type pointed to will be set to indicate the TT entry of the pointer
+%       to that type (0 means none defined yet).  When evaluating the
+%       expression @x, the type in that field in the entry for the type of x
+%       will be used (unless it's 0, in which case a new TT entry will be
+%       created).
+%
+%
+%  MISSING
+%
+%    - Consider non-ISO extensions.  e.g. 
+%      Dynamic arrays.  Objects.  But, perhaps stick to my old goal, standard Pascal.
+%
+%  PASCAL DOCS
+%      Here's some handy language material:
+%      https://www.freepascal.org/docs-html/ref/ref.html
+%      https://www.freepascal.org/docs-html/prog/prog.html
+%      https://en.wikipedia.org/wiki/Turbo_Pascal
+%      https://en.wikipedia.org/wiki/Pascal_(programming_language)#Standards
+%      http://www.standardpascaline.org/
+%
+
+input:
+   pIdent
+   pIntLit
+   pDoubleLit
+   pStrLit
+   pCharLit
+   pAssign       ':='
+   pSemiColon    ';'
+   pEqual        '='
+   pNotEqual     '<>'
+   pLess         '<'
+   pGreater      '>'
+   pLessEqual    '<='
+   pGreaterEqual '>='
+   pColon        ':'
+   pComma        ','
+   pLParen       '('
+   pRParen       ')'
+   pLSquare      '['
+   pRSquare      ']'
+   pCarat        '^'
+   pAt           '@'
+   pDot          '.'
+   pDotDot       '..'
+   pTimes        '*'
+   pDivide       '/'
+   pPlus         '+'
+   pMinus        '-'
+   pEof
+   pInvalid
+
+%  keywords  (built-in types 'integer', 'byte', 'char', etc, are not keywords,
+%             type constructors 'array', 'record', 'set' are keywords,
+%             pseudo-procedures 'writeln', 'readln' are keywords)
+%
+%             forward/external/name/cdecl appear in method modifiers, in fpc grammar.
+%             I'm making them keywords to simplify parsing, but could reconsider.
+
+   pProgram
+   pProcedure
+   pFunction
+   pConst
+   pType
+   pVar
+   pLabel
+   pBegin
+   pEnd
+   pArray
+   pRecord
+   pSet
+   pOf
+   pIf
+   pThen
+   pElse
+   pFor
+   pTo
+   pDownto
+   pDo
+   pWhile
+   pRepeat
+   pUntil
+   pContinue
+   pBreak
+   pCase
+   pOtherwise
+   pGoto
+   pAnd
+   pOr
+   pNot
+   pUses
+   pUnit
+   pInterface
+   pImplementation
+   pInitialization
+   pFinalization
+   pWriteln
+   pWrite
+   pReadln
+   pRead
+
+   pForward
+   pExternal
+   pName
+   pCdecl
+   ;
+
+
+output:
+
+%  Instructions for a stack machine
+
+   tPushGlobalI      % <ptr> - push int value read from ptr
+   tPushGlobalB      % <ptr> - push byte value read from ptr
+   tPushGlobalP      % <ptr> - push ptr value read from ptr
+   tPushGlobalD      % <ptr> - push double precision float value read from ptr
+   tPushLocalI       % <offset> - push int value read from local var in current scope
+   tPushLocalB       % <offset> - push byte value read from local var in current scope
+   tPushLocalP       % <offset> - push ptr value read from local var in current scope
+   tPushLocalD       % <offset> - push double value read from local var in current scope
+   tPushParamI       % <offset> - push int value read from param in current scope
+   tPushParamB       % <offset> - push byte value read from param in current scope
+   tPushParamP       % <offset> - push ptr value read from param in current scope
+   tPushParamD       % <offset> - push double value read from param in current scope
+   tPushUpLocalI     % <uplevels> <offset> - push int value read from local var in a parent static scope
+   tPushUpLocalB     % <uplevels> <offset> - push byte value read from local var in a parent static scope
+   tPushUpLocalP     % <uplevels> <offset> - push ptr value read from local var in a parent static scope
+   tPushUpLocalD     % <uplevels> <offset> - push double value read from local var in a parent static scope
+   tPushUpParamI     % <uplevels> <offset> - push int value read from param in a parent static scope
+   tPushUpParamB     % <uplevels> <offset> - push byte value read from param in a parent static scope
+   tPushUpParamP     % <uplevels> <offset> - push ptr value read from param in a parent static scope
+   tPushUpParamD     % <uplevels> <offset> - push double value read from param in a parent static scope
+   tPushConstI       % <int> - push int value on stack (NOTE, used for BOOLEAN too)
+   tPushConstD       % <double> - push double value on stack
+   tPushAddrGlobal   % <offset> - push ptr to global var
+   tPushAddrLocal    % <offset> - push ptr to local var
+   tPushAddrParam    % <offset> - push ptr to formal param (used by method to see its param)
+   tPushAddrActual   % <offset> - push ptr to actual param, in actuals space (used by caller)
+   tPushAddrUpLocal  % <uplevels> <offset> - push ptr to local var in a parent static scope
+   tPushAddrUpParam  % <uplevels> <offset> - push ptr to formal param in a parent static scope
+   tSwap             % swap the top two entries on the stack
+   tFetchI           % pop ptr from stack, and push int value it points to
+   tFetchB           %    "      "      "     "     byte  "   "    "
+   tFetchP           %    "      "      "     "     ptr   "   "    "   
+   tFetchD           %    "      "      "     "     double "  "    "   
+   tAssignI          % assign int value on top of stack to addr under it (pop both)
+   tAssignB          %   "    byte   "    "   "  "   "    "    "   "   "
+   tAssignP          %   "    ptr    "    "   "  "   "    "    "   "   "
+   tAssignD          %   "    double "    "   "  "   "    "    "   "   "
+   tCopy             % <#bytes> - copy bytes.  tos=src, 2nd=dest (pop 2)
+   tCastBtoI         % zero-extend uint8_t to int32_t
+   tCastItoB         % truncate int32_t to uint8_t
+   tCastItoD         % convert int32_t to double
+   tIncI             % increment int value on top of expr stack
+   tDecI             % decrement int value on top of expr stack
+   tMultI            % multiply top two integers (replacing with result)
+   tDivI
+   tAddPI            % add ptr (2nd value) and int (top value), resulting in a ptr
+   tAddI
+   tSubP
+   tSubPI
+   tSubI
+   tNegI             % top entry *= -1
+   tMultD            % operations on double-precision floating point values
+   tDivD
+   tAddD
+   tSubD
+   tNegD
+   tNot              % negate top boolean
+   tEqualB
+   tNotEqualB
+   tGreaterB         % B is uint8_t, so these are unsigned comparisons
+   tLessB
+   tGreaterEqualB
+   tLessEqualB
+   tEqualI           % top two entries equal? (pop 2, push 1) (true=1)
+   tNotEqualI        %    NOTE, these all work for booleans too, but I'm moving to tEqualB etc for those
+   tGreaterI         % 2nd entry greater than top entry? (pop 2, push answer)
+   tLessI  
+   tGreaterEqualI
+   tLessEqualI
+   tEqualP           % two two pointer values equal? (pop 2, push 1) (true=1)
+   tNotEqualP
+   tGreaterP
+   tLessP
+   tGreaterEqualP
+   tLessEqualP
+   tEqualD           % double comparisions
+   tNotEqualD
+   tGreaterD
+   tLessD
+   tGreaterEqualD
+   tLessEqualD
+   tAllocActuals     % <#bytes> - make space on call stack for actual params (adjusting call stack sp)
+   tAllocActualsCdecl  % <#bytes> - starting a call to a cdecl method.  tcode still describes my own calling convention.
+   tFreeActuals      % <#bytes> - discard space on call stack allocated by tAllocActuals
+   tCall             % <label#>
+   tCallCdecl        % <label#> - call a method using native (C) calling convention. Only supported for extern labels.
+   tReturn
+   tEnter            % <#bytes> - start a stack frame on the call stack, reserving #bytes of local variable space
+   tJump             % <label#>
+   tJumpTrue         % <label#>  (pops top of stack, jumps if true)
+   tJumpFalse        % <label#>  (pops top of stack, jumps if false)
+   tJumpCaseB        % <label#>  pops uint8_t, jumps to case indicated by table at label (consisting of tCase, tCaseRange, tCaseEnd)
+   tJumpCaseI        % <label#>  pops integer, jumps to case indicated by table at label
+   tJumpCaseS        % <label#>  pops pointer to ShortString, jumps to case indicated by table at label
+   tCase             % <int> <label#>  - case table entry: if match int, goto label.  For tJumpCaseS, int is offset into global data.
+   tCaseRange        % <lowint> <highint> <label#>  - case table entry: if lowint <= value <= highint, goto label.  For tJumpCaseS, offsets into global.
+   tCaseEnd          % <label#> - end of case table.  Label points to no-match code (otherwise clause or end of statement).
+   tLabel            % <label#> - define label# at the current address
+   tLabelAlias       % <label#> <aliasToLabel#> - defines label to be an alias of another label
+   tLabelExtern      % <label#> <offsetToStrLit> - defines label to mean an extern symbol, whose name is in global data
+   tWriteI           % for writeln : write integer on tos, pop
+   tWriteBool        %  "     "    : write TRUE/FALSE, pop
+   tWriteChar        %  "     "    : write char, pop
+   tWriteShortStr    %  "     "    : write ShortString whose addr is on tos, pop
+   tWritePChar       %  "     "    : write a null-terminated string whose addr is on tos, pop
+   tWriteP           %  "     "    : write ptr var whose addr is on tos, pop
+   tWriteEnum        %  "     "    : write enum name.  Name table on tos, value under it, pop both
+   tWriteD           %  "     "    : write double-precision floating point value on tos, pop
+   tWriteCR          %  "     "    : write cr
+   tReadI            % for readln : pointer to integer on tos.  Assign read value to it, and pop
+   tReadChar         %  "     "   : pointer to char on tos.  Asign read value to it, and pop
+   tReadShortStr     % <capacity>  "     "   : pointer to ShortString on tos, and given max capacity.  Assign read value to it, and pop
+   tReadCR           %  "     "   : read the end-of-line.  Will accept any platform's eoln sequence.
+   tFile             % <file#> - pascal source file id, for debugging.  I haven't decided yet how I will communicate the corresponding filename.
+   tLine             % <line#> - pascal source line number, for debugging
+
+%  Other:
+
+   tSpace            % emit a hole, to be patched later
+   ;
+
+error:
+   eBadStatement
+   eNotConst
+   eNotType
+   eNotOrdinalType
+   eNotVar
+   eNotIntVar
+   eNotValue
+   eNotInteger
+   eNotBoolean
+   eNotDouble
+   eNotPointer
+   eNotArray
+   eNotRecord
+   eNotRecordField
+   eTooManySubscripts
+   eTypeMismatch
+   eMissingParameter
+   eNotImplemented
+   eNotAllowed
+   eNotInALoop
+   eRecordEmpty
+   eNotCurrentFunction
+   eAlreadyDefined
+   eOnlyOneVarCanBeInitialized
+   eExternalMethodCannotBeNested
+   eExternalMethodMustBeCdecl
+   eCantFindUnitFile
+   eInternalScopeMismatch
+   eEnumValueNotAscending
+   eUsedButNotDefined
+   eCantUsePredSuccOnEnumWithValueGaps
+   eCantDereference
+   eSizeMismatch
+   eTypeNameNotAllowedHere
+   ;
+
+include 'pascal_schema.ssl'
+
+type Node:     % A pointer to a node in the schema database (symbol database)
+   Null = 0
+   ;
+
+type NodeIter:   % An iterator over nodes in a list, in the schema database
+   NullIter = 0
+   ;
+
+type NodeVec:  % A pointer to a vector of Node.  See mechanism node_vec_mech
+   NullVec = 0
+   ;
+
+type boolean:
+   false    = 0
+   true     = 1;
+
+type double:
+   doubleZero = 0
+   ;
+
+type Label:
+   labelNull = 0;
+
+% An output code stream.
+type Code:
+   codeNull = 0
+   codeDefault = 1
+   ;
+
+% A string
+type String:
+   stringNull = 0
+   ;
+
+% allocation modes for oScopeBegin
+type AllocMode:
+   allocGlobal = 0  % allocate from global data
+   allocDown        % allocate down the stack
+   allocUp          % allocate up the stack
+   ;
+
+% Some general schema node operations.
+% node_type and node_attribute are defined in generated file pascal_schema.ssl included above.
+%
+mechanism node_mech:
+    oNodeNew (node_type) >> Node         % create new node
+    oNodeSet (Node, node_attribute, Node)   % set Node attribute of node
+    oNodeSetDouble (Node, node_attribute, double)   % set double attribute
+    oNodeSetString (Node, node_attribute, String)
+    oNodeSetInt (Node, node_attribute, int) % set int attribute of node
+    oNodeSetBoolean (Node, node_attribute, boolean)
+    oNodeSetLabel( Node, node_attribute, Label )  % set Label attribute of node
+    oNodeSetCode( Node, node_attribute, Code )    % set Code attribute of node
+    oNodeAddLast( Node, node_attribute, Node value )  % append to a List attribute of node
+    oNodeGet (Node, node_attribute) >> Node    % get Node attribute of node
+    oNodeGetDouble (Node, node_attribute) >> double
+    oNodeGetString (Node, node_attribute) >> String
+    oNodeGetInt (Node, node_attribute) >> int  % get int attribute of node
+    oNodeGetBoolean (Node, node_attribute) >> boolean  % get int attribute of node
+    oNodeGetLabel (Node, node_attribute) >> Label      % get Label attribute of node
+    oNodeGetCode (Node, node_attribute) >> Code        % get code stream attribute of node
+    oNodeNull (Node) >> boolean          % is node null?
+    oNodeFind (Node, node_attribute listAttr, node_attribute valueAttr, int value) >> Node  % find node with value in list
+    oNodeGetIter (Node, node_attribute) >> NodeIter   % get an iterator over nodes in a List attribute
+    oNodeGetIterLast (Node, node_attribute) >> NodeIter  % get an iterator over nodes in a List, starting at last
+    oNodeIterValue (NodeIter) >> Node             % the node that iter is referring to (NodeNull if no more nodes)
+    oNodeIterNext (inout NodeIter)                % advance iterator through list
+    oNodeIterPrev (inout NodeIter)                % advance iterator backwards through list
+    oNodeType (Node) >> node_type        % return node type of node
+    oNodeEqual (Node, Node) >> boolean   % compare two nodes for equality
+                                         % (i.e. same node, not just same contents)
+    ;
+
+
+% Manipulate a temporary vector of Node
+%
+mechanism node_vec_mech:
+    oNodeVecNew >> NodeVec
+    oNodeVecDelete( NodeVec nv )
+    oNodeVecAppend( NodeVec nv, Node n )
+    oNodeVecSize( NodeVec nv ) >> int                % how many elements
+    oNodeVecElement( NodeVec nv, int idx ) >> Node   % element at index idx (0..size-1)
+    ;
+
+
+
+mechanism emit_mech:
+    oEmitInt( int )              % emit int into the generated code
+    oEmitDouble( double )        % emit double into the generated code
+    oEmitLabel( Label )
+    oEmitCode( Code )            % append a code stream to the current code stream
+    Here >> int                  % current address in the generated code
+                                 %   (only usable in the default code stream)
+    oPatch( int addr, int val )  % patch an int into address in the generated code
+                                 %   (only usable in the default code stream)
+    ;
+
+mechanism math:
+    inc (inout int)
+    dec (inout int)
+    negate (int) >> int
+    add( int x, int y ) >> int
+    subtract( int x, int y ) >> int     % x - y
+    multiply( int x, int y ) >> int     % x * y
+    equal( int x, int y ) >> boolean
+    equal_zero (int) >> boolean
+    equal_node( Node, Node ) >> boolean
+    equal_string( String, String ) >> boolean
+    equal_node_type (node_type, node_type) >> boolean     % Want equal_<type> for every type
+    equal_label( Label, Label ) >> boolean
+    equal_code( Code, Code ) >> boolean
+    greater( int x, int y ) >> boolean
+    oMININT >> int    % the minimum 32-bit integer.
+    oMAXINT >> int    % the maximum 32-bit integer.
+    ;
+
+mechanism more_builtins:      % These should be built-in SSL operations
+    TOKEN_VALUE >> int        % value of just accepted token, e.g. IntLit token
+    TOKEN_VALUE_DOUBLE >> double
+    LAST_ID >> int            % id number of last accepted identifier
+    ID_STRING( int id ) >> String       % text name of identifier with given id
+    CURRENT_STRLIT >> String            % text value of just-accepted string literal
+    UNACCEPT_TOKEN            % Unaccept the last accepted token.  The next input, inputchoice will see it again.
+    ;
+
+mechanism workspace_mech:
+    oWorkspaceNew >> Node
+    ;
+
+mechanism scope_mech:
+    oScopeBegin( int level, AllocMode )  % create a new scope. Subsequent declarations will go here.
+                                         %  level = static scope depth (0 = globals)
+    oScopeEnter( Node scope )            % enter an existing scope.
+    oScopeEnd                            % end current scope. Subsequent declarations will go to previous scope.
+    oScopeCurrent >> Node                % returns current scope
+    oScopeDeclare( Node decl )           % add declaration to current scope.
+    oScopeDeclareAlloc( Node decl )      % add declaration to current scope, and allocate space according to its type
+    oScopeAllocType( Node theType ) >> int   % allocate space for type in current scope, and return its address
+    oScopeAlloc( int size, int align ) >> int % allocate bytes, with given alignment in bytes 
+    oScopeFind >> Node                   % find declaration of last accepted identifier.  Returns Null if not found.
+    oScopeFindRequire >> Node            % find declaration of last accepted identifier.  Error if not found.
+    oScopeFindInCurrentScope >> Node     % find declaration of last accepted identifier, only within the current scope.  Null if not found.
+    oScopeFindRequireInScope( Node scope ) >> Node  % find decl of last accepted identifier, only within the given scope.  Error it not found.
+    ;
+
+mechanism type_mech:
+    oTypeAdd( Node node )     % add the given nType to the type table
+    ;
+
+mechanism type_stack_mech:
+    oTypeSPush( Node node )
+    oTypeSPop
+    oTypeSTop >> Node
+    oTypeSNodeType >> node_type          % node_type of the node on top of type stack, skipping subranges
+    ;
+
+
+mechanism id_mech:
+    % gets/adds a predefined id to the scanner's id table, and returns the id code
+    oId_mysystem >> int
+    oId_ShortStringAppendShortString >> int
+    oId_ShortStringAppendChar >> int
+    oId_ShortStringCmp >> int
+    oId_File >> int
+    oId_Integer >> int
+    oId_Boolean >> int
+    oId_Char >> int
+    oId_Byte >> int
+    oId_Single >> int
+    oId_Double >> int
+    oId_Pointer >> int
+    oId_ShortString >> int
+    oId_True >> int
+    oId_False >> int
+    oId_Nil >> int
+    oId_Ord >> int
+    oId_Chr >> int
+    oId_Pred >> int
+    oId_Succ >> int
+    oId_Sizeof >> int
+    oChangeIntLitToLabelIdent    % change current token from pIntLit to pIdent "_label_<intlit>"
+    ;
+
+
+
+mechanism label_mech:
+   oLabelNew >> Label
+   ;
+
+mechanism code_mech:
+   oCodeNew >> Code         % create a new empty code stream
+   oCodePush( Code )        % change the current output code stream to the given one
+   oCodePop                 % restore the current code stream to the previous one
+   oCodeDiscard( Code )     % discard the given code stream
+   ;
+
+mechanism include_mech:
+   oIncludeUnitFile( int id ) >> boolean  % search for <unit>.pas and include it.
+                                          % returns false if can't find.
+   oIncludeEnd              % stop including the current file
+   ;
+
+
+mechanism count :
+   oCountPush(int)          % start a new counter, with initial value
+   oCountInc
+   oCountDec
+   oCountIsZero >> boolean
+   oCountPop;
+
+
+mechanism value :              % value stack, to calc. const expr's
+   oValuePush(int)             % push an explicit int lit
+   oValuePushDouble(double)    % push a double onto value stack
+   oValuePushString(String)    % push string onto value stack
+   oValueTop >> int            % get top value on value stack
+   oValueTopDouble >> double
+   oValueTopString >> String
+   oValueSwap                  % swap top two
+   oValuePop
+   oValueCharToString          % convert top value from char to string
+   oValueIntToDouble
+
+   oValueNegate                % negate top numeric value
+   oValueEqual
+   oValueNotEqual
+   oValueLess
+   oValueGreater
+   oValueLessEqual
+   oValueGreaterEqual
+
+   oValueNegateD               % operations on double values
+   oValueEqualD
+   oValueNotEqualD
+   oValueLessD
+   oValueGreaterD
+   oValueLessEqualD
+   oValueGreaterEqualD
+
+   oValueOr                    % boolean or
+   oValueAnd
+   oValueNot                   % boolean not
+
+   oValueAdd
+   oValueSub
+   oValueMult
+   oValueDiv
+
+   oValueAddD
+   oValueSubD
+   oValueMultD
+   oValueDivD
+
+   oValueStringCmp             % compare top two strings. replace with negative, 0, or positive
+   oValueStringConcat
+   ;
+
+mechanism string :
+   oStringAllocLit( String ) >> int      % alloc global space for strlit, return address
+   oStringAllocShortStringLit( String ) >> int  % alloc global space for ShortString, return address
+   ;
+
+% track labels for the loop we're in, if any
+mechanism loop_mech:
+   oLoopPush( Label continueLabel, Label breakLabel )
+   oLoopContinueLabel >> Label
+   oLoopBreakLabel >> Label
+   oLoopPop
+   ;
+
+% for hacky debugging
+mechanism msg_mech:
+   oMsg( int num )             % print message "oMsg <num>"
+   oMsgTrace( int num )        % print message "oMsg <num>" followed by ssl traceback
+   oMsgNode( Node node )       % print node
+   oMsgNodeLong( Node node )   % print node with more detail
+   oMsgNodeVec( NodeVec vec )  % print node vec
+   ;
+
+
+rules
+
+% ----------------------------- Global Variables ----------------------------
+
+Node    workspace              % root of database
+Node    globalScope            % scope for globals in the current module
+Node    initScope              % scope for temporaries global var init,
+                               % and program main stmt / unit initialization stmts
+
+int     mysystemId               % id of identifier "mysystem"
+
+% built-in nTypes
+Node    FileType
+Node    IntegerType
+Node    BooleanType
+Node    BooleanFlowType
+Node    CharType
+Node    PCharType
+Node    ByteType
+Node    SingleType
+Node    DoubleType
+Node    UniversalPointerType
+Node    StrLitType
+Node    ShortStringType
+
+% nBuiltInFunc
+Node    BuiltIn_Ord
+Node    BuiltIn_Chr
+Node    BuiltIn_Pred
+Node    BuiltIn_Succ
+Node    BuiltIn_Sizeof
+
+% Declarations in unit mysystem that the compiler may refer to directly.
+
+Node    System_ShortStringAppendShortString
+Node    System_ShortStringAppendChar
+Node    System_ShortStringCmp
+
+
+% Expr has a corner case flag, needed for sizeof()
+boolean flagExprAllowTypeName
+
+
+% -------------------------- Forward Declarations -------------------------
+
+Block( node_type varNodeType, Label labelForBody );
+BlockDecls( node_type varNodeType );
+BlockStmt( Label labelForBody, Node varScope, boolean isMain );
+VarDecl( node_type varNodeType );
+newType( node_type nt, int size ) >> Node;
+newIdent( node_type nt, int id ) >> Node;
+EmitValue( Node decl );
+TypeRef( out Node theType );
+EnumTypeRef( out Node resultType );
+PointerTypeTo( Node theType ) >> Node;
+OrdinalLow( Node theType ) >> int;
+OrdinalHigh( Node theType ) >> int;
+AssignStmt( Node decl );
+BooleanExprControlFlow( out Label falseLabel );
+ExprAllowFlow( out Label falseLabel );
+BoolExprAllowFlow( out Label falseLabel );
+BoolTermAllowFlow( out Label falseLabel );
+BoolFactorAllowFlow( out Label falseLabel );
+ArithExprAllowFlow( out Label falseLabel );
+TermAllowFlow( out Label falseLabel );
+FactorAllowFlow( out Label falseLabel );
+PrimaryAllowFlow( out Label falseLabel );
+
+VarExpr( Node decl );
+LValueFromDecl( Node decl, boolean writeable );
+LValueVar( Node decl, boolean writeable );
+IncVar( Node decl );
+DecVar( Node decl );
+
+FlowToVal( inout Label falseLabel );
+ValToFlow( out Label falseLabel );
+MoveIntoTempShortString >> int;
+
+DeclLevel( Node decl ) >> int;
+DeclUpLevels( Node decl ) >> int;
+
+% ----------------------------- Start ----------------------------
+
+MainRule:
+   @Program
+   ;
+
+include 'pascal_unit.ssl'
+include 'pascal_decl.ssl'
+include 'pascal_constexpr.ssl'
+include 'pascal_expr.ssl'
+include 'pascal_stmt.ssl'
+include 'pascal_str.ssl'
+include 'pascal_call.ssl'
+include 'pascal_type.ssl'
+
+
+Program:
+   Node t
+
+   workspace = oWorkspaceNew
+
+   % root scope is used for builtins e.g. Integer,
+   % and is a parent to any used units, and the program's own global scope.
+   oScopeBegin( 0, allocGlobal )
+   Node rootScope = oScopeCurrent
+
+   @installBuiltIns
+
+   % Start by calling the main program routine.
+
+   % This dummy call to main needs to look like a normal method itself,
+   % so jit can align the stack properly.  So we need .tEnter,
+   % and .tAllocActuals / .tFreeActuals.
+   .tEnter  oEmitInt( 0 )
+   Label mainLabel = oLabelNew
+
+   .tAllocActuals  oEmitInt( 0 )
+   .tCall  oEmitLabel( mainLabel )
+   .tFreeActuals  oEmitInt( 0 )
+   .tReturn
+
+   pProgram
+   pIdent
+
+   Node program = oNodeNew( nProgram )
+   oNodeSetInt( program, qIdent, LAST_ID )
+   oNodeSet( workspace, qProgram, program )
+
+
+   [
+      | '(' :
+         pIdent      % input, output files
+
+         t = @newIdent( nVar, LAST_ID )
+         oNodeSet( t, qType, FileType )
+         oScopeDeclareAlloc( t )
+         % TO DO: I shouldn't declare the files in root scope.
+         %        Should save them for program's global scope.
+
+         ','
+         pIdent
+
+         t = @newIdent( nVar, LAST_ID )
+         oNodeSet( t, qType, FileType )
+         oScopeDeclareAlloc( t )
+
+         ')'
+      | * :
+   ]
+   ';'
+
+   @UsesMySystem( program )
+   % The uses clause may only appear once, immediately after the program declaration.
+   [
+      | pUses :  @UsesClause( program )
+      | * :
+   ]
+   @EnterUsedUnits( program )
+
+   % Global scope for the program, below any used units.
+   oScopeBegin( 0, allocGlobal )
+   globalScope = oScopeCurrent
+
+   % A new scope just for temporaries in the main routine
+   % Create it up front, in case it's needed by variable initialization exprs.
+   % But we won't stay in it here.
+   % Note we say it extends the global scope, so that during main statement evaluation
+   % any user labels declared in the global scope are considered to be part of the current scope.
+   oScopeBegin( 0, allocDown )
+   oNodeSet( oScopeCurrent, qExtends, globalScope )
+   initScope = oScopeCurrent
+   oNodeSet( program, qMainRoutineScope, initScope )
+   oScopeEnd
+
+   @BlockDecls( nGlobalVar )
+
+
+   oScopeEnter( initScope )
+
+   % The block statement includes a stack frame, and enter/return,
+   % even for the main routine.
+   % That will be necessary for temporaries allocated in the main routine.
+
+   % isMain means we'll generate calls to the unit init/final methods in here too.
+   % Alternatively we could do that in a higher level method that calls main.
+   boolean isMain = true
+   @BlockStmt( mainLabel, globalScope, isMain )
+
+   oScopeEnd   % main routine scope
+
+   '.'
+   @CheckForUndefinedLabels
+   oScopeEnd   % global scope
+   @EndUsedUnits( program )   % used units scopes
+   ;
+
+
+
+
+Block( node_type varNodeType, Label labelForBody ):
+   @BlockDecls( varNodeType )
+   @BlockStmt( labelForBody, oScopeCurrent, false )
+   @CheckForUndefinedLabels
+   ;
+
+
+BlockDecls( node_type varNodeType ):
+   {[
+      | pConst :     @ConstDecl
+      | pType :      @TypeDecl
+      | pVar :       @VarDecl( varNodeType )
+      | pLabel :     @LabelDecl
+      | pProcedure : @ProcDecl
+      | pFunction :  @FuncDecl
+      | * :          >
+   ]}
+   @CheckForUndefinedMethods
+   ;
+
+
+% were there any procedures or functions declared in this scope
+% that were never defined?
+CheckForUndefinedMethods:
+   % TO DO
+   % Note: disregard methods marked external
+   ;
+
+% were there any labels declared in the current scope, and used,
+% but never defined (as the prefix of a stement)?
+%
+CheckForUndefinedLabels:
+   NodeIter it = oNodeGetIter( oScopeCurrent, qDecls )
+   {
+      Node decl = oNodeIterValue( it )
+      [ oNodeNull( decl )
+         | false :
+         | * :  >
+      ]
+      [ oNodeType( decl )
+         | nLabel :
+            [ oNodeGetBoolean( decl, qDefined )
+               | false :
+                  [ oNodeGetBoolean( decl, qUsed )
+                     | true :    #eUsedButNotDefined  % TO DO: give the decl in the message
+                     | * :
+                  ]
+               | * :
+            ]
+         | * :
+      ]
+      oNodeIterNext( it )
+   }
+   ;
+
+
+% Given the scope of vars in this block.
+% Usually it's the current scope, but it's a bit different for the main statement.
+%
+BlockStmt( Label labelForBody, Node varScope, boolean isMain ):
+   .tLabel  oEmitLabel( labelForBody )
+
+   % Proc, func, and main routine all start with tEnter
+   % to create a stack frame.  This will be used for temporaries
+   % (and local vars in the case of proc, func).
+
+   int patchLS
+   .tEnter  patchLS = Here  .tSpace
+
+   % If we're generating the program main method,
+   % add in calls to the loaded units' initialization and finalization.
+   [ isMain
+      | true :  @InitializeUnits
+      | * :
+   ]
+
+   % insert any code for initialization of this scope's variables
+   Code initCode = oNodeGetCode( varScope, qInitCode )
+   oEmitCode( initCode )
+   oNodeSetCode( varScope, qInitCode, codeNull )
+
+   @Statement
+
+   [ isMain
+      | true :  @FinalizeUnits
+      | * :
+   ]
+
+   .tReturn
+
+   int localSpace = oNodeGetInt( oScopeCurrent, qSize )
+   oPatch( patchLS, localSpace )
+   ;
+
+
+% We need an initCode code stream for the given scope.
+% Create it if not present yet.  Return it.
+% (This will be used for variable initialization.)
+%
+GetOrCreateInitCode( Node scope ) >> Code:
+   Code initCode = oNodeGetCode( scope, qInitCode )
+   [ equal_code( initCode, codeNull )
+      | true :
+         initCode = oCodeNew
+         oNodeSetCode( scope, qInitCode, initCode )
+      | * :
+   ]
+   >> initCode;
+
+
+
+
+
+% -------------------------------- Utilities -------------------------------
+
+% Return the static scope level of the current scope
+%
+ScopeLevel >> int:
+   >> oNodeGetInt( oScopeCurrent, qLevel );
+
+% Return the static scope level of the given declaration
+%
+DeclLevel( Node decl ) >> int:
+   >> oNodeGetInt( oNodeGet( decl, qParentScope ), qLevel );
+   
+
+% How many levels higher is the given declaration from the current scope?
+%
+DeclUpLevels( Node decl ) >> int:
+   >> subtract( @ScopeLevel, @DeclLevel( decl ) );
+
+
+
+
+% Create and return a new nIdent of the given node_type, with the given ident id.
+% Does not add it to any scope.
+%
+newIdent( node_type nt, int id ) >> Node:
+  Node t = oNodeNew( nt )
+  oNodeSetInt( t, qIdent, id )
+  >> t
+  ;
+
+
+% Emit the value in a declaration.
+% For a constant integer, this is the constant value.
+% For a global variable, this is the global address.
+% For a local variable, this is the local address relative to the call stack frame.
+%
+EmitValue( Node decl ):
+    oEmitInt( oNodeGetInt( decl, qValue ));
+
+
+DeclareBuiltInFunc( int id ) >> Node:
+   Node decl = @newIdent( nBuiltInFunc, id )
+   oScopeDeclare( decl )
+   >> decl;
+
+
+installBuiltIns:
+
+   % initialize some other globals too
+   flagExprAllowTypeName = false
+
+   % "mysystem" is the name of a unit that will be available everywhere.
+   % Add its name to the id table so we can easily spot the name later.
+   mysystemId = oId_mysystem
+
+   % install built-in types
+   FileType = @newType( nFileType, 4 )
+   IntegerType = @newType( nIntegerType, 4 )
+   BooleanType = @newType( nBooleanType, 1 )
+   BooleanFlowType = @newType( nBooleanFlowType, 1 )
+   CharType = @newType( nCharType, 1 )
+   PCharType = @PointerTypeTo( CharType )
+   ByteType = @newType( nByteType, 1 )
+   SingleType = @newType( nSingleType, 4 )
+   DoubleType = @newType( nDoubleType, 8 )
+   % Universal pointer says base type Byte, but this is only for the sake of
+   % pointer arithmetic.  It doesn't matter otherwise, because this type cannot be dereferened.
+   UniversalPointerType = @newType( nUniversalPointerType, 8 )
+   oNodeSet( UniversalPointerType, qBaseType, ByteType )
+   % StrLitType is stored with both a length byte and null termination, so it can be assigned to
+   % both a ShortString and a PChar.  StrLits longer than 255 characters appear truncated when
+   % referenced as a ShortString, but not when referenced as a PChar.
+   StrLitType = @newType( nStrLitType, 256 )
+   % ShortString is the original Pascal string type: an array of characters, not null-terminated,
+   % with the first byte recording the current length.
+   % The default ShortString type has capacity for 255 characters.  The user may define
+   % additional ShortString types with smaller capacities.
+   % The first character can be accessed as myString[1].
+   ShortStringType = @newType( nShortStringType, 256 )
+   oNodeSetInt( ShortStringType, qCapacity, 255 )
+
+   % Declare those type identifiers.
+   % SSL doesn't support strings, so need help from operations e.g. oId_File
+
+   Node t
+
+   t = @newIdent( nTypeDecl, oId_File )
+   oNodeSet( t, qType, FileType )
+   oScopeDeclare( t )
+
+   t = @newIdent( nTypeDecl, oId_Integer )
+   oNodeSet( t, qType, IntegerType )
+   oScopeDeclare( t )
+
+   t = @newIdent( nTypeDecl, oId_Boolean )
+   oNodeSet( t, qType, BooleanType )
+   oScopeDeclare( t )
+
+   t = @newIdent( nTypeDecl, oId_Char )
+   oNodeSet( t, qType, CharType )
+   oScopeDeclare( t )
+
+   t = @newIdent( nTypeDecl, oId_Byte )
+   oNodeSet( t, qType, ByteType )
+   oScopeDeclare( t )
+
+   t = @newIdent( nTypeDecl, oId_Single )
+   oNodeSet( t, qType, SingleType )
+   oScopeDeclare( t )
+
+   t = @newIdent( nTypeDecl, oId_Double )
+   oNodeSet( t, qType, DoubleType )
+   oScopeDeclare( t )
+
+   t = @newIdent( nTypeDecl, oId_Pointer )
+   oNodeSet( t, qType, UniversalPointerType )
+   oScopeDeclare( t )
+
+   t = @newIdent( nTypeDecl, oId_ShortString )
+   oNodeSet( t, qType, ShortStringType )
+   oScopeDeclare( t )
+
+   % Built-in constants
+
+   t = @newIdent( nConst, oId_True )
+   oNodeSet( t, qType, BooleanType )
+   oNodeSetInt( t, qValue, 1 )
+   oScopeDeclare( t )
+
+   t = @newIdent( nConst, oId_False )
+   oNodeSet( t, qType, BooleanType )
+   oNodeSetInt( t, qValue, 0 )
+   oScopeDeclare( t )
+
+   t = @newIdent( nConst, oId_Nil )
+   oNodeSet( t, qType, UniversalPointerType )
+   oNodeSetInt( t, qValue, 0 )
+   oScopeDeclare( t )
+
+   % Built-in methods
+   % These aren't declared like normal methods, because they may have
+   % special rules for parameter types (e.g. any scalar type).
+   % Calls to these methods will be handled specially by the compiler.
+
+   BuiltIn_Ord = @DeclareBuiltInFunc( oId_Ord )
+   BuiltIn_Chr = @DeclareBuiltInFunc( oId_Chr )
+   BuiltIn_Pred = @DeclareBuiltInFunc( oId_Pred )
+   BuiltIn_Succ = @DeclareBuiltInFunc( oId_Succ )
+   BuiltIn_Sizeof = @DeclareBuiltInFunc( oId_Sizeof )
+   ;
+
+end
+

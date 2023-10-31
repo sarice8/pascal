@@ -1,0 +1,1520 @@
+%
+% Pascal Compiler
+%
+
+
+% ------------------------------ Expressions -----------------------------
+
+
+% There are two wrappers leading into expression parsing:
+%   Expr()
+%   BooleanExprControlFlow( out Label falseLabel )
+%
+% Expr always produces a value on the runtime expr stack,
+% and pushes its type on the type stack.
+%
+% BooleanExprControlFlow always generates control-flow code.
+% It does not push a value on the runtime expr stack.
+% It does not push a type on the type stack.
+% The control flow code ends up at Here if the expr is true,
+% and jumps to falseLabel if the expr is false.
+% This rule allocates falseLabel, and passes it back.
+% The caller will need to define its location.
+%
+% The internal methods of expr parsing may produce a mix of
+% values and control flow, depending on the operators seen.
+% We don't always do one or the other, hoping to be efficient for
+% cases like   "func_call( bool_var1, bool_var2 )"
+% as well as  "if bool_expr1 or bool_expr2 then ...".
+% If a subexpression rule produces control flow, it will allocate a
+% falseLabel and pass it back up.  And it will push the
+% result type as BooleanFlowType, to distinguish from BooleanType
+% which corresponds with a boolean value on the expr stack.
+% 
+% Note that my expression parsing is broken into more levels than
+% grammars describe for Pascal precedence levels.  This follows my
+% original parser implementation.  I think my rationale was that
+% operators from the levels that I split up couldn't have been
+% mixed anyway, since they require different data types
+% (e.g. boolean vs int/real).  And splitting them up simplified
+% my code.  But, I should revisit this.
+%
+
+
+% Public entry point:
+%
+% Parse an expression, leaving a value on the runtime expr stack
+% and its type on the type stack.
+%
+% This rule does not export control flow (though it may generate
+% control flow internally for subexpressions).
+%
+Expr:
+   Label falseLabel = labelNull
+
+   @ExprAllowFlow( falseLabel )
+   @FlowToVal( falseLabel );
+
+
+% Public entry point:
+%
+% Parse an expression, just like Expr,
+% but also allows type names as Primary elements of the expression.
+% This is for use by sizeof().
+% The value produced by that primary is bogus, but this is ok because the
+% caller (sizeof) is going to discard all generated code for the expression.
+% It's only interested in the type produced by the expression.
+%
+ExprAllowTypeName:
+   boolean oldAllowTypeName = flagExprAllowTypeName
+   flagExprAllowTypeName = true
+   @Expr
+   flagExprAllowTypeName = oldAllowTypeName
+   ;
+
+
+% Public entry point:
+%
+% Parse a Boolean expression, producing control flow code rather than a value.
+% Does not leave a value on the runtime expr stack.
+% Does not leave a type on the type stack.
+%
+% If the expression is true, the code will fall through to the end (Here).
+% If the expression is false, the code will jump to the given falseLabel,
+% which this rule will allocate but not define the location for.
+% The caller must do so.
+%
+BooleanExprControlFlow( out Label falseLabel ):
+   @ExprAllowFlow( falseLabel )
+   [ oTypeSNodeType
+      | nBooleanFlowType :
+      | nBooleanType :
+         % convert value to control flow
+         falseLabel = oLabelNew
+         .tJumpFalse  oEmitLabel( falseLabel )
+      | * :
+         #eNotBoolean
+   ]
+   oTypeSPop;
+
+
+% If the current expr result is control flow, convert it to a value.
+% falseLabel is the label that had been used by the control flow.
+% On return it will be set to labelNull.
+%
+FlowToVal( inout Label falseLabel ):
+   [ oTypeSNodeType
+      | nBooleanFlowType :
+         Label doneLabel = oLabelNew
+         .tPushConstI  oEmitInt( 1 )
+         .tJump  oEmitLabel( doneLabel )
+         .tLabel  oEmitLabel( falseLabel )
+         .tPushConstI  oEmitInt( 0 )
+         .tLabel  oEmitLabel( doneLabel )
+         oTypeSPop
+         oTypeSPush( BooleanType )
+         falseLabel = labelNull
+      | * :
+   ];
+
+
+% If the current expr result is boolean value, convert it to control flow.
+% falseLabel will be allocated by this rule and passed back.
+% The caller must define its location.
+%
+ValToFlow( out Label falseLabel ):
+   [ oTypeSNodeType
+      | nBooleanType :
+         falseLabel = oLabelNew
+         .tJumpFalse  oEmitLabel( falseLabel )
+         oTypeSPop
+         oTypeSPush( BooleanFlowType )
+      | * :
+   ];
+
+
+% Parse an expression.  It may produce a value on the expr stack,
+% or control flow, depending on what's seen in the expression.
+% Leaves the expression type on the type stack.
+%
+% If the expression produces control flow, the expression type will be
+% nBooleanFlowType.  In this case, a true value falls through to Here,
+% and a false value jumps to falseLabel.  This rule will allocate falseLabel
+% and return it, but will not define its location; the caller must do so.
+%
+% If the expression produces a value, the value will be left on the
+% expression stack, and the type will be some type other than nBooleanFlowType.
+% In this case, falseLabel is ignored.
+%
+ExprAllowFlow( out Label falseLabel ):
+   @BoolExprAllowFlow( falseLabel )
+   {[
+      | '=' :
+         @FlowToVal( falseLabel )
+         @PromoteToIntOptional
+         @BoolExprAllowFlow( falseLabel )
+         @FlowToVal( falseLabel )
+         @PromoteToIntOptional
+         @CoerceTypePair
+         [ oTypeSNodeType
+            | nBooleanType, nCharType :     .tEqualB
+            | nIntegerType, nEnumType :     .tEqualI
+            | nDoubleType :                 .tEqualD
+            | nPointerType, nUniversalPointerType :    .tEqualP
+            | nShortStringType, nStrLitType :
+               @ShortStringCmp  .tPushConstI  oEmitInt( 0 )  .tEqualI
+            | * :                           #eNotAllowed
+         ]
+         oTypeSPop
+         oTypeSPush( BooleanType )
+
+      | '<>' :
+         @FlowToVal( falseLabel )
+         @PromoteToIntOptional
+         @BoolExprAllowFlow( falseLabel )
+         @FlowToVal( falseLabel )
+         @PromoteToIntOptional
+         @CoerceTypePair
+         [ oTypeSNodeType
+            | nBooleanType, nCharType :     .tNotEqualB
+            | nIntegerType, nEnumType :     .tNotEqualI
+            | nDoubleType :                 .tNotEqualD
+            | nPointerType, nUniversalPointerType :    .tNotEqualP
+            | nShortStringType, nStrLitType :
+               @ShortStringCmp  .tPushConstI  oEmitInt( 0 )  .tNotEqualI
+            | * :                           #eNotAllowed
+         ]
+         oTypeSPop
+         oTypeSPush( BooleanType )
+
+      | '<' :
+         @FlowToVal( falseLabel )
+         @PromoteToIntOptional
+         @BoolExprAllowFlow( falseLabel )
+         @FlowToVal( falseLabel )
+         @PromoteToIntOptional
+         @CoerceTypePair
+         [ oTypeSNodeType
+            | nBooleanType, nCharType :     .tLessB
+            | nIntegerType, nEnumType :     .tLessI
+            | nDoubleType :                 .tLessD
+            | nPointerType, nUniversalPointerType :   .tLessP
+            | nShortStringType, nStrLitType :
+               @ShortStringCmp  .tPushConstI  oEmitInt( 0 )  .tLessI
+            | * :                           #eNotAllowed
+         ]
+         oTypeSPop
+         oTypeSPush( BooleanType )
+
+      | '>' :
+         @FlowToVal( falseLabel )
+         @PromoteToIntOptional
+         @BoolExprAllowFlow( falseLabel )
+         @FlowToVal( falseLabel )
+         @PromoteToIntOptional
+         @CoerceTypePair
+         [ oTypeSNodeType
+            | nBooleanType, nCharType :     .tGreaterB
+            | nIntegerType, nEnumType :     .tGreaterI
+            | nDoubleType :                 .tGreaterD
+            | nPointerType, nUniversalPointerType :   .tGreaterP
+            | nShortStringType, nStrLitType :
+               @ShortStringCmp  .tPushConstI  oEmitInt( 0 )  .tGreaterI
+            | * :                           #eNotAllowed
+         ]
+         oTypeSPop
+         oTypeSPush( BooleanType )
+
+      | '<=' :
+         @FlowToVal( falseLabel )
+         @PromoteToIntOptional
+         @BoolExprAllowFlow( falseLabel )
+         @FlowToVal( falseLabel )
+         @PromoteToIntOptional
+         @CoerceTypePair
+         [ oTypeSNodeType
+            | nBooleanType, nCharType :     .tLessEqualB
+            | nIntegerType, nEnumType :     .tLessEqualI
+            | nDoubleType :                 .tLessEqualD
+            | nPointerType, nUniversalPointerType :   .tLessEqualP
+            | nShortStringType, nStrLitType :
+               @ShortStringCmp  .tPushConstI  oEmitInt( 0 )  .tLessEqualI
+            | * :                           #eNotAllowed
+         ]
+         oTypeSPop
+         oTypeSPush( BooleanType )
+
+      | '>=' :
+         @FlowToVal( falseLabel )
+         @PromoteToIntOptional
+         @BoolExprAllowFlow( falseLabel )
+         @FlowToVal( falseLabel )
+         @PromoteToIntOptional
+         @CoerceTypePair
+         [ oTypeSNodeType
+            | nBooleanType, nCharType :     .tGreaterEqualB
+            | nIntegerType, nEnumType :     .tGreaterEqualI
+            | nDoubleType :                 .tGreaterEqualD
+            | nPointerType, nUniversalPointerType :   .tGreaterEqualP
+            | nShortStringType, nStrLitType :
+               @ShortStringCmp  .tPushConstI  oEmitInt( 0 )  .tGreaterEqualI
+            | * :                           #eNotAllowed
+         ]
+         oTypeSPop
+         oTypeSPush( BooleanType )
+
+      | * :
+         >
+   ]};
+
+
+BoolExprAllowFlow( out Label falseLabel ):
+   Label trueLabel = labelNull
+
+   @BoolTermAllowFlow( falseLabel )
+   {[
+      | pOr :
+         [ oTypeSNodeType
+            | nBooleanFlowType :
+               % We are true here. Jump ahead to done
+               [ equal_label( trueLabel, labelNull )
+                  | true :  trueLabel = oLabelNew
+                  | * :
+               ]
+               .tJump  oEmitLabel( trueLabel )
+            | nBooleanType :
+               @ValToFlow( falseLabel )
+               % We are true here. Jump ahead to done
+               [ equal_label( trueLabel, labelNull )
+                  | true :  trueLabel = oLabelNew
+                  | * :
+               ]
+               .tJump  oEmitLabel( trueLabel )
+            | * : #eNotBoolean
+         ]
+         oTypeSPop
+
+         % false in previous term will jump here, to try this alternative term
+         .tLabel  oEmitLabel( falseLabel )
+
+         % we'll get a new falseLabel for this term
+         falseLabel = labelNull
+         @BoolTermAllowFlow( falseLabel )
+
+         [ oTypeSNodeType
+            | nBooleanFlowType :
+            | nBooleanType :
+               @ValToFlow( falseLabel )
+            | * : #eNotBoolean
+         ]
+
+         oTypeSPop
+         oTypeSPush( BooleanFlowType )
+
+      | * :
+         >
+   ]}
+
+   % any short-circuit trues jump here to the end
+   [ equal_label( trueLabel, labelNull )
+      | false :
+         .tLabel  oEmitLabel( trueLabel )
+      | * :
+   ]
+   ;
+
+
+BoolTermAllowFlow( out Label falseLabel ):
+   Label overallFalseLabel = labelNull
+
+   @BoolFactorAllowFlow( falseLabel )
+   {[
+      | pAnd :
+         [ oTypeSNodeType
+            | nBooleanFlowType :
+            | nBooleanType :
+               @ValToFlow( falseLabel )
+            | * :
+               #eNotBoolean
+         ]
+         oTypeSPop
+
+         % We're going to have a different falseLabel for each term,
+         % because we let each rule allocate its own (rather than accepting labels passed in).
+         % And in this case we want them all to go to the same place,
+         % to be determined by the caller.
+         %
+         % I'll allow for label aliases.  This will be more optimal than generating
+         % multiple private false-handling code segments, that the true path would have to
+         % jump around.  That would be hard to eliminate afterwards.
+
+         [ equal_label( overallFalseLabel, labelNull )
+            | true :
+               overallFalseLabel = oLabelNew
+               .tLabelAlias  oEmitLabel( falseLabel )  oEmitLabel( overallFalseLabel )
+               falseLabel = overallFalseLabel
+            | * :
+         ]
+
+         Label factorFalseLabel = labelNull
+         @BoolFactorAllowFlow( factorFalseLabel )
+
+         [ oTypeSNodeType
+            | nBooleanFlowType :
+            | nBooleanType :
+               @ValToFlow( factorFalseLabel )
+            | * : #eNotBoolean
+         ]
+        .tLabelAlias  oEmitLabel( factorFalseLabel )  oEmitLabel( overallFalseLabel )
+
+      | * :
+         >
+   ]};
+
+
+BoolFactorAllowFlow( out Label falseLabel ):
+   [
+      | pNot :
+         Label factorFalseLabel = labelNull
+
+         @BoolFactorAllowFlow( factorFalseLabel )
+         [ oTypeSNodeType
+            | nBooleanFlowType :
+               % We have control flow, and are sitting at the point that has value false.
+               falseLabel = oLabelNew
+               .tJump  oEmitLabel( falseLabel )
+               % The true path jumps here
+               .tLabel  oEmitLabel( factorFalseLabel )
+
+            | nBooleanType :
+               % I have a value.  I'll leave it as a value, rather than create control flow.
+               % See how this goes.
+               .tNot
+
+            | * : #eNotBoolean
+         ]
+
+      | * :
+         @ArithExprAllowFlow( falseLabel )
+   ];
+
+
+ArithExprAllowFlow( out Label falseLabel ):
+   boolean first = true
+   int tempStrOffset
+
+   @TermAllowFlow( falseLabel )
+   {[
+      | '+' :
+         [ oTypeSNodeType
+            | nIntegerType, nByteType :
+               @PromoteToIntPop
+               @TermAllowFlow( falseLabel )  % actually not allowing CF, will be caught by type check
+
+               [ oTypeSNodeType
+                  | nPointerType, nUniversalPointerType :
+                     % int + ptr
+                     .tSwap
+                     % leave only the ptr type on the type stack (int was already popped above)
+                     @PointerAddition
+                  | nDoubleType :
+                     % int + double
+                     % int type was already popped above; leave double on type stack
+                     .tSwap
+                     .tCastItoD
+                     .tAddD
+                  | * :
+                     @PromoteToInt
+                     .tAddI
+               ]
+
+            | nDoubleType :
+               @TermAllowFlow( falseLabel )
+               @PromoteToDoublePop
+               .tAddD
+
+            | nShortStringType, nStrLitType, nCharType :
+               % String concatenation
+               [ first
+                  | true :  % move into a temp string, so subsequent term(s) can further modify it.
+                            tempStrOffset = @MoveIntoTempShortString
+                            first = false
+                  | * :
+               ]
+               @TermAllowFlow( falseLabel )  % actually not allowing CF, will be caught by type check
+               [ oTypeSNodeType
+                  | nShortStringType, nStrLitType :
+                     @ShortStringAppendShortString
+                     % Have to re-push the temp string.
+                     % If we ever have .tDup then the append method could do it and we wouldn't need this
+                     .tPushAddrLocal  oEmitInt( tempStrOffset )
+                     oTypeSPush( ShortStringType )
+                  | nCharType :
+                     @ShortStringAppendChar
+                     % Have to re-push the temp string.
+                     % If we ever have .tDup then the append method could do it and we wouldn't need this
+                     .tPushAddrLocal  oEmitInt( tempStrOffset )
+                     oTypeSPush( ShortStringType )
+                  | * :
+                     #eTypeMismatch
+                     oTypeSPop
+               ]
+
+            | nPointerType, nUniversalPointerType :
+               @TermAllowFlow( falseLabel )   % actually not allowing CF
+               @PromoteToIntPop
+               @PointerAddition
+
+            | * :
+               #eNotAllowed
+         ]
+
+      | '-' :
+         [ oTypeSNodeType
+            | nIntegerType, nByteType :
+               @PromoteToIntPop
+               @TermAllowFlow( falseLabel )
+
+               [ oTypeSNodeType
+                  | nDoubleType :
+                     % int - double
+                     % int type was already popped above; leave double on type stack
+                     .tSwap
+                     .tCastItoD
+                     .tSwap
+                     .tSubD
+                  | * :
+                     @PromoteToInt
+                     .tSubI
+               ]
+
+            | nDoubleType :
+               @TermAllowFlow( falseLabel )
+               @PromoteToDoublePop
+               .tSubD
+
+            | nPointerType, nUniversalPointerType :
+               @TermAllowFlow( falseLabel )
+               [ oTypeSNodeType
+                  | nIntegerType, nByteType :
+                     @PromoteToIntPop
+                     @PointerSubInt
+                  | nPointerType, nUniversalPointerType :
+                     @MatchTypes
+                     @PointerSubPointer
+                  | * :
+                     #eNotAllowed
+               ]
+
+            | * :  #eNotAllowed
+
+         ]
+      | * :
+         >
+   ]};
+
+
+TermAllowFlow( out Label falseLabel ):
+   @FactorAllowFlow( falseLabel )
+   {[
+      | '*' :
+         [ oTypeSNodeType
+            | nIntegerType, nByteType :
+               @PromoteToIntPop
+               @FactorAllowFlow( falseLabel )  % actually not allowing CF, will be caught by type check
+
+               [ oTypeSNodeType
+                  | nDoubleType :
+                     % int * double
+                     % int type was already popped above; leave double on type stack
+                     .tSwap
+                     .tCastItoD
+                     .tMultD
+                  | * :
+                     @PromoteToInt
+                     .tMultI
+               ]
+
+            | nDoubleType :
+               @FactorAllowFlow( falseLabel )
+               @PromoteToDoublePop
+               .tMultD
+
+            | * :
+               #eNotAllowed
+         ]
+
+      | '/' :
+         [ oTypeSNodeType
+            | nIntegerType, nByteType :
+               @PromoteToIntPop
+               @FactorAllowFlow( falseLabel )
+               [ oTypeSNodeType
+                  | nDoubleType :
+                     % int / double
+                     % int type was already popped above; leave double on type stack
+                     .tSwap
+                     .tCastItoD
+                     .tSwap
+                     .tDivD
+                  | * :
+                     @PromoteToInt
+                     .tDivI
+               ]
+
+            | nDoubleType :
+               @FactorAllowFlow( falseLabel )
+               @PromoteToDoublePop
+               .tDivD
+
+            | * :
+               #eNotAllowed
+         ]
+
+      | * :
+         >
+   ]};
+
+
+FactorAllowFlow( out Label falseLabel ):
+   [
+      | '+' :
+         @PrimaryAllowFlow( falseLabel )  % actually not allowing CF, will be caught by type check
+         [ oTypeSNodeType
+            | nIntegerType, nByteType :
+            | nDoubleType :
+            | * :
+               #eNotAllowed
+         ]
+      | '-' :
+         @PrimaryAllowFlow( falseLabel )
+         [ oTypeSNodeType
+            | nIntegerType, nByteType :
+               % It's probably fair to promote byte to int, since byte is unsigned
+               @PromoteToInt
+               .tNegI
+            | nDoubleType :
+               .tNegD
+            | * :
+               #eNotAllowed
+         ]
+      | * :
+         @PrimaryAllowFlow( falseLabel )
+   ];
+
+
+PrimaryAllowFlow( out Label falseLabel ):
+   [
+      | pIntLit :
+         .tPushConstI  oEmitInt( TOKEN_VALUE )
+         oTypeSPush( IntegerType )
+
+      | pCharLit :
+         .tPushConstI  oEmitInt( TOKEN_VALUE )
+         oTypeSPush( CharType )
+
+      | pDoubleLit :
+         .tPushConstD  oEmitDouble( TOKEN_VALUE_DOUBLE )
+         oTypeSPush( DoubleType )
+
+      | '(' :
+         @ExprAllowFlow( falseLabel )
+         ')'
+
+      | pStrLit :
+         int addr = oStringAllocShortStringLit( CURRENT_STRLIT )     % store in global data
+         .tPushAddrGlobal oEmitInt( addr )
+         % TO DO: consider defining a ShortString type with the exact capacity used.
+         % But, I don't think it should matter here, since nobody should be assigning to this string.
+         oTypeSPush( StrLitType )
+         % This seems unlikely, but the strlit may be followed by
+         % array indexing.  Handle this the same way we would with a variable expression (see VarExpr)
+         % First, advance the pointer by index if any
+         @LValueIndexes
+         % get final value of dereferencing, if any
+         @FetchVar
+
+      | pIdent :
+         Node decl = oScopeFindRequire
+         @ResolveUnitRef( decl )
+         Node theType
+
+         [ oNodeType( decl )
+            | nFunc :
+               @Call( decl )
+
+            | nBuiltInFunc :
+               @CallBuiltInFunc( decl )
+
+            | nConst, nEnumValue :
+               theType = oNodeGet( decl, qType )
+               oTypeSPush( theType )
+               [ oTypeSNodeType
+                  | nIntegerType, nEnumType, nBooleanType, nCharType, nByteType :
+                     .tPushConstI @EmitValue( decl )
+                  | nPointerType, nUniversalPointerType :
+                     % We have one pointer const, Nil.  It's pushed as I.
+                     % Sign-extending I to P won't hurt since it's 0.
+                     .tPushConstI @EmitValue( decl )
+                  | * :
+                     #eNotImplemented
+               ]
+
+            | nConstDouble :
+               theType = oNodeGet( decl, qType )
+               oTypeSPush( theType )
+               [ oTypeSNodeType
+                  | nDoubleType :
+                     .tPushConstD  oEmitDouble( oNodeGetDouble( decl, qValueDouble ) )
+                  | * :
+                     #eNotImplemented
+               ]
+               
+            | nConstStr :
+               % This is a non-typed const defined as a strlit.
+               % So far, the value is held in the compiler's symbol table.
+               % Referencing the constant in the code will work the same as directly giving a strlit.
+               % (See pStrLit above).  We store the strlit in global memory, and set expr type to StrLitType.
+
+               % Storage in global memory only happens the first time the const is referenced.
+               % The global offset is stored in qValue.
+               int addr = oNodeGetInt( decl, qValue )
+               [ equal_zero( addr )
+                  | true :
+                     addr = oStringAllocShortStringLit( oNodeGetString( decl, qValueStr ) )
+                     oNodeSetInt( decl, qValue, addr )
+                  | * :
+               ]
+               .tPushAddrGlobal oEmitInt( addr )
+               oTypeSPush( StrLitType )
+               % This seems unlikely, but the strlit may be followed by
+               % array indexing.  Handle this the same way we would with a variable expression (see VarExpr)
+               % First, advance the pointer by index if any
+               @LValueIndexes
+               % get final value of dereferencing, if any
+               @FetchVar
+
+            | nGlobalVar, nLocalVar, nParam, nTypedConst :
+               @VarExpr( decl )
+
+            | nTypeDecl :
+               % A type name.
+               % This is normally a type cast.
+               % Or, if Expr is running within sizeof(), we do also allow type names as primaries.
+               oTypeSPush( oNodeGet( decl, qType ) )
+               [
+                  | '(' : 
+                     % Type cast
+                     @Expr
+                     ')'
+                     @CastType
+
+                     % The expression can be further modified after the typecast.
+                     % This is taken from VarExpr.  Try to consolidate.
+
+                     [ oTypeSNodeType
+                        | nPointerType, nUniversalPointerType :
+                           [
+                              | '^' :             % dereferenced
+                                 oTypeSPop
+                                 oTypeSPush( oNodeGet( theType, qBaseType ) )
+                                 @LValueIndexes
+                                 @FetchVar
+                              | '[' :             % dereferencing pointer like an array [0..] of baseType
+                                 @PointerArraySubscript
+                                 % modify addr for any subsequent subscripts, field references, etc
+                                 @LValueIndexes
+                                 @FetchVar
+                              | * :               % just ptr value alone
+                           ]
+
+                        | nArrayType, nRecordType, nShortStringType :
+                           % So far we would have the addr of the compound value.
+                           % Modify addr for subscripts, field references, etc
+                           @LValueIndexes
+                           % get final value, if no longer compound
+                           @FetchVar
+
+                        | *:
+                     ]
+
+                  | * :
+                     % Not a type cast
+                     % A raw typename is only allowed in expressions within sizeof
+                     [ flagExprAllowTypeName
+                        | true :
+                           % The value we produce is bogus.  The caller will discard all code.
+                           % Only the type stack matters.
+                           .tPushConstI  oEmitInt( 0 )
+                        | * :    #eTypeNameNotAllowedHere
+                     ]
+               ]
+
+            | * :
+               #eNotValue
+               oTypeSPush( IntegerType )
+         ]
+
+      | '@' :        % @var -- pointer to var
+         pIdent
+
+         Node decl = oScopeFindRequire
+         @ResolveUnitRef( decl )
+         Node theType
+
+         % writeable is false because we're not on the left hand side of an assignment,
+         % or passing into a var parameter.  So it's ok to take the address of a typed const.
+         @LValueFromDecl( decl, false )
+
+         % The above leaves the pointed-to type on type stack.
+         % Replace with ptr-to-<type>.
+         theType = oTypeSTop
+         oTypeSPop
+         Node ptrType = @PointerTypeTo( theType )
+         oTypeSPush( ptrType )
+
+      | * :
+         #eNotValue
+         oTypeSPush( IntegerType )
+   ];
+
+
+% Parse a variable expression, given the declaration of the
+% just-accepted identifier.
+% Leaves the value on the expression stack, and type on the type stack.
+%
+VarExpr( Node decl ):
+   Node theType = oNodeGet( decl, qType )
+   % how many levels up the static scope? Will ignore for globals.
+   int uplevels = @DeclUpLevels( decl )
+
+   oTypeSPush( theType )
+   [ oTypeSNodeType
+      | nIntegerType, nEnumType :
+         [ oNodeType( decl )
+            | nGlobalVar, nTypedConst :   .tPushGlobalI  @EmitValue( decl )
+            | nLocalVar :
+               [ equal_zero( uplevels )
+                  | true :  .tPushLocalI  @EmitValue( decl )
+                  | * :     .tPushUpLocalI  oEmitInt( uplevels )  @EmitValue( decl )
+               ]
+            | nParam :
+               [ oNodeGetBoolean( decl, qInOut )
+                  | true :    % VAR param points to the var.  Auto dereference.
+                     [ equal_zero( uplevels )
+                        | true :  .tPushParamP  @EmitValue( decl )
+                        | * :     .tPushUpParamP  oEmitInt( uplevels )  @EmitValue( decl )
+                     ]
+                     .tFetchI
+                  | * :
+                     [ equal_zero( uplevels )
+                        | true :  .tPushParamI  @EmitValue( decl )
+                        | * :     .tPushUpParamI  oEmitInt( uplevels )  @EmitValue( decl )
+                     ]
+               ]
+         ]
+
+      | nBooleanType, nByteType, nCharType :
+         [ oNodeType( decl )
+            | nGlobalVar, nTypedConst :   .tPushGlobalB  @EmitValue( decl )
+            | nLocalVar :
+               [ equal_zero( uplevels )
+                  | true :  .tPushLocalB  @EmitValue( decl )
+                  | * :     .tPushUpLocalB  oEmitInt( uplevels )  @EmitValue( decl )
+               ]
+            | nParam :
+               [ oNodeGetBoolean( decl, qInOut )
+                  | true :    % VAR param points to the var.  Auto dereference.
+                     [ equal_zero( uplevels )
+                        | true :  .tPushParamP  @EmitValue( decl )
+                        | * :     .tPushUpParamP  oEmitInt( uplevels )  @EmitValue( decl )
+                     ]
+                     .tFetchB
+                  | * :
+                     [ equal_zero( uplevels )
+                        | true :  .tPushParamB  @EmitValue( decl )
+                        | * :     .tPushUpParamB  oEmitInt( uplevels )  @EmitValue( decl )
+                     ]
+               ]
+         ]
+
+      | nFileType :
+         #eNotImplemented
+
+      | nDoubleType :
+         [ oNodeType( decl )
+            | nGlobalVar, nTypedConst :   .tPushGlobalD  @EmitValue( decl )
+            | nLocalVar :
+               [ equal_zero( uplevels )
+                  | true :  .tPushLocalD  @EmitValue( decl )
+                  | * :     .tPushUpLocalD  oEmitInt( uplevels )  @EmitValue( decl )
+               ]
+            | nParam :
+               [ oNodeGetBoolean( decl, qInOut )
+                  | true :    % VAR param points to the var.  Auto dereference.
+                     [ equal_zero( uplevels )
+                        | true :  .tPushParamP  @EmitValue( decl )
+                        | * :     .tPushUpParamP  oEmitInt( uplevels )  @EmitValue( decl )
+                     ]
+                     .tFetchD
+                  | * :
+                     [ equal_zero( uplevels )
+                        | true :  .tPushParamD  @EmitValue( decl )
+                        | * :     .tPushUpParamD  oEmitInt( uplevels )  @EmitValue( decl )
+                     ]
+               ]
+         ]
+
+      | nPointerType, nUniversalPointerType :
+         [ oNodeType( decl )
+            | nGlobalVar, nTypedConst :   .tPushGlobalP @EmitValue( decl )
+            | nLocalVar :
+               [ equal_zero( uplevels )
+                  | true :  .tPushLocalP  @EmitValue( decl )
+                  | * :     .tPushUpLocalP  oEmitInt( uplevels )  @EmitValue( decl )
+               ]
+            | nParam :
+               [ oNodeGetBoolean( decl, qInOut )
+                  | true :    % VAR param points to the var.  Auto dereference.
+                     [ equal_zero( uplevels )
+                        | true :  .tPushParamP  @EmitValue( decl )
+                        | * :     .tPushUpParamP  oEmitInt( uplevels )  @EmitValue( decl )
+                     ]
+                     .tFetchP
+                  | * :
+                     [ equal_zero( uplevels )
+                        | true :  .tPushParamP  @EmitValue( decl )
+                        | * :     .tPushUpParamP  oEmitInt( uplevels )  @EmitValue( decl )
+                     ]
+               ]               
+         ]
+         [
+            | '^' :             % dereferenced
+               oTypeSPop
+               oTypeSPush( oNodeGet( theType, qBaseType ) )
+               @LValueIndexes
+               @FetchVar
+            | '[' :             % dereferencing pointer like an array [0..] of baseType
+               @PointerArraySubscript
+               % modify addr for any subsequent subscripts, field references, etc
+               @LValueIndexes
+               @FetchVar
+            | * :               % just ptr value alone
+         ]
+
+      | nArrayType, nRecordType, nShortStringType :
+         % compound type
+         % first, push addr of start of var
+         [ oNodeType( decl )
+            | nGlobalVar, nTypedConst :   .tPushAddrGlobal @EmitValue( decl )
+            | nLocalVar :
+               [ equal_zero( uplevels )
+                  | true :  .tPushAddrLocal  @EmitValue( decl )
+                  | * :     .tPushAddrUpLocal  oEmitInt( uplevels )  @EmitValue( decl )
+               ]
+            | nParam :
+               [ oNodeGetBoolean( decl, qInOut )
+                  | true :    % VAR param points to the var.  Auto dereference.
+                     [ equal_zero( uplevels )
+                        | true :  .tPushParamP  @EmitValue( decl )
+                        | * :     .tPushUpParamP  oEmitInt( uplevels )  @EmitValue( decl )
+                     ]
+                  | * :
+                     [ equal_zero( uplevels )
+                        | true :  .tPushAddrParam  @EmitValue( decl )
+                        | * :     .tPushAddrUpParam  oEmitInt( uplevels )  @EmitValue( decl )
+                     ]
+               ]
+         ]
+         % modify addr for subscripts, field references, etc
+         @LValueIndexes
+         % get final value
+         @FetchVar
+   ];
+
+
+% Addr of start of var is on expr stack; type is on type stack.
+% Replace expr stack with value of var.
+% (In the case of compound vars, this remains as the addr of the var).
+
+FetchVar:
+   [ oTypeSNodeType
+      | nIntegerType, nEnumType :  .tFetchI
+      | nBooleanType, nByteType, nCharType :  .tFetchB
+      | nDoubleType :              .tFetchD
+      | nFileType :   #eNotImplemented
+      | nPointerType :             .tFetchP
+      | nUniversalPointerType :    #eCantDereference
+      | nArrayType, nRecordType, nStrLitType, nShortStringType :  % compound type; leave as addr
+   ];
+
+
+% Addr of start of var is already on run stack, and type is on type stack.
+% Read subscripts, record fields, etc, to get final addr on run stack, and final type
+% on type stack.
+
+LValueIndexes:
+   {[
+      | '[' :
+         [ oTypeSNodeType
+            | nArrayType :    @ArraySubscripts
+            | nPointerType :  @PointerArraySubscript
+            | nStrLitType, nShortStringType :  @ShortStringArraySubscript
+            | * :             #eNotArray
+         ]
+      | '.' :       @RecordFieldRef
+      | '^' :       @PointerDeref   % TO DO: I suspect I don't have logic right here
+                                    % about precondition and using .tFetchP
+                                    % Ideally this should take over for the ^ in VarExpr too.
+      | * :         >
+   ]};
+
+
+ArraySubscripts:
+   [ oTypeSNodeType
+      | nArrayType :
+      | * :       #eNotArray
+   ]
+   {
+      [ oTypeSNodeType
+         | nArrayType :
+         | * :    #eTooManySubscripts
+      ]
+
+      % low subscript of this dimension
+      int low = @OrdinalLow( oNodeGet( oTypeSTop, qIndexType ) )
+
+      % replace type stack with next dimension, or OF type
+      Node baseType
+      baseType = oNodeGet( oTypeSTop, qBaseType )
+      oTypeSPop
+      oTypeSPush( baseType )
+
+      @Expr
+      @RequireIntPop
+      % adjust for low subscript
+      [ equal_zero( low )
+         | false :
+            .tPushConstI oEmitInt( low ) .tSubI
+         | * :
+      ]
+
+      % multiply by element size
+      int size = oNodeGetInt( baseType, qSize )
+      [ equal( size, 1 )
+         | false :
+            .tPushConstI oEmitInt( size ) .tMultI
+         | * :
+      ]
+
+      % update start address
+      .tAddPI
+      [
+         | ']' :  >
+         | ',' :
+      ]
+   };
+
+
+% pointer[index] - similar to array[index] where index counts from 0.
+% On entry, the pointer value is on the stack, and pointer type is on the type stack.
+% We've already accepted the '['.
+% On exit, the address of the pointed-to element is on the stack,
+% and the element type is on the type stack.
+%
+PointerArraySubscript:
+   [ oTypeSNodeType
+      | nPointerType :
+      | * :    #eCantDereference
+   ]
+   % replace type stack with base type
+   Node baseType = oNodeGet( oTypeSTop, qBaseType )
+   oTypeSPop
+   oTypeSPush( baseType )
+   
+   @Expr
+   @RequireIntPop
+   % multiply by element size
+   int size = oNodeGetInt( baseType, qSize )
+   [ equal( size, 1 )
+      | false :
+         .tPushConstI  oEmitInt( size )  .tMultI
+      | * :
+   ]
+   % update start address
+   .tAddPI
+   ']';
+
+
+% Specialization of array indexing for ShortString.
+% We treat the starting index as 0 so that str[1] sees the first string char,
+% past the length byte.
+%
+ShortStringArraySubscript:
+   [ oTypeSNodeType
+      | nStrLitType, nShortStringType :
+      | * :    #eCantDereference
+   ]
+   oTypeSPop
+   oTypeSPush( CharType )
+   @Expr
+   @RequireIntPop
+   .tAddPI
+   ']';
+
+
+RecordFieldRef:
+   [ oTypeSNodeType
+      | nRecordType :
+      | * :    #eNotRecord
+   ]
+   oScopeEnter( oNodeGet( oTypeSTop, qScope ) )
+   pIdent
+   Node field = oScopeFindRequire
+   % oScopeFind searches all open scopes, so make sure we found nRecordField
+   % which could only be seen in the local scope we entered above.
+   [ oNodeType( field )
+      | nRecordField :
+      | * :   #eNotRecordField
+   ]
+   oScopeEnd
+   int offset = oNodeGetInt( field, qValue )
+   [ equal_zero( offset )
+      | false :
+         .tPushConstI oEmitInt( offset ) .tAddPI
+      | * :
+   ]
+
+   % replace the type on the type stack, with the field type
+   oTypeSPop
+   oTypeSPush( oNodeGet( field, qType ) )
+   ;
+
+
+% On entry, expr stack has ptr, and integer index above it.
+% The type stack has just the pointer type.
+% Pop those, and push the ptr advanced to that index
+% (scaled by the pointed-to element size).
+% Leaves the pointer type on the type stack.
+%
+PointerAddition:
+   Node elementType = oNodeGet( oTypeSTop, qBaseType )
+   int elementSize = oNodeGetInt( elementType, qSize )
+   [ equal( elementSize, 1 )
+      | false :
+         .tPushConstI  oEmitInt( elementSize )
+         .tMultI
+      | * :
+   ]
+   .tAddPI
+   ;
+
+
+% On entry, expr stack has ptr, and integer above it.
+% The type stack has just the pointer type.
+% Pop those, and push the ptr decremented by that integer
+% (scaled by the pointed-to element size).
+% Leaves the pointer type on the type stack.
+%
+PointerSubInt:
+   Node elementType = oNodeGet( oTypeSTop, qBaseType )
+   int elementSize = oNodeGetInt( elementType, qSize )
+   [ equal( elementSize, 1 )
+      | false :
+         .tPushConstI  oEmitInt( elementSize )
+         .tMultI
+      | * :
+   ]
+   .tSubPI
+   ;
+
+
+% On entry, expr stack has two pointers, P1 and P2 above it.
+% The type stack has the type of P1.  (The type of P2 was already matched to P1.)
+% Replace the pointers on the expression stack with P1 - P2, scaled by the
+% pointed-to element size.  Type stack switched to integer.
+% 
+PointerSubPointer:
+   .tSubP
+   Node elementType = oNodeGet( oTypeSTop, qBaseType )
+   int elementSize = oNodeGetInt( elementType, qSize )
+   [ equal( elementSize, 1 )
+      | false :
+         .tPushConstI  oEmitInt( elementSize )
+         .tDivI
+      | * :
+   ]
+   oTypeSPop
+   oTypeSPush( IntegerType )
+   ;
+
+% ptr deref on left side, i.e. BEFORE addr of ptr var is on stack,
+%                              AFTER addr of thing pointed to is on stack
+PointerDeref:
+   [ oTypeSNodeType
+      | nPointerType :
+      | nUniversalPointerType :   #eCantDereference
+      | * :       #eNotPointer
+   ]
+   .tFetchP           % now addr on stack is addr of what we're pointing to
+
+   Node theType = oTypeSTop
+   oTypeSPop
+   oTypeSPush( oNodeGet( theType, qBaseType ) )
+   ;
+
+
+% The expr stack contains a value whose type is on top of the type stack.
+% Generate code to coerce the value to the type under it in the type stack
+% (pop the type stack, leaving only the desired type).
+% This is used for assignment.
+%
+CoerceType:
+   node_type nt = oTypeSNodeType
+   Node given = oTypeSTop
+   oTypeSPop
+   [ equal_node_type( nt, oTypeSNodeType )
+      | false :
+         % Can we implicitly convert the value to the desired type?
+         [ oTypeSNodeType
+            | nIntegerType :
+               [ nt
+                  | nByteType :   .tCastBtoI  >>
+                  | * :
+               ]
+            | nByteType :
+               [ nt
+                  | nIntegerType :   .tCastItoB  >>
+                  | * :
+               ]
+            | nDoubleType :
+               [ nt
+                  | nIntegerType :   .tCastItoD  >>
+                  | * :
+               ]
+            | nPointerType :
+               [ nt
+                  | nUniversalPointerType :  >>
+                  | nStrLitType :
+                     [ equal_node( oTypeSTop, PCharType )
+                        | true :
+                           % PChar := 'strlit' i.e. point at strlit[1]
+                           .tPushConstI  oEmitInt(1)  .tAddPI  >>
+                        | * :
+                     ]
+                  | * :
+               ]
+            | nUniversalPointerType :
+               [ nt
+                  | nPointerType :  >>
+                  | * :
+               ]
+            | nShortStringType :
+               [ nt
+                  | nStrLitType :  >>
+                  | nCharType :
+                     % Store char as a temp ShortString.
+                     oTypeSPush( CharType )
+                     int tempOffset = @MoveIntoTempShortString
+                     oTypeSPop
+                     >>
+                  | * :
+               ]
+            | * :
+         ]
+         #eTypeMismatch
+      | * :
+   ];
+
+
+% The expr stack contains two values, and their two types are on the type stack.
+% Typically these are two arguments of an operator; the key is that both types are flexible
+% (unlike CoerceType, where only the top type is flexible).
+% Coerce one type to match the other.  Generally the smaller type is coerced to the larger.  
+% Leave both values on the expr stack, and the single common type on the type stack. 
+%
+CoerceTypePair:
+   node_type right_nt = oTypeSNodeType
+   Node right = oTypeSTop
+   oTypeSPop
+   node_type left_nt = oTypeSNodeType
+   Node left = oTypeSTop
+
+   % Start with assumption that we'll keep left type
+   [ equal_node_type( left_nt, right_nt )
+      | true :
+         % TO DO: BUG: in some cases, need to validate base types match (e.g. enum types, ptr types)
+         >>
+      | * :
+   ]
+   [ left_nt
+      | nIntegerType :
+         [ right_nt
+            | nByteType :     .tCastBtoI  >>
+            | * :
+         ]
+      | nDoubleType :
+         [ right_nt
+            | nByteType :     .tCastBtoI  .tCastItoD  >>
+            | nIntegerType :  .tCastItoD  >>
+            | * :
+         ]
+      | nPointerType :
+         [ right_nt
+            | nUniversalPointerType :   >>
+            | * :
+         ]
+      | nShortStringType :
+         [ right_nt
+            | nStrLitType :  >>
+            | nCharType :
+               % Store char as a temp ShortString
+               oTypeSPush( CharType )
+               int tempOffset = @MoveIntoTempShortString
+               oTypeSPop
+               >>
+            | * :
+         ]
+      | * :
+   ]  
+
+   % See if we can coerce left to right type.
+   % If so remember we need to replace the type on the type stack.
+   [ right_nt
+      | nIntegerType :
+         [ left_nt
+            | nByteType :
+               .tSwap  .tCastBtoI  .tSwap
+               oTypeSPop  oTypeSPush( right )
+               >>
+            | * :
+         ]
+      | nDoubleType :
+         [ left_nt
+            | nByteType :
+               .tSwap  .tCastBtoI  .tCastItoD  .tSwap
+               oTypeSPop  oTypeSPush( right )
+               >>
+            | nIntegerType :
+               .tSwap  .tCastItoD  .tSwap
+               oTypeSPop  oTypeSPush( right )
+               >>
+            | * :
+         ]
+      | nPointerType :
+         [ left_nt
+            | nUniversalPointerType :
+               % TO DO: does fpc inherit right type here?
+               %  or stay with left.
+               oTypeSPop  oTypeSPush( right )
+               >>
+            | * :
+         ]
+      | nShortStringType :
+         [ left_nt
+            | nStrLitType :
+               oTypeSPop  oTypeSPush( right )
+               >>
+            | nCharType :
+               .tSwap
+               % Store char as a temp ShortString
+               oTypeSPush( CharType )
+               int tempOffset = @MoveIntoTempShortString
+               oTypeSPop
+               .tSwap
+               oTypeSPop  oTypeSPush( right )
+               >>
+            | * :
+         ]
+      | * :
+   ]
+   #eTypeMismatch
+   ;
+
+
+% The expr stack contains a value whose type is on top of the type stack.
+% Generate code to cast the value to the type under it in the type stack
+% (pop the type stack, leaving only the desired type).
+%
+% This is stronger than CoerceType, since it isn't limited to implicit conversions.
+% There are still going to be limits on what is allowed though.
+%
+CastType:
+   node_type nt = oTypeSNodeType
+   oTypeSPop
+   [ equal_node_type( nt, oTypeSNodeType )
+      | false :
+         % Can we cast the value to the desired type?
+         [ oTypeSNodeType
+            | nIntegerType, nEnumType :
+               [ nt
+                  | nByteType, nCharType, nBooleanType :   .tCastBtoI  >>
+                  | nIntegerType, nEnumType :   >>
+                  | * :
+               ]
+            | nByteType, nCharType, nBooleanType :
+               [ nt
+                  | nByteType, nCharType, nBooleanType :   >>
+                  | nIntegerType, nEnumType :   .tCastItoB  >>
+                  | * :
+               ]
+            | nPointerType :
+               [ nt
+                  | nUniversalPointerType :  >>
+                  | nStrLitType :
+                     [ equal_node( oTypeSTop, PCharType )
+                        | true :
+                           % PChar := 'strlit' i.e. point at strlit[1]
+                           .tPushConstI  oEmitInt(1)  .tAddPI  >>
+                        | * :
+                     ]
+                  | * :
+               ]
+            | nUniversalPointerType :
+               [ nt
+                  | nPointerType :  >>
+                  | * :
+               ]
+            | nShortStringType :
+               [ nt
+                  | nStrLitType :  >>
+                  | nCharType :
+                     % Store char as a temp ShortString.
+                     oTypeSPush( CharType )
+                     int tempOffset = @MoveIntoTempShortString
+                     oTypeSPop
+                     >>
+                  | * :
+               ]
+            | * :
+         ]
+         #eTypeMismatch
+      | * :
+   ];
+
+
+% Require that the top two types on the type stack are matching (ignoring subranges).
+% Pop one of them, leaving only one.
+%
+% This is used when passing a variable to a VAR parameter, so essentially no coercion
+% can be allowed.  The called method will interact with the actual variable using the
+% formal parameter type, so they must agree.
+%
+% TO DO: BUG: I'm not confirming that enum types are the same type!
+%     Only that they are both enums!
+%     Probably same flaw with record & array types.
+%     Not enough to compare only the node type.
+%
+MatchTypes:
+   node_type nt = oTypeSNodeType
+   oTypeSPop
+   [ equal_node_type( nt, oTypeSNodeType )
+      | false :
+         % Some very minor implicit conversion is allowed even here,
+         % but must not affect the value size.
+         [ oTypeSNodeType
+            | nPointerType :
+               [ nt
+                  | nUniversalPointerType :  >>
+                  | * :
+               ]
+            | nUniversalPointerType :
+               [ nt
+                  | nPointerType :  >>
+                  | * :
+               ]
+            | * :
+         ]
+         #eTypeMismatch
+      | * :
+   ];
+
+
+% Require that the top type on the type stack is integer (ignoring subranges).
+% Pop it.
+%
+RequireIntPop:
+   [ oTypeSNodeType
+      | nIntegerType :
+      | * :          #eNotInteger
+   ]
+   oTypeSPop;
+
+RequireInt:
+   [ oTypeSNodeType
+      | nIntegerType :
+      | * :          #eNotInteger
+   ];
+
+
+% Convert the top value to integer (if it isn't already).
+% It must be implicitly convertable to integer.
+% Pop the type stack.
+%
+PromoteToIntPop:
+   [ oTypeSNodeType
+      | nIntegerType :
+      | nByteType :        .tCastBtoI
+      | * :                #eNotInteger
+   ]
+   oTypeSPop;
+
+% Convert the top value to integer (if it isn't already).
+% It must be implicitly convertable to integer.
+% Leave integer on the type stack.
+%
+PromoteToInt:
+   [ oTypeSNodeType
+      | nIntegerType :
+      | nByteType :        .tCastBtoI
+                           oTypeSPop
+                           oTypeSPush( IntegerType )
+      | * :                #eNotInteger
+   ];
+
+
+% If the top value is implicitly convertable to integer, do so.
+% Otherwise leave it as-is.
+%
+PromoteToIntOptional:
+   [ oTypeSNodeType
+      | nByteType :        .tCastBtoI
+                           oTypeSPop
+                           oTypeSPush( IntegerType )
+      | * :
+   ];
+
+
+% Convert the top value to double (if it isn't already).
+% It must be implicitly convertable to double.
+% Pop the type stack.
+%
+PromoteToDoublePop:
+   [ oTypeSNodeType
+      | nDoubleType :
+      | nIntegerType :     .tCastItoD
+                           oTypeSPop
+                           oTypeSPush( DoubleType )
+      | nByteType :        .tCastBtoI
+                           .tCastItoD
+                           oTypeSPop
+                           oTypeSPush( DoubleType )
+      | * :                #eNotDouble
+   ]
+   oTypeSPop;
+
+
+RequireBoolPop:
+   [ oTypeSNodeType
+      | nBooleanType :
+      | * :          #eNotBoolean
+   ]
+   oTypeSPop;
+
+RequireBool:
+   [ oTypeSNodeType
+      | nBooleanType :
+      | * :          #eNotBoolean
+   ];
+
+

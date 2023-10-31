@@ -1,0 +1,30 @@
+Pascal Compiler 1.1.5 -- Jan 01 '90
+Including ../mysystem.pas
+Including ./testing.pas
+
+Writing Files...
+Stack Machine - program loaded (733 words)
+TEST: Starting test
+123581321345589
+1FALSE
+2FALSE
+3FALSE
+4FALSE
+5FALSE
+6TRUE
+7TRUE
+8TRUE
+9TRUE
+10TRUE
+1010
+99
+88
+77
+66
+55
+44
+33
+22
+11
+TEST: Finished test
+.Done

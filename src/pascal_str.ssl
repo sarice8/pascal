@@ -1,0 +1,100 @@
+%
+% Pascal Compiler
+%
+
+% ------------------------------ String Operations -----------------------------
+
+
+% Given a ShortString, StrLit, or Char on the expression stack
+% (and type on the type stack).  Move the value into a new temporary ShortString.
+% Leave that temp string and type on the stacks.
+% Also returns the offset of the temp string.
+%
+MoveIntoTempShortString >> int:
+   int tempOffset = oScopeAllocType( ShortStringType )
+   % copy the value
+   [ oTypeSNodeType
+      | nShortStringType, nStrLitType :
+         .tPushAddrLocal  oEmitInt( tempOffset )
+         % put temp addr under value addr
+         .tSwap
+         % TO DO: we could just copy length + 1, but tCopy takes a fixed #bytes
+         .tCopy  oEmitInt( oNodeGetInt( ShortStringType, qSize ) )
+      | nCharType :
+         % temp[0] = 1
+         .tPushAddrLocal  oEmitInt( tempOffset )
+         .tPushConstI  oEmitInt( 1 )
+         .tAssignB
+         % temp[1] = value
+         .tPushAddrLocal  oEmitInt( add( tempOffset, 1 ) )
+         .tSwap
+         .tAssignB
+      | * :   #eTypeMismatch
+   ]
+   oTypeSPop
+   % Leave the temp ShortString on the expr stack and type stack
+   .tPushAddrLocal  oEmitInt( tempOffset )
+   oTypeSPush( ShortStringType )
+   >> tempOffset;
+
+
+% Top of expr stack / type stack is ShortString B.
+% Under it is ShortString A.
+% Change A to append the contents of B to it (truncating if necessary).
+% Removes both A and B from the expr stack / type stack.
+%
+ShortStringAppendShortString:
+   % TO DO: ideally I would do this directly with tcode.  But I think I need some more
+   % enhancements for that to work well.   Meanwhile, generate a call to a method.
+   % For the moment, I'll implement the method in Pascal, in the mysystem unit.
+   .tAllocActuals  oEmitInt( 16 )
+   .tPushAddrActual  oEmitInt( 8 )  .tSwap  .tAssignP
+   .tPushAddrActual  oEmitInt( 0 )  .tSwap  .tAssignP
+   .tCall   @EmitValue( System_ShortStringAppendShortString )
+   % TO DO: Ideally I would leave A on the expr stack / type stack.
+   %  But I can't really do that without dup, which I hesitate to add.
+   %  I'll have the caller push A again themselves.
+   .tFreeActuals  oEmitInt( 16 )
+   oTypeSPop
+   oTypeSPop
+   ;
+
+% Top of expr stack / type stack is Char B.
+% Under it is ShortString A.
+% Change A to append char B to it (truncating if necessary).
+% Removes both A and B from the expr stack / type stack.
+%
+ShortStringAppendChar:
+   % Note at the moment I don't align params
+   .tAllocActuals  oEmitInt( 12 )
+   .tPushAddrActual  oEmitInt( 8 )  .tSwap  .tAssignB
+   .tPushAddrActual  oEmitInt( 0 )  .tSwap  .tAssignP
+   .tCall  @EmitValue( System_ShortStringAppendChar )
+   .tFreeActuals  oEmitInt( 12 )
+   oTypeSPop
+   oTypeSPop
+   ;
+
+% Expr stack has ShortString A, and ShortString B above it.
+% Type stack has just the type of ShortString A.
+% Replaces the expr stack with the integer value of string comparison:
+% -1 if A < B,  0 if A = B,  1 if A > B
+% Leaves Integer on the type stack.
+%
+% TO DO: kind of annoying that we need to hardcode the fact that the called method is cdecl extern.
+%   It would be nicer if that was noted only in the label.
+%   Alternatively, use a utility method in SSL to generate the appropriate call,
+%   given the method decl.
+%
+ShortStringCmp:
+   .tAllocActualsCdecl  oEmitInt( 24 )
+   .tPushAddrActual  oEmitInt( 8 )  .tSwap  .tAssignP
+   .tPushAddrActual  oEmitInt( 0 )  .tSwap  .tAssignP
+   int tempOffset = oScopeAllocType( IntegerType )
+   .tPushAddrActual  oEmitInt( 16 )  .tPushAddrLocal  oEmitInt( tempOffset )  .tAssignP
+   .tCallCdecl  @EmitValue( System_ShortStringCmp )
+   .tPushLocalI  oEmitInt( tempOffset )
+   .tFreeActuals  oEmitInt( 24 )
+   oTypeSPop
+   oTypeSPush( IntegerType )
+   ;

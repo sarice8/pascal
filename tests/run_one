@@ -1,0 +1,121 @@
+#!/bin/bash
+
+# Run one unit test
+#
+# usage:  run_one  [-f] [-i]  <test.pas>
+#   -f : run fpc instead of my compiler
+#   -i : run pascal with -i option (interpret rather than jit)
+#   The .pas suffix is optional
+#
+# If filename contains "*_unit*" it is assumed to be a unit file, and ignored.
+#
+# NOTE: for fpc:
+#  tests that -use- units expect that the unit file was already compiled,
+#  so there are both *.ppu and *.o files existing for those units.
+#  For now I generate those manually (fpc unit_name) and leave the files around.
+#  Should automate that.
+
+# -------------------------------------------------------------------------
+#
+# A testcase should have these files:
+#   name.pas
+#   name.gold     - golden log file
+#   name.gold.fpc - golden log file expected from fpc, which may intentionally differ from my golden log
+#   name.disable  - optional: ignore this test if present
+#
+# -------------------------------------------------------------------------
+
+use_fpc=0
+pas_options=""
+
+if [ "$1" = "-f" ]; then
+  use_fpc=1
+  shift
+fi
+
+if [ "$1" = "-i" ]; then
+  pas_options="$pas_options -i"
+  shift
+fi
+
+file=$1
+
+if [ ! -f "$file" ]; then
+  if [ -f "$file.pas" ]; then
+    file=$file.pas
+  else
+    echo "ERROR: no such file $file"
+    exit 1
+  fi
+fi
+
+# Front end currently needs the .pas suffix stripped
+name=`echo $file | sed 's#\.pas##'`
+
+if [ -f $name.disable ]; then
+  exit 0
+fi
+
+# Skip unit files.  For now this is based on the filename *_unit*.pas
+foo=`echo $name | egrep -s "_unit"`
+if [ $? -eq 0 ]; then
+  #echo "Skipping unit file $name"
+  exit 0
+fi
+
+echo -n "$file	"
+
+if [ $use_fpc -eq 1 ]; then
+  # Consider -Mdelphi  (compatibility mode) which would define integer as longint rather than shortint
+  # But, it brings other language changes e.g. cannot add ^LongInt + shortInt
+  # and since I'm not implementing Delphi, I'm not going to use it for now.
+
+  fpc -otmp.fpc $name >& tmp.log
+  status=$?
+
+  if [ $status -eq 0 ]; then
+    ./tmp.fpc >& tmp.log
+    status=$?
+    rm -f ./tmp.fpc
+    rm -f $name.o
+    # For some reason, the finalization message doesn't get into the redirected log
+    # As a workaround, append it manually
+    echo "TEST: Finished test" >> tmp.log
+  fi
+
+else
+  pas $pas_options $name >& tmp.log
+  status=$?
+fi
+
+# We don't currently allow tests with errors
+if [ $status -ne 0 ]; then
+  echo "ERROR: $file failed to compile"
+  exit 0
+fi
+
+gold=$name.gold
+if [ $use_fpc -eq 1 ]; then
+  if [ -f $name.gold.fpc ]; then
+    gold=$name.gold.fpc
+  fi
+fi
+
+if [ ! -f $gold ]; then
+  echo "INFO: $file has has no golden log"
+  exit 0
+fi
+
+cat tmp.log | awk '/TEST: Starting test/,/TEST: Finished test/' > tmp.log.1
+cat $gold | awk '/TEST: Starting test/,/TEST: Finished test/' > tmp.gold.1
+diff tmp.gold.1 tmp.log.1 > diffs
+status=$?
+
+if [ $status -ne 0 ]; then
+  mv diffs $name.diffs
+  echo "ERROR: bad results.  See $name.diffs"
+else
+  rm diffs
+  echo "PASSED"
+fi
+
