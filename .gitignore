@@ -3,7 +3,7 @@
 # Any file not ignored will be noticed, and reported as "untracked"
 # until it is added to the repository or added to this ignore file.
 
-release/*
+release
 bin-*/
 obj-*/
 .vscode
