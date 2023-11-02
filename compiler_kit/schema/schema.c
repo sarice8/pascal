@@ -991,16 +991,6 @@ print_long ( void* variable, void* udata )
 }
 
 
-/***** FIX THIS.  debug/1.2.8/debug.o calls it. *****/
-void
-nodeDumpTreeNum ( long node_number )
-{
-    Node  N;
-    N = SCH_LookupNode (node_number);
-    DumpNodeLong (N);
-}
-
-
 /*
  *  Scanner
  */

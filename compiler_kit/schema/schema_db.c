@@ -261,6 +261,19 @@ GetValue( Node N, int attr_code )
 }
 
 
+// Get the node id
+//
+long
+NodeNum( Node N )
+{
+    if ( N == NULL ) {
+      return 0;
+    } else {
+      return N->node_num;
+    }
+}
+
+
 void   FreeNode (N, recurse)
 Node             N;
 Boolean1         recurse;
@@ -575,6 +588,30 @@ Item   NullItem ()
     return (NULL);
 }
 
+
+// Given a list (in the listOwner node, as attribute listAttr).
+// Find the Node within the list where findAttr has value findValue.
+// This is a slow linear search.
+// This api was in schema 1.3 but not schema 1.4, so adding here for now.
+// Should replace this lookup with a map.
+//
+Node
+FindValue_NoErrorChecking( Node listOwner, int listAttr, int findAttr, long findValue )
+{
+  List list = (List) GetAttr( listOwner, listAttr );
+  if ( !list ) {
+    return NULL;
+  }
+  for ( Item it = FirstItem( list ); it; it = NextItem( it ) ) {
+    Node node = Value( it );
+    if ( GetValue( node, findAttr ) == findValue ) {
+      return node;
+    }
+  }
+  return NULL;
+}
+
+
 Boolean1   IsEmpty (L)
 List                L;
 {
@@ -721,6 +758,18 @@ Node                N;
     }
 
     indent -= 4;
+}
+
+
+void
+DumpNodeNum( long nodeNum )
+{
+  Node node = SCH_LookupNode( nodeNum );
+  if ( !node ) {
+    printf( "Can't find node %ld\n", nodeNum );
+  } else {
+    DumpNodeLong( node );
+  }
 }
 
 

@@ -577,45 +577,6 @@ createGlobalData( const char* sourceData, int sourceBytes )
 }
 
 
-// Given a list (in the listOwner node, as attribute listAttr).
-// Find the Node within the list where findAttr has value findValue.
-// This is a slow linear search.
-// This api was in schema 1.3 but not schema 1.4, so adding here for now.
-// Should replace this lookup with a map.
-//
-Node
-nodeFindValue_NoErrorChecking( Node listOwner, int listAttr, int findAttr, long findValue )
-{
-  List list = (List) GetAttr( listOwner, listAttr );
-  if ( !list ) {
-    return NULL;
-  }
-  for ( Item it = FirstItem( list ); it; it = NextItem( it ) ) {
-    Node node = Value( it );
-    if ( GetValue( node, findAttr ) == findValue ) {
-      return node;
-    }
-  }
-  return NULL;
-}
-
-// This is a schema method expected by the debugger, that was present in schema 1.3
-// but not schema 1.4.   Partly a placeholder for now, the old one showed the whole subtree.
-//
-extern "C" void nodeDumpTreeNum( long nodeNum );
-
-void
-nodeDumpTreeNum( long nodeNum )
-{
-  Node node = SCH_LookupNode( nodeNum );
-  if ( !node ) {
-    printf( "Can't find node %ld\n", nodeNum );
-  } else {
-    DumpNodeLong( node );
-  }
-}
-
-
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
 
@@ -689,7 +650,7 @@ Node dNode;  // temporary for several mechanisms
             int nodeAttr = ssl_argv(1,4);
             int valueAttr = ssl_argv(2,4);
             long value = ssl_argv(3,4);
-            ssl_result = (long) nodeFindValue_NoErrorChecking (N, nodeAttr, valueAttr, value);
+            ssl_result = (long) FindValue_NoErrorChecking (N, nodeAttr, valueAttr, value);
             continue;
             }
     case oNodeGetIter: {
@@ -976,7 +937,7 @@ Node dNode;  // temporary for several mechanisms
     case oScopeFind:
             for (int dScopeStackLookup = dScopeStackPtr; dScopeStackLookup > 0; dScopeStackLookup--)
             {  
-                dNode = nodeFindValue_NoErrorChecking (dScopeStack[dScopeStackLookup], qDecls, qIdent, ssl_last_id);
+                dNode = FindValue_NoErrorChecking (dScopeStack[dScopeStackLookup], qDecls, qIdent, ssl_last_id);
                 if (dNode != NULL)
                     break;
             }
@@ -985,7 +946,7 @@ Node dNode;  // temporary for several mechanisms
     case oScopeFindRequire:
             for (int dScopeStackLookup = dScopeStackPtr; dScopeStackLookup > 0; dScopeStackLookup--)
             {  
-                dNode = nodeFindValue_NoErrorChecking (dScopeStack[dScopeStackLookup], qDecls, qIdent, ssl_last_id);
+                dNode = FindValue_NoErrorChecking (dScopeStack[dScopeStackLookup], qDecls, qIdent, ssl_last_id);
                 if (dNode != NULL)
                     break;
             }  
@@ -999,12 +960,12 @@ Node dNode;  // temporary for several mechanisms
             continue;
     case oScopeFindInCurrentScope: {
             Node scope = dScopeStack[dScopeStackPtr];
-            dNode = nodeFindValue_NoErrorChecking( scope, qDecls, qIdent, ssl_last_id );
+            dNode = FindValue_NoErrorChecking( scope, qDecls, qIdent, ssl_last_id );
             if ( !dNode ) {
               // Look in a scope we extend, too.  Needed to provide impl for procs in unit interface.
               Node extends = (Node) GetAttr( scope, qExtends );
               if ( extends) {
-                dNode = nodeFindValue_NoErrorChecking( extends, qDecls, qIdent, ssl_last_id );
+                dNode = FindValue_NoErrorChecking( extends, qDecls, qIdent, ssl_last_id );
               }
             }
             ssl_result = (long) dNode;
@@ -1012,12 +973,12 @@ Node dNode;  // temporary for several mechanisms
             }
     case oScopeFindRequireInScope: {
             Node scope = (Node) ssl_param;
-            dNode = nodeFindValue_NoErrorChecking( scope, qDecls, qIdent, ssl_last_id );
+            dNode = FindValue_NoErrorChecking( scope, qDecls, qIdent, ssl_last_id );
             if ( !dNode ) {
               // Look in a scope we extend, too.
               Node extends = (Node) GetAttr( scope, qExtends );
               if ( extends) {
-                dNode = nodeFindValue_NoErrorChecking( extends, qDecls, qIdent, ssl_last_id );
+                dNode = FindValue_NoErrorChecking( extends, qDecls, qIdent, ssl_last_id );
               }
             }
             ssl_result = (long) dNode;

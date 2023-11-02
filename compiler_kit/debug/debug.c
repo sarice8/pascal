@@ -40,7 +40,7 @@ static char sccsid[] = "@(#)debug.c	1.5 4/21/94 13:07:52 /files/home/sim/sarice/
 
 
 // Debugger can dump a node
-#include "node.h"
+#include "schema_db.h"
 
 
 /* ----------------------------------------------------------------------- */
@@ -587,7 +587,7 @@ dbg_command ( char* command )
         if ((argv[1][0] >= '0') && (argv[1][0] <= '9'))
         {
             node_number = atoi(argv[1]);
-            nodeDumpTreeNum (node_number);  /* TO DO, remove from debugger */
+            DumpNodeNum( node_number );  /* TO DO, remove from debugger */
             printf ("_________________________________________________________________________\n");
         }
         else

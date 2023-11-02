@@ -52,13 +52,26 @@ $(BINDIR):
 	mkdir -p $(BINDIR)
 
 
+clean:
+	rm -f $(OBJS)
+
+
+# Bootstrap: build from existing C/C++ files.  Don't use any other tools. 
+#
+bootstrap:
+	make all
+	make release
+
+
 # Release
 
-release:
+release_headers:
 	mkdir -p $(OUR_RELEASE_DIR)
 	cp -p ssl_begin.h $(OUR_RELEASE_DIR)
 	cp -p ssl_end.h   $(OUR_RELEASE_DIR)
 	cp -p ssl_rt.h    $(OUR_RELEASE_DIR)
+
+release: release_headers
 	mkdir -p $(OUR_RELEASE_DIR)/obj-$(OSTYPE)
 	cp -p $(OBJDIR)/ssl_rt.o   $(OUR_RELEASE_DIR)/obj-$(OSTYPE)
 	cp -p $(OBJDIR)/ssl_scan.o $(OUR_RELEASE_DIR)/obj-$(OSTYPE)

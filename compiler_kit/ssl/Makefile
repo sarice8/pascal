@@ -45,8 +45,8 @@ DBG_STUBS      = ${DBG_DIR}/obj-$(OSTYPE)/dbgstub.o
 #     -DDEBUG           -- to integrate with debugger
 #     -TRACE_RECOVERY   -- trace steps in recovery mode
 
-#CFLAGS = -g -Werror -DDEBUG
-CFLAGS = -O3 -Werror -DDEBUG
+CFLAGS = -g -Werror -DDEBUG
+#CFLAGS = -O3 -Werror -DDEBUG
 
 OBJDIR = ./obj-$(OSTYPE)
 BINDIR = ./bin-$(OSTYPE)
@@ -58,7 +58,7 @@ SRCS = \
 OBJS = $(SRCS:%.c=$(OBJDIR)/%.o)
 
 LINK_OBJS = \
-  $(SCHEMA_DIR)/obj-$(OSTYPE)/node.o \
+  $(SCHEMA_DIR)/obj-$(OSTYPE)/schema_db.o \
   $(SSL_RT_DIR)/obj-$(OSTYPE)/ssl_rt.o \
   $(SSL_RT_DIR)/obj-$(OSTYPE)/ssl_scan.o \
 
@@ -70,8 +70,11 @@ DEP = $(ALL_OBJS:%.o=%.d)
 INCLUDE = -I$(SSL_RT_DIR) -I$(DBG_DIR) -I$(SCHEMA_DIR)
 
 
-# Main target
 EXEC = $(BINDIR)/ssl
+
+# Main target
+all:  $(EXEC)
+
 
 # Note:  | $(BINDIR)   means the exec depends on existence of $BINDIR, but its timestamp is irrelevant.
 $(EXEC):  $(OBJS) | $(BINDIR)
@@ -130,11 +133,26 @@ ssl.h:	ssl.ssl
 	mv ram_ssl.dbg ssl.dbg
 
 
+clean:
+	rm -f $(OBJS) $(EXEC)
+
+
+# Bootstrap: build from existing C/C++ files.  Don't use any other tools.
+#
+bootstrap:
+	touch ssl.h
+	touch ssl_schema.c
+	touch ssl_schema.ssl
+	make all
+	make release
+
 
 # Release
 
-release:
+release_headers:
 	mkdir -p $(OUR_RELEASE_DIR)
+
+release: release_headers
 	mkdir -p $(OUR_RELEASE_DIR)/bin-$(OSTYPE)
 	cp -p $(BINDIR)/ssl $(OUR_RELEASE_DIR)/bin-$(OSTYPE)/ssl
 

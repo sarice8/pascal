@@ -65,7 +65,7 @@ static char sccsid[] = "%W% %G% %U% %P%";
 
 
 /*  Schema database access functions  */
-#include "node.h"
+#include "schema_db.h"
 
 
 /*  Optionally integrate SSL debugger */
@@ -127,11 +127,11 @@ char target_title[SSL_STRLIT_SIZE+1];   /* Title of processor being compiled */
 
 
 #define dSSsize 400                        /* SS: scope stack               */
-NODE_PTR       dSS[dSSsize];
+Node           dSS[dSSsize];
 int            dSSptr;
 int            dSSlookup;     /* for lookup in scope stack */
 
-NODE_PTR       dGlobalScope;  /* Global nScope (only set at end of parsing) */
+Node           dGlobalScope;  /* Global nScope (only set at end of parsing) */
 
 
 /*  Table of string aliases for declarations  */
@@ -139,7 +139,7 @@ NODE_PTR       dGlobalScope;  /* Global nScope (only set at end of parsing) */
 #define dStrTableSize 10000
 struct dStrTableType {
   char      *buffer;                   /* text is stored in separately allocated memory */
-  NODE_PTR   decl_ptr;                 /* associated nDeclaration node */
+  Node       decl_ptr;                 /* associated nDeclaration node */
 } dStrTable[dStrTableSize];
 int dStrTableNext;
 
@@ -209,7 +209,7 @@ void w_optimize_table();
 void w_dump_tables();
 void dump_debug_symbols();
 void list_generated_code ();
-void set_global_scope ( NODE_PTR scope_ptr );
+void set_global_scope ( Node scope_ptr );
 
 /*  Callbacks  */
 void my_listing_function( char* source_line, int token_accepted );
@@ -491,7 +491,7 @@ init_my_operations()
     w_here = 0;
 
     /* Initialize node package (schema runtime module) */
-    nodeInit();
+    SCH_Init();
 
     dSSptr = 0;
     dGlobalScope = NULL;
@@ -523,7 +523,7 @@ install_system_operations ( long* next_operation )
 {
     int        id;
     int        index;
-    NODE_PTR   node_ptr;
+    Node       node_ptr;
 
     /* This list must match the list of output tokens defined in ssl.ssl
        with the exception of token values that are not emitted in final
@@ -564,10 +564,10 @@ install_system_operations ( long* next_operation )
     {
         id = ssl_add_id (system_operations[index], pIdent);
 
-        node_ptr = nodeNew (nOperation);
-        nodeSetValue (node_ptr, qIdent, id);
-        nodeSetValue (node_ptr, qValue, (*next_operation)++);
-        nodeAppend (dSS[dSSptr], qDecls, node_ptr);
+        node_ptr = NewNode( nOperation );
+        SetValue( node_ptr, qIdent, id );
+        SetValue( node_ptr, qValue, (*next_operation)++ );
+        NodeAddLast( dSS[dSSptr], qDecls, node_ptr );
     }
 }
 
@@ -576,21 +576,21 @@ install_system_operations ( long* next_operation )
    eventually.  */
 
 void
-install_system_types ( NODE_PTR* int_type, NODE_PTR* token_type )
+install_system_types ( Node* int_type, Node* token_type )
 {
     int        id;
-    NODE_PTR   node_ptr;
+    Node       node_ptr;
 
     id = ssl_add_id ("int", pIdent);
-    node_ptr = nodeNew (nType);
-    nodeSetValue (node_ptr, qIdent, id);
-    nodeAppend (dSS[dSSptr], qDecls, node_ptr);
+    node_ptr = NewNode( nType );
+    SetValue( node_ptr, qIdent, id );
+    NodeAddLast( dSS[dSSptr], qDecls, node_ptr );
     *int_type = node_ptr;
 
     id = ssl_add_id ("token", pIdent);
-    node_ptr = nodeNew (nType);
-    nodeSetValue (node_ptr, qIdent, id);
-    nodeAppend (dSS[dSSptr], qDecls, node_ptr);
+    node_ptr = NewNode( nType );
+    SetValue( node_ptr, qIdent, id );
+    NodeAddLast( dSS[dSSptr], qDecls, node_ptr );
     *token_type = node_ptr;
 
 }
@@ -598,7 +598,7 @@ install_system_types ( NODE_PTR* int_type, NODE_PTR* token_type )
 /* ----------------------------------------------------------------------- */
 /* ----------------------------------------------------------------------- */
 
-NODE_PTR dNode;
+Node     dNode;
 int      dTemp;                            /* multi-purpose */
 
 
@@ -705,7 +705,7 @@ int      dTemp;                            /* multi-purpose */
             if (dStrTableNext==dStrTableSize)
                 ssl_fatal("String table overflow");
             dStrTable[dStrTableNext].buffer = strdup(ssl_strlit_buffer);
-            dStrTable[dStrTableNext++].decl_ptr = (NODE_PTR)ssl_param;
+            dStrTable[dStrTableNext++].decl_ptr = (Node)ssl_param;
             continue;
     case oShortFormLookup :
             dNode = NULL;
@@ -772,12 +772,11 @@ int      dTemp;                            /* multi-purpose */
             /* Find identifier 'dTemp' in scope */
             for (dSSlookup = dSSptr; dSSlookup > 0; dSSlookup--)
             {  
-                dNode = nodeFindValue_NoErrorChecking (dSS[dSSlookup], qDecls, qIdent, dTemp);
+                dNode = FindValue_NoErrorChecking (dSS[dSSlookup], qDecls, qIdent, dTemp);
                 if (dNode != NULL)
                     break;
             }  
-            w_outTable[dPS[ssl_param].stack[dPS[ssl_param].ptr--]] =
-                    nodeGetValue (dNode, qValue);
+            w_outTable[dPS[ssl_param].stack[dPS[ssl_param].ptr--]] = GetValue( dNode, qValue );
             continue;
 
 
@@ -806,30 +805,55 @@ int      dTemp;                            /* multi-purpose */
     /* mechanism Node */
 
     case oNodeNew:      /* (node_type) -- create node */
-            ssl_result = (long) nodeNew (ssl_param);
+            ssl_result = (long) NewNode( ssl_param );
             continue;
     case oNodeSet:
-            nodeLink ((NODE_PTR)ssl_argv(0,3), ssl_argv(1,3), (NODE_PTR)ssl_argv(2,3));
+            SetAttr( (Node)ssl_argv(0,3), ssl_argv(1,3), (Node)ssl_argv(2,3) );
             continue;
     case oNodeSetInt:
     case oNodeSetBoolean:
-            nodeSetValue ((NODE_PTR)ssl_argv(0,3), ssl_argv(1,3), ssl_argv(2,3));
+            SetValue( (Node)ssl_argv(0,3), ssl_argv(1,3), ssl_argv(2,3) );
             continue;
     case oNodeGet:
-            ssl_result = (long) nodeGet ((NODE_PTR)ssl_argv(0,2), ssl_argv(1,2));
+            ssl_result = (long) GetAttr( (Node)ssl_argv(0,2), ssl_argv(1,2) );
             continue;
     case oNodeGetInt:
     case oNodeGetBoolean:
-            ssl_result = (long) nodeGetValue ((NODE_PTR)ssl_argv(0,2), ssl_argv(1,2));
+            ssl_result = (long) GetValue( (Node)ssl_argv(0,2), ssl_argv(1,2) );
             continue;
     case oNodeNull:
-            ssl_result = ((NODE_PTR)ssl_param == NULL);
+            ssl_result = ((Node)ssl_param == NULL);
             continue;
-    case oNodeNext:
-            ssl_var_stack[ssl_param] = (long) nodeNext((NODE_PTR)ssl_var_stack[ssl_param]);
+
+    case oNodeGetIter: {
+            List list = (List) GetAttr( (Node)ssl_argv(0,2), ssl_argv(1,2) );
+            if ( !list ) {
+              ssl_result = 0;
+            } else {
+              ssl_result = (long) FirstItem( list );
+            }
             continue;
+            }
+    case oNodeIterValue: {
+            Item item = (Item)ssl_param;
+            if ( item == NULL ) {
+              ssl_result = 0;
+            } else {
+              ssl_result = (long) Value( item );
+            }
+            continue;
+            }
+    case oNodeIterNext: {
+            Item item = (Item) ssl_var_stack[ssl_param];
+            if ( item != NULL ) {
+              item = NextItem( item );
+              ssl_var_stack[ssl_param] = (long) item;
+            }
+            continue;
+            }
+
     case oNodeType:
-            ssl_result = nodeType((NODE_PTR)ssl_param);
+            ssl_result = Kind( (Node)ssl_param );
             continue;
     case oNodeEqual:
             ssl_result = (ssl_argv(0,2) == ssl_argv(1,2));
@@ -839,16 +863,16 @@ int      dTemp;                            /* multi-purpose */
     /* mechanism Scope */
 
     case oScopeBegin:
-            dNode = nodeNew (nScope);
+            dNode = NewNode( nScope );
             if (dSSptr > 0)
-                nodeLink (dNode, qParentScope, dSS[dSSptr]);
+                SetAttr( dNode, qParentScope, dSS[dSSptr] );
             ssl_var_stack[ssl_param] = (long) dNode;
             if (++dSSptr == dSSsize) ssl_fatal ("SS overflow");
             dSS[dSSptr] = dNode;
             continue;
     case oScopeOpen:
             if (++dSSptr == dSSsize) ssl_fatal ("SS overflow");
-            dSS[dSSptr] = (NODE_PTR) ssl_param;
+            dSS[dSSptr] = (Node) ssl_param;
             continue;
     case oScopeEnd:
             ssl_assert (dSSptr >= 1);
@@ -856,12 +880,12 @@ int      dTemp;                            /* multi-purpose */
             continue;
     case oScopeDeclare:
             ssl_assert (dSSptr >= 1);
-            nodeAppend (dSS[dSSptr], qDecls, (NODE_PTR)ssl_param);
+            NodeAddLast( dSS[dSSptr], qDecls, (Node)ssl_param );
             continue;
     case oScopeFind:
             for (dSSlookup = dSSptr; dSSlookup > 0; dSSlookup--)
             {  
-                dNode = nodeFindValue_NoErrorChecking (dSS[dSSlookup], qDecls, qIdent, ssl_last_id);
+                dNode = FindValue_NoErrorChecking( dSS[dSSlookup], qDecls, qIdent, ssl_last_id );
                 if (dNode != NULL)
                     break;
             }
@@ -869,14 +893,14 @@ int      dTemp;                            /* multi-purpose */
             ssl_result = (dNode != NULL);
             continue;
     case oScopeFindInCurrentScope: {
-                dNode = nodeFindValue_NoErrorChecking( dSS[dSSptr], qDecls, qIdent, ssl_last_id );
+                dNode = FindValue_NoErrorChecking( dSS[dSSptr], qDecls, qIdent, ssl_last_id );
                 ssl_result = (long) dNode;
             }
             continue;
     case oScopeFindRequire:
             for (dSSlookup = dSSptr; dSSlookup > 0; dSSlookup--)
             {  
-                dNode = nodeFindValue_NoErrorChecking (dSS[dSSlookup], qDecls, qIdent, ssl_last_id);
+                dNode = FindValue_NoErrorChecking( dSS[dSSlookup], qDecls, qIdent, ssl_last_id );
                 if (dNode != NULL)
                     break;
             }  
@@ -896,15 +920,15 @@ int      dTemp;                            /* multi-purpose */
             install_system_operations (&ssl_var_stack[ssl_param]);
             continue;
     case oInstallSystemTypes:
-            install_system_types ((NODE_PTR*)&(ssl_var_stack[ssl_argv(0,2)]),
-                                  (NODE_PTR*)&(ssl_var_stack[ssl_argv(1,2)]));
+            install_system_types ((Node*)&(ssl_var_stack[ssl_argv(0,2)]),
+                                  (Node*)&(ssl_var_stack[ssl_argv(1,2)]));
             continue;
 
 
     /* mechanism WriteTables */
 
     case oWriteTables:
-            set_global_scope ((NODE_PTR)ssl_param);
+            set_global_scope ((Node)ssl_param);
             if (option_optimize)
                 w_optimize_table();
             if (option_list_code)
@@ -982,10 +1006,9 @@ init_my_scanner ()
 
 
 void
-set_global_scope (scope_ptr)
-NODE_PTR          scope_ptr;
+set_global_scope( Node scope_ptr )
 {
-    if (! nodeIsA (scope_ptr, nScope))
+    if ( !IsA( Kind( scope_ptr ), nScope ) )
     {
         ssl_error ("Internal error: global scope out of place");
         return;
@@ -1006,7 +1029,6 @@ w_dump_tables()
     };
     struct rule_addr *head, *curr, *prev, *new_rule;
     int               rule_table_size;
-    NODE_PTR          node_ptr;
   
     if (ssl_error_count > 0)
     {
@@ -1021,15 +1043,14 @@ w_dump_tables()
     rule_table_size = 0;
     head = NULL;
 
-    for (node_ptr = nodeGet(dGlobalScope, qDecls);
-         node_ptr != NULL;
-         node_ptr = nodeNext(node_ptr))
-    {
-        if (nodeType(node_ptr) == nRule)
+    Item it;
+    FOR_EACH_ITEM( it, (List) GetAttr( dGlobalScope, qDecls ) ) {
+        Node node_ptr = Value( it );
+        if ( Kind(node_ptr) == nRule )
         {
             new_rule = (struct rule_addr *) malloc (sizeof(struct rule_addr));
-            new_rule->name = ssl_get_id_string(nodeGetValue(node_ptr, qIdent));
-            new_rule->addr = nodeGetValue(node_ptr, qValue);
+            new_rule->name = ssl_get_id_string( GetValue( node_ptr, qIdent ) );
+            new_rule->addr = GetValue( node_ptr, qValue );
             new_rule->next = NULL;
             rule_table_size++;
             if (head == NULL)
@@ -1112,20 +1133,18 @@ w_dump_tables()
     fprintf(f_hdr,"#define SSL_CODE_TABLE_SIZE %d\n\n",
                   ((w_here/100)+2)*100);
 
-    for (node_ptr = nodeGet(dGlobalScope, qDecls);
-         node_ptr != NULL;
-         node_ptr = nodeNext(node_ptr))
-    {
-        switch (nodeType(node_ptr))
+    FOR_EACH_ITEM( it, (List) GetAttr( dGlobalScope, qDecls ) ) {
+        Node node_ptr = Value( it );
+        switch ( Kind(node_ptr) )
         {
             /* case nInput: */
             case nOutput:
             case nError:
             case nValue:
             case nOperation:
-                fprintf(f_hdr, "#define %s %ld\n",
-                               ssl_get_id_string(nodeGetValue(node_ptr, qIdent)),
-                               nodeGetValue(node_ptr, qValue));
+                fprintf( f_hdr, "#define %s %ld\n",
+                         ssl_get_id_string( GetValue( node_ptr, qIdent ) ),
+                         GetValue( node_ptr, qValue ) );
                 break;
 
 #if 0
@@ -1136,9 +1155,9 @@ w_dump_tables()
    * (Of course, that's assuming that the user didn't generate C code for the table).
    */
             case nGlobal:
-                fprintf(f_hdr, "#define var_%s (ssl_var_stack[%ld])\n",
-                               ssl_get_id_string(nodeGetValue(node_ptr, qIdent)),
-                               nodeGetValue(node_ptr, qAddr));
+                fprintf( f_hdr, "#define var_%s (ssl_var_stack[%ld])\n",
+                         ssl_get_id_string( GetValue( node_ptr, qIdent ) ),
+                         GetValue( node_ptr, qAddr ) );
                 break;
 #endif /* 0 */
 
@@ -1153,14 +1172,13 @@ w_dump_tables()
 
     fprintf(f_hdr,"\nstruct ssl_error_table_struct ssl_error_table[] = {\n");
 
-    for (node_ptr = nodeGet(dGlobalScope, qDecls);
-         node_ptr != NULL;
-         node_ptr = nodeNext(node_ptr))
-    {
-        if (nodeType(node_ptr) == nError)
+    FOR_EACH_ITEM( it, (List) GetAttr( dGlobalScope, qDecls ) ) {
+        Node node_ptr = Value( it );
+        if ( Kind(node_ptr) == nError )
         {
-            fprintf(f_hdr,"   \"%s\", %ld,\n",ssl_get_id_string(nodeGetValue(node_ptr, qIdent)),
-                                             nodeGetValue(node_ptr, qValue));
+            fprintf( f_hdr,"   \"%s\", %ld,\n",
+                     ssl_get_id_string( GetValue( node_ptr, qIdent ) ),
+                     GetValue( node_ptr, qValue ) );
             count++;
         }
     }
@@ -1173,44 +1191,45 @@ w_dump_tables()
 void
 dump_debug_symbols ()
 {
-    NODE_PTR  np, p;
-
-    for (np = nodeGet(dGlobalScope, qDecls); np != NULL; np = nodeNext(np))
-    {
-        switch (nodeType(np))
+    Item it;
+    FOR_EACH_ITEM( it, (List) GetAttr( dGlobalScope, qDecls ) ) {
+        Node np = Value( it );
+        switch ( Kind( np ) )
         {
             case nType:
-                fprintf(f_dbg, "%d %s %s\n", nodeNum(np),
-                                             ssl_get_id_string(nodeGetValue(np,qIdent)),
-                                             nodeTypeName(nodeType(np)));
+                fprintf( f_dbg, "%ld %s %s\n", NodeNum(np),
+                         ssl_get_id_string( GetValue( np,qIdent ) ),
+                         SCH_GetTypeName( Kind( np ) ) );
                 break;
             case nGlobal:
-                fprintf(f_dbg, "%d %s %s %d %ld\n", nodeNum(np),
-                                             ssl_get_id_string(nodeGetValue(np,qIdent)),
-                                             nodeTypeName(nodeType(np)),
-                                             nodeNum(nodeGet(np,qType)),
-                                             nodeGetValue(np, qAddr));
+                fprintf( f_dbg, "%ld %s %s %ld %ld\n", NodeNum(np),
+                         ssl_get_id_string( GetValue( np, qIdent ) ),
+                         SCH_GetTypeName( Kind( np ) ),
+                         NodeNum( GetAttr( np, qType ) ),
+                         GetValue( np, qAddr ) );
                 break;
             case nRule:
-                fprintf(f_dbg, "%d %s %s %ld\n", nodeNum(np),
-                                             ssl_get_id_string(nodeGetValue(np,qIdent)),
-                                             nodeTypeName(nodeType(np)),
-                                             nodeGetValue(np, qValue));
-                for (p = nodeGet(nodeGet(np, qParamScope), qDecls); p != NULL; p = nodeNext(p))
-                {
-                    fprintf(f_dbg, "%d %s %s %d %ld\n", nodeNum(p),
-                                             ssl_get_id_string(nodeGetValue(p,qIdent)),
-                                             nodeTypeName(nodeType(p)),
-                                             nodeNum(nodeGet(p,qType)),
-                                             nodeGetValue(p, qAddr));
+                fprintf( f_dbg, "%ld %s %s %ld\n", NodeNum(np),
+                         ssl_get_id_string( GetValue( np, qIdent ) ),
+                         SCH_GetTypeName( Kind( np ) ),
+                         GetValue( np, qValue ) );
+
+                Item it2;
+                FOR_EACH_ITEM( it2, (List) GetAttr( GetAttr( np, qParamScope ), qDecls ) ) {
+                    Node p = Value( it2 );
+                    fprintf( f_dbg, "%ld %s %s %ld %ld\n", NodeNum(p),
+                             ssl_get_id_string( GetValue( p, qIdent ) ),
+                             SCH_GetTypeName( Kind( p ) ),
+                             NodeNum( GetAttr( p, qType ) ),
+                             GetValue( p, qAddr ) );
                 }
-                for (p = nodeGet(nodeGet(np, qScope), qDecls); p != NULL; p = nodeNext(p))
-                {
-                    fprintf(f_dbg, "%d %s %s %d %ld\n", nodeNum(p),
-                                             ssl_get_id_string(nodeGetValue(p,qIdent)),
-                                             nodeTypeName(nodeType(p)),
-                                             nodeNum(nodeGet(p,qType)),
-                                             nodeGetValue(p, qAddr));
+                FOR_EACH_ITEM( it2, (List) GetAttr( GetAttr( np, qScope ), qDecls ) ) {
+                    Node p = Value( it2 );
+                    fprintf( f_dbg, "%ld %s %s %ld %ld\n", NodeNum(p),
+                             ssl_get_id_string( GetValue( p, qIdent ) ),
+                             SCH_GetTypeName( Kind( p ) ),
+                             NodeNum( GetAttr( p, qType ) ),
+                             GetValue( p, qAddr ) );
                 }
                 break;
 
@@ -1334,16 +1353,13 @@ list_generated_code ()
 const char*
 get_op_name( int op )
 {
-    NODE_PTR    node_ptr;
-
-    for (node_ptr = nodeGet(dGlobalScope, qDecls);
-         node_ptr != NULL;
-         node_ptr = nodeNext(node_ptr))
-    {
-        if ((nodeType(node_ptr) == nOperation) &&
-            (nodeGetValue(node_ptr, qValue) == op))
+    Item it;
+    FOR_EACH_ITEM( it, (List) GetAttr( dGlobalScope, qDecls ) ) {
+        Node node_ptr = Value( it );
+        if ( ( Kind( node_ptr ) == nOperation ) &&
+             ( GetValue( node_ptr, qValue ) == op ) )
         {
-            return (ssl_get_id_string(nodeGetValue(node_ptr, qIdent)));
+            return ssl_get_id_string( GetValue( node_ptr, qIdent ) );
         }
     }
     return ("<UnnamedOperation>");
@@ -1524,15 +1540,15 @@ void
 dump_tree_short ( void* variable, void* udata )
 {
     int         stack_size;
-    NODE_PTR*   stack;
+    Node*       stack;
 
-    stack = (NODE_PTR *) variable;
+    stack = (Node*) variable;
 
     for (stack_size = *((int*) udata);
          stack_size > 0;
          stack_size--)
     {
-        nodeDumpNodeShort (stack[stack_size]);
+        DumpNodeShort (stack[stack_size]);
     }
 }
 
@@ -1540,11 +1556,11 @@ dump_tree_short ( void* variable, void* udata )
 void
 dump_node_short ( void* variable, void* udata )
 {
-    NODE_PTR    node_ptr;
+    Node        node_ptr;
 
-    node_ptr = *((NODE_PTR *) variable);
+    node_ptr = *((Node*) variable);
 
-    nodeDumpNodeShort (node_ptr);
+    DumpNodeShort (node_ptr);
 }
 
 

@@ -173,6 +173,10 @@ type Node:     % A pointer to a node in the schema database (symbol database)
     Null = 0
     ;
 
+type NodeIter:  % An iterator over nodes in a list, in the schema database
+    NullIter = 0
+    ;
+
 type kind:
     kIllegal        % not an identifier
     kUnknown        % new identifier
@@ -276,7 +280,12 @@ mechanism node_mech:
     oNodeGetInt (Node, node_attribute) >> int  % get int attribute of node
     oNodeGetBoolean (Node, node_attribute) >> boolean  % get int attribute of node
     oNodeNull (Node) >> boolean          % is node null?
-    oNodeNext (inout Node)               % advance Node to next in list    
+
+    oNodeGetIter (Node, node_attribute) >> NodeIter  % get an iterator over nodes in a List attribute
+    oNodeIterValue (NodeIter) >> Node                % the node that iter is referring to (NodeNull if no more nodes)
+    oNodeIterNext (inout NodeIter)                   % advance iterator through list
+    oNodeIterPrev (inout NodeIter)                   % advance iterator backwards through list
+
     oNodeType (Node) >> node_type        % return node type of node
     oNodeEqual (Node, Node) >> boolean   % compare two nodes for equality
                                          % (i.e. same node, not just same contents)
@@ -691,18 +700,18 @@ FormalParamDefinition (Node scope):
 
     %  Now go back and assign addresses to the parameters
 
-    p = oNodeGet (scope, qDecls)
-
+    NodeIter it = oNodeGetIter( scope, qDecls )
     {
-        [ equal_zero (num_params)
-            | true:  >
-            | false:
+        p = oNodeIterValue( it )
+        [ oNodeNull( p )
+            | false :
+            | * : >
         ]
 
-        oNodeSetInt (p, qAddr, num_params)
+        oNodeSetInt( p, qAddr, num_params )
 
-        dec (num_params)
-        oNodeNext (p)
+        dec( num_params )
+        oNodeIterNext( it )
     }
     ;
 
@@ -720,10 +729,10 @@ FormalParamRedefinition (Node scope):
     node_type dir, dir2
     Node      t, t2
 
-    p = oNodeGet (scope, qDecls)       % previous param declarations
+    NodeIter it = oNodeGetIter( scope, qDecls )   % previous param declarations
 
     [ | '(' :
-      | *   : [ oNodeNull(p)
+      | *   : [ oNodeNull( oNodeIterValue( it ) )
                   | true :
                   | * :    #eParameterMismatch
               ]
@@ -731,6 +740,7 @@ FormalParamRedefinition (Node scope):
     ]
 
     {
+        p = oNodeIterValue( it )
         [ oNodeNull(p)
             | true :    #eParameterMismatch  % too many params given this time
             | false :
@@ -759,7 +769,7 @@ FormalParamRedefinition (Node scope):
             | * :       oNodeSetInt (p, qIdent, 0)   % currently unnamed
         ]
 
-        oNodeNext (p)
+        oNodeIterNext( it )
 
         [
             | ',' :
@@ -769,7 +779,7 @@ FormalParamRedefinition (Node scope):
 
     ')'
 
-    [ oNodeNull(p)
+    [ oNodeNull( oNodeIterValue( it ) )
         | true :
         | * :    #eParameterMismatch   % Not enough params given this time
     ]
@@ -1081,9 +1091,10 @@ ActualParams (Node r) >> int:
     Node  t, t2
 
     param_scope = oNodeGet (r, qParamScope)  % Always present, but might contain no nParams
-    p = oNodeGet (param_scope, qDecls)
+    NodeIter it = oNodeGetIter( param_scope, qDecls )
+    p = oNodeIterValue( it )
 
-    [ oNodeNull(p)
+    [ oNodeNull( p )
 
         | true :    >> 0
         | false :
@@ -1112,7 +1123,8 @@ ActualParams (Node r) >> int:
 
         %  ----------------------------
 
-        oNodeNext (p)
+        oNodeIterNext( it )
+        p = oNodeIterValue( it )
 
         [ oNodeNull (p)
             | true :   >
@@ -1197,15 +1209,16 @@ CallUndefinedRule:
         % Assign parameter addresses
 
         addr = num_params
-        p = oNodeGet (s, qDecls)
+        NodeIter it = oNodeGetIter( s, qDecls )
         {
+            p = oNodeIterValue( it )
             [ oNodeNull(p)
                 | true :  >
                 | false :
             ]
             oNodeSetInt (p, qAddr, addr)
             dec (addr)
-            oNodeNext (p)
+            oNodeIterNext( it )
         }
 
       | * :
@@ -1382,9 +1395,9 @@ FixForwardCalls:
 
 % Ensure that there are no rules referenced but never declared
 VerifyAllRulesDeclared:
-    Node  n
-    n = oNodeGet (GlobalScope, qDecls)
+    NodeIter it = oNodeGetIter( GlobalScope, qDecls )
     {
+        Node n = oNodeIterValue( it )
         [ oNodeNull(n)
             | true : >
             | false :
@@ -1399,7 +1412,7 @@ VerifyAllRulesDeclared:
             | * :
         ]
 
-        oNodeNext(n)
+        oNodeIterNext( it )
     };
 
 %  ------------------------------------------------------- 

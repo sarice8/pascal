@@ -26,8 +26,8 @@ SDL2_LIBS = `sdl2-config --libs`
 CFLAGS = -g -Werror -DINTEGRATE_SSL_DEBUGGER $(SDL2_CFLAGS)
 #CFLAGS = -O3 -Werror -DINTEGRATE_SSL_DEBUGGER $(SDL2_CFLAGS)
 
-OBJDIR = ./obj-$(OSTYPE)
-BINDIR = ./bin-$(OSTYPE)
+OBJDIR = ../obj-$(OSTYPE)
+BINDIR = ../bin-$(OSTYPE)
 
 FRONT_SRCS = \
   pascal.cc \
@@ -152,5 +152,7 @@ pascal.h:  $(FRONT_SSL)
 	mv ram_pascal.dbg pascal.dbg
 
 
+clean:
+	rm -f $(FRONT_OBJS) $(BACK_OBJS) $(JIT_OBJS) $(TCODE_OBJS) $(RUNLIB_OBJS) $(FRONT_EXEC) $(BACK_EXEC) $(JIT_EXEC)
 
 

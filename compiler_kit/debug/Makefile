@@ -54,11 +54,24 @@ $(BINDIR):
 	mkdir -p $(BINDIR)
 
 
+clean:
+	rm -f $(OBJS)
+
+
+# Bootstrap: build from existing C/C++ files.  Don't use any other tools.
+#
+bootstrap:
+	make all
+	make release
+
+
 # Release
 
-release:
+release_headers:
 	mkdir -p $(OUR_RELEASE_DIR)
 	cp -p debug.h $(OUR_RELEASE_DIR)
+
+release: release_headers
 	mkdir -p $(OUR_RELEASE_DIR)/obj-$(OSTYPE)
 	cp -p $(OBJDIR)/debug.o $(OUR_RELEASE_DIR)/obj-$(OSTYPE)
 	cp -p $(OBJDIR)/dbgstub.o $(OUR_RELEASE_DIR)/obj-$(OSTYPE)

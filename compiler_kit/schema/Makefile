@@ -33,8 +33,8 @@ DBG_STUBS        = ${DBG_DIR}/obj-$(OSTYPE)/dbgstub.o
 
 # ---------------------------------------------------------
 
-#CFLAGS = -g -Werror
-CFLAGS = -O3 -Werror
+CFLAGS = -g -Werror
+#CFLAGS = -O3 -Werror
 
 OBJDIR = ./obj-$(OSTYPE)
 BINDIR = ./bin-$(OSTYPE)
@@ -120,11 +120,30 @@ schema.h: schema.ssl schema_schema.ssl
 	mv ram_schema.dbg schema.dbg
 
 
+clean:
+	rm -f $(OBJS) $(EXEC)
+
+
+# Bootstrap: build from existing C/C++ files.  Don't use any other tools.
+#
+# The touches should let us bypass running the generation tools.
+#
+bootstrap:
+	touch schema_schema.c
+	touch schema_schema.ssl
+	touch schema.h
+	make all
+	make release
+
+
+
 # Release
 
-release:
+release_headers:
 	mkdir -p $(OUR_RELEASE_DIR)
 	cp -p schema_db.h $(OUR_RELEASE_DIR)
+
+release: release_headers
 	mkdir -p $(OUR_RELEASE_DIR)/obj-$(OSTYPE)
 	cp -p $(OBJDIR)/schema_db.o   $(OUR_RELEASE_DIR)/obj-$(OSTYPE)
 	cp -p $(OBJDIR)/browser.o     $(OUR_RELEASE_DIR)/obj-$(OSTYPE)

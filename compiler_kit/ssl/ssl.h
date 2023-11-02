@@ -1,4 +1,4 @@
-#define SSL_CODE_TABLE_SIZE 4400
+#define SSL_CODE_TABLE_SIZE 4500
 
 #define oJumpForward 0
 #define oJumpBack 1
@@ -145,6 +145,7 @@
 #define wRuleMissingAtSign 0
 #define wReturnValueIgnored 1
 #define Null 0
+#define NullIter 0
 #define kIllegal 0
 #define kUnknown 1
 #define kInput 2
@@ -201,19 +202,22 @@
 #define oNodeGetInt 59
 #define oNodeGetBoolean 60
 #define oNodeNull 61
-#define oNodeNext 62
-#define oNodeType 63
-#define oNodeEqual 64
-#define oScopeBegin 65
-#define oScopeOpen 66
-#define oScopeEnd 67
-#define oScopeDeclare 68
-#define oScopeFind 69
-#define oScopeFindInCurrentScope 70
-#define oScopeFindRequire 71
-#define oInstallSystemOperations 72
-#define oInstallSystemTypes 73
-#define oWriteTables 74
+#define oNodeGetIter 62
+#define oNodeIterValue 63
+#define oNodeIterNext 64
+#define oNodeIterPrev 65
+#define oNodeType 66
+#define oNodeEqual 67
+#define oScopeBegin 68
+#define oScopeOpen 69
+#define oScopeEnd 70
+#define oScopeDeclare 71
+#define oScopeFind 72
+#define oScopeFindInCurrentScope 73
+#define oScopeFindRequire 74
+#define oInstallSystemOperations 75
+#define oInstallSystemTypes 76
+#define oWriteTables 77
 
 #ifdef SSL_INCLUDE_ERR_TABLE
 
