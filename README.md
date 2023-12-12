@@ -10,3 +10,7 @@ The second pass is a JIT that translates the intermediate code into machine code
 Currently only X86-64 running on Linux is supported.
 
 Alternatively, the intermediate code can be interpreted.
+
+Please note - the base code here is very old, written in K&R C, and with things like fixed array sizes.
+I haven't attempted yet to clean it up.  My goal for this hobby so far has been to finally reach the goal
+that I set out way back then.
