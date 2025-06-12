@@ -1,6 +1,6 @@
 #!/bin/sh
 
-../bin-${OSTYPE}/pascal -l -I.. $*
+../bin-${OSTYPE}/pascal -l -I../src $*
 
 # Now execute
 #./bin-${OSTYPE}/sm a.out | tee a.log
