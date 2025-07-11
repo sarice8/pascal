@@ -98,8 +98,6 @@ void t_printToken();
 void t_dumpTables();
 
 
-int   w_here;  // obsolete.  TO DO: remove
-
 // A t-code output stream.
 // We have one main 'default' stream, and other temporary ones that are copied into the default stream.
 typedef std::vector<int> CodeStream;
@@ -118,10 +116,7 @@ CodeStream* currentCodeStream = nullptr;
 Node            workspace = nullptr;
 
 // scope stack
-#define dScopeStackSize 40
-Node            dScopeStack[dScopeStackSize];
-int             dScopeStackPtr;
-
+std::vector<Node> dScopeStack;
 
 // Type table, owns nType nodes.
 // TO DO: make all of these tables dynamic size.
@@ -229,7 +224,6 @@ dump_node_stack_short( void* variable, void* udata )
 dbg_variables debug_variables[] = {
     /* "Name",     address,             udata,           function */
 
-    "Here",        (char*) &w_here,       NULL,          dump_int,
     "TypeStack",   (char*) dTypeStack,    (char*) &dTypeStackPtr,    dump_node_stack_short,
 
     /*  Type displayers  */
@@ -505,9 +499,6 @@ init_my_operations()
   codeStreamStack.push_back( 1 );
   currentCodeStream = codeStreams[1];
 
-  // unused, but mentioned in debug table so leaving in for now.
-  w_here = 0;
-
   // Initialize schema package (schema runtime module)
   SCH_Init();
 
@@ -555,7 +546,7 @@ scopeAlloc( Node scope, int size )
 int
 createGlobalData( const char* sourceData, int sourceBytes )
 {
-  Node globalScope = dScopeStack[1];
+  Node globalScope = dScopeStack.front();
   int numInts = (sourceBytes + 3) / 4;
   if (dSLptr + numInts + 2 >= dSLsize) ssl_fatal("SL overflow");
 
@@ -880,34 +871,32 @@ Node dNode;  // temporary for several mechanisms
 
     case oScopeBegin:
             dNode = NewNode (nScope);
-            if (++dScopeStackPtr == dScopeStackSize) ssl_fatal ("Scope Stack overflow");
             SetValue( dNode, qLevel, ssl_argv(0,2) );
             SetValue( dNode, qAllocMode, ssl_argv(1,2) );
-            dScopeStack[dScopeStackPtr] = dNode;
+            dScopeStack.push_back( dNode );
             continue;
     case oScopeEnter:
-            if (++dScopeStackPtr == dScopeStackSize) ssl_fatal ("Scope Stack overflow");
-            dScopeStack[dScopeStackPtr] = (Node) ssl_param;
+            dScopeStack.push_back( (Node) ssl_param );
             continue;
     case oScopeEnd:
-            ssl_assert (dScopeStackPtr >= 1);
-            dScopeStackPtr--;
+            ssl_assert( !dScopeStack.empty() );
+            dScopeStack.pop_back();
             continue;
     case oScopeCurrent:
-            ssl_assert (dScopeStackPtr >= 1);
-            ssl_result = (long) dScopeStack[dScopeStackPtr];
+            ssl_assert( !dScopeStack.empty() );
+            ssl_result = (long) dScopeStack.back();
             continue;
     case oScopeDeclare: {
-            ssl_assert (dScopeStackPtr >= 1);
-            Node scope = dScopeStack[dScopeStackPtr];
+            ssl_assert( !dScopeStack.empty() );
+            Node scope = dScopeStack.back();
             Node decl = (Node) ssl_param;
             SetAttr( decl, qParentScope, scope );
             NodeAddLast( scope, qDecls, decl );
             continue;
             }
     case oScopeDeclareAlloc: {
-            ssl_assert (dScopeStackPtr >= 1);
-            Node scope = dScopeStack[dScopeStackPtr];
+            ssl_assert( !dScopeStack.empty() );
+            Node scope = dScopeStack.back();
             Node decl = (Node)ssl_param;
             SetAttr( decl, qParentScope, scope );
             NodeAddLast( scope, qDecls, decl );
@@ -918,8 +907,8 @@ Node dNode;  // temporary for several mechanisms
             continue;
             }
     case oScopeAllocType: {
-            ssl_assert (dScopeStackPtr >= 1);
-            Node scope = dScopeStack[dScopeStackPtr];
+            ssl_assert( !dScopeStack.empty() );
+            Node scope = dScopeStack.back();
             Node theType = (Node)ssl_param;
             ssl_assert( theType != NULL );
             int size = GetValue( theType, qSize );
@@ -927,15 +916,15 @@ Node dNode;  // temporary for several mechanisms
             continue;
             }
     case oScopeAlloc: {
-            ssl_assert (dScopeStackPtr >= 1);
-            Node scope = dScopeStack[dScopeStackPtr];
+            ssl_assert( !dScopeStack.empty() );
+            Node scope = dScopeStack.back();
             int size = ssl_argv( 0, 2 );
             // TO DO: use align i.e. ssl_argv( 1, 2 )
             ssl_result = scopeAlloc( scope, size );
             continue;
             }
     case oScopeFind:
-            for (int dScopeStackLookup = dScopeStackPtr; dScopeStackLookup > 0; dScopeStackLookup--)
+            for (int dScopeStackLookup = dScopeStack.size() - 1; dScopeStackLookup >= 0; dScopeStackLookup--)
             {  
                 dNode = FindValue_NoErrorChecking (dScopeStack[dScopeStackLookup], qDecls, qIdent, ssl_last_id);
                 if (dNode != NULL)
@@ -944,7 +933,7 @@ Node dNode;  // temporary for several mechanisms
             ssl_result = (long) dNode;
             continue;
     case oScopeFindRequire:
-            for (int dScopeStackLookup = dScopeStackPtr; dScopeStackLookup > 0; dScopeStackLookup--)
+            for (int dScopeStackLookup = dScopeStack.size() - 1; dScopeStackLookup >= 0; dScopeStackLookup--)
             {  
                 dNode = FindValue_NoErrorChecking (dScopeStack[dScopeStackLookup], qDecls, qIdent, ssl_last_id);
                 if (dNode != NULL)
@@ -959,7 +948,7 @@ Node dNode;  // temporary for several mechanisms
             }
             continue;
     case oScopeFindInCurrentScope: {
-            Node scope = dScopeStack[dScopeStackPtr];
+            Node scope = dScopeStack.back();
             dNode = FindValue_NoErrorChecking( scope, qDecls, qIdent, ssl_last_id );
             if ( !dNode ) {
               // Look in a scope we extend, too.  Needed to provide impl for procs in unit interface.
