@@ -67,10 +67,6 @@ extern "C" {
    The 'id #' of an identifier is the unique # for that name (actually
    the index into the scanner's identifier table).
 
-   The various stacks here don't use the [0] entry.  The stack variable
-   points to the top entry.  Overflow is always checked; underflow is
-   never checked.
-
    The scanner maintains an identifier table, which is used to find
    keywords, and to translate names into integers.  Whenever a new
    identifier is found, it is added to the table.  It is separate from
@@ -115,19 +111,13 @@ CodeStream* currentCodeStream = nullptr;
 // workspace
 Node            workspace = nullptr;
 
-// scope stack
 std::vector<Node> dScopeStack;
 
 // Type table, owns nType nodes.
-// TO DO: make all of these tables dynamic size.
-#define dTypeTableSize 50
-Node dTypeTable[dTypeTableSize];
-int dTypeTablePtr;
+std::vector<Node> dTypeTable;
 
-// Type stack
-#define dTypeStackSize 50
-Node dTypeStack[dTypeStackSize];
-int dTypeStackPtr;
+// Type stack, references nType nodes involved in current declaration or expression.
+std::vector<Node> dTypeStack;
 
 // Value stack
 // This is mainly used for constant expressions
@@ -206,22 +196,18 @@ dump_node_short( void* variable, void* udata )
 void
 dump_node_stack_short( void* variable, void* udata )
 {
-  int top = *(int*) udata;
-  Node* stack = (Node*) variable;
-  for ( int i = top; i > 0; --i ) {
-    DumpNodeShort( stack[i] );
+  auto ts = ( std::vector<Node>* )( variable );
+  for ( int i = (*ts).size() - 1; i >= 0; --i ) {
+    DumpNodeShort( (*ts)[i] );
   }
 }
 
-//
-// Node dTypeStack[dTypeStackSize];
-// int dTypeStackPtr;
 
 
 dbg_variables debug_variables[] = {
     /* "Name",     address,             udata,           function */
 
-    "TypeStack",   (char*) dTypeStack,    (char*) &dTypeStackPtr,    dump_node_stack_short,
+    "TypeStack",   (char*) &dTypeStack,   NULL,          dump_node_stack_short,
 
     /*  Type displayers  */
     "Node",        DBG_TYPE_DISPLAY,      NULL,          dump_node_short,
@@ -980,28 +966,26 @@ Node dNode;  // temporary for several mechanisms
     /* Mechanism type_mech */
 
     case oTypeAdd:
-            if (++dTypeTablePtr==dTypeTableSize) ssl_fatal("Type Table overflow");
-            dTypeTable[dTypeTablePtr] = (Node) ssl_param;
+            dTypeTable.push_back( (Node) ssl_param );
             continue;
 
 
     /* Mechanism type_stack_mech */
 
     case oTypeSPush:
-            if (++dTypeStackPtr==dTypeStackSize) ssl_fatal("Type Stack overflow");
-            dTypeStack[dTypeStackPtr] = (Node) ssl_param;
+            dTypeStack.push_back( (Node) ssl_param );
             continue;
     case oTypeSPop:
-            ssl_assert( dTypeStackPtr > 0 );
-            --dTypeStackPtr;
+            ssl_assert( !dTypeStack.empty() );
+            dTypeStack.pop_back();
             continue;
     case oTypeSTop:
-            ssl_assert( dTypeStackPtr > 0 );
-            ssl_result = (long) dTypeStack[dTypeStackPtr];
+            ssl_assert( !dTypeStack.empty() );
+            ssl_result = (long) dTypeStack.back();
             continue;
     case oTypeSNodeType: {
-            ssl_assert( dTypeStackPtr > 0 );
-            Node t = dTypeStack[dTypeStackPtr];
+            ssl_assert( !dTypeStack.empty() );
+            Node t = dTypeStack.back();
             // Skip past subranges, to the underlying base type.
             // If a caller wants the raw type including subranges, they can examine
             // the top node themselves using oTypeSTop.
