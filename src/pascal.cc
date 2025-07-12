@@ -149,8 +149,8 @@ public:
 };
 ValueStack valueStack;
 
-#define dSLsize 400
-int dSL[dSLsize], dSLptr;        /* string literal table */
+// string literals and other global data
+std::vector<int> dSL;
 
 
 // A dynamic vector of Node's
@@ -531,7 +531,6 @@ createGlobalData( const char* sourceData, int sourceBytes )
 {
   Node globalScope = dScopeStack.front();
   int numInts = (sourceBytes + 3) / 4;
-  if (dSLptr + numInts + 2 >= dSLsize) ssl_fatal("SL overflow");
 
   // allocating as ints, because the strlit data table assumes that (see just below)
   int offset = scopeAlloc( globalScope, numInts * sizeof( int ) );
@@ -540,11 +539,11 @@ createGlobalData( const char* sourceData, int sourceBytes )
   // with the format:
   //    <addr> <#ints> <int> <int> <int> ...
 
-  dSL[dSLptr++] = offset;
-  dSL[dSLptr++] = numInts;
+  dSL.push_back( offset );
+  dSL.push_back( numInts );
   const int* intPtr = (const int*) sourceData;
   for (int i = 0; i < numInts; ++i) {
-  dSL[dSLptr++] = *intPtr++;
+    dSL.push_back( *intPtr++ );
   }
 
   return offset;
@@ -1535,7 +1534,7 @@ t_dumpTables()
   }
 
   /* string literals table */
-  for ( int i = 0; i < dSLptr; ++i ) {
+  for ( int i = 0; i < dSL.size(); ++i ) {
     fprintf( t_out, "%6d ", dSL[i] );
     if ( ( ++col % 10 ) == 0 ) {
       fprintf(t_out,"\n");
