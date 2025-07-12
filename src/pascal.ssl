@@ -501,14 +501,6 @@ mechanism include_mech:
    ;
 
 
-mechanism count :
-   oCountPush(int)          % start a new counter, with initial value
-   oCountInc
-   oCountDec
-   oCountIsZero >> boolean
-   oCountPop;
-
-
 mechanism value :              % value stack, to calc. const expr's
    oValuePush(int)             % push an explicit int lit
    oValuePushDouble(double)    % push a double onto value stack

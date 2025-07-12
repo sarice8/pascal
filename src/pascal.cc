@@ -129,9 +129,6 @@ int dTypeTablePtr;
 Node dTypeStack[dTypeStackSize];
 int dTypeStackPtr;
 
-#define dCSsize 30
-int dCS[dCSsize], dCSptr;        /* count stack */
-
 // Value stack
 // This is mainly used for constant expressions
 //
@@ -1166,25 +1163,6 @@ Node dNode;  // temporary for several mechanisms
             // OR, this should happen when explicitly accepting pEof of the include file?
             ssl_end_include();
             }
-            continue;
-
-     /* Mechanism count */
-
-     case oCountPush :
-            if (++dCSptr==dCSsize) ssl_fatal("CS overflow");
-            dCS[dCSptr] = ssl_param;
-            continue;
-     case oCountInc :
-            dCS[dCSptr]++;
-            continue;
-     case oCountDec :
-            dCS[dCSptr]--;
-            continue;
-     case oCountIsZero :
-            ssl_result = !dCS[dCSptr];
-            continue;
-     case oCountPop :
-            dCSptr--;
             continue;
 
      /* Mechanism value */

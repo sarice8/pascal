@@ -602,14 +602,6 @@
    2:    ;
       
       
-   2: mechanism count :
-   2:    oCountPush(int)          % start a new counter, with initial value
-   2:    oCountInc
-   2:    oCountDec
-   2:    oCountIsZero >> boolean
-   2:    oCountPop;
-      
-      
    2: mechanism value :              % value stack, to calc. const expr's
    2:    oValuePush(int)             % push an explicit int lit
    2:    oValuePushDouble(double)    % push a double onto value stack
